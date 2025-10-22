@@ -15,10 +15,17 @@
     "db:generate": "cd backend && npx prisma generate",
     "db:seed": "cd backend && npm run seed"
   },
-  "keywords": ["warehouse", "management", "saas", "moving", "logistics"],
+  "keywords": [
+    "warehouse",
+    "management",
+    "saas",
+    "moving",
+    "logistics"
+  ],
   "author": "Your Company",
   "license": "ISC",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "typescript": "^5.9.3"
   }
 }

@@ -1,0 +1,7 @@
+{
+  "version": "5.22.0",
+  "dialect": "mysql",
+  "hash": "qgo_init_mysql_migration",
+  "name": "init_mysql",
+  "applied": false
+}
