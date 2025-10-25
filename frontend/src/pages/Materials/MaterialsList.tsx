@@ -12,7 +12,6 @@ interface Material {
   unitCost?: number;
   sellingPrice?: number;
   isActive: boolean;
-  stockBatches: Array<{ id: string; quantityRemaining: number }>;
 }
 
 const MaterialsList: React.FC = () => {
@@ -37,11 +36,10 @@ const MaterialsList: React.FC = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
-        alert('No authentication token. Please login again.');
+        alert('Please login first');
         setMaterials([]);
-        setLoading(false);
         return;
       }
 
@@ -53,18 +51,14 @@ const MaterialsList: React.FC = () => {
       });
 
       if (!response.ok) {
-        console.error('Response status:', response.status);
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Error:', errorData);
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`Error: ${response.status}`);
       }
 
       const data = await response.json();
       setMaterials(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error fetching materials:', error);
+      console.error('Error:', error);
       setMaterials([]);
-      alert('Failed to load materials. Please check your authentication.');
     } finally {
       setLoading(false);
     }
@@ -82,8 +76,9 @@ const MaterialsList: React.FC = () => {
         },
         body: JSON.stringify(formData),
       });
-      if (!response.ok) throw new Error('Failed to add material');
-      alert('Material added successfully!');
+
+      if (!response.ok) throw new Error('Failed');
+      alert('Material added!');
       setFormData({
         sku: '',
         name: '',
@@ -96,22 +91,30 @@ const MaterialsList: React.FC = () => {
       setShowAddForm(false);
       fetchMaterials();
     } catch (error) {
-      console.error('Error adding material:', error);
+      console.error('Error:', error);
       alert('Failed to add material');
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: ['minStockLevel', 'unitCost', 'sellingPrice'].includes(name) ? parseFloat(value) : value
+    }));
+  };
+
   if (loading) {
-    return <div className="p-4">Loading materials...</div>;
+    return <div className="p-6">Loading materials...</div>;
   }
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Material Stock</h1>
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Material Inventory</h1>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
           <Plus size={20} />
           Add Material
@@ -119,72 +122,86 @@ const MaterialsList: React.FC = () => {
       </div>
 
       {showAddForm && (
-        <div className="bg-white p-4 rounded-lg border mb-6">
-          <form onSubmit={handleAddMaterial}>
-            <div className="grid grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="SKU"
-                value={formData.sku}
-                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                className="border p-2 rounded"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Material Name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="border p-2 rounded"
-                required
-              />
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="border p-2 rounded"
-              >
-                <option value="BOX">Box</option>
-                <option value="TAPE">Tape</option>
-                <option value="WRAPPING">Bubble Wrap</option>
-                <option value="PADDING">Padding</option>
-                <option value="OTHER">Other</option>
-              </select>
-              <select
-                value={formData.unit}
-                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                className="border p-2 rounded"
-              >
-                <option value="PCS">Pieces</option>
-                <option value="ROLL">Roll</option>
-                <option value="KG">Kg</option>
-                <option value="METER">Meter</option>
-              </select>
-              <input
-                type="number"
-                placeholder="Unit Cost"
-                value={formData.unitCost}
-                onChange={(e) => setFormData({ ...formData, unitCost: parseFloat(e.target.value) })}
-                className="border p-2 rounded"
-              />
-              <input
-                type="number"
-                placeholder="Selling Price"
-                value={formData.sellingPrice}
-                onChange={(e) => setFormData({ ...formData, sellingPrice: parseFloat(e.target.value) })}
-                className="border p-2 rounded"
-              />
-            </div>
-            <div className="flex gap-2 mt-4">
+        <div className="bg-white p-6 rounded-lg border space-y-4">
+          <h2 className="text-lg font-bold">Add New Material</h2>
+          <form onSubmit={handleAddMaterial} className="grid grid-cols-2 gap-4">
+            <input
+              type="text"
+              name="sku"
+              placeholder="SKU"
+              value={formData.sku}
+              onChange={handleInputChange}
+              className="border p-2 rounded"
+            />
+            <input
+              type="text"
+              name="name"
+              placeholder="Material Name"
+              value={formData.name}
+              onChange={handleInputChange}
+              className="border p-2 rounded"
+              required
+            />
+            <select
+              name="category"
+              value={formData.category}
+              onChange={handleInputChange}
+              className="border p-2 rounded"
+            >
+              <option value="BOX">Box</option>
+              <option value="TAPE">Tape</option>
+              <option value="WRAPPING">Wrapping</option>
+              <option value="PADDING">Padding</option>
+              <option value="OTHER">Other</option>
+            </select>
+            <select
+              name="unit"
+              value={formData.unit}
+              onChange={handleInputChange}
+              className="border p-2 rounded"
+            >
+              <option value="PCS">PCS</option>
+              <option value="ROLL">Roll</option>
+              <option value="KG">KG</option>
+              <option value="METER">Meter</option>
+            </select>
+            <input
+              type="number"
+              name="minStockLevel"
+              placeholder="Min Stock"
+              value={formData.minStockLevel}
+              onChange={handleInputChange}
+              className="border p-2 rounded"
+            />
+            <input
+              type="number"
+              name="unitCost"
+              placeholder="Unit Cost"
+              step="0.01"
+              value={formData.unitCost}
+              onChange={handleInputChange}
+              className="border p-2 rounded"
+            />
+            <input
+              type="number"
+              name="sellingPrice"
+              placeholder="Selling Price"
+              step="0.01"
+              value={formData.sellingPrice}
+              onChange={handleInputChange}
+              className="border p-2 rounded col-span-2"
+            />
+            <div className="col-span-2 flex gap-2">
               <button
                 type="submit"
-                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
               >
                 Save Material
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddForm(false)}
-                className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+                className="px-4 py-2 bg-gray-300 text-black rounded hover:bg-gray-400"
               >
                 Cancel
               </button>
@@ -193,51 +210,53 @@ const MaterialsList: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-lg border overflow-hidden">
+      <div className="bg-white rounded-lg border overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-100">
+          <thead className="bg-gray-100 border-b">
             <tr>
-              <th className="p-3 text-left font-semibold">SKU</th>
-              <th className="p-3 text-left font-semibold">Name</th>
-              <th className="p-3 text-left font-semibold">Category</th>
-              <th className="p-3 text-center font-semibold">Stock</th>
-              <th className="p-3 text-center font-semibold">Min Level</th>
-              <th className="p-3 text-right font-semibold">Unit Cost</th>
-              <th className="p-3 text-center font-semibold">Status</th>
+              <th className="p-3 text-left">SKU</th>
+              <th className="p-3 text-left">Name</th>
+              <th className="p-3 text-left">Category</th>
+              <th className="p-3 text-center">Stock</th>
+              <th className="p-3 text-center">Unit</th>
+              <th className="p-3 text-right">Cost</th>
+              <th className="p-3 text-right">Price</th>
+              <th className="p-3">Status</th>
             </tr>
           </thead>
           <tbody>
-            {materials.map((material) => {
-              const totalBatchQty = material.stockBatches.reduce((sum, b) => sum + b.quantityRemaining, 0);
-              const isLowStock = material.totalQuantity < material.minStockLevel;
-
-              return (
-                <tr key={material.id} className="border-t hover:bg-gray-50">
-                  <td className="p-3 font-mono text-sm">{material.sku}</td>
-                  <td className="p-3">{material.name}</td>
-                  <td className="p-3">
-                    <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm">
-                      {material.category}
-                    </span>
-                  </td>
-                  <td className="p-3 text-center font-semibold">
-                    {material.totalQuantity} {material.unit}
-                  </td>
-                  <td className="p-3 text-center">{material.minStockLevel}</td>
-                  <td className="p-3 text-right">Rs. {material.unitCost?.toFixed(2) || '0.00'}</td>
-                  <td className="p-3 text-center">
-                    {isLowStock ? (
-                      <div className="flex items-center justify-center gap-1 text-red-600">
-                        <AlertCircle size={16} />
-                        <span className="text-sm">Low</span>
-                      </div>
-                    ) : (
-                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-sm">Active</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {materials.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="p-4 text-center text-gray-500">
+                  No materials yet. Add one to get started!
+                </td>
+              </tr>
+            ) : (
+              materials.map((material) => {
+                const isLowStock = material.totalQuantity <= material.minStockLevel;
+                return (
+                  <tr key={material.id} className={`border-b ${isLowStock ? 'bg-yellow-50' : ''}`}>
+                    <td className="p-3 font-mono text-sm">{material.sku}</td>
+                    <td className="p-3">{material.name}</td>
+                    <td className="p-3">{material.category}</td>
+                    <td className="p-3 text-center font-bold">{material.totalQuantity}</td>
+                    <td className="p-3 text-center">{material.unit}</td>
+                    <td className="p-3 text-right">{material.unitCost?.toFixed(2) || '0.00'}</td>
+                    <td className="p-3 text-right">{material.sellingPrice?.toFixed(2) || '0.00'}</td>
+                    <td className="p-3">
+                      {isLowStock ? (
+                        <div className="flex items-center gap-1 text-yellow-600">
+                          <AlertCircle size={16} />
+                          Low Stock
+                        </div>
+                      ) : (
+                        <span className="text-green-600">✓ OK</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
