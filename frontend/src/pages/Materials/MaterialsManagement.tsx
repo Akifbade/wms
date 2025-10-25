@@ -628,7 +628,7 @@ const MaterialsManagement = () => {
                       </td>
                     </tr>
                   ))
-                }}
+                )}
               </tbody>
             </table>
           </div>
