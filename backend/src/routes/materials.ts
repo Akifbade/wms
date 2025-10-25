@@ -14,6 +14,11 @@ const router = Router();
 router.get("/", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
+    
+    if (!companyId) {
+      return res.status(400).json({ error: "Company not found" });
+    }
+
     const materials = await prisma.packingMaterial.findMany({
       where: { companyId, isActive: true },
       include: {
@@ -70,6 +75,10 @@ router.get("/job-materials/:jobId", authenticateToken as any, async (req: AuthRe
 router.get("/available-racks", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
+    
+    if (!companyId) {
+      return res.status(400).json({ error: "Company not found" });
+    }
 
     const racks = await prisma.rack.findMany({
       where: { 
