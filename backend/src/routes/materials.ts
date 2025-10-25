@@ -1265,5 +1265,133 @@ router.post("/return", authenticateToken as any, damagePhotoUpload.array('photos
   }
 });
 
+/**
+ * GET /api/materials/:materialId/history
+ * Get complete transaction history for a material
+ */
+router.get("/:materialId/history", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    const { materialId } = req.params;
+
+    // Get material info
+    const material = await prisma.packingMaterial.findFirst({
+      where: { id: materialId, companyId }
+    });
+
+    if (!material) {
+      return res.status(404).json({ error: "Material not found" });
+    }
+
+    const transactions: any[] = [];
+    let runningBalance = 0;
+
+    // 1. Get all stock batches (PURCHASES)
+    const batches = await prisma.stockBatch.findMany({
+      where: { materialId, companyId },
+      orderBy: { purchaseDate: 'asc' }
+    });
+
+    for (const batch of batches) {
+      runningBalance += batch.quantityPurchased;
+      transactions.push({
+        id: batch.id,
+        type: 'PURCHASE',
+        quantity: batch.quantityPurchased,
+        balanceAfter: runningBalance,
+        date: batch.purchaseDate,
+        details: {
+          supplier: batch.supplier,
+          purchaseOrderNo: batch.purchaseOrderNo,
+          unitCost: batch.unitCost,
+          notes: `Batch #${batch.batchNumber}`
+        }
+      });
+    }
+
+    // 2. Get all material issues (ISSUED TO JOBS)
+    const issues = await prisma.materialIssue.findMany({
+      where: { materialId, companyId },
+      include: {
+        job: {
+          select: { jobCode: true, jobTitle: true }
+        },
+        rack: {
+          select: { code: true, location: true }
+        }
+      },
+      orderBy: { issuedAt: 'asc' }
+    });
+
+    for (const issue of issues) {
+      runningBalance -= issue.quantity;
+      transactions.push({
+        id: issue.id,
+        type: 'ISSUE',
+        quantity: issue.quantity,
+        balanceAfter: runningBalance,
+        date: issue.issuedAt,
+        details: {
+          jobCode: issue.job.jobCode,
+          jobTitle: issue.job.jobTitle,
+          rack: issue.rack ? `${issue.rack.code} - ${issue.rack.location}` : 'N/A',
+          unitCost: issue.unitCost,
+          notes: issue.notes
+        }
+      });
+    }
+
+    // 3. Get all returns (RETURNED FROM JOBS)
+    const returns = await prisma.materialReturn.findMany({
+      where: { materialId, companyId },
+      include: {
+        issue: {
+          include: {
+            job: {
+              select: { jobCode: true, jobTitle: true }
+            }
+          }
+        }
+      },
+      orderBy: { recordedAt: 'asc' }
+    });
+
+    for (const ret of returns) {
+      if (ret.quantityGood > 0) {
+        runningBalance += ret.quantityGood;
+        transactions.push({
+          id: ret.id,
+          type: 'RETURN',
+          quantity: ret.quantityGood,
+          balanceAfter: runningBalance,
+          date: ret.recordedAt,
+          details: {
+            jobCode: ret.issue.job.jobCode,
+            jobTitle: ret.issue.job.jobTitle,
+            notes: ret.notes || 'Good condition materials returned to stock'
+          }
+        });
+      }
+    }
+
+    // Sort all transactions by date
+    transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Calculate summary
+    const summary = {
+      currentStock: material.totalQuantity,
+      totalPurchased: batches.reduce((sum: number, b: any) => sum + b.quantityPurchased, 0),
+      totalIssued: issues.reduce((sum: number, i: any) => sum + i.quantity, 0),
+      totalReturned: returns.reduce((sum: number, r: any) => sum + r.quantityGood, 0),
+      totalDamaged: returns.reduce((sum: number, r: any) => sum + r.quantityDamaged, 0)
+    };
+
+    res.json({ transactions, summary });
+  } catch (error) {
+    console.error("Error fetching material history:", error);
+    res.status(500).json({ error: "Failed to fetch material history" });
+  }
+});
+
 export default router;
 
