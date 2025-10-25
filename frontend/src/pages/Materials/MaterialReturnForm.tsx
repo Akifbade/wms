@@ -50,6 +50,12 @@ const MaterialReturnForm: React.FC<Props> = ({ jobId, onComplete }) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
+      
+      if (!token) {
+        alert('No token found. Please login again.');
+        return;
+      }
+
       const headers = {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -60,14 +66,18 @@ const MaterialReturnForm: React.FC<Props> = ({ jobId, onComplete }) => {
         fetch('/api/materials/available-racks', { headers }),
       ]);
 
+      if (!materialsRes.ok || !racksRes.ok) {
+        throw new Error(`API error: materials=${materialsRes.status}, racks=${racksRes.status}`);
+      }
+
       const materialsData = await materialsRes.json();
       const racksData = await racksRes.json();
 
-      setJobMaterials(materialsData);
-      setRacks(racksData);
+      setJobMaterials(Array.isArray(materialsData) ? materialsData : []);
+      setRacks(Array.isArray(racksData) ? racksData : []);
 
       // Initialize returns array
-      const initialReturns = materialsData.map((m: MaterialIssue) => ({
+      const initialReturns = (Array.isArray(materialsData) ? materialsData : []).map((m: MaterialIssue) => ({
         materialId: m.material.id,
         issueId: m.id,
         quantityGood: 0,

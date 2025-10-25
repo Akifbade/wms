@@ -41,6 +41,12 @@ const JobMaterialsForm: React.FC<Props> = ({ jobId, onComplete }) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
+      
+      if (!token) {
+        alert('No token found. Please login again.');
+        return;
+      }
+
       const headers = {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -51,11 +57,15 @@ const JobMaterialsForm: React.FC<Props> = ({ jobId, onComplete }) => {
         fetch('/api/materials/available-racks', { headers }),
       ]);
 
+      if (!materialsRes.ok || !racksRes.ok) {
+        throw new Error(`API error: materials=${materialsRes.status}, racks=${racksRes.status}`);
+      }
+
       const materialsData = await materialsRes.json();
       const racksData = await racksRes.json();
 
-      setMaterials(materialsData.filter((m: MaterialOption) => m.totalQuantity > 0));
-      setRacks(racksData);
+      setMaterials((Array.isArray(materialsData) ? materialsData : []).filter((m: MaterialOption) => m.totalQuantity > 0));
+      setRacks(Array.isArray(racksData) ? racksData : []);
     } catch (error) {
       console.error('Error fetching data:', error);
       alert('Failed to load materials and racks');

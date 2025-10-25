@@ -37,17 +37,34 @@ const MaterialsList: React.FC = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
+      
+      if (!token) {
+        alert('No authentication token. Please login again.');
+        setMaterials([]);
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch('/api/materials', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
+
+      if (!response.ok) {
+        console.error('Response status:', response.status);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error:', errorData);
+        throw new Error(`API error: ${response.status}`);
+      }
+
       const data = await response.json();
-      setMaterials(data);
+      setMaterials(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching materials:', error);
-      alert('Failed to load materials');
+      setMaterials([]);
+      alert('Failed to load materials. Please check your authentication.');
     } finally {
       setLoading(false);
     }
