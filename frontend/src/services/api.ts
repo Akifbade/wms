@@ -178,29 +178,30 @@ export const jobsAPI = {
     if (params?.endDate) queryParams.append('endDate', params.endDate);
     
     const query = queryParams.toString();
-    return apiCall<{ jobs: any[] }>(`/jobs${query ? `?${query}` : ''}`);
+    const jobs = await apiCall<any[]>(`/moving-jobs${query ? `?${query}` : ''}`);
+    return { jobs }; // Wrap in object for compatibility
   },
 
   getById: async (id: string) => {
-    return apiCall<{ job: any }>(`/jobs/${id}`);
+    return apiCall<{ job: any }>(`/moving-jobs/${id}`);
   },
 
   create: async (data: any) => {
-    return apiCall<{ job: any }>('/jobs', {
+    return apiCall<{ job: any }>('/moving-jobs', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
   update: async (id: string, data: any) => {
-    return apiCall<{ job: any }>(`/jobs/${id}`, {
-      method: 'PUT',
+    return apiCall<{ job: any }>(`/moving-jobs/${id}`, {
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   },
 
   delete: async (id: string) => {
-    return apiCall<{ message: string }>(`/jobs/${id}`, {
+    return apiCall<{ message: string }>(`/moving-jobs/${id}`, {
       method: 'DELETE',
     });
   },

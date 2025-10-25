@@ -32,6 +32,8 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
   });
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [selectedMaterials, setSelectedMaterials] = useState<Array<{materialId: string; quantity: number}>>([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -53,10 +55,28 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
       });
       setError('');
       setSuccess('');
+      setSelectedMaterials([]);
       loadCustomFields();
+      loadMaterials();
       setCustomFieldValues({});
     }
   }, [isOpen]);
+
+  const loadMaterials = async () => {
+    try {
+      const response = await fetch('/api/materials', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setMaterials(data.filter((m: any) => m.totalQuantity > 0));
+      }
+    } catch (err) {
+      console.error('Failed to load materials:', err);
+    }
+  };
 
   const loadCustomFields = async () => {
     try {
@@ -111,13 +131,48 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
         throw new Error('To address is required for international moves');
       }
 
+      // Transform frontend fields to backend format
       const dataToSubmit = {
-        ...formData,
-        scheduledDate: new Date(formData.scheduledDate).toISOString(),
+        jobCode: `JOB-${Date.now()}`, // Auto-generate job code
+        jobTitle: formData.title,
+        clientName: formData.clientName,
+        clientPhone: formData.clientPhone,
+        clientEmail: '', // Optional
+        jobDate: new Date(formData.scheduledDate).toISOString(),
+        jobAddress: formData.fromAddress,
+        dropoffAddress: formData.toAddress || null,
+        teamLeaderId: null,
+        driverName: null,
+        vehicleNumber: null,
+        notes: null,
+        status: formData.status,
       };
 
       const response: any = await jobsAPI.create(dataToSubmit);
-      const jobId = response.job?.id || response.id;
+      const jobId = response.id; // Backend returns job directly, not wrapped
+
+      // Issue materials if selected
+      if (selectedMaterials.length > 0) {
+        const validMaterials = selectedMaterials.filter(m => m.materialId && m.quantity > 0);
+        for (const material of validMaterials) {
+          try {
+            await fetch('/api/materials/issue', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+              },
+              body: JSON.stringify({
+                jobId,
+                materialId: material.materialId,
+                quantity: material.quantity
+              })
+            });
+          } catch (err) {
+            console.error('Failed to issue material:', err);
+          }
+        }
+      }
 
       // Save custom field values if any
       if (customFields.length > 0) {
@@ -369,6 +424,74 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
               <p className="text-xs text-gray-500 mt-1">
                 Optional - Can be updated later after job completion
               </p>
+            </div>
+          </div>
+
+          {/* Materials Section */}
+          <div className="border-b pb-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">📦 Materials (Optional)</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Select materials needed for this job. Stock will be deducted automatically.
+            </p>
+            
+            <div className="space-y-3">
+              {selectedMaterials.map((item, index) => {
+                const material = materials.find(m => m.id === item.materialId);
+                return (
+                  <div key={index} className="flex gap-3 items-center bg-gray-50 p-3 rounded">
+                    <select
+                      value={item.materialId}
+                      onChange={(e) => {
+                        const newMaterials = [...selectedMaterials];
+                        newMaterials[index].materialId = e.target.value;
+                        setSelectedMaterials(newMaterials);
+                      }}
+                      className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="">-- Select Material --</option>
+                      {materials.map(mat => (
+                        <option key={mat.id} value={mat.id}>
+                          {mat.sku} - {mat.name} (Stock: {mat.totalQuantity} {mat.unit})
+                        </option>
+                      ))}
+                    </select>
+                    
+                    <input
+                      type="number"
+                      min="1"
+                      max={material?.totalQuantity || 999}
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const newMaterials = [...selectedMaterials];
+                        newMaterials[index].quantity = parseInt(e.target.value) || 0;
+                        setSelectedMaterials(newMaterials);
+                      }}
+                      className="w-24 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      placeholder="Qty"
+                    />
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedMaterials(selectedMaterials.filter((_, i) => i !== index));
+                      }}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMaterials([...selectedMaterials, { materialId: '', quantity: 1 }]);
+                }}
+                className="text-green-600 hover:text-green-800 text-sm font-medium"
+              >
+                + Add Material
+              </button>
             </div>
           </div>
 

@@ -18,12 +18,22 @@ const shipmentSchema = z.object({
   clientName: z.string().optional(),
   clientPhone: z.string().optional(),
   rackId: z.string().optional(),
+  // NEW: Enhanced warehouse fields
+  category: z.enum(['CUSTOMER_STORAGE', 'AIRPORT_CARGO', 'WAREHOUSE_STOCK']).optional(),
+  awbNumber: z.string().optional(),
+  flightNumber: z.string().optional(),
+  origin: z.string().optional(),
+  destination: z.string().optional(),
+  customerName: z.string().optional(),
+  shipper: z.string().optional(),
+  consignee: z.string().optional(),
+  isWarehouseShipment: z.boolean().optional(),
 });
 
 // Get all shipments
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { status, search, isWarehouseShipment, page = '1', limit = '50' } = req.query;
+    const { status, search, isWarehouseShipment, category, customerName, page = '1', limit = '50' } = req.query;
     const companyId = req.user!.companyId;
 
     const where: any = { companyId };
@@ -36,11 +46,24 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       where.isWarehouseShipment = isWarehouseShipment === 'true';
     }
 
+    // NEW: Category filter
+    if (category && category !== 'all') {
+      where.category = category;
+    }
+
+    // NEW: Customer name filter
+    if (customerName) {
+      where.customerName = { contains: customerName as string };
+    }
+
     if (search) {
       where.OR = [
         { name: { contains: search as string } },
         { referenceId: { contains: search as string } },
         { clientName: { contains: search as string } },
+        { customerName: { contains: search as string } },
+        { shipper: { contains: search as string } },
+        { awbNumber: { contains: search as string } },
       ];
     }
 
@@ -48,19 +71,19 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       prisma.shipment.findMany({
         where,
         include: {
-          rack: {
-            select: {
-              id: true,
-              code: true,
-              location: true,
-            },
-          },
           boxes: {
             select: {
               id: true,
               boxNumber: true,
               status: true,
               rackId: true,
+              rack: {
+                select: {
+                  id: true,
+                  code: true,
+                  location: true,
+                },
+              },
             },
           },
         },
@@ -121,7 +144,6 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     const shipment = await prisma.shipment.findFirst({
       where: { id, companyId },
       include: {
-        rack: true,
         boxes: {
           include: {
             rack: {
@@ -219,16 +241,22 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
         description: data.description,
         estimatedValue: data.estimatedValue,
         notes: data.notes,
-        rackId: data.rackId,
         companyId,
         qrCode: masterQR,
         arrivalDate: new Date(),
-        status: data.rackId ? 'IN_STORAGE' : 'PENDING', // ✅ PENDING if no rack, IN_STORAGE if rack assigned
+        status: 'PENDING', // All shipments start as PENDING
         createdById: userId, // User ID who created
-        assignedById: data.rackId ? userId : null, // Track who assigned if rack is provided
-        assignedAt: data.rackId ? new Date() : null,
+        // Warehouse fields
+        isWarehouseShipment: data.isWarehouseShipment || false,
+        shipper: data.shipper,
+        consignee: data.consignee,
+        category: data.category || 'CUSTOMER_STORAGE',
+        awbNumber: data.awbNumber,
+        flightNumber: data.flightNumber,
+        origin: data.origin,
+        destination: data.destination,
+        customerName: data.customerName,
       },
-      include: { rack: true },
     });
 
     // ✅ CREATE INDIVIDUAL QR CODES FOR EACH BOX
@@ -302,41 +330,21 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
 
     const existing = await prisma.shipment.findFirst({
       where: { id, companyId },
-      include: { rack: true }
     });
 
     if (!existing) {
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
-    // If shipment is being RELEASED, clear the rack assignment
+    // Update shipment data
     const updateData: any = { 
-      ...req.body
+      ...req.body,
+      updatedAt: new Date(),
     };
-    if (req.body.status === 'RELEASED' && existing.rackId) {
-      updateData.rackId = null; // Remove from rack
-      updateData.releasedAt = new Date();
-      updateData.releasedById = userId; // Track who released
-      
-      // Update rack capacity (decrease by released boxes)
-      const boxesToRelease = req.body.currentBoxCount !== undefined 
-        ? existing.currentBoxCount - req.body.currentBoxCount 
-        : existing.currentBoxCount;
-        
-      await prisma.rack.update({
-        where: { id: existing.rackId },
-        data: {
-          capacityUsed: {
-            decrement: boxesToRelease
-          }
-        }
-      });
-    }
 
     const shipment = await prisma.shipment.update({
       where: { id },
       data: updateData,
-      include: { rack: true },
     });
 
     res.json({ shipment });

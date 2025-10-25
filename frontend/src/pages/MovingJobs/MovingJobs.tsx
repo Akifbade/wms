@@ -6,11 +6,15 @@ import {
   UserGroupIcon,
   MapPinIcon,
   PencilIcon,
-  TrashIcon
+  TrashIcon,
+  EyeIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import { jobsAPI } from '../../services/api';
 import CreateMovingJobModal from '../../components/CreateMovingJobModal';
 import EditMovingJobModal from '../../components/EditMovingJobModal';
+import JobDetailsModal from '../../components/moving-jobs/JobDetailsModal';
+import JobMaterialReport from '../../components/moving-jobs/JobMaterialReport';
 
 export const MovingJobs: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
@@ -18,6 +22,8 @@ export const MovingJobs: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<any>(null);
 
   useEffect(() => {
@@ -221,6 +227,16 @@ export const MovingJobs: React.FC = () => {
                   <button
                     onClick={() => {
                       setSelectedJob(job);
+                      setDetailsModalOpen(true);
+                    }}
+                    className="flex-1 px-4 py-2 bg-green-50 text-green-600 rounded-md hover:bg-green-100 font-medium text-sm flex items-center justify-center gap-2"
+                  >
+                    <EyeIcon className="h-4 w-4" />
+                    View
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedJob(job);
                       setEditModalOpen(true);
                     }}
                     className="flex-1 px-4 py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium text-sm flex items-center justify-center gap-2"
@@ -229,8 +245,18 @@ export const MovingJobs: React.FC = () => {
                     Edit
                   </button>
                   <button
+                    onClick={() => {
+                      setSelectedJob(job);
+                      setReportModalOpen(true);
+                    }}
+                    className="flex-1 px-4 py-2 bg-purple-50 text-purple-600 rounded-md hover:bg-purple-100 font-medium text-sm flex items-center justify-center gap-2"
+                  >
+                    <DocumentTextIcon className="h-4 w-4" />
+                    Report
+                  </button>
+                  <button
                     onClick={async () => {
-                      if (confirm(`Delete job "${job.title}"?`)) {
+                      if (confirm(`Delete job "${job.title || job.jobTitle}"?`)) {
                         try {
                           await jobsAPI.delete(job.id);
                           loadJobs();
@@ -265,6 +291,21 @@ export const MovingJobs: React.FC = () => {
         onClose={() => setEditModalOpen(false)}
         job={selectedJob}
         onSuccess={loadJobs}
+      />
+
+      {/* Job Details Modal with Materials */}
+      <JobDetailsModal
+        isOpen={detailsModalOpen}
+        onClose={() => setDetailsModalOpen(false)}
+        job={selectedJob}
+        onUpdate={loadJobs}
+      />
+
+      {/* Job Material Report Modal */}
+      <JobMaterialReport
+        isOpen={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        jobId={selectedJob?.id || ''}
       />
     </div>
   );

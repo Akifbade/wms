@@ -63,7 +63,11 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
       include: {
         shipment: {
           include: {
-            rack: true,
+            boxes: {
+              include: {
+                rack: true,
+              },
+            },
           }
         }
       },
@@ -135,7 +139,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     // Update shipment box count and status
     const newStatus = remainingBoxCount === 0 
       ? 'RELEASED' 
-      : (withdrawnBoxCount < shipment.currentBoxCount ? 'PARTIAL' : 'IN_STORAGE');
+      : (withdrawnBoxCount < shipment.currentBoxCount ? 'PARTIAL' : 'ACTIVE');
     
     await prisma.shipment.update({
       where: { id: shipmentId },
@@ -146,36 +150,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       },
     });
 
-    // If rack assigned, update rack capacity
-    if (shipment.rackId) {
-      const rack = await prisma.rack.findUnique({
-        where: { id: shipment.rackId },
-      });
-
-      if (rack) {
-        await prisma.rack.update({
-          where: { id: shipment.rackId },
-          data: {
-            capacityUsed: Math.max(0, rack.capacityUsed - withdrawnBoxCount),
-          },
-        });
-
-        // Log rack activity
-        await prisma.rackActivity.create({
-          data: {
-            companyId,
-            rackId: shipment.rackId,
-            userId,
-            activityType: 'ITEM_REMOVED',
-            itemDetails: `Withdrawal: ${withdrawnBoxCount} boxes from ${shipment.referenceId}`,
-            quantityBefore: shipment.currentBoxCount + withdrawnBoxCount,
-            quantityAfter: shipment.currentBoxCount,
-          },
-        });
-      }
-    }
-
-    res.json({ 
+    res.status(201).json({ 
       withdrawal,
       message: remainingBoxCount === 0 
         ? 'Shipment fully released' 

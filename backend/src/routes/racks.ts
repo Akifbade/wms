@@ -35,11 +35,15 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       where,
       include: {
         inventory: true,
+        boxes: {
+          where: { status: 'IN_STORAGE' },
+          select: {
+            id: true,
+            shipmentId: true,
+          },
+        },
         _count: {
           select: {
-            shipments: {
-              where: { status: 'IN_STORAGE' }  // Count only active shipments, exclude RELEASED
-            },
             activities: true,
           },
         },
@@ -72,16 +76,20 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       where: { id, companyId },
       include: {
         inventory: true,
-        shipments: {
+        boxes: {
           where: { 
-            status: 'IN_STORAGE'  // Only show shipments currently in storage, exclude RELEASED
+            status: 'IN_STORAGE'  // Only show boxes currently in storage
           },
-          select: {
-            id: true,
-            referenceId: true,
-            clientName: true,
-            currentBoxCount: true,
-            status: true,
+          include: {
+            shipment: {
+              select: {
+                id: true,
+                name: true,
+                referenceId: true,
+                clientName: true,
+                status: true,
+              },
+            },
           },
         },
         activities: {
@@ -184,7 +192,9 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
     const existing = await prisma.rack.findFirst({
       where: { id, companyId },
       include: {
-        shipments: true,
+        boxes: {
+          where: { status: 'IN_STORAGE' },
+        },
       },
     });
 
@@ -192,9 +202,9 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
       return res.status(404).json({ error: 'Rack not found' });
     }
 
-    if (existing.shipments.length > 0) {
+    if (existing.boxes.length > 0) {
       return res.status(400).json({ 
-        error: 'Cannot delete rack with active shipments' 
+        error: 'Cannot delete rack with boxes in storage' 
       });
     }
 

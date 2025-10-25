@@ -23,9 +23,14 @@ import templateRoutes from './routes/templates';
 import uploadRoutes from './routes/upload';
 import permissionsRoutes from './routes/permissions';
 import movingJobsRoutes from './routes/moving-jobs';
+import jobsRoutes from './routes/jobs';
 import materialsRoutes from './routes/materials';
 import reportsRoutes from './routes/reports';
 import pluginsRoutes from './routes/plugins';
+// NEW: Enhanced warehouse routes
+import shipmentItemsRoutes from './routes/shipment-items';
+import customerMaterialsRoutes from './routes/customer-materials';
+import workerDashboardRoutes from './routes/worker-dashboard';
 
 // Load environment variables FIRST
 dotenv.config();
@@ -84,9 +89,14 @@ app.use('/api/template-settings', templateRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/permissions', permissionsRoutes);
 app.use('/api/moving-jobs', movingJobsRoutes);
+// app.use('/api/jobs', jobsRoutes); // REMOVED: Duplicate of moving-jobs
 app.use('/api/materials', materialsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/plugins', pluginsRoutes);
+// NEW: Enhanced warehouse routes
+app.use('/api', shipmentItemsRoutes); // Handles /api/shipments/:id/items
+app.use('/api', customerMaterialsRoutes); // Handles /api/customers/*
+app.use('/api', workerDashboardRoutes); // Handles /api/worker/*
 
 // 404 handler
 app.use((req, res) => {

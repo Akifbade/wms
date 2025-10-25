@@ -52,6 +52,7 @@ model Company {
   templateSettings  TemplateSettings?
   rolePermissions   RolePermission[]
   packingMaterials  PackingMaterial[]
+  materialCategories MaterialCategory[]
   vendors           Vendor[]
   stockBatches      StockBatch[]
   rackLevels        RackStockLevel[]
@@ -63,6 +64,15 @@ model Company {
   systemPlugins     SystemPlugin[]
   JobAssignment     JobAssignment[]
   SystemPluginLog   SystemPluginLog[]
+  shipmentItems     ShipmentItem[] // NEW: Detailed item tracking
+  
+  // NEW: Enhanced Material System Relations
+  materialUsages       MaterialUsage[]
+  materialTransfers    MaterialTransfer[]
+  stockAlerts          StockAlert[]
+  purchaseOrders       PurchaseOrder[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  materialPriceHistory MaterialPriceHistory[]
 
   @@map("companies")
 }
@@ -101,6 +111,15 @@ model User {
   damagesApproved         MaterialDamage[]   @relation("DamageApprovedBy")
   approvalsRequested      MaterialApproval[] @relation("ApprovalRequestedBy")
   approvalsDecided        MaterialApproval[] @relation("ApprovalDecidedBy")
+  
+  // NEW: Enhanced Material System Relations
+  materialUsages          MaterialUsage[]    @relation("MaterialUsedBy")
+  transfersRequested      MaterialTransfer[] @relation("TransferRequestedBy")
+  transfersApproved       MaterialTransfer[] @relation("TransferApprovedBy")
+  transfersCompleted      MaterialTransfer[] @relation("TransferCompletedBy")
+  alertsResolved          StockAlert[]       @relation("AlertResolvedBy")
+  purchaseOrdersCreated   PurchaseOrder[]    @relation("POCreatedBy")
+  purchaseOrdersApproved  PurchaseOrder[]    @relation("POApprovedBy")
 
   // Shipment User Tracking Relations
   shipmentsCreated  Shipment[] @relation("ShipmentCreatedBy")
@@ -128,13 +147,14 @@ model Rack {
 
   // Relations
   company        Company          @relation(fields: [companyId], references: [id])
-  shipments      Shipment[]
   boxes          ShipmentBox[] // Individual boxes assigned
   activities     RackActivity[]
   inventory      RackInventory[]
   materialLevels RackStockLevel[] @relation("RackMaterialLevels")
   MaterialReturn MaterialReturn[]
   jobMaterials   MaterialIssue[]  @relation("JobMaterialRack") // Materials assigned to jobs
+  transfersFrom  MaterialTransfer[] @relation("TransferFromRack") // NEW: Transfers from this rack
+  transfersTo    MaterialTransfer[] @relation("TransferToRack")   // NEW: Transfers to this rack
 
   @@unique([code, companyId])
   @@map("racks")
@@ -197,7 +217,6 @@ model Shipment {
   notes            String?
   qrCode           String    @unique // Master QR for shipment
   status           String    @default("ACTIVE") // ACTIVE, PARTIAL, RELEASED
-  rackId           String? // DEPRECATED - use boxes relation instead
   assignedAt       DateTime?
   releasedAt       DateTime?
   storageCharge    Float?
@@ -217,19 +236,31 @@ model Shipment {
   shipper             String? // Sender information for warehouse
   consignee           String? // Receiver information for warehouse
 
+  // NEW: Enhanced Warehouse Fields
+  category      String  @default("CUSTOMER_STORAGE") // CUSTOMER_STORAGE, AIRPORT_CARGO, WAREHOUSE_STOCK
+  awbNumber     String? // Air Waybill number for airport shipments
+  flightNumber  String? // Flight number for airport tracking
+  origin        String? // Origin airport/location
+  destination   String? // Destination airport/location
+  customerName  String? // Normalized customer name for grouping (e.g., "Dior", "Boodai Trading")
+
   // Relations
   company     Company          @relation(fields: [companyId], references: [id])
-  rack        Rack?            @relation(fields: [rackId], references: [id])
-  boxes       ShipmentBox[] // Individual boxes with QR codes
+  boxes       ShipmentBox[] // Individual boxes with QR codes - USE THIS for rack assignment
   withdrawals Withdrawal[]
   invoices    Invoice[]
   charges     ShipmentCharges?
+  items       ShipmentItem[] // NEW: Detailed item tracking
+  materialUsages MaterialUsage[] // NEW: Materials used for this shipment
 
   // User Relations for Tracking
   createdBy  User? @relation("ShipmentCreatedBy", fields: [createdById], references: [id])
   assignedBy User? @relation("ShipmentAssignedBy", fields: [assignedById], references: [id])
   releasedBy User? @relation("ShipmentReleasedBy", fields: [releasedById], references: [id])
 
+  @@index([category])
+  @@index([customerName])
+  @@index([awbNumber])
   @@map("shipments")
 }
 
@@ -245,18 +276,47 @@ model ShipmentBox {
   releasedAt DateTime?
   companyId  String
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  updatedAt  DateTime  @default(now())
 
   // Warehouse Integration Fields (Non-breaking additions)  
   pieceWeight Float? // Weight of this specific piece/box
   pieceQR     String? // Alternative QR format for warehouse pieces
 
-  // Relations
+  // Relations with proper cascading
   shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  rack     Rack?    @relation(fields: [rackId], references: [id])
+  rack     Rack?    @relation(fields: [rackId], references: [id], onDelete: SetNull)
 
   @@unique([shipmentId, boxNumber])
+  @@index([rackId])
+  @@index([status])
   @@map("shipment_boxes")
+}
+
+// NEW: Detailed Item Tracking per Shipment
+model ShipmentItem {
+  id                String   @id @default(cuid())
+  shipmentId        String
+  itemName          String // e.g., "Louis Vuitton Bags", "Nike Shoes"
+  itemDescription   String? // Additional details
+  category          String // BAGS, SHOES, ELECTRONICS, FURNITURE, CLOTHING, DOCUMENTS, FRAGILE, GENERAL
+  quantity          Int // Number of items
+  weight            Float? // Weight in KG
+  value             Float? // Estimated value in KWD
+  barcode           String? // Item barcode if available
+  photos            String? // JSON array of photo URLs
+  boxNumbers        String? // JSON array of box numbers containing this item e.g., [1,2,3]
+  customAttributes  String? // JSON for custom fields like size, color, brand
+  companyId         String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  company  Company  @relation(fields: [companyId], references: [id])
+
+  @@index([shipmentId])
+  @@index([category])
+  @@map("shipment_items")
 }
 
 // Partial Withdrawals
@@ -884,30 +944,58 @@ model JobAssignment {
   @@map("job_assignments")
 }
 
-model PackingMaterial {
-  id               String   @id @default(cuid())
-  sku              String
-  name             String
-  description      String?
-  unit             String   @default("PCS")
-  category         String
-  minStockLevel    Int      @default(0)
-  totalQuantity    Int      @default(0) // Total stock available
-  unitCost         Float?   // Cost per unit
-  sellingPrice     Float?   // Selling price per unit
-  isActive         Boolean  @default(true)
-  companyId        String
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+model MaterialCategory {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  parentId    String?
+  companyId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  company         Company          @relation(fields: [companyId], references: [id])
-  stockBatches    StockBatch[]
-  rackLevels      RackStockLevel[]
-  materialIssues  MaterialIssue[]
-  materialReturns MaterialReturn[]
-  materialDamages MaterialDamage[]
+  parent   MaterialCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children MaterialCategory[] @relation("CategoryHierarchy")
+  materials PackingMaterial[]
+  company   Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@index([parentId])
+  @@map("material_categories")
+}
+
+model PackingMaterial {
+  id            String   @id @default(cuid())
+  sku           String
+  name          String
+  description   String?
+  unit          String   @default("PCS")
+  category      String   // Legacy field
+  categoryId    String?  // New foreign key to MaterialCategory
+  minStockLevel Int      @default(0)
+  totalQuantity Int      @default(0) // Total stock available
+  unitCost      Float?   // Cost per unit
+  sellingPrice  Float?   // Selling price per unit
+  isActive      Boolean  @default(true)
+  companyId     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  materialCategory MaterialCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  company          Company           @relation(fields: [companyId], references: [id])
+  stockBatches     StockBatch[]
+  rackLevels       RackStockLevel[]
+  materialIssues   MaterialIssue[]
+  materialReturns  MaterialReturn[]
+  materialDamages  MaterialDamage[]
+  materialUsages   MaterialUsage[]      // NEW: Track material consumption
+  materialTransfers MaterialTransfer[]  // NEW: Track transfers
+  stockAlerts      StockAlert[]         // NEW: Low stock alerts
+  purchaseOrderItems PurchaseOrderItem[] // NEW: Purchase history
+  priceHistory     MaterialPriceHistory[] // NEW: Price tracking
 
   @@unique([sku, companyId])
+  @@index([categoryId])
   @@map("packing_materials")
 }
 
@@ -917,13 +1005,18 @@ model Vendor {
   contact   String?
   phone     String?
   email     String?
+  address   String?  // NEW: Vendor address
+  rating    Float?   // NEW: Vendor rating (0-5)
   notes     String?
+  isActive  Boolean  @default(true)  // NEW: Active/inactive status
   companyId String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company      Company      @relation(fields: [companyId], references: [id])
-  stockBatches StockBatch[]
+  company         Company                @relation(fields: [companyId], references: [id])
+  stockBatches    StockBatch[]
+  purchaseOrders  PurchaseOrder[]        // NEW: Purchase orders
+  priceHistory    MaterialPriceHistory[] // NEW: Price history
 
   @@unique([name, companyId])
   @@map("vendors")
@@ -931,6 +1024,7 @@ model Vendor {
 
 model StockBatch {
   id                String   @id @default(cuid())
+  batchNumber       String?  // Batch identifier (optional)
   materialId        String
   vendorId          String?
   vendorName        String?
@@ -982,7 +1076,7 @@ model MaterialIssue {
   quantity     Int
   unitCost     Float
   totalCost    Float
-  rackId       String?  // Rack where material is stored for this job
+  rackId       String? // Rack where material is stored for this job
   issuedById   String?
   issuedAt     DateTime @default(now())
   notes        String?
@@ -1135,4 +1229,157 @@ model SystemPluginLog {
   company Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@map("system_plugin_logs")
+}
+
+// ==================== ENHANCED MATERIAL SYSTEM ====================
+
+// Material Usage/Consumption tracking (linked to shipments)
+model MaterialUsage {
+  id              String   @id @default(cuid())
+  materialId      String
+  shipmentId      String?  // Which shipment used this material
+  stockBatchId    String?
+  quantityUsed    Int
+  unitCost        Float
+  totalCost       Float
+  usageType       String   @default("PACKING") // PACKING, LOADING, UNLOADING, OTHER
+  usedById        String?
+  usedAt          DateTime @default(now())
+  notes           String?
+  companyId       String
+  createdAt       DateTime @default(now())
+
+  material   PackingMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  shipment   Shipment?       @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  usedBy     User?           @relation("MaterialUsedBy", fields: [usedById], references: [id])
+  company    Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@index([shipmentId])
+  @@map("material_usage")
+}
+
+// Material Transfer between warehouses/racks
+model MaterialTransfer {
+  id                String    @id @default(cuid())
+  materialId        String
+  fromRackId        String?
+  toRackId          String?
+  stockBatchId      String?
+  quantity          Int
+  transferType      String    @default("RACK_TO_RACK") // RACK_TO_RACK, WAREHOUSE_TO_WAREHOUSE
+  status            String    @default("PENDING") // PENDING, IN_TRANSIT, COMPLETED, CANCELLED
+  requestedById     String?
+  approvedById      String?
+  completedById     String?
+  requestedAt       DateTime  @default(now())
+  approvedAt        DateTime?
+  completedAt       DateTime?
+  notes             String?
+  companyId         String
+
+  material      PackingMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  fromRack      Rack?           @relation("TransferFromRack", fields: [fromRackId], references: [id])
+  toRack        Rack?           @relation("TransferToRack", fields: [toRackId], references: [id])
+  requestedBy   User?           @relation("TransferRequestedBy", fields: [requestedById], references: [id])
+  approvedBy    User?           @relation("TransferApprovedBy", fields: [approvedById], references: [id])
+  completedBy   User?           @relation("TransferCompletedBy", fields: [completedById], references: [id])
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@index([status])
+  @@map("material_transfers")
+}
+
+// Stock alerts and notifications
+model StockAlert {
+  id                String    @id @default(cuid())
+  materialId        String
+  alertType         String    @default("LOW_STOCK") // LOW_STOCK, OUT_OF_STOCK, EXPIRING_SOON, EXPIRED
+  threshold         Int?      // Stock level that triggered alert
+  currentStock      Int?
+  message           String?
+  isResolved        Boolean   @default(false)
+  resolvedById      String?
+  resolvedAt        DateTime?
+  notificationSent  Boolean   @default(false)
+  notificationSentAt DateTime?
+  createdAt         DateTime  @default(now())
+  companyId         String
+
+  material   PackingMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  resolvedBy User?           @relation("AlertResolvedBy", fields: [resolvedById], references: [id])
+  company    Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@index([isResolved])
+  @@map("stock_alerts")
+}
+
+// Purchase Orders for materials
+model PurchaseOrder {
+  id              String    @id @default(cuid())
+  orderNumber     String    // PO-2024-001
+  vendorId        String?
+  vendorName      String?
+  orderDate       DateTime  @default(now())
+  expectedDate    DateTime?
+  receivedDate    DateTime?
+  status          String    @default("PENDING") // PENDING, APPROVED, ORDERED, RECEIVED, CANCELLED
+  totalAmount     Float     @default(0)
+  notes           String?
+  createdById     String?
+  approvedById    String?
+  approvedAt      DateTime?
+  companyId       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  vendor      Vendor?              @relation(fields: [vendorId], references: [id])
+  createdBy   User?                @relation("POCreatedBy", fields: [createdById], references: [id])
+  approvedBy  User?                @relation("POApprovedBy", fields: [approvedById], references: [id])
+  company     Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items       PurchaseOrderItem[]
+
+  @@unique([orderNumber, companyId])
+  @@index([vendorId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+// Purchase Order Items
+model PurchaseOrderItem {
+  id                String   @id @default(cuid())
+  purchaseOrderId   String
+  materialId        String
+  quantity          Int
+  unitCost          Float
+  totalCost         Float
+  receivedQuantity  Int      @default(0)
+  companyId         String
+
+  purchaseOrder PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  material      PackingMaterial @relation(fields: [materialId], references: [id])
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_order_items")
+}
+
+// Material price history tracking
+model MaterialPriceHistory {
+  id          String   @id @default(cuid())
+  materialId  String
+  vendorId    String?
+  unitCost    Float
+  sellingPrice Float?
+  effectiveDate DateTime @default(now())
+  source      String?  // PURCHASE, MANUAL_UPDATE, AUTO_CALCULATED
+  companyId   String
+
+  material PackingMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  vendor   Vendor?         @relation(fields: [vendorId], references: [id])
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@map("material_price_history")
 }

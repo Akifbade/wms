@@ -192,34 +192,34 @@ async function main() {
     const job = await prisma.movingJob.create({
       data: {
         companyId: company.id,
-        title: `Moving Job for ${customer.name}`,
-        jobType: i % 3 === 0 ? 'LOCAL' : i % 3 === 1 ? 'INTERNATIONAL' : 'PACKING_ONLY',
+        jobCode: `JOB-${String(i + 1).padStart(4, '0')}`,
+        jobTitle: `Moving Job for ${customer.name}`,
         clientName: customer.name,
         clientPhone: customer.phone,
-        fromAddress: i % 2 === 0 ? 'Warehouse - Kuwait City' : customer.address,
-        toAddress: i % 2 === 0 ? customer.address : 'Warehouse - Kuwait City',
-        scheduledDate: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000), // Future dates
-        estimatedHours: 4 + i * 2,
+        jobAddress: i % 2 === 0 ? 'Warehouse - Kuwait City' : customer.address,
+        dropoffAddress: i % 2 === 0 ? customer.address : 'Warehouse - Kuwait City',
+        jobDate: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000), // Future dates
         status: movingStatuses[i % 3],
-        estimatedCost: i % 3 === 2 ? 50 + i * 25 : null, // Only completed jobs have cost
         teamLeaderId: i % 2 === 0 ? worker1.id : worker2.id,
       },
     });
 
-    // Assign workers to jobs using new JobTeamMember model
-    await prisma.jobTeamMember.create({
+    // Assign workers to jobs using JobAssignment model
+    await prisma.jobAssignment.create({
       data: {
         jobId: job.id,
         userId: worker1.id,
-        role: 'LEAD',
+        role: 'TEAM_LEAD',
+        companyId: company.id,
       },
     });
 
-    await prisma.jobTeamMember.create({
+    await prisma.jobAssignment.create({
       data: {
         jobId: job.id,
         userId: worker2.id,
         role: 'HELPER',
+        companyId: company.id,
       },
     });
   }

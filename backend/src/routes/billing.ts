@@ -384,7 +384,6 @@ router.get('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
       include: {
         shipment: {
           include: {
-            rack: true,
             boxes: {
               include: {
                 rack: {

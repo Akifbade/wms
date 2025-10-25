@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { jobsAPI } from '../services/api';
+import MaterialReturnModal from './MaterialReturnModal';
 
 interface CustomField {
   id: string;
@@ -33,6 +34,7 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
   });
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [showReturnModal, setShowReturnModal] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -163,11 +165,19 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
         }
       }
       
-      setSuccess('Moving job updated successfully! ✅');
-      setTimeout(() => {
-        onSuccess();
-        onClose();
-      }, 1500);
+      // If status changed to COMPLETED, show material return modal
+      if (formData.status === 'COMPLETED' && job.status !== 'COMPLETED') {
+        setSuccess('Job marked as completed! Please return materials...');
+        setTimeout(() => {
+          setShowReturnModal(true);
+        }, 1000);
+      } else {
+        setSuccess('Moving job updated successfully! ✅');
+        setTimeout(() => {
+          onSuccess();
+          onClose();
+        }, 1500);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to update moving job');
     } finally {
@@ -496,6 +506,22 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
           </div>
         </form>
       </div>
+
+      {/* Material Return Modal */}
+      <MaterialReturnModal
+        isOpen={showReturnModal}
+        onClose={() => {
+          setShowReturnModal(false);
+          onSuccess();
+          onClose();
+        }}
+        jobId={job?.id || ''}
+        onSuccess={() => {
+          setShowReturnModal(false);
+          onSuccess();
+          onClose();
+        }}
+      />
     </div>
   );
 }

@@ -20,7 +20,6 @@ interface MaterialIssue {
 const MaterialsManager: React.FC = () => {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [issues, setIssues] = useState<MaterialIssue[]>([]);
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'materials' | 'issues' | 'returns'>('materials');
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
