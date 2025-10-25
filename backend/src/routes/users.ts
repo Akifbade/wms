@@ -330,7 +330,7 @@ router.get('/profile/stats', async (req: AuthRequest, res: Response) => {
         where: { userId, companyId }
       }),
       prisma.jobAssignment.count({
-        where: { userId }
+        where: { userId, companyId }
       })
     ]);
 

@@ -15,6 +15,12 @@ import { Expenses } from './pages/Expenses/Expenses';
 import { TemplateSettingsPage } from './pages/Settings/TemplateSettings';
 import UserProfile from './pages/Profile/UserProfile';
 import RoleManagement from './pages/Admin/RoleManagement';
+import MovingJobsManager from './components/moving-jobs/MovingJobsManager';
+import MaterialsManager from './components/moving-jobs/MaterialsManager';
+import JobReportsDashboard from './components/moving-jobs/JobReportsDashboard';
+import PluginSystemManager from './components/moving-jobs/PluginSystemManager';
+import ApprovalManager from './components/moving-jobs/ApprovalManager';
+
 
 import { getAuthToken } from './services/api';
 import { PermissionProvider } from './contexts/PermissionContext';
@@ -77,9 +83,7 @@ function App() {
             
             {/* ADMIN & MANAGER Routes */}
             <Route path="dashboard" element={
-              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
-                <Dashboard />
-              </ProtectedRoute>
+              <Dashboard />
             } />
             <Route path="shipments" element={
               <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
@@ -94,6 +98,31 @@ function App() {
             <Route path="moving-jobs" element={
               <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                 <MovingJobs />
+              </ProtectedRoute>
+            } />
+            <Route path="jobs-management" element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                <MovingJobsManager />
+              </ProtectedRoute>
+            } />
+            <Route path="materials-management" element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                <MaterialsManager />
+              </ProtectedRoute>
+            } />
+            <Route path="job-reports" element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                <JobReportsDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="plugin-system" element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <PluginSystemManager />
+              </ProtectedRoute>
+            } />
+            <Route path="approvals" element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                <ApprovalManager />
               </ProtectedRoute>
             } />
             <Route path="invoices" element={

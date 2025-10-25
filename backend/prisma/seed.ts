@@ -201,31 +201,30 @@ async function main() {
         scheduledDate: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000), // Future dates
         estimatedHours: 4 + i * 2,
         status: movingStatuses[i % 3],
-        totalCost: i % 3 === 2 ? 50 + i * 25 : null, // Only completed jobs have cost
+        estimatedCost: i % 3 === 2 ? 50 + i * 25 : null, // Only completed jobs have cost
+        teamLeaderId: i % 2 === 0 ? worker1.id : worker2.id,
       },
     });
 
-    // Assign workers to jobs
-    await prisma.jobAssignment.create({
+    // Assign workers to jobs using new JobTeamMember model
+    await prisma.jobTeamMember.create({
       data: {
         jobId: job.id,
         userId: worker1.id,
-        companyId: company.id,
         role: 'LEAD',
       },
     });
 
-    await prisma.jobAssignment.create({
+    await prisma.jobTeamMember.create({
       data: {
         jobId: job.id,
         userId: worker2.id,
-        companyId: company.id,
         role: 'HELPER',
       },
     });
   }
 
-  console.log('✅ Moving jobs created: 5 jobs with assignments');
+  console.log('✅ Moving jobs created: 5 jobs with team members');
 
   // Create invoice settings
   await prisma.invoiceSettings.create({

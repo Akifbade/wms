@@ -7,7 +7,6 @@ import { PrismaClient } from '@prisma/client';
 import authRoutes from './routes/auth';
 import shipmentRoutes from './routes/shipments';
 import rackRoutes from './routes/racks';
-import jobRoutes from './routes/jobs';
 import dashboardRoutes from './routes/dashboard';
 import billingRoutes from './routes/billing';
 import withdrawalRoutes from './routes/withdrawals';
@@ -23,6 +22,10 @@ import shipmentSettingsRoutes from './routes/shipment-settings';
 import templateRoutes from './routes/templates';
 import uploadRoutes from './routes/upload';
 import permissionsRoutes from './routes/permissions';
+import movingJobsRoutes from './routes/moving-jobs';
+import materialsRoutes from './routes/materials';
+import reportsRoutes from './routes/reports';
+import pluginsRoutes from './routes/plugins';
 
 // Load environment variables FIRST
 dotenv.config();
@@ -65,7 +68,6 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/racks', rackRoutes);
-app.use('/api/jobs', jobRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
@@ -81,6 +83,10 @@ app.use('/api/shipment-settings', shipmentSettingsRoutes);
 app.use('/api/template-settings', templateRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/permissions', permissionsRoutes);
+app.use('/api/moving-jobs', movingJobsRoutes);
+app.use('/api/materials', materialsRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/plugins', pluginsRoutes);
 
 // 404 handler
 app.use((req, res) => {

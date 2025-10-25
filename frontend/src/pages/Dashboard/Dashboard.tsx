@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { dashboardAPI } from '../../services/api';
+import MovingJobsManager from '../../components/moving-jobs/MovingJobsManager';
 
 export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<any>(null);
@@ -421,6 +422,15 @@ export const Dashboard: React.FC = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Moving Jobs Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <TruckIcon className="h-6 w-6 mr-2 text-orange-600" />
+          🚚 Moving Jobs Management
+        </h3>
+        <MovingJobsManager />
       </div>
     </div>
   );
