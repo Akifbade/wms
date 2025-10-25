@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, AlertCircle } from 'lucide-react';
-import axiosInstance from '../../services/axios';
+import { Plus, AlertCircle } from 'lucide-react';
 
 interface Material {
   id: string;
@@ -37,8 +36,15 @@ const MaterialsList: React.FC = () => {
   const fetchMaterials = async () => {
     try {
       setLoading(true);
-      const response = await axiosInstance.get('/materials');
-      setMaterials(response.data);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/materials', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      setMaterials(data);
     } catch (error) {
       console.error('Error fetching materials:', error);
       alert('Failed to load materials');
@@ -50,7 +56,16 @@ const MaterialsList: React.FC = () => {
   const handleAddMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axiosInstance.post('/materials', formData);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/materials', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+      if (!response.ok) throw new Error('Failed to add material');
       alert('Material added successfully!');
       setFormData({
         sku: '',

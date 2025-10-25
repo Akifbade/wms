@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle } from 'lucide-react';
-import axiosInstance from '../../services/axios';
 
 interface MaterialIssue {
   id: string;
@@ -51,15 +49,25 @@ const MaterialReturnForm: React.FC<Props> = ({ jobId, onComplete }) => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
       const [materialsRes, racksRes] = await Promise.all([
-        axiosInstance.get(`/materials/job-materials/${jobId}`),
-        axiosInstance.get('/materials/available-racks'),
+        fetch(`/api/materials/job-materials/${jobId}`, { headers }),
+        fetch('/api/materials/available-racks', { headers }),
       ]);
-      setJobMaterials(materialsRes.data);
-      setRacks(racksRes.data);
+
+      const materialsData = await materialsRes.json();
+      const racksData = await racksRes.json();
+
+      setJobMaterials(materialsData);
+      setRacks(racksData);
 
       // Initialize returns array
-      const initialReturns = materialsRes.data.map((m: MaterialIssue) => ({
+      const initialReturns = materialsData.map((m: MaterialIssue) => ({
         materialId: m.material.id,
         issueId: m.id,
         quantityGood: 0,
@@ -92,19 +100,31 @@ const MaterialReturnForm: React.FC<Props> = ({ jobId, onComplete }) => {
 
     try {
       setSubmitting(true);
+      const token = localStorage.getItem('token');
 
       for (const ret of returns) {
         if (ret.quantityGood > 0 || ret.quantityDamaged > 0) {
           const issue = jobMaterials.find(m => m.id === ret.issueId);
           if (issue) {
-            await axiosInstance.post('/materials/returns', {
-              jobId,
-              materialId: ret.materialId,
-              issueId: ret.issueId,
-              quantityGood: ret.quantityGood,
-              quantityDamaged: ret.quantityDamaged,
-              rackId: ret.rackId,
+            const response = await fetch('/api/materials/returns', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                jobId,
+                materialId: ret.materialId,
+                issueId: ret.issueId,
+                quantityGood: ret.quantityGood,
+                quantityDamaged: ret.quantityDamaged,
+                rackId: ret.rackId,
+              }),
             });
+
+            if (!response.ok) {
+              throw new Error('Failed to record return');
+            }
           }
         }
       }
