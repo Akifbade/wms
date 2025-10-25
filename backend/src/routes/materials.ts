@@ -1301,10 +1301,10 @@ router.get("/:materialId/history", authenticateToken as any, async (req: AuthReq
         balanceAfter: runningBalance,
         date: batch.purchaseDate,
         details: {
-          supplier: batch.supplier,
-          purchaseOrderNo: batch.purchaseOrderNo,
+          supplier: batch.vendorName || 'N/A',
+          purchaseOrderNo: batch.purchaseOrder || 'N/A',
           unitCost: batch.unitCost,
-          notes: `Batch #${batch.batchNumber}`
+          notes: batch.batchNumber ? `Batch #${batch.batchNumber}` : 'Stock purchase'
         }
       });
     }
@@ -1357,7 +1357,7 @@ router.get("/:materialId/history", authenticateToken as any, async (req: AuthReq
     });
 
     for (const ret of returns) {
-      if (ret.quantityGood > 0) {
+      if (ret.quantityGood > 0 && ret.issue) {
         runningBalance += ret.quantityGood;
         transactions.push({
           id: ret.id,
