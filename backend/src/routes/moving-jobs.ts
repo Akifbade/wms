@@ -152,4 +152,33 @@ router.patch("/:jobId", authenticateToken as any, async (req: AuthRequest, res) 
   }
 });
 
+/**
+ * DELETE /api/moving-jobs/:jobId
+ * Delete a moving job
+ */
+router.delete("/:jobId", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { jobId } = req.params;
+    const { companyId } = req.user!;
+
+    // Verify job belongs to the company
+    const existingJob = await prisma.movingJob.findFirst({
+      where: { id: jobId, companyId },
+    });
+
+    if (!existingJob) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    await prisma.movingJob.delete({
+      where: { id: jobId },
+    });
+
+    res.json({ message: "Job deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting job:", error);
+    res.status(500).json({ error: "Failed to delete job." });
+  }
+});
+
 export default router;

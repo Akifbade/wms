@@ -1167,11 +1167,11 @@ router.post("/return", authenticateToken as any, damagePhotoUpload.array('photos
       return res.status(404).json({ error: "Material issue record not found" });
     }
 
-    // Validate quantities
-    const totalReturn = quantityUsed + quantityGood + quantityDamaged;
-    if (totalReturn !== issue.quantity) {
+    // Validate quantities - simple check that returned + damaged doesn't exceed issued
+    const totalReturn = quantityGood + quantityDamaged;
+    if (totalReturn > issue.quantity) {
       return res.status(400).json({ 
-        error: `Total must equal issued quantity (${issue.quantity}). Got: ${totalReturn}` 
+        error: `Total returned (${totalReturn}) cannot exceed issued quantity (${issue.quantity})` 
       });
     }
 
