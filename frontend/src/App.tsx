@@ -22,6 +22,7 @@ import PluginSystemManager from './components/moving-jobs/PluginSystemManager';
 import ApprovalManager from './components/moving-jobs/ApprovalManager';
 import { MaterialsManagement } from './pages/Materials';
 import MaterialReports from './pages/Materials/MaterialReports';
+import { DamageReport } from './components/reports/DamageReport';
 
 import { getAuthToken } from './services/api';
 import { PermissionProvider } from './contexts/PermissionContext';
@@ -104,6 +105,11 @@ function App() {
             <Route path="material-reports" element={
               <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                 <MaterialReports />
+              </ProtectedRoute>
+            } />
+            <Route path="damage-report" element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                <DamageReport />
               </ProtectedRoute>
             } />
             <Route path="moving-jobs" element={

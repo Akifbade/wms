@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Package, FolderTree, Archive, AlertCircle, Search, Edit, Trash2, Save, X } from 'lucide-react';
+import { Plus, Package, FolderTree, Archive, AlertCircle, Search, Edit, Trash2, Save, X, History } from 'lucide-react';
+import { MaterialTransactionHistory } from '../../components/MaterialTransactionHistory';
 
 interface MaterialCategory {
   id: string;
@@ -42,6 +43,10 @@ const MaterialsManagement = () => {
   const [stockBatches, setStockBatches] = useState<StockBatch[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Material History Modal
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   
   // Category Form
   const [showCategoryForm, setShowCategoryForm] = useState(false);
@@ -575,16 +580,17 @@ const MaterialsManagement = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">Loading...</td>
+                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">Loading...</td>
                   </tr>
                 ) : filteredMaterials.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
                       No materials found. Add your first material to get started.
                     </td>
                   </tr>
@@ -608,9 +614,21 @@ const MaterialsManagement = () => {
                           {material.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => {
+                            setSelectedMaterial(material);
+                            setHistoryModalOpen(true);
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
+                        >
+                          <History className="w-4 h-4" />
+                          History
+                        </button>
+                      </td>
                     </tr>
                   ))
-                )}
+                }}
               </tbody>
             </table>
           </div>
@@ -747,6 +765,14 @@ const MaterialsManagement = () => {
           </div>
         </div>
       )}
+
+      {/* Material Transaction History Modal */}
+      <MaterialTransactionHistory
+        isOpen={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        materialId={selectedMaterial?.id || ''}
+        materialName={selectedMaterial?.name || ''}
+      />
     </div>
   );
 };

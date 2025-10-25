@@ -15,7 +15,8 @@ import {
   BanknotesIcon,
   ArrowRightOnRectangleIcon,
   ShieldCheckIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 
 // Role-based navigation configuration
@@ -26,6 +27,7 @@ const navigationConfig = {
     { name: 'Racks', href: '/racks', icon: CubeIcon },
     { name: 'Materials', href: '/materials', icon: DocumentTextIcon },
     { name: 'Material Reports', href: '/material-reports', icon: ChartBarIcon },
+    { name: 'Damage Report', href: '/damage-report', icon: ExclamationTriangleIcon },
     { name: 'Moving Jobs', href: '/moving-jobs', icon: TruckIcon },
     { name: 'Invoices', href: '/invoices', icon: DocumentTextIcon },
     { name: 'Expenses', href: '/expenses', icon: BanknotesIcon },
@@ -38,6 +40,7 @@ const navigationConfig = {
     { name: 'Racks', href: '/racks', icon: CubeIcon },
     { name: 'Materials', href: '/materials', icon: DocumentTextIcon },
     { name: 'Material Reports', href: '/material-reports', icon: ChartBarIcon },
+    { name: 'Damage Report', href: '/damage-report', icon: ExclamationTriangleIcon },
     { name: 'Moving Jobs', href: '/moving-jobs', icon: TruckIcon },
     { name: 'Invoices', href: '/invoices', icon: DocumentTextIcon },
     { name: 'Expenses', href: '/expenses', icon: BanknotesIcon },
