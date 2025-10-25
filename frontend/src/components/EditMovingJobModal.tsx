@@ -40,22 +40,22 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
 
   useEffect(() => {
     if (isOpen && job) {
-      // Populate form with existing job data
-      const scheduledDate = job.scheduledDate 
-        ? new Date(job.scheduledDate).toISOString().split('T')[0]
+      // Map backend fields to frontend format
+      const scheduledDate = (job.jobDate || job.scheduledDate)
+        ? new Date(job.jobDate || job.scheduledDate).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0];
 
       setFormData({
-        title: job.title || '',
+        title: job.jobTitle || job.title || '',
         jobType: job.jobType || 'LOCAL',
         clientName: job.clientName || '',
         clientPhone: job.clientPhone || '',
-        fromAddress: job.fromAddress || '',
-        toAddress: job.toAddress || '',
+        fromAddress: job.jobAddress || job.fromAddress || '',
+        toAddress: job.dropoffAddress || job.toAddress || '',
         scheduledDate,
         estimatedHours: job.estimatedHours || 0,
         totalCost: job.totalCost || 0,
-        status: job.status || 'SCHEDULED',
+        status: job.status || 'PLANNED',
       });
       setError('');
       setSuccess('');
@@ -133,9 +133,15 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
         throw new Error('To address is required for international moves');
       }
 
+      // Transform frontend fields to backend format
       const dataToSubmit = {
-        ...formData,
-        scheduledDate: new Date(formData.scheduledDate).toISOString(),
+        jobTitle: formData.title,
+        clientName: formData.clientName,
+        clientPhone: formData.clientPhone,
+        jobDate: new Date(formData.scheduledDate).toISOString(),
+        jobAddress: formData.fromAddress,
+        dropoffAddress: formData.toAddress || null,
+        status: formData.status,
       };
 
       await jobsAPI.update(job.id, dataToSubmit);

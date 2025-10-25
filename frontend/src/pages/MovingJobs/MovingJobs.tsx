@@ -169,22 +169,19 @@ export const MovingJobs: React.FC = () => {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <div className="flex items-center space-x-2">
-                    <h3 className="text-lg font-bold text-gray-900">{job.title}</h3>
+                    <h3 className="text-lg font-bold text-gray-900">{job.jobTitle || job.title || 'Untitled Job'}</h3>
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(job.status)}`}>
                       {job.status}
                     </span>
                   </div>
                   <p className="text-gray-600 mt-1">{job.clientName}</p>
                 </div>
-                <div className={`text-sm font-semibold ${getPriorityColor(job.priority)}`}>
-                  {job.priority} Priority
-                </div>
               </div>
 
               <div className="space-y-3">
                 <div className="flex items-center text-sm text-gray-600">
                   <TruckIcon className="h-5 w-5 mr-2 text-gray-400" />
-                  <span className="font-medium">{job.jobType}</span>
+                  <span className="font-medium">{job.jobCode || 'No Code'}</span>
                 </div>
 
                 <div className="flex items-center text-sm text-gray-600">
@@ -192,18 +189,20 @@ export const MovingJobs: React.FC = () => {
                   <div className="flex-1">
                     <div className="flex items-center">
                       <span className="font-medium">From:</span>
-                      <span className="ml-2">{job.fromAddress}</span>
+                      <span className="ml-2">{job.jobAddress || job.fromAddress || 'Not specified'}</span>
                     </div>
-                    <div className="flex items-center mt-1">
-                      <span className="font-medium">To:</span>
-                      <span className="ml-2">{job.toAddress}</span>
-                    </div>
+                    {(job.dropoffAddress || job.toAddress) && (
+                      <div className="flex items-center mt-1">
+                        <span className="font-medium">To:</span>
+                        <span className="ml-2">{job.dropoffAddress || job.toAddress}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex items-center text-sm text-gray-600">
                   <CalendarIcon className="h-5 w-5 mr-2 text-gray-400" />
-                  <span>{new Date(job.scheduledDate).toLocaleDateString()}</span>
+                  <span>{job.jobDate ? new Date(job.jobDate).toLocaleDateString() : (job.scheduledDate ? new Date(job.scheduledDate).toLocaleDateString() : 'Invalid Date')}</span>
                 </div>
 
                 <div className="flex items-center text-sm text-gray-600">
