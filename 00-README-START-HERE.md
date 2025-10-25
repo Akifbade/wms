@@ -5,6 +5,13 @@
 ## 📚 QUICK NAVIGATION - IMPORTANT GUIDES
 
 ### � Getting Started (READ THESE FIRST!)
+
+⚠️ **CRITICAL:** **[DOCKER-SAFETY-GUIDE.md](./DOCKER-SAFETY-GUIDE.md)** - READ THIS BEFORE ANY DEVELOPMENT!
+   - 🛡️ How Docker containers work (TEMPORARY!)
+   - 🚨 Emergency recovery steps
+   - ✅ Safe development workflow
+   - 📦 Auto-backup system
+
 1. **[DEPLOYMENT-GUIDE.md](./DEPLOYMENT-GUIDE.md)** 
    - 📦 Dusre PC/VPS par kaise deploy kare
    - ⏱️ 5 minutes (Docker) ya 10 minutes (Local)
