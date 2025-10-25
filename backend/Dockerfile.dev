@@ -1,7 +1,11 @@
-# Development Backend Dockerfile
-FROM node:18-alpine
+# Development Backend Dockerfile  
+# Using Debian-based Node for better Prisma compatibility
+FROM node:18-slim
 
 WORKDIR /app
+
+# Install OpenSSL for Prisma
+RUN apt-get update -y && apt-get install -y openssl
 
 # Install dependencies
 COPY package*.json ./
