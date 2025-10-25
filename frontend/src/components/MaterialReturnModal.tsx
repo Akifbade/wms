@@ -212,11 +212,10 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
                           type="number"
                           min="0"
                           max={material.quantity}
-                          value={returnData.quantityGood || ''}
+                          value={returnData.quantityGood === 0 ? '' : returnData.quantityGood}
                           onChange={(e) => updateReturn(material.id, 'quantityGood', e.target.value === '' ? 0 : parseInt(e.target.value))}
-                          onFocus={(e) => e.target.value === '0' ? e.target.value = '' : null}
                           className="w-full border rounded px-3 py-2 text-lg font-semibold"
-                          placeholder="0"
+                          placeholder="Enter quantity"
                         />
                         <p className="text-xs text-gray-500 mt-1">
                           Good items returned to stock
@@ -231,11 +230,10 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
                           type="number"
                           min="0"
                           max={material.quantity}
-                          value={returnData.quantityDamaged || ''}
+                          value={returnData.quantityDamaged === 0 ? '' : returnData.quantityDamaged}
                           onChange={(e) => updateReturn(material.id, 'quantityDamaged', e.target.value === '' ? 0 : parseInt(e.target.value))}
-                          onFocus={(e) => e.target.value === '0' ? e.target.value = '' : null}
                           className="w-full border rounded px-3 py-2 text-lg font-semibold"
-                          placeholder="0"
+                          placeholder="Enter quantity"
                         />
                         <p className="text-xs text-gray-500 mt-1">
                           Damaged/broken items
