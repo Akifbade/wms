@@ -15,7 +15,8 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        // Use backend container name in Docker, localhost for local development
+        target: process.env.DOCKER_ENV === 'true' ? 'http://backend:5000' : 'http://localhost:5000',
         changeOrigin: true,
       },
     },
