@@ -110,16 +110,19 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
         const material = issuedMaterials.find(m => m.id === issueId);
         if (!material) continue;
 
-        // Validate total
-        const total = returnData.quantityUsed + returnData.quantityGood + returnData.quantityDamaged;
-        if (total !== material.quantity) {
-          alert(`${material.material.name}: Total must equal ${material.quantity}. Got ${total}`);
+        // Simple validation: returned + damaged should not exceed issued
+        const total = returnData.quantityGood + returnData.quantityDamaged;
+        if (total > material.quantity) {
+          alert(`${material.material.name}: Total returned (${total}) cannot exceed issued quantity (${material.quantity})`);
           setLoading(false);
           return;
         }
 
+        // Calculate used automatically
+        const quantityUsed = material.quantity - total;
+
         // Validate damaged items have reason and photos
-        if (returnData.quantityDamaged > 0 && !returnData.damageReason) {
+        if (returnData.quantityDamaged > 0 && !returnData.damageReason.trim()) {
           alert(`${material.material.name}: Damage reason required for damaged items`);
           setLoading(false);
           return;
@@ -135,7 +138,7 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
         const formData = new FormData();
         formData.append('jobId', jobId);
         formData.append('issueId', issueId);
-        formData.append('quantityUsed', returnData.quantityUsed.toString());
+        formData.append('quantityUsed', quantityUsed.toString());
         formData.append('quantityGood', returnData.quantityGood.toString());
         formData.append('quantityDamaged', returnData.quantityDamaged.toString());
         formData.append('damageReason', returnData.damageReason);
@@ -196,49 +199,60 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
                     <div className="mb-4">
                       <h3 className="font-bold text-lg">{material.material.name}</h3>
                       <p className="text-sm text-gray-600">
-                        {material.material.sku} • Issued: {material.quantity} {material.material.unit}
+                        {material.material.sku} • Issued: <span className="font-bold text-blue-600">{material.quantity} {material.material.unit}</span>
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className="block text-sm font-medium mb-1">Quantity Used *</label>
+                        <label className="block text-sm font-medium mb-1">
+                          ✅ Returned (Good Condition) *
+                        </label>
                         <input
                           type="number"
                           min="0"
                           max={material.quantity}
-                          value={returnData.quantityUsed}
-                          onChange={(e) => updateReturn(material.id, 'quantityUsed', parseInt(e.target.value) || 0)}
-                          className="w-full border rounded px-3 py-2"
-                          required
+                          value={returnData.quantityGood || ''}
+                          onChange={(e) => updateReturn(material.id, 'quantityGood', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                          onFocus={(e) => e.target.value === '0' ? e.target.value = '' : null}
+                          className="w-full border rounded px-3 py-2 text-lg font-semibold"
+                          placeholder="0"
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Good items returned to stock
+                        </p>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium mb-1">Good Condition *</label>
+                        <label className="block text-sm font-medium mb-1">
+                          ❌ Damaged (Lost)
+                        </label>
                         <input
                           type="number"
                           min="0"
                           max={material.quantity}
-                          value={returnData.quantityGood}
-                          onChange={(e) => updateReturn(material.id, 'quantityGood', parseInt(e.target.value) || 0)}
-                          className="w-full border rounded px-3 py-2"
-                          required
+                          value={returnData.quantityDamaged || ''}
+                          onChange={(e) => updateReturn(material.id, 'quantityDamaged', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                          onFocus={(e) => e.target.value === '0' ? e.target.value = '' : null}
+                          className="w-full border rounded px-3 py-2 text-lg font-semibold"
+                          placeholder="0"
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Damaged/broken items
+                        </p>
                       </div>
+                    </div>
 
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Damaged *</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max={material.quantity}
-                          value={returnData.quantityDamaged}
-                          onChange={(e) => updateReturn(material.id, 'quantityDamaged', parseInt(e.target.value) || 0)}
-                          className="w-full border rounded px-3 py-2"
-                          required
-                        />
-                      </div>
+                    {/* Auto-calculated Used */}
+                    <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+                      <p className="text-sm font-medium text-blue-900">
+                        🔧 Used/Consumed: <span className="text-lg font-bold">
+                          {material.quantity - (returnData.quantityGood + returnData.quantityDamaged)} {material.material.unit}
+                        </span>
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Automatically calculated: Issued ({material.quantity}) - Returned ({returnData.quantityGood}) - Damaged ({returnData.quantityDamaged})
+                      </p>
                     </div>
 
                     {returnData.quantityDamaged > 0 && (
