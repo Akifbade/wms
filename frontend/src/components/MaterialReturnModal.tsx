@@ -110,8 +110,18 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
         const material = issuedMaterials.find(m => m.id === issueId);
         if (!material) continue;
 
+        // Debug logging
+        console.log('Return Data:', {
+          materialName: material.material.name,
+          issued: material.quantity,
+          quantityGood: returnData.quantityGood,
+          quantityGoodType: typeof returnData.quantityGood,
+          quantityDamaged: returnData.quantityDamaged,
+          quantityDamagedType: typeof returnData.quantityDamaged
+        });
+
         // Simple validation: returned + damaged should not exceed issued
-        const total = returnData.quantityGood + returnData.quantityDamaged;
+        const total = Number(returnData.quantityGood) + Number(returnData.quantityDamaged);
         if (total > material.quantity) {
           alert(`${material.material.name}: Total returned (${total}) cannot exceed issued quantity (${material.quantity})`);
           setLoading(false);
@@ -138,9 +148,9 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
         const formData = new FormData();
         formData.append('jobId', jobId);
         formData.append('issueId', issueId);
-        formData.append('quantityUsed', quantityUsed.toString());
-        formData.append('quantityGood', returnData.quantityGood.toString());
-        formData.append('quantityDamaged', returnData.quantityDamaged.toString());
+        formData.append('quantityUsed', String(quantityUsed));
+        formData.append('quantityGood', String(Number(returnData.quantityGood)));
+        formData.append('quantityDamaged', String(Number(returnData.quantityDamaged)));
         formData.append('damageReason', returnData.damageReason);
         formData.append('notes', returnData.notes);
         
@@ -213,7 +223,10 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
                           min="0"
                           max={material.quantity}
                           value={returnData.quantityGood === 0 ? '' : returnData.quantityGood}
-                          onChange={(e) => updateReturn(material.id, 'quantityGood', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? 0 : Number(e.target.value);
+                            updateReturn(material.id, 'quantityGood', isNaN(value) ? 0 : value);
+                          }}
                           className="w-full border rounded px-3 py-2 text-lg font-semibold"
                           placeholder="Enter quantity"
                         />
@@ -231,7 +244,10 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
                           min="0"
                           max={material.quantity}
                           value={returnData.quantityDamaged === 0 ? '' : returnData.quantityDamaged}
-                          onChange={(e) => updateReturn(material.id, 'quantityDamaged', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? 0 : Number(e.target.value);
+                            updateReturn(material.id, 'quantityDamaged', isNaN(value) ? 0 : value);
+                          }}
                           className="w-full border rounded px-3 py-2 text-lg font-semibold"
                           placeholder="Enter quantity"
                         />
