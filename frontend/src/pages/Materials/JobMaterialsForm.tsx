@@ -1,45 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, Trash2, AlertCircle } from 'lucide-react';
 import axiosInstance from '../../services/axios';
 
-interface Material {
+interface MaterialOption {
   id: string;
   sku: string;
   name: string;
-  totalQuantity: number;
   unit: string;
-  category: string;
+  totalQuantity: number;
+  stockBatches: Array<{ id: string; quantityRemaining: number }>;
 }
 
-interface Rack {
+interface RackOption {
   id: string;
   code: string;
   location: string;
-  capacityTotal: number;
-  capacityUsed: number;
 }
 
 interface JobMaterial {
   materialId: string;
   quantity: number;
   rackId: string;
+  tempId?: string; // For tracking during editing
 }
 
 interface Props {
   jobId: string;
-  onComplete?: () => void;
+  onMaterialsChange?: (materials: JobMaterial[]) => void;
+  readOnly?: boolean;
 }
 
-const JobMaterialsForm: React.FC<Props> = ({ jobId, onComplete }) => {
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [racks, setRacks] = useState<Rack[]>([]);
-  const [selectedMaterials, setSelectedMaterials] = useState<JobMaterial[]>([]);
+const JobMaterialsForm: React.FC<Props> = ({ jobId, onMaterialsChange, readOnly = false }) => {
+  const [materials, setMaterials] = useState<MaterialOption[]>([]);
+  const [racks, setRacks] = useState<RackOption[]>([]);
+  const [jobMaterials, setJobMaterials] = useState<JobMaterial[]>([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchData();
-  }, [jobId]);
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -48,7 +47,55 @@ const JobMaterialsForm: React.FC<Props> = ({ jobId, onComplete }) => {
         axiosInstance.get('/materials'),
         axiosInstance.get('/materials/available-racks'),
       ]);
-      setMaterials(materialsRes.data.filter((m: Material) => m.totalQuantity > 0));
+      setMaterials(materialsRes.data);
+      setRacks(racksRes.data);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addMaterial = () => {
+    const newMaterial: JobMaterial = {
+      materialId: '',
+      quantity: 1,
+      rackId: '',
+      tempId: Date.now().toString(),
+    };
+    setJobMaterials([...jobMaterials, newMaterial]);
+  };
+
+  const updateMaterial = (tempId: string, field: string, value: any) => {
+    const updated = jobMaterials.map((m) =>
+      m.tempId === tempId ? { ...m, [field]: value } : m
+    );
+    setJobMaterials(updated);
+    onMaterialsChange?.(updated);
+  };
+
+  const removeMaterial = (tempId: string) => {
+    const updated = jobMaterials.filter((m) => m.tempId !== tempId);
+    setJobMaterials(updated);
+    onMaterialsChange?.(updated);
+  };
+
+  const getMaterialInfo = (materialId: string) => {
+    return materials.find((m) => m.id === materialId);
+  };
+
+  const getTotalAvailable = (materialId: string) => {
+    const material = getMaterialInfo(materialId);
+    return material?.totalQuantity || 0;
+  };
+
+  if (loading) {
+    return <div className="p-4 text-gray-600">Loading materials...</div>;
+  }
+
+  if (readOnly && jobMaterials.length === 0) {
+    return <div className="p-4 text-gray-600">No materials assigned</div>;
+  }      setMaterials(materialsRes.data.filter((m: Material) => m.totalQuantity > 0));
       setRacks(racksRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);

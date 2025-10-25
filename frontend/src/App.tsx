@@ -20,7 +20,7 @@ import MaterialsManager from './components/moving-jobs/MaterialsManager';
 import JobReportsDashboard from './components/moving-jobs/JobReportsDashboard';
 import PluginSystemManager from './components/moving-jobs/PluginSystemManager';
 import ApprovalManager from './components/moving-jobs/ApprovalManager';
-
+import { MaterialsList } from './pages/Materials';
 
 import { getAuthToken } from './services/api';
 import { PermissionProvider } from './contexts/PermissionContext';
@@ -93,6 +93,11 @@ function App() {
             <Route path="racks" element={
               <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                 <Racks />
+              </ProtectedRoute>
+            } />
+            <Route path="materials" element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                <MaterialsList />
               </ProtectedRoute>
             } />
             <Route path="moving-jobs" element={
