@@ -1146,12 +1146,14 @@ router.post("/return", authenticateToken as any, damagePhotoUpload.array('photos
     const { 
       jobId, 
       issueId, 
-      quantityUsed, 
-      quantityGood, 
-      quantityDamaged, 
       damageReason, 
       notes 
     } = req.body;
+
+    // Parse numeric values from FormData (they come as strings)
+    const quantityUsed = parseInt(req.body.quantityUsed) || 0;
+    const quantityGood = parseInt(req.body.quantityGood) || 0;
+    const quantityDamaged = parseInt(req.body.quantityDamaged) || 0;
 
     if (!jobId || !issueId) {
       return res.status(400).json({ error: "jobId and issueId are required" });
