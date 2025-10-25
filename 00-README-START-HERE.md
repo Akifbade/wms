@@ -6,6 +6,12 @@
 
 ### � Getting Started (READ THESE FIRST!)
 
+🤖 **FOR AI DEVELOPMENT:** **[HOW-TO-WORK-WITH-AI.md](./HOW-TO-WORK-WITH-AI.md)** + **[AI-CONTEXT.md](./AI-CONTEXT.md)**
+   - 🎯 Share with AI in every new chat
+   - 🛡️ Prevents AI from breaking code
+   - ✅ Auto-backup system explained
+   - 📋 Template for AI conversations
+
 ⚠️ **CRITICAL:** **[DOCKER-SAFETY-GUIDE.md](./DOCKER-SAFETY-GUIDE.md)** - READ THIS BEFORE ANY DEVELOPMENT!
    - 🛡️ How Docker containers work (TEMPORARY!)
    - 🚨 Emergency recovery steps
