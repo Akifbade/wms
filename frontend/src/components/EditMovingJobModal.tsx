@@ -171,19 +171,12 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
         }
       }
       
-      // If status changed to COMPLETED, show material return modal
-      if (formData.status === 'COMPLETED' && job.status !== 'COMPLETED') {
-        setSuccess('Job marked as completed! Please return materials...');
-        setTimeout(() => {
-          setShowReturnModal(true);
-        }, 1000);
-      } else {
-        setSuccess('Moving job updated successfully! ✅');
-        setTimeout(() => {
-          onSuccess();
-          onClose();
-        }, 1500);
-      }
+      // Update job successfully
+      setSuccess('Moving job updated successfully! ✅');
+      setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 1500);
     } catch (err: any) {
       setError(err.message || 'Failed to update moving job');
     } finally {
@@ -269,11 +262,14 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   required
                 >
+                  <option value="PLANNED">Planned</option>
                   <option value="SCHEDULED">Scheduled</option>
                   <option value="IN_PROGRESS">In Progress</option>
-                  <option value="COMPLETED">Completed</option>
                   <option value="CANCELLED">Cancelled</option>
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Use "Complete Job" button to finish job and return materials
+                </p>
               </div>
 
               <div>

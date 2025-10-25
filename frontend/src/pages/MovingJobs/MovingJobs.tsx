@@ -15,6 +15,7 @@ import CreateMovingJobModal from '../../components/CreateMovingJobModal';
 import EditMovingJobModal from '../../components/EditMovingJobModal';
 import JobDetailsModal from '../../components/moving-jobs/JobDetailsModal';
 import JobMaterialReport from '../../components/moving-jobs/JobMaterialReport';
+import MaterialReturnModal from '../../components/MaterialReturnModal';
 
 export const MovingJobs: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
@@ -24,6 +25,7 @@ export const MovingJobs: React.FC = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<any>(null);
 
   useEffect(() => {
@@ -222,13 +224,13 @@ export const MovingJobs: React.FC = () => {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="pt-3 border-t border-gray-200 flex items-center gap-2">
+                <div className="pt-3 border-t border-gray-200 grid grid-cols-2 gap-2">
                   <button
                     onClick={() => {
                       setSelectedJob(job);
                       setDetailsModalOpen(true);
                     }}
-                    className="flex-1 px-4 py-2 bg-green-50 text-green-600 rounded-md hover:bg-green-100 font-medium text-sm flex items-center justify-center gap-2"
+                    className="px-4 py-2 bg-green-50 text-green-600 rounded-md hover:bg-green-100 font-medium text-sm flex items-center justify-center gap-2"
                   >
                     <EyeIcon className="h-4 w-4" />
                     View
@@ -238,7 +240,7 @@ export const MovingJobs: React.FC = () => {
                       setSelectedJob(job);
                       setEditModalOpen(true);
                     }}
-                    className="flex-1 px-4 py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium text-sm flex items-center justify-center gap-2"
+                    className="px-4 py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium text-sm flex items-center justify-center gap-2"
                   >
                     <PencilIcon className="h-4 w-4" />
                     Edit
@@ -248,11 +250,22 @@ export const MovingJobs: React.FC = () => {
                       setSelectedJob(job);
                       setReportModalOpen(true);
                     }}
-                    className="flex-1 px-4 py-2 bg-purple-50 text-purple-600 rounded-md hover:bg-purple-100 font-medium text-sm flex items-center justify-center gap-2"
+                    className="px-4 py-2 bg-purple-50 text-purple-600 rounded-md hover:bg-purple-100 font-medium text-sm flex items-center justify-center gap-2"
                   >
                     <DocumentTextIcon className="h-4 w-4" />
                     Report
                   </button>
+                  {job.status !== 'COMPLETED' && (
+                    <button
+                      onClick={() => {
+                        setSelectedJob(job);
+                        setReturnModalOpen(true);
+                      }}
+                      className="px-4 py-2 bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100 font-medium text-sm flex items-center justify-center gap-2"
+                    >
+                      ✅ Complete Job
+                    </button>
+                  )}
                   <button
                     onClick={async () => {
                       if (confirm(`Delete job "${job.title || job.jobTitle}"?`)) {
@@ -265,7 +278,7 @@ export const MovingJobs: React.FC = () => {
                         }
                       }
                     }}
-                    className="flex-1 px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 font-medium text-sm flex items-center justify-center gap-2"
+                    className="px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 font-medium text-sm flex items-center justify-center gap-2"
                   >
                     <TrashIcon className="h-4 w-4" />
                     Delete
@@ -305,6 +318,24 @@ export const MovingJobs: React.FC = () => {
         isOpen={reportModalOpen}
         onClose={() => setReportModalOpen(false)}
         jobId={selectedJob?.id || ''}
+      />
+
+      {/* Material Return Modal - Complete Job */}
+      <MaterialReturnModal
+        isOpen={returnModalOpen}
+        onClose={() => setReturnModalOpen(false)}
+        jobId={selectedJob?.id || ''}
+        onSuccess={async () => {
+          // Update job status to COMPLETED after materials returned
+          try {
+            await jobsAPI.update(selectedJob.id, { status: 'COMPLETED' });
+            setReturnModalOpen(false);
+            loadJobs();
+            alert('✅ Job completed successfully!');
+          } catch (error) {
+            console.error('Failed to update job status:', error);
+          }
+        }}
       />
     </div>
   );
