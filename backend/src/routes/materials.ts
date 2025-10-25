@@ -158,6 +158,12 @@ router.get("/job-materials/:jobId", authenticateToken as any, async (req: AuthRe
         material: true,
         rack: {
           select: { id: true, code: true, location: true, status: true }
+        },
+        returns: {
+          include: {
+            damages: true // Include damage records with photos
+          },
+          orderBy: { recordedAt: 'desc' }
         }
       },
       orderBy: { issuedAt: "desc" },

@@ -173,8 +173,11 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
         }
       }
 
+      // Call onSuccess FIRST to update job status and reload data
+      await onSuccess();
+      
+      // Then show success message and close modal
       alert('✅ Material returns recorded successfully! Stock updated.');
-      onSuccess();
       onClose();
     } catch (error: any) {
       alert(`❌ Error: ${error.message}`);

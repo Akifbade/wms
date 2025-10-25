@@ -329,11 +329,10 @@ export const MovingJobs: React.FC = () => {
           // Update job status to COMPLETED after materials returned
           try {
             await jobsAPI.update(selectedJob.id, { status: 'COMPLETED' });
-            setReturnModalOpen(false);
-            loadJobs();
-            alert('✅ Job completed successfully!');
+            await loadJobs(); // Reload jobs to get updated data
           } catch (error) {
             console.error('Failed to update job status:', error);
+            throw error; // Re-throw so MaterialReturnModal can handle it
           }
         }}
       />
