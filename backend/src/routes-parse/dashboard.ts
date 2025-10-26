@@ -98,8 +98,8 @@ router.get('/dashboard/stats', async (req, res) => {
       }))
     ].sort((a, b) => b.timestamp - a.timestamp);
 
+    // Return direct data without success wrapper (frontend expects direct response)
     res.json({
-      success: true,
       stats: {
         totalShipments: shipmentCount,
         activeShipments,

@@ -36,8 +36,8 @@ router.get('/materials/reports/stock-summary', async (req, res) => {
       totalValue: summary.reduce((sum: number, m: any) => sum + m.totalValue, 0),
     };
 
+    // Return direct data
     res.json({
-      success: true,
       summary,
       totals,
     });
@@ -69,8 +69,8 @@ router.get('/materials/reports/low-stock', async (req, res) => {
       .filter((m: any) => m.currentStock <= m.minStock)
       .sort((a: any, b: any) => b.shortage - a.shortage);
 
+    // Return direct data
     res.json({
-      success: true,
       lowStockAlerts,
     });
   } catch (error: any) {
@@ -121,8 +121,8 @@ router.get('/materials/reports/consumption', async (req, res) => {
 
     const consumptionData = Object.values(consumptionMap);
 
+    // Return direct data
     res.json({
-      success: true,
       consumptionData,
       summary: {
         totalIssues: issues.length,
@@ -169,8 +169,8 @@ router.get('/materials/reports/purchase-history', async (req, res) => {
 
     const totalSpent = purchaseHistory.reduce((sum: number, p: any) => sum + (p.totalAmount || 0), 0);
 
+    // Return direct data
     res.json({
-      success: true,
       purchases: purchaseHistory,
       summary: {
         totalPurchases: purchases.length,
@@ -216,8 +216,8 @@ router.get('/materials/reports/vendor-performance', async (req, res) => {
 
     const vendors = Object.values(vendorMap);
 
+    // Return direct data
     res.json({
-      success: true,
       vendors,
     });
   } catch (error: any) {
@@ -257,8 +257,8 @@ router.get('/materials/reports/valuation', async (req, res) => {
       categoryValuation[cat].itemCount += 1;
     });
 
+    // Return direct data
     res.json({
-      success: true,
       totalValuation,
       byCategory: Object.values(categoryValuation),
       items: valuationData,
