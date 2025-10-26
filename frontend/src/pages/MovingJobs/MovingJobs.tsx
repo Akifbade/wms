@@ -38,7 +38,15 @@ export const MovingJobs: React.FC = () => {
     try {
       setLoading(true);
       const params: any = {};
-      if (filterStatus !== 'all') params.status = filterStatus.toUpperCase().replace(' ', '_');
+      if (filterStatus !== 'all') {
+        // Map filter names to actual DB status values
+        const statusMap: Record<string, string> = {
+          'scheduled': 'SCHEDULED,PLANNED',  // Include both
+          'inprogress': 'IN_PROGRESS,DISPATCHED',  // Include both  
+          'completed': 'COMPLETED,CLOSED'  // Include both
+        };
+        params.status = statusMap[filterStatus] || filterStatus.toUpperCase();
+      }
       
       const data = await jobsAPI.getAll(params);
       setJobs(data.jobs || []);
@@ -91,7 +99,7 @@ export const MovingJobs: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Total Jobs</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">24</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{jobs.length}</p>
             </div>
             <TruckIcon className="h-10 w-10 text-primary-500" />
           </div>
@@ -100,7 +108,9 @@ export const MovingJobs: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">In Progress</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">3</p>
+              <p className="text-3xl font-bold text-green-600 mt-2">
+                {jobs.filter((j: any) => j.status === 'IN_PROGRESS').length}
+              </p>
             </div>
           </div>
         </div>
@@ -108,15 +118,19 @@ export const MovingJobs: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Scheduled</p>
-              <p className="text-3xl font-bold text-blue-600 mt-2">8</p>
+              <p className="text-3xl font-bold text-blue-600 mt-2">
+                {jobs.filter((j: any) => j.status === 'SCHEDULED' || j.status === 'PLANNED').length}
+              </p>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Revenue</p>
-              <p className="text-xl font-bold text-gray-900 mt-2">12,500 KWD</p>
+              <p className="text-sm font-medium text-gray-500">Completed</p>
+              <p className="text-xl font-bold text-gray-900 mt-2">
+                {jobs.filter((j: any) => j.status === 'COMPLETED').length}
+              </p>
             </div>
           </div>
         </div>

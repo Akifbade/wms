@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { racksAPI, shipmentsAPI } from '../services/api';
+import { parseNumberInput, getSafeNumber } from '../utils/inputHelpers';
 
 interface WHMShipmentModalProps {
   isOpen: boolean;
@@ -257,7 +258,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     const { name, value, type } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : 
+      [name]: type === 'number' ? parseNumberInput(value, true) : 
                type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }));
   };
