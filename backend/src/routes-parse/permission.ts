@@ -5,6 +5,32 @@ import { Permission } from '../models-parse/Permission';
 
 const router = express.Router();
 
+// GET /permissions/my-permissions - Get current user's permissions
+router.get('/permissions/my-permissions', async (req, res) => {
+  try {
+    // For now, return default ADMIN permissions
+    // TODO: Implement proper role-based permissions from database
+    const defaultPermissions = [
+      { id: '1', name: 'view_dashboard', resource: 'dashboard', action: 'view' },
+      { id: '2', name: 'view_shipments', resource: 'shipments', action: 'view' },
+      { id: '3', name: 'create_shipments', resource: 'shipments', action: 'create' },
+      { id: '4', name: 'edit_shipments', resource: 'shipments', action: 'edit' },
+      { id: '5', name: 'delete_shipments', resource: 'shipments', action: 'delete' },
+      { id: '6', name: 'view_materials', resource: 'materials', action: 'view' },
+      { id: '7', name: 'manage_materials', resource: 'materials', action: 'manage' },
+    ];
+    
+    res.json({ 
+      success: true,
+      data: { 
+        permissions: defaultPermissions 
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /permissions
 router.get('/permissions', async (req, res) => {
   try {
