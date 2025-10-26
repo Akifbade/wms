@@ -1,26 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormControlLabel,
-  Checkbox,
-  Typography,
-  Box,
-  Chip,
-  Autocomplete,
-  IconButton,
-  Divider,
-} from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, Person as PersonIcon } from '@mui/icons-material';
+import { X, UserPlus, Trash2, Users } from 'lucide-react';
 
 interface User {
   id: string;
