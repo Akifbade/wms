@@ -23,6 +23,7 @@ import ApprovalManager from './components/moving-jobs/ApprovalManager';
 import { MaterialsManagement } from './pages/Materials';
 import MaterialReports from './pages/Materials/MaterialReports';
 import { DamageReport } from './components/reports/DamageReport';
+import { DebugLogin } from './pages/DebugLogin';
 
 import { getAuthToken } from './services/api';
 import { PermissionProvider } from './contexts/PermissionContext';
@@ -76,6 +77,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
+          <Route path="/debug-login" element={<DebugLogin />} />
 
 
 

@@ -1,200 +1,397 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WMS Login Test</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+<!DOCTYPE html><!DOCTYPE html>
+
+<html lang="en"><html lang="en">
+
+<head><head>
+
+    <meta charset="UTF-8">    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Login Debug Test</title>    <title>WMS Login Test</title>
+
+    <style>    <style>
+
+        body {        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+            font-family: Arial, sans-serif;        body {
+
+            max-width: 800px;            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+            margin: 50px auto;            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+            padding: 20px;            min-height: 100vh;
+
+            background: #f5f5f5;            display: flex;
+
+        }            align-items: center;
+
+        .container {            justify-content: center;
+
+            background: white;            padding: 20px;
+
+            padding: 30px;        }
+
+            border-radius: 10px;        .container {
+
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);            background: white;
+
+        }            border-radius: 20px;
+
+        h1 { color: #4F46E5; }            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+
+        .status {            padding: 40px;
+
+            padding: 15px;            max-width: 500px;
+
+            margin: 15px 0;            width: 100%;
+
+            border-radius: 5px;        }
+
+            font-weight: bold;        h1 {
+
+        }            color: #667eea;
+
+        .success { background: #D1FAE5; color: #065F46; border-left: 4px solid #10B981; }            margin-bottom: 10px;
+
+        .error { background: #FEE2E2; color: #991B1B; border-left: 4px solid #EF4444; }            font-size: 28px;
+
+        .info { background: #DBEAFE; color: #1E40AF; border-left: 4px solid #3B82F6; }        }
+
+        .warning { background: #FEF3C7; color: #92400E; border-left: 4px solid #F59E0B; }        .subtitle {
+
+        button {            color: #666;
+
+            background: #4F46E5;            margin-bottom: 30px;
+
+            color: white;            font-size: 14px;
+
+            border: none;        }
+
+            padding: 12px 24px;        .status {
+
+            border-radius: 5px;            padding: 15px;
+
+            cursor: pointer;            border-radius: 10px;
+
+            margin: 5px;            margin-bottom: 20px;
+
+            font-size: 14px;            font-weight: 500;
+
+        }        }
+
+        button:hover { background: #4338CA; }        .status.loading { background: #fff3cd; color: #856404; }
+
+        button.danger { background: #EF4444; }        .status.success { background: #d4edda; color: #155724; }
+
+        button.danger:hover { background: #DC2626; }        .status.error { background: #f8d7da; color: #721c24; }
+
+        input {        .info-box {
+
+            width: 100%;            background: #f8f9fa;
+
+            padding: 10px;            padding: 20px;
+
+            margin: 10px 0;            border-radius: 10px;
+
+            border: 1px solid #ddd;            margin-bottom: 20px;
+
+            border-radius: 5px;        }
+
+            box-sizing: border-box;        .info-item {
+
+        }            display: flex;
+
+        pre {            justify-content: space-between;
+
+            background: #1F2937;            padding: 10px 0;
+
+            color: #10B981;            border-bottom: 1px solid #dee2e6;
+
+            padding: 15px;        }
+
+            border-radius: 5px;        .info-item:last-child { border-bottom: none; }
+
+            overflow-x: auto;        .info-label {
+
+            max-height: 400px;            font-weight: 600;
+
+            overflow-y: auto;            color: #495057;
+
+        }        }
+
+        .section {        .info-value {
+
+            margin: 20px 0;            color: #28a745;
+
+            padding: 20px;            font-family: 'Courier New', monospace;
+
+            background: #F9FAFB;        }
+
+            border-radius: 5px;        .info-value.fail {
+
+        }            color: #dc3545;
+
+    </style>        }
+
+</head>        button {
+
+<body>            width: 100%;
+
+    <div class="container">            padding: 15px;
+
+        <h1>🔍 Login Debug Tool</h1>            background: #667eea;
+
+                    color: white;
+
+        <div class="section">            border: none;
+
+            <h2>📊 Current Auth Status</h2>            border-radius: 10px;
+
+            <div id="authStatus"></div>            font-size: 16px;
+
+            <button onclick="checkAuthStatus()">🔄 Refresh Status</button>            font-weight: 600;
+
+            <button class="danger" onclick="clearAuth()">🗑️ Clear Auth Data</button>            cursor: pointer;
+
+        </div>            transition: all 0.3s;
+
         }
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            padding: 40px;
-            max-width: 500px;
-            width: 100%;
+
+        <div class="section">        button:hover {
+
+            <h2>🔐 Test Login</h2>            background: #5568d3;
+
+            <div>            transform: translateY(-2px);
+
+                <input type="email" id="email" placeholder="Email" value="test@example.com">            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+
+                <input type="password" id="password" placeholder="Password" value="Test123!">        }
+
+                <button onclick="testLogin()">🚀 Test Login</button>        button:disabled {
+
+            </div>            background: #ccc;
+
+            <div id="loginResult"></div>            cursor: not-allowed;
+
+        </div>            transform: none;
+
         }
-        h1 {
-            color: #667eea;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        .status {
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            font-weight: 500;
-        }
-        .status.loading { background: #fff3cd; color: #856404; }
-        .status.success { background: #d4edda; color: #155724; }
-        .status.error { background: #f8d7da; color: #721c24; }
-        .info-box {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        .info-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid #dee2e6;
-        }
-        .info-item:last-child { border-bottom: none; }
-        .info-label {
-            font-weight: 600;
-            color: #495057;
-        }
-        .info-value {
-            color: #28a745;
+
+        <div class="section">        .log {
+
+            <h2>📋 Response Logs</h2>            background: #212529;
+
+            <pre id="logs">Waiting for actions...</pre>            color: #00ff00;
+
+        </div>            padding: 15px;
+
+    </div>            border-radius: 10px;
+
             font-family: 'Courier New', monospace;
-        }
-        .info-value.fail {
-            color: #dc3545;
-        }
-        button {
-            width: 100%;
-            padding: 15px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        button:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .log {
-            background: #212529;
-            color: #00ff00;
-            padding: 15px;
-            border-radius: 10px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            max-height: 300px;
+
+    <script>            font-size: 12px;
+
+        let logs = [];            max-height: 300px;
+
             overflow-y: auto;
-            margin-top: 20px;
-        }
-        .log-line {
-            margin-bottom: 5px;
-        }
+
+        function addLog(message, type = 'info') {            margin-top: 20px;
+
+            const timestamp = new Date().toLocaleTimeString();        }
+
+            logs.unshift(`[${timestamp}] ${message}`);        .log-line {
+
+            document.getElementById('logs').textContent = logs.join('\n');            margin-bottom: 5px;
+
+        }        }
+
         .log-error { color: #ff6b6b; }
-        .log-success { color: #51cf66; }
-        .log-info { color: #74c0fc; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🏭 WMS Login Tester</h1>
-        <p class="subtitle">Testing your Warehouse Management System connection...</p>
-        
-        <div id="status" class="status loading">
-            🔄 Checking system status...
-        </div>
 
-        <div class="info-box">
-            <div class="info-item">
-                <span class="info-label">Backend Server:</span>
-                <span id="backend-status" class="info-value">Checking...</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Frontend Server:</span>
-                <span id="frontend-status" class="info-value">Checking...</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Login API:</span>
-                <span id="login-status" class="info-value">Not tested</span>
-            </div>
-        </div>
+        function checkAuthStatus() {        .log-success { color: #51cf66; }
 
-        <button id="test-btn" onclick="runFullTest()">
+            const token = localStorage.getItem('authToken');        .log-info { color: #74c0fc; }
+
+            const user = localStorage.getItem('user');    </style>
+
+            </head>
+
+            let html = '';<body>
+
+                <div class="container">
+
+            if (token) {        <h1>🏭 WMS Login Tester</h1>
+
+                html += `<div class="status success">✅ Token exists in localStorage</div>`;        <p class="subtitle">Testing your Warehouse Management System connection...</p>
+
+                html += `<div class="info"><strong>Token:</strong><br><code style="word-break: break-all;">${token.substring(0, 50)}...</code></div>`;        
+
+                addLog('Token found in localStorage', 'success');        <div id="status" class="status loading">
+
+            } else {            🔄 Checking system status...
+
+                html += `<div class="status error">❌ No token found</div>`;        </div>
+
+                addLog('No token in localStorage', 'warning');
+
+            }        <div class="info-box">
+
+            <div class="info-item">
+
+            if (user) {                <span class="info-label">Backend Server:</span>
+
+                try {                <span id="backend-status" class="info-value">Checking...</span>
+
+                    const userData = JSON.parse(user);            </div>
+
+                    html += `<div class="status success">✅ User data exists</div>`;            <div class="info-item">
+
+                    html += `<div class="info"><strong>User:</strong><br><pre>${JSON.stringify(userData, null, 2)}</pre></div>`;                <span class="info-label">Frontend Server:</span>
+
+                    addLog(`User data found: ${userData.email || userData.id}`, 'success');                <span id="frontend-status" class="info-value">Checking...</span>
+
+                } catch (e) {            </div>
+
+                    html += `<div class="status error">❌ Invalid user data format</div>`;            <div class="info-item">
+
+                    addLog('Invalid user data in localStorage', 'error');                <span class="info-label">Login API:</span>
+
+                }                <span id="login-status" class="info-value">Not tested</span>
+
+            } else {            </div>
+
+                html += `<div class="status error">❌ No user data found</div>`;        </div>
+
+                addLog('No user data in localStorage', 'warning');
+
+            }        <button id="test-btn" onclick="runFullTest()">
+
             🚀 Run Full System Test
-        </button>
+
+            document.getElementById('authStatus').innerHTML = html;        </button>
+
+        }
 
         <div id="log" class="log"></div>
-    </div>
 
-    <script>
-        const API_BASE = 'http://localhost:5000/api';
-        const TEST_EMAIL = 'admin@demo.com';
-        const TEST_PASSWORD = 'admin123';
+        function clearAuth() {    </div>
 
-        function log(message, type = 'info') {
-            const logEl = document.getElementById('log');
-            const line = document.createElement('div');
-            line.className = `log-line log-${type}`;
+            localStorage.removeItem('authToken');
+
+            localStorage.removeItem('user');    <script>
+
+            addLog('🗑️ Cleared all auth data', 'warning');        const API_BASE = 'http://localhost:5000/api';
+
+            checkAuthStatus();        const TEST_EMAIL = 'admin@demo.com';
+
+        }        const TEST_PASSWORD = 'admin123';
+
+
+
+        async function testLogin() {        function log(message, type = 'info') {
+
+            const email = document.getElementById('email').value;            const logEl = document.getElementById('log');
+
+            const password = document.getElementById('password').value;            const line = document.createElement('div');
+
+            const resultDiv = document.getElementById('loginResult');            line.className = `log-line log-${type}`;
+
             line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            logEl.appendChild(line);
-            logEl.scrollTop = logEl.scrollHeight;
+
+            resultDiv.innerHTML = '<div class="status info">⏳ Logging in...</div>';            logEl.appendChild(line);
+
+            addLog(`Attempting login with: ${email}`, 'info');            logEl.scrollTop = logEl.scrollHeight;
+
         }
 
-        function updateStatus(message, type) {
-            const statusEl = document.getElementById('status');
-            statusEl.className = `status ${type}`;
-            statusEl.textContent = message;
-        }
+            try {
 
-        async function checkBackend() {
+                const response = await fetch('/api/auth/login', {        function updateStatus(message, type) {
+
+                    method: 'POST',            const statusEl = document.getElementById('status');
+
+                    headers: {            statusEl.className = `status ${type}`;
+
+                        'Content-Type': 'application/json',            statusEl.textContent = message;
+
+                    },        }
+
+                    body: JSON.stringify({ email, password })
+
+                });        async function checkBackend() {
+
             log('Testing backend server (http://localhost:5000)...');
-            try {
-                const response = await fetch(`${API_BASE}/health`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('backend-status').textContent = '✅ Online';
-                    document.getElementById('backend-status').classList.remove('fail');
-                    log(`✅ Backend is running: ${data.message}`, 'success');
-                    return true;
-                } else {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-            } catch (err) {
-                document.getElementById('backend-status').textContent = '❌ Offline';
-                document.getElementById('backend-status').classList.add('fail');
-                log(`❌ Backend check failed: ${err.message}`, 'error');
-                return false;
-            }
-        }
 
-        async function checkFrontend() {
-            log('Testing frontend server (http://localhost:3000)...');
-            try {
-                const response = await fetch('http://localhost:3000', {
-                    method: 'HEAD',
+                const data = await response.json();            try {
+
+                                const response = await fetch(`${API_BASE}/health`, {
+
+                if (response.ok && data.success) {                    method: 'GET',
+
+                    // Save token and user like the actual app does                    headers: { 'Content-Type': 'application/json' }
+
+                    localStorage.setItem('authToken', data.token);                });
+
+                    localStorage.setItem('user', JSON.stringify(data.user));                
+
+                                    if (response.ok) {
+
+                    resultDiv.innerHTML = `                    const data = await response.json();
+
+                        <div class="status success">✅ Login Successful!</div>                    document.getElementById('backend-status').textContent = '✅ Online';
+
+                        <div class="info">                    document.getElementById('backend-status').classList.remove('fail');
+
+                            <strong>User ID:</strong> ${data.user.id}<br>                    log(`✅ Backend is running: ${data.message}`, 'success');
+
+                            <strong>Email:</strong> ${data.user.email}<br>                    return true;
+
+                            <strong>Token:</strong> ${data.token.substring(0, 30)}...                } else {
+
+                        </div>                    throw new Error(`HTTP ${response.status}`);
+
+                    `;                }
+
+                    addLog(`✅ Login successful for ${data.user.email}`, 'success');            } catch (err) {
+
+                    addLog(`Token saved: ${data.token.substring(0, 20)}...`, 'success');                document.getElementById('backend-status').textContent = '❌ Offline';
+
+                                    document.getElementById('backend-status').classList.add('fail');
+
+                    checkAuthStatus();                log(`❌ Backend check failed: ${err.message}`, 'error');
+
+                } else {                return false;
+
+                    resultDiv.innerHTML = `<div class="status error">❌ Login Failed: ${data.message || 'Unknown error'}</div>`;            }
+
+                    addLog(`❌ Login failed: ${data.message}`, 'error');        }
+
+                }
+
+            } catch (error) {        async function checkFrontend() {
+
+                resultDiv.innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;            log('Testing frontend server (http://localhost:3000)...');
+
+                addLog(`❌ Error during login: ${error.message}`, 'error');            try {
+
+            }                const response = await fetch('http://localhost:3000', {
+
+        }                    method: 'HEAD',
+
                     mode: 'no-cors'
-                });
-                document.getElementById('frontend-status').textContent = '✅ Online';
-                document.getElementById('frontend-status').classList.remove('fail');
-                log('✅ Frontend is accessible', 'success');
-                return true;
-            } catch (err) {
+
+        // Auto-check status on load                });
+
+        checkAuthStatus();                document.getElementById('frontend-status').textContent = '✅ Online';
+
+        addLog('🚀 Debug tool loaded', 'info');                document.getElementById('frontend-status').classList.remove('fail');
+
+    </script>                log('✅ Frontend is accessible', 'success');
+
+</body>                return true;
+
+</html>            } catch (err) {
+
                 document.getElementById('frontend-status').textContent = '❌ Offline';
                 document.getElementById('frontend-status').classList.add('fail');
                 log(`❌ Frontend check failed: ${err.message}`, 'error');
