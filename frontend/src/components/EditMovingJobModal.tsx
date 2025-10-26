@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { jobsAPI } from '../services/api';
 import MaterialReturnModal from './MaterialReturnModal';
+import { parseNumberInput, getSafeNumber } from '../utils/inputHelpers';
 
 interface CustomField {
   id: string;
@@ -28,8 +29,8 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
     fromAddress: '',
     toAddress: '',
     scheduledDate: '',
-    estimatedHours: 0,
-    totalCost: 0,
+    estimatedHours: '', // Empty string instead of 0
+    totalCost: '', // Empty string instead of 0
     status: 'SCHEDULED',
   });
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
@@ -53,8 +54,8 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
         fromAddress: job.jobAddress || job.fromAddress || '',
         toAddress: job.dropoffAddress || job.toAddress || '',
         scheduledDate,
-        estimatedHours: job.estimatedHours || 0,
-        totalCost: job.totalCost || 0,
+        estimatedHours: job.estimatedHours || '', // Empty string instead of 0
+        totalCost: job.totalCost || '', // Empty string instead of 0
         status: job.status || 'PLANNED',
       });
       setError('');
@@ -106,10 +107,14 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'estimatedHours' || name === 'totalCost' ? Number(value) : value
-    }));
+    
+    // For number fields, allow empty string (no "0" stuck)
+    if (name === 'estimatedHours' || name === 'totalCost') {
+      const parsedValue = parseNumberInput(value, true); // true = allow decimals
+      setFormData(prev => ({ ...prev, [name]: parsedValue }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -142,6 +147,8 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
         jobAddress: formData.fromAddress,
         dropoffAddress: formData.toAddress || null,
         status: formData.status,
+        estimatedHours: getSafeNumber(formData.estimatedHours, 0),
+        totalCost: getSafeNumber(formData.totalCost, 0),
       };
 
       await jobsAPI.update(job.id, dataToSubmit);
