@@ -5,6 +5,8 @@ import authRoutes from './auth';
 import uploadRoutes from './upload';
 // 📊 Material Reports
 import materialReportsRoutes from './material-reports';
+// 📈 Dashboard
+import dashboardRoutes from './dashboard';
 // Auto-generated model routes
 import companyRoutes from './company';
 import userRoutes from './user';
@@ -57,6 +59,9 @@ export function registerParseRoutes(app: express.Application) {
   
   // 📊 Material Reports (before model routes)
   app.use('/api', materialReportsRoutes);
+  
+  // 📈 Dashboard
+  app.use('/api', dashboardRoutes);
   
   // Auto-generated model routes
   app.use('/api', companyRoutes);
