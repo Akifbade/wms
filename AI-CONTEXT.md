@@ -95,12 +95,26 @@ frontend/
 
 ## 🔧 TECHNOLOGY STACK
 
-### Backend
+### Backend (MIGRATED TO PARSE!)
 - Node.js 18
 - Express.js
-- Prisma ORM (MySQL)
+- **Parse Server** (MongoDB backend) ✅ NEW!
+- **MongoDB 6.0** (replaced MySQL) ✅ NEW!
+- ~~Prisma ORM~~ (Deprecated - kept in BACKUP-PRISMA-MYSQL/)
+- ~~MySQL~~ (Deprecated - replaced with MongoDB)
 - TypeScript
 - JWT Authentication
+- Parse.User for authentication
+- Parse.File for file storage
+
+### Parse Migration Status:
+- ✅ All 43 models migrated to Parse classes
+- ✅ All API routes converted to Parse SDK
+- ✅ Authentication using Parse.User + JWT
+- ✅ File uploads using Parse.File
+- ✅ Frontend integration tested (zero changes needed)
+- ✅ Dual-mode backend (USE_PARSE=true/false toggle)
+- 📦 Old Prisma/MySQL backup: `BACKUP-PRISMA-MYSQL/`
 
 ### Frontend
 - React 18
@@ -110,16 +124,19 @@ frontend/
 - React Router v6
 - Axios
 
-### Database
-- MySQL 8.0 (Docker)
-- 40+ tables
-- Complex relationships
+### Database (MIGRATED!)
+- **MongoDB 6.0** (Primary) ✅
+- Parse Server Collections: _User, Company, MovingJob, Shipment, etc.
+- ~~MySQL 8.0~~ (Deprecated - backed up)
+- Port: 27017 (MongoDB)
+- Database: warehouse_wms
 
 ### DevOps
 - Docker Compose
-- 4 containers (MySQL, Backend, Frontend, Git-watcher)
-- Auto-commit system
+- 5 containers: MongoDB, Parse Server, Parse Dashboard, Backend, Frontend
+- Auto-commit system (every 5 minutes)
 - Volume mounts for development
+- Parse Dashboard: http://localhost:4040
 
 ## 🛡️ SAFETY CHECKLIST FOR NEW FEATURES
 
