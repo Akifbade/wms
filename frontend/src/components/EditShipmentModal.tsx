@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { racksAPI, shipmentsAPI } from '../services/api';
 import RackMapModal from './RackMapModal';
+import { parseNumberInput, getSafeNumber } from '../utils/inputHelpers';
 
 interface EditShipmentModalProps {
   isOpen: boolean;
@@ -38,10 +39,10 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
     clientPhone: '',
     clientEmail: '',
     description: '',
-    totalBoxCount: 0,
-    currentBoxCount: 0,
+    totalBoxCount: '',
+    currentBoxCount: '',
     rackId: '',
-    estimatedValue: 0,
+    estimatedValue: '',
     notes: '',
     status: '',
   });
@@ -59,10 +60,10 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         clientPhone: shipment.clientPhone || '',
         clientEmail: shipment.clientEmail || '',
         description: shipment.description || '',
-        totalBoxCount: shipment.totalBoxCount || 0,
-        currentBoxCount: shipment.currentBoxCount || 0,
+        totalBoxCount: shipment.totalBoxCount || '',
+        currentBoxCount: shipment.currentBoxCount || '',
         rackId: shipment.rackId || '',
-        estimatedValue: shipment.estimatedValue || 0,
+        estimatedValue: shipment.estimatedValue || '',
         notes: shipment.notes || '',
         status: shipment.status || 'IN_STORAGE',
       });
@@ -125,7 +126,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name.includes('Count') || name === 'estimatedValue' ? Number(value) : value
+      [name]: (name.includes('Count') || name === 'estimatedValue') ? parseNumberInput(value, true) : value
     }));
   };
 
@@ -515,7 +516,4 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
           setShowRackMap(false);
         }}
       />
-    </div>
-  );
-}
-
+    <
