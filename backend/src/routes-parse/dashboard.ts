@@ -113,6 +113,46 @@ router.get('/dashboard/stats', async (req, res) => {
           ? Math.round((racks.reduce((sum: number, r: any) => sum + (r.get('occupiedCapacity') || 0), 0) / 
              racks.reduce((sum: number, r: any) => sum + (r.get('totalCapacity') || 100), 0)) * 100)
           : 0,
+        
+        // Additional fields for frontend compatibility
+        shipments: {
+          total: shipmentCount,
+          active: activeShipments,
+          pending: pendingShipments
+        },
+        jobs: {
+          total: movingJobCount,
+          inProgress: activeJobs,
+          scheduled: 0 // TODO: Add scheduled jobs count
+        },
+        racks: {
+          total: rackCount,
+          active: rackCount,
+          utilization: racks.length > 0 
+            ? Math.round((racks.reduce((sum: number, r: any) => sum + (r.get('occupiedCapacity') || 0), 0) / 
+               racks.reduce((sum: number, r: any) => sum + (r.get('totalCapacity') || 100), 0)) * 100)
+            : 0
+        },
+        invoiceRevenue: {
+          total: totalRevenue,
+          paid: totalRevenue,
+          outstanding: 0,
+          count: 0,
+          paidCount: 0
+        },
+        thisMonthRevenue: {
+          amount: 0
+        },
+        withdrawals: {
+          thisMonth: 0,
+          total: 0
+        },
+        shipmentStatusBreakdown: {
+          total: shipmentCount,
+          pending: pendingShipments,
+          active: activeShipments,
+          released: 0
+        }
       },
       topClients,
       storageBySection,
