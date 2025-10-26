@@ -218,11 +218,6 @@ export const MovingJobs: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Estimated Cost</span>
-                  <span className="text-lg font-bold text-gray-900">{job.totalCost || 0} KWD</span>
-                </div>
-
                 {/* Action Buttons */}
                 <div className="pt-3 border-t border-gray-200 grid grid-cols-2 gap-2">
                   <button

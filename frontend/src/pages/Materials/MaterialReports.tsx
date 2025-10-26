@@ -204,7 +204,7 @@ const MaterialReports: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm">Total Value</p>
-                      <p className="text-2xl font-bold">₹{stockSummary.totals.totalValue.toFixed(2)}</p>
+                      <p className="text-2xl font-bold">{stockSummary.totals.totalValue.toFixed(2)} KWD</p>
                     </div>
                     <DollarSign className="w-10 h-10 text-green-600" />
                   </div>
@@ -284,7 +284,7 @@ const MaterialReports: React.FC = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Min Level</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value (₹)</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value (KWD)</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -304,7 +304,7 @@ const MaterialReports: React.FC = () => {
                             {item.stockStatus}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">₹{item.totalValue.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">{item.totalValue.toFixed(2)} KWD</td>
                       </tr>
                     ))}
                   </tbody>
@@ -375,7 +375,7 @@ const MaterialReports: React.FC = () => {
                 </div>
                 <div className="border p-4 rounded">
                   <p className="text-gray-500 text-sm">Total Amount</p>
-                  <p className="text-2xl font-bold">₹{purchaseHistory.summary.totalAmount.toFixed(2)}</p>
+                  <p className="text-2xl font-bold">{purchaseHistory.summary.totalAmount.toFixed(2)} KWD</p>
                 </div>
               </div>
               {/* Add purchase history table here */}
@@ -406,8 +406,8 @@ const MaterialReports: React.FC = () => {
                           ⭐ {vendor.rating.toFixed(1)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">{vendor.totalPurchases}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">₹{vendor.totalAmount.toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">₹{vendor.avgUnitCost.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">{vendor.totalAmount.toFixed(2)} KWD</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">{vendor.avgUnitCost.toFixed(2)} KWD</td>
                       </tr>
                     ))}
                   </tbody>
@@ -422,7 +422,7 @@ const MaterialReports: React.FC = () => {
                 <h2 className="text-xl font-bold">Stock Valuation Report ({valuation.valuationMethod})</h2>
                 <div className="text-right">
                   <p className="text-gray-500 text-sm">Total Inventory Value</p>
-                  <p className="text-3xl font-bold text-green-600">₹{valuation.totalValue.toFixed(2)}</p>
+                  <p className="text-3xl font-bold text-green-600">{valuation.totalValue.toFixed(2)} KWD</p>
                 </div>
               </div>
               {/* Add valuation details here */}

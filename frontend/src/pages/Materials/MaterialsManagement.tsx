@@ -547,7 +547,7 @@ const MaterialsManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Unit Cost (₹)</label>
+                  <label className="block text-sm font-medium mb-1">Unit Cost (KWD)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -698,7 +698,7 @@ const MaterialsManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Unit Cost (₹)</label>
+                  <label className="block text-sm font-medium mb-1">Unit Cost (KWD)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -753,7 +753,7 @@ const MaterialsManagement = () => {
                           {batch.quantityRemaining}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">₹{batch.unitCost.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">{batch.unitCost.toFixed(2)} KWD</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {new Date(batch.purchaseDate).toLocaleDateString()}
                       </td>
