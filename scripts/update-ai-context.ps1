@@ -12,6 +12,25 @@ param(
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 $dateStamp = Get-Date -Format "yyyyMMdd-HHmmss"
 
+# AUTO-DETECT from recent commits if not provided
+if ([string]::IsNullOrEmpty($CurrentTask)) {
+    $recentCommit = git log -1 --pretty=format:"%s" 2>$null
+    if ($recentCommit -and $recentCommit -notmatch "AUTO-BACKUP") {
+        $CurrentTask = "Working on: $recentCommit"
+    } else {
+        $CurrentTask = "Development in progress"
+    }
+}
+
+if ([string]::IsNullOrEmpty($ConversationSummary)) {
+    $last5Commits = git log -5 --pretty=format:"- %s" 2>$null | Where-Object { $_ -notmatch "AUTO-BACKUP" } | Select-Object -First 3
+    if ($last5Commits) {
+        $ConversationSummary = "Recent work completed:`n$($last5Commits -join "`n")"
+    } else {
+        $ConversationSummary = "Active development session"
+    }
+}
+
 # File paths
 $contextFile = "AI-SESSION-CONTEXT.md"
 $backupFolder = "ai-conversation-backups"
@@ -84,14 +103,28 @@ $recentTags
 ### What We're Working On:
 $CurrentTask
 
-### Issues Faced:
+### Recent Conversation Summary:
+$ConversationSummary
+
+### Issues Faced (if any):
 $IssuesFaced
 
-### Next Steps:
+### Next Steps (if planned):
 $NextSteps
 
-### Conversation Summary:
+### 💬 LAST AI CONVERSATION TOPICS:
+**Auto-detected from recent commits and activity:**
+
 $ConversationSummary
+
+**Key Points for New AI:**
+1. Read the recent commits above to understand what was done
+2. Check Docker status to see system health
+3. Review changed files to know what's modified
+4. Continue from current branch: $currentBranch
+5. User prefers Hinglish communication
+6. Always create backup before risky changes
+7. Test thoroughly before merging to master
 
 ---
 
