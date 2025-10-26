@@ -80,4 +80,57 @@ router.delete('/companys/:id', async (req, res) => {
   }
 });
 
+// GET /company/branding - Public endpoint for login page
+router.get('/company/branding', async (req, res) => {
+  try {
+    const query = new Parse.Query(Company);
+    query.equalTo('isActive', true);
+    query.limit(1);
+    
+    const company = await query.first({ useMasterKey: true });
+    
+    if (!company) {
+      // Return default branding if no company exists
+      return res.json({
+        success: true,
+        branding: {
+          name: 'Warehouse WMS',
+          logoUrl: null,
+          primaryColor: '#4F46E5',
+          secondaryColor: '#7C3AED',
+          showCompanyName: true,
+          logoSize: 'medium'
+        }
+      });
+    }
+    
+    // Return company branding
+    res.json({
+      success: true,
+      branding: {
+        name: company.get('name') || 'Warehouse WMS',
+        logoUrl: company.get('logoUrl') || company.get('logo'),
+        primaryColor: company.get('primaryColor') || '#4F46E5',
+        secondaryColor: company.get('secondaryColor') || '#7C3AED',
+        showCompanyName: company.get('showCompanyName') !== false,
+        logoSize: company.get('logoSize') || 'medium'
+      }
+    });
+  } catch (error: any) {
+    console.error('Error fetching branding:', error);
+    // Return defaults on error
+    res.json({
+      success: true,
+      branding: {
+        name: 'Warehouse WMS',
+        logoUrl: null,
+        primaryColor: '#4F46E5',
+        secondaryColor: '#7C3AED',
+        showCompanyName: true,
+        logoSize: 'medium'
+      }
+    });
+  }
+});
+
 export default router;
