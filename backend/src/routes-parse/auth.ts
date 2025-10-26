@@ -82,18 +82,16 @@ router.post('/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // Frontend expects direct token and user (not wrapped in data)
     res.json({
       success: true,
-      message: 'User registered successfully',
-      data: {
-        token,
-        user: {
-          id: user.id,
-          email: user.get('email'),
-          name: user.get('name'),
-          role: user.get('role'),
-          companyId,
-        },
+      token,
+      user: {
+        id: user.id,
+        email: user.get('email'),
+        name: user.get('name'),
+        role: user.get('role'),
+        companyId,
       },
     });
   } catch (error: any) {
@@ -181,25 +179,23 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // Frontend expects direct token and user (not wrapped in data)
     res.json({
       success: true,
-      message: 'Login successful',
-      data: {
-        token,
-        user: {
-          id: user.id,
-          email: user.get('email'),
-          name: user.get('name'),
-          role: user.get('role'),
-          phone: user.get('phone'),
-          isActive: user.get('isActive'),
-          companyId: companyId || null,
-          company: company ? {
-            id: company.id,
-            name: company.get('name'),
-            plan: company.get('plan'),
-          } : null,
-        },
+      token,
+      user: {
+        id: user.id,
+        email: user.get('email'),
+        name: user.get('name'),
+        role: user.get('role'),
+        phone: user.get('phone'),
+        isActive: user.get('isActive'),
+        companyId: companyId || null,
+        company: company ? {
+          id: company.id,
+          name: company.get('name'),
+          plan: company.get('plan'),
+        } : null,
       },
     });
   } catch (error: any) {
