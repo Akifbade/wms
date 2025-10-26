@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { jobsAPI } from '../services/api';
 import MaterialReturnModal from './MaterialReturnModal';
-import { parseNumberInput, getSafeNumber } from '../utils/inputHelpers';
+import { parseNumberInput } from '../utils/inputHelpers';
 
 interface CustomField {
   id: string;
@@ -147,8 +147,7 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
         jobAddress: formData.fromAddress,
         dropoffAddress: formData.toAddress || null,
         status: formData.status,
-        estimatedHours: getSafeNumber(formData.estimatedHours, 0),
-        totalCost: getSafeNumber(formData.totalCost, 0),
+        // Note: estimatedHours and totalCost removed - not in DB schema
       };
 
       await jobsAPI.update(job.id, dataToSubmit);
