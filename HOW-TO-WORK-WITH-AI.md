@@ -18,6 +18,18 @@ When you open a new chat with AI, it has **NO MEMORY** of your project. This mea
 **Every new chat, copy-paste this to AI:**
 
 ```
+CONTINUE WMS
+```
+
+**That's it!** AI will automatically read all context files and continue your work! 🎯
+
+---
+
+### **OLD WAY (Still works but not needed!):**
+
+If you want to give more details:
+
+```
 I have a working WMS project. Before making ANY changes:
 
 1. Read AI-CONTEXT.md file completely

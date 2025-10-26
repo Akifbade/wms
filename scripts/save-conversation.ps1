@@ -48,34 +48,17 @@ Write-Host "✅ DONE! Context saved to:" -ForegroundColor Green
 Write-Host "   📄 AI-SESSION-CONTEXT.md" -ForegroundColor White
 Write-Host "   💾 ai-conversation-backups/" -ForegroundColor White
 Write-Host ""
-Write-Host "📋 For next AI conversation, share:" -ForegroundColor Yellow
+Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "  🚀 FOR NEW AI CHAT - JUST TYPE THIS:" -ForegroundColor Yellow
+Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "---COPY BELOW---" -ForegroundColor Gray
+Write-Host "     CONTINUE WMS" -ForegroundColor Green -BackgroundColor Black
 Write-Host ""
-
-$contextPreview = @"
-🎯 PROJECT: Warehouse Management System (WMS)
-📁 LOCATION: c:\Users\USER\Videos\NEW START\
-
-⚠️ CRITICAL INSTRUCTIONS:
-1. Read AI-SESSION-CONTEXT.md file FIRST (has full conversation history)
-2. This is a WORKING production system
-3. Use feature branches for ALL changes
-4. Create backup before starting
-5. Commit frequently
-6. Test before merging
-
-📋 CURRENT STATUS:
-Task: $currentTask
-Issues: $issuesFaced
-Next: $nextSteps
-
-🔍 Full context in: AI-SESSION-CONTEXT.md
-"@
-
-Write-Host $contextPreview -ForegroundColor Cyan
+Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "---COPY ABOVE---" -ForegroundColor Gray
+Write-Host "That's it! AI will read AI-SESSION-CONTEXT.md automatically!" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "Copy and paste this to your next AI chat! 🚀" -ForegroundColor Green
+Write-Host "Optional - Add specific issue:" -ForegroundColor Gray
+Write-Host "  CONTINUE WMS" -ForegroundColor White
+Write-Host "  Vite is crashing" -ForegroundColor White
 Write-Host ""

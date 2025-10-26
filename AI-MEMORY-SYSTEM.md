@@ -1,5 +1,21 @@
 # 🤖 AI CONVERSATION MEMORY SYSTEM
 
+---
+
+## 🎯 **ULTRA SIMPLE VERSION:**
+
+### **Chat crash ho gaya? New chat me bas type karo:**
+
+```
+CONTINUE WMS
+```
+
+**Done! AI sab samajh jayega!** ✅
+
+**Full guide neeche hai (optional reading)** ⬇️
+
+---
+
 ## 🎯 **PROBLEM YE SOLVE KARTA HAI:**
 
 Jab aap:
