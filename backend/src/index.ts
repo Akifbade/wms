@@ -3,6 +3,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 
+// Import Parse config
+import './config/parse';
+
 // Import routes
 import authRoutes from './routes/auth';
 import shipmentRoutes from './routes/shipments';
@@ -31,6 +34,8 @@ import pluginsRoutes from './routes/plugins';
 import shipmentItemsRoutes from './routes/shipment-items';
 import customerMaterialsRoutes from './routes/customer-materials';
 import workerDashboardRoutes from './routes/worker-dashboard';
+// PARSE: Test routes
+import parseTestRoutes from './routes/parse-test';
 
 // Load environment variables FIRST
 dotenv.config();
@@ -93,6 +98,9 @@ app.use('/api/moving-jobs', movingJobsRoutes);
 app.use('/api/materials', materialsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/plugins', pluginsRoutes);
+
+// PARSE: Test routes
+app.use('/api/parse', parseTestRoutes);
 // NEW: Enhanced warehouse routes
 app.use('/api', shipmentItemsRoutes); // Handles /api/shipments/:id/items
 app.use('/api', customerMaterialsRoutes); // Handles /api/customers/*

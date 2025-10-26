@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clearing Cache...</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .container {
+      background: white;
+      padding: 3rem;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+      max-width: 500px;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 1rem;
+      font-size: 2rem;
+    }
+    .status {
+      margin: 2rem 0;
+      padding: 1rem;
+      background: #f0f9ff;
+      border-radius: 10px;
+      color: #0369a1;
+      font-weight: 600;
+    }
+    .success {
+      background: #dcfce7;
+      color: #15803d;
+    }
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 2rem auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      font-size: 1.1rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s;
+      margin-top: 1rem;
+    }
+    button:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    .log {
+      text-align: left;
+      margin-top: 2rem;
+      padding: 1rem;
+      background: #f8fafc;
+      border-radius: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .log-item {
+      padding: 0.5rem;
+      margin: 0.25rem 0;
+      border-left: 3px solid #667eea;
+      padding-left: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧹 Cache Cleaner</h1>
+    <div id="status" class="status">
+      <div class="spinner"></div>
+      Clearing browser cache...
+    </div>
+    <div id="log" class="log"></div>
+    <button id="continueBtn" style="display:none;" onclick="window.location.href='/'">
+      Continue to App →
+    </button>
+  </div>
+
+  <script>
+    const log = document.getElementById('log');
+    const status = document.getElementById('status');
+    const continueBtn = document.getElementById('continueBtn');
+
+    function addLog(message, emoji = '✓') {
+      const div = document.createElement('div');
+      div.className = 'log-item';
+      div.textContent = `${emoji} ${message}`;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    async function clearEverything() {
+      try {
+        addLog('Starting comprehensive cache clear...', '🚀');
+
+        // 1. Unregister all service workers
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (let registration of registrations) {
+            await registration.unregister();
+            addLog(`Unregistered service worker: ${registration.scope}`, '🗑️');
+          }
+          if (registrations.length === 0) {
+            addLog('No service workers found', 'ℹ️');
+          }
+        }
+
+        // 2. Clear all caches
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          for (let name of cacheNames) {
+            await caches.delete(name);
+            addLog(`Deleted cache: ${name}`, '🗑️');
+          }
+          if (cacheNames.length === 0) {
+            addLog('No caches found', 'ℹ️');
+          }
+        }
+
+        // 3. Clear localStorage
+        const localStorageKeys = Object.keys(localStorage);
+        localStorage.clear();
+        addLog(`Cleared ${localStorageKeys.length} localStorage items`, '🗑️');
+
+        // 4. Clear sessionStorage
+        const sessionStorageKeys = Object.keys(sessionStorage);
+        sessionStorage.clear();
+        addLog(`Cleared ${sessionStorageKeys.length} sessionStorage items`, '🗑️');
+
+        // 5. Clear IndexedDB (if any)
+        if ('indexedDB' in window) {
+          const databases = await indexedDB.databases();
+          for (let db of databases) {
+            if (db.name) {
+              indexedDB.deleteDatabase(db.name);
+              addLog(`Deleted IndexedDB: ${db.name}`, '🗑️');
+            }
+          }
+        }
+
+        // Success!
+        status.innerHTML = '✅ Cache Cleared Successfully!';
+        status.className = 'status success';
+        addLog('All browser data cleared!', '🎉');
+        continueBtn.style.display = 'block';
+
+      } catch (error) {
+        status.innerHTML = '❌ Error clearing cache';
+        status.className = 'status';
+        addLog(`Error: ${error.message}`, '❌');
+        continueBtn.style.display = 'block';
+      }
+    }
+
+    // Run on page load
+    clearEverything();
+  </script>
+</body>
+</html>

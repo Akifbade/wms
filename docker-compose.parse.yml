@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:6
+    container_name: wms-mongodb-dev
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: adminpassword
+      MONGO_INITDB_DATABASE: warehouse_wms
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - wms-network-dev
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/warehouse_wms --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Parse Server
+  parse:
+    image: parseplatform/parse-server:latest
+    container_name: wms-parse-dev
+    restart: unless-stopped
+    environment:
+      PARSE_SERVER_APPLICATION_ID: WMS_WAREHOUSE_APP
+      PARSE_SERVER_MASTER_KEY: ${PARSE_MASTER_KEY:-wms-master-key-change-in-production}
+      PARSE_SERVER_DATABASE_URI: mongodb://admin:adminpassword@mongodb:27017/warehouse_wms?authSource=admin
+      PARSE_SERVER_URL: http://localhost:1337/parse
+      PARSE_SERVER_MOUNT_PATH: /parse
+      PARSE_SERVER_ALLOW_CLIENT_CLASS_CREATION: "true"
+      PARSE_SERVER_ENABLE_EXPERIMENTAL_DIRECT_ACCESS: "true"
+    ports:
+      - "1337:1337"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - wms-network-dev
+
+  # Parse Dashboard (Visual DB Editor)
+  parse-dashboard:
+    image: parseplatform/parse-dashboard:latest
+    container_name: wms-parse-dashboard-dev
+    restart: unless-stopped
+    environment:
+      PARSE_DASHBOARD_APP_ID: WMS_WAREHOUSE_APP
+      PARSE_DASHBOARD_MASTER_KEY: ${PARSE_MASTER_KEY:-wms-master-key-change-in-production}
+      PARSE_DASHBOARD_SERVER_URL: http://parse:1337/parse
+      PARSE_DASHBOARD_APP_NAME: WMS Warehouse
+      PARSE_DASHBOARD_USER_ID: admin
+      PARSE_DASHBOARD_USER_PASSWORD: ${PARSE_DASHBOARD_PASSWORD:-admin123}
+      PARSE_DASHBOARD_ALLOW_INSECURE_HTTP: "true"
+    ports:
+      - "4040:4040"
+    depends_on:
+      - parse
+    networks:
+      - wms-network-dev
+
+  # Backend Development Service (Updated for Parse)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: wms-backend-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PARSE_APP_ID: WMS_WAREHOUSE_APP
+      PARSE_MASTER_KEY: ${PARSE_MASTER_KEY:-wms-master-key-change-in-production}
+      PARSE_SERVER_URL: http://parse:1337/parse
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-key}
+      PORT: 5000
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - parse
+    networks:
+      - wms-network-dev
+
+  # Frontend Development Service (No changes)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: wms-frontend-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DOCKER_ENV: "true"
+      VITE_HOST: "0.0.0.0"
+      VITE_PORT: "3000"
+      VITE_API_URL: http://localhost:5000
+    ports:
+      - "${FRONTEND_PORT:-80}:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - wms-network-dev
+    stdin_open: true
+    tty: true
+
+  # Git Auto-Commit Watcher (No changes)
+  git-watcher:
+    image: alpine:latest
+    container_name: wms-git-watcher-dev
+    restart: unless-stopped
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    command: >
+      sh -c "apk add --no-cache git && 
+             git config --global user.email 'dev@wms.local' &&
+             git config --global user.name 'WMS Auto-Backup' &&
+             git config --global --add safe.directory /workspace &&
+             while true; do 
+               git add -A 2>/dev/null || true;
+               git commit -m 'Auto-backup: Docker dev environment' 2>/dev/null || true;
+               sleep 300;
+             done"
+    networks:
+      - wms-network-dev
+
+networks:
+  wms-network-dev:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
