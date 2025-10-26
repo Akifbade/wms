@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, UserPlus, Trash2, Users } from 'lucide-react';
 
 interface User {
@@ -14,16 +14,12 @@ interface StaffAssignment {
   id?: string;
   jobId: string;
   materialIssueId?: string;
-  
-  // Internal Staff
   packerName?: string;
   packerUserId?: string;
   carpenterName?: string;
   carpenterUserId?: string;
   driverName?: string;
   driverUserId?: string;
-  
-  // External Resources
   externalLaborCount?: number;
   externalLaborNames?: string;
   externalLaborCost?: number;
@@ -31,7 +27,6 @@ interface StaffAssignment {
   forkliftOperatorName?: string;
   forkliftCost?: number;
   forkliftHours?: number;
-  
   notes?: string;
 }
 
@@ -96,7 +91,7 @@ const StaffAssignmentDialog: React.FC<StaffAssignmentDialogProps> = ({
   const fetchAvailableStaff = async () => {
     try {
       const response = await fetch('/api/staff-assignments/available-staff', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ` },
       });
       if (response.ok) {
         const data = await response.json();
@@ -107,18 +102,13 @@ const StaffAssignmentDialog: React.FC<StaffAssignmentDialogProps> = ({
     }
   };
 
-  const handleUserSelect = (field: 'packer' | 'carpenter' | 'driver', user: User | null) => {
+  const handleUserSelect = (field: string, userId: string) => {
+    const user = users.find(u => u.id === userId);
     if (user) {
       setFormData({
         ...formData,
         [`${field}Name`]: user.name,
         [`${field}UserId`]: user.id,
-      });
-    } else {
-      setFormData({
-        ...formData,
-        [`${field}Name`]: '',
-        [`${field}UserId`]: '',
       });
     }
   };
@@ -134,7 +124,8 @@ const StaffAssignmentDialog: React.FC<StaffAssignmentDialogProps> = ({
     setExternalLaborList(externalLaborList.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
     try {
       const dataToSubmit = {
@@ -144,7 +135,7 @@ const StaffAssignmentDialog: React.FC<StaffAssignmentDialogProps> = ({
       };
 
       const url = existingAssignment?.id
-        ? `/api/staff-assignments/${existingAssignment.id}`
+        ? `/api/staff-assignments/`
         : '/api/staff-assignments';
       
       const method = existingAssignment?.id ? 'PUT' : 'POST';
@@ -153,7 +144,7 @@ const StaffAssignmentDialog: React.FC<StaffAssignmentDialogProps> = ({
         method,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer `,
         },
         body: JSON.stringify(dataToSubmit),
       });
@@ -172,240 +163,195 @@ const StaffAssignmentDialog: React.FC<StaffAssignmentDialogProps> = ({
     }
   };
 
-  const selectedPacker = users.find(u => u.id === formData.packerUserId);
-  const selectedCarpenter = users.find(u => u.id === formData.carpenterUserId);
-  const selectedDriver = users.find(u => u.id === formData.driverUserId);
+  if (!open) return null;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        <Box display="flex" alignItems="center" gap={1}>
-          <PersonIcon />
-          Staff Assignment
-        </Box>
-      </DialogTitle>
-      
-      <DialogContent dividers>
-        <Grid container spacing={3}>
-          {/* Internal Staff Section */}
-          <Grid item xs={12}>
-            <Typography variant="h6" gutterBottom>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-4 flex justify-between items-center rounded-t-lg">
+          <div className="flex items-center gap-2">
+            <Users className="w-6 h-6" />
+            <h2 className="text-xl font-bold">Staff Assignment</h2>
+          </div>
+          <button onClick={onClose} className="text-white hover:text-gray-200 transition-colors">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-gray-700 flex items-center gap-2">
+              <Users className="w-5 h-5" />
               Internal Staff
-            </Typography>
-          </Grid>
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Packer</label>
+                <select
+                  value={formData.packerUserId || ''}
+                  onChange={(e) => handleUserSelect('packer', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">Select Packer</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} - {user.position || 'Staff'}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          {/* Packer */}
-          <Grid item xs={12} md={6}>
-            <Autocomplete
-              options={users}
-              getOptionLabel={(option) => `${option.name} - ${option.position || 'Staff'}`}
-              value={selectedPacker || null}
-              onChange={(_, newValue) => handleUserSelect('packer', newValue)}
-              renderInput={(params) => (
-                <TextField {...params} label="Packer" placeholder="Select or type name" />
-              )}
-              freeSolo
-              onInputChange={(_, value) => {
-                if (!selectedPacker) {
-                  setFormData({ ...formData, packerName: value });
-                }
-              }}
-            />
-          </Grid>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Carpenter</label>
+                <select
+                  value={formData.carpenterUserId || ''}
+                  onChange={(e) => handleUserSelect('carpenter', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">Select Carpenter</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} - {user.position || 'Staff'}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          {/* Carpenter */}
-          <Grid item xs={12} md={6}>
-            <Autocomplete
-              options={users}
-              getOptionLabel={(option) => `${option.name} - ${option.position || 'Staff'}`}
-              value={selectedCarpenter || null}
-              onChange={(_, newValue) => handleUserSelect('carpenter', newValue)}
-              renderInput={(params) => (
-                <TextField {...params} label="Carpenter" placeholder="Select or type name" />
-              )}
-              freeSolo
-              onInputChange={(_, value) => {
-                if (!selectedCarpenter) {
-                  setFormData({ ...formData, carpenterName: value });
-                }
-              }}
-            />
-          </Grid>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Driver</label>
+                <select
+                  value={formData.driverUserId || ''}
+                  onChange={(e) => handleUserSelect('driver', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">Select Driver</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} - {user.position || 'Staff'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
 
-          {/* Driver */}
-          <Grid item xs={12} md={6}>
-            <Autocomplete
-              options={users}
-              getOptionLabel={(option) => `${option.name} - ${option.position || 'Staff'}`}
-              value={selectedDriver || null}
-              onChange={(_, newValue) => handleUserSelect('driver', newValue)}
-              renderInput={(params) => (
-                <TextField {...params} label="Driver" placeholder="Select or type name" />
-              )}
-              freeSolo
-              onInputChange={(_, value) => {
-                if (!selectedDriver) {
-                  setFormData({ ...formData, driverName: value });
-                }
-              }}
-            />
-          </Grid>
-
-          <Grid item xs={12}>
-            <Divider />
-          </Grid>
-
-          {/* External Labor Section */}
-          <Grid item xs={12}>
-            <Typography variant="h6" gutterBottom>
-              External Labor
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12}>
-            <Box display="flex" gap={1} alignItems="flex-start">
-              <TextField
-                fullWidth
-                label="External Labor Name"
+          <div className="border-t pt-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">External Labor</h3>
+            
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
                 value={newLabor}
                 onChange={(e) => setNewLabor(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addExternalLabor()}
-                placeholder="Enter name and press Add"
+                placeholder="Enter labor name"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addExternalLabor())}
               />
-              <Button
-                variant="contained"
-                onClick={addExternalLabor}
-                startIcon={<AddIcon />}
-                sx={{ minWidth: 100 }}
-              >
+              <button type="button" onClick={addExternalLabor} className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2">
+                <UserPlus className="w-4 h-4" />
                 Add
-              </Button>
-            </Box>
-          </Grid>
+              </button>
+            </div>
 
-          {externalLaborList.length > 0 && (
-            <Grid item xs={12}>
-              <Box display="flex" flexWrap="wrap" gap={1}>
-                {externalLaborList.map((name, index) => (
-                  <Chip
-                    key={index}
-                    label={name}
-                    onDelete={() => removeExternalLabor(index)}
-                    color="primary"
-                    variant="outlined"
-                  />
+            {externalLaborList.length > 0 && (
+              <div className="space-y-2">
+                {externalLaborList.map((labor, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
+                    <span className="text-sm font-medium">{labor}</span>
+                    <button type="button" onClick={() => removeExternalLabor(index)} className="text-red-600 hover:text-red-700">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 ))}
-              </Box>
-            </Grid>
-          )}
+              </div>
+            )}
 
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              type="number"
-              label="External Labor Cost (KWD)"
-              value={formData.externalLaborCost || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, externalLaborCost: parseFloat(e.target.value) || 0 })
-              }
-              InputProps={{ inputProps: { min: 0, step: 0.5 } }}
-            />
-          </Grid>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">External Labor Cost (KWD)</label>
+              <input
+                type="number"
+                step="0.001"
+                value={formData.externalLaborCost || ''}
+                onChange={(e) => setFormData({ ...formData, externalLaborCost: parseFloat(e.target.value) || 0 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
 
-          <Grid item xs={12}>
-            <Divider />
-          </Grid>
-
-          {/* Forklift Section */}
-          <Grid item xs={12}>
-            <Typography variant="h6" gutterBottom>
-              Equipment
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12}>
-            <FormControlLabel
-              control={
-                <Checkbox
+          <div className="border-t pt-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">Forklift (Outside)</h3>
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="forklift"
                   checked={formData.outsideForkliftNeeded || false}
-                  onChange={(e) =>
-                    setFormData({ ...formData, outsideForkliftNeeded: e.target.checked })
-                  }
+                  onChange={(e) => setFormData({ ...formData, outsideForkliftNeeded: e.target.checked })}
+                  className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                 />
-              }
-              label="Outside Forklift Needed"
-            />
-          </Grid>
+                <label htmlFor="forklift" className="text-sm font-medium text-gray-700">Outside Forklift Needed</label>
+              </div>
 
-          {formData.outsideForkliftNeeded && (
-            <>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  label="Forklift Operator Name"
-                  value={formData.forkliftOperatorName || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, forkliftOperatorName: e.target.value })
-                  }
-                />
-              </Grid>
+              {formData.outsideForkliftNeeded && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Operator Name</label>
+                    <input
+                      type="text"
+                      value={formData.forkliftOperatorName || ''}
+                      onChange={(e) => setFormData({ ...formData, forkliftOperatorName: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Hours</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={formData.forkliftHours || ''}
+                      onChange={(e) => setFormData({ ...formData, forkliftHours: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost (KWD)</label>
+                    <input
+                      type="number"
+                      step="0.001"
+                      value={formData.forkliftCost || ''}
+                      onChange={(e) => setFormData({ ...formData, forkliftCost: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Forklift Hours"
-                  value={formData.forkliftHours || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, forkliftHours: parseFloat(e.target.value) || 0 })
-                  }
-                  InputProps={{ inputProps: { min: 0, step: 0.5 } }}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Forklift Cost (KWD)"
-                  value={formData.forkliftCost || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, forkliftCost: parseFloat(e.target.value) || 0 })
-                  }
-                  InputProps={{ inputProps: { min: 0, step: 0.5 } }}
-                />
-              </Grid>
-            </>
-          )}
-
-          <Grid item xs={12}>
-            <Divider />
-          </Grid>
-
-          {/* Notes */}
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              label="Notes"
+          <div className="border-t pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea
               value={formData.notes || ''}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
               placeholder="Any additional notes..."
             />
-          </Grid>
-        </Grid>
-      </DialogContent>
+          </div>
 
-      <DialogActions>
-        <Button onClick={onClose} disabled={loading}>
-          Cancel
-        </Button>
-        <Button onClick={handleSubmit} variant="contained" disabled={loading}>
-          {loading ? 'Saving...' : existingAssignment ? 'Update' : 'Assign Staff'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+          <div className="flex justify-end gap-3 border-t pt-4">
+            <button type="button" onClick={onClose} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50" disabled={loading}>
+              Cancel
+            </button>
+            <button type="submit" className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50" disabled={loading}>
+              {loading ? 'Saving...' : existingAssignment ? 'Update' : 'Assign Staff'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 };
 
