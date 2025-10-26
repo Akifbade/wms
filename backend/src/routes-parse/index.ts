@@ -3,6 +3,8 @@ import express from 'express';
 // 🔐 Authentication & File Upload
 import authRoutes from './auth';
 import uploadRoutes from './upload';
+// 📊 Material Reports
+import materialReportsRoutes from './material-reports';
 // Auto-generated model routes
 import companyRoutes from './company';
 import userRoutes from './user';
@@ -52,6 +54,9 @@ export function registerParseRoutes(app: express.Application) {
   // 🔐 Auth & Upload routes (priority)
   app.use('/api/auth', authRoutes);
   app.use('/api/upload', uploadRoutes);
+  
+  // 📊 Material Reports (before model routes)
+  app.use('/api', materialReportsRoutes);
   
   // Auto-generated model routes
   app.use('/api', companyRoutes);
