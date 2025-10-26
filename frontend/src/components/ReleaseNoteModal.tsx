@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { format, parseISO } from 'date-fns';
+﻿import React, { useState, useEffect } from 'react';
 import { XMarkIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -105,11 +104,26 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
   const dateFormatStr = settings.dateFormat || 'MMM dd, yyyy';
   const timeFormatStr = settings.timeFormat || 'hh:mm a';
 
+  // Helper function to format dates
+  const formatDate = (date: Date | string, format: string): string => {
+    const d = date instanceof Date ? date : new Date(date);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    if (format === 'MMM dd, yyyy') {
+      return `${monthNames[d.getMonth()]} ${d.getDate().toString().padStart(2, '0')}, ${d.getFullYear()}`;
+    } else if (format === 'yyyyMMdd-HHmmss') {
+      return `${d.getFullYear()}${(d.getMonth() + 1).toString().padStart(2, '0')}${d.getDate().toString().padStart(2, '0')}-${d.getHours().toString().padStart(2, '0')}${d.getMinutes().toString().padStart(2, '0')}${d.getSeconds().toString().padStart(2, '0')}`;
+    } else {
+      // Default: use toLocaleDateString
+      return d.toLocaleDateString();
+    }
+  };
+
   // Parse dates safely
-  const parsedReleaseDate = releaseDate instanceof Date ? releaseDate : parseISO(releaseDate as string);
+  const parsedReleaseDate = releaseDate instanceof Date ? releaseDate : new Date(releaseDate as string);
   const parsedArrivalDate = shipment.arrivalDate instanceof Date 
     ? shipment.arrivalDate 
-    : parseISO(shipment.arrivalDate);
+    : new Date(shipment.arrivalDate);
   
   // Calculate storage duration
   const storageDays = Math.ceil((parsedReleaseDate.getTime() - parsedArrivalDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -192,12 +206,12 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="font-semibold">Release Note #:</span>
-                <span className="ml-2">RN-{format(parsedReleaseDate, 'yyyyMMdd-HHmmss')}</span>
+                <span className="ml-2">RN-{formatDate(parsedReleaseDate, 'yyyyMMdd-HHmmss')}</span>
               </div>
               <div>
                 <span className="font-semibold">Date & Time:</span>
                 <span className="ml-2">
-                  {format(parsedReleaseDate, dateFormatStr)} - {format(parsedReleaseDate, timeFormatStr)}
+                  {formatDate(parsedReleaseDate, dateFormatStr)} - {parsedReleaseDate.toLocaleTimeString()}
                 </span>
               </div>
               <div>
@@ -235,15 +249,15 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
             <div className="grid grid-cols-4 gap-4 text-sm">
               <div>
                 <p className="font-semibold text-gray-600">Received Date</p>
-                <p className="text-gray-800">{shipment.receivedDate ? format(parseISO(shipment.receivedDate), 'MMM dd, yyyy') : 'N/A'}</p>
+                <p className="text-gray-800">{shipment.receivedDate ? formatDate(shipment.receivedDate, 'MMM dd, yyyy') : 'N/A'}</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-600">Arrival Date</p>
-                <p className="text-gray-800">{shipment.arrivalDate ? format(parseISO(shipment.arrivalDate), 'MMM dd, yyyy') : format(parsedArrivalDate, 'MMM dd, yyyy')}</p>
+                <p className="text-gray-800">{shipment.arrivalDate ? formatDate(shipment.arrivalDate, 'MMM dd, yyyy') : formatDate(parsedArrivalDate, 'MMM dd, yyyy')}</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-600">Release Date</p>
-                <p className="text-gray-800">{format(parsedReleaseDate, 'MMM dd, yyyy')}</p>
+                <p className="text-gray-800">{formatDate(parsedReleaseDate, 'MMM dd, yyyy')}</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-600">Storage Duration</p>
@@ -285,7 +299,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
           {/* Box Distribution by Rack - NEW SECTION */}
           {settings.releaseShowItems !== false && shipment.boxes && shipment.boxes.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-lg font-bold mb-3 pb-2 border-b" style={{ color: primaryColor }}>📦 BOX DISTRIBUTION BY RACK</h3>
+            <h3 className="text-lg font-bold mb-3 pb-2 border-b" style={{ color: primaryColor }}>ًں“¦ BOX DISTRIBUTION BY RACK</h3>
             <div className="text-xs text-gray-600 mb-3">
               Storage location details for each box before release
             </div>
@@ -326,7 +340,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="text-base font-bold text-gray-800">
-                                {isUnassigned ? '⏳ Unassigned' : `🗄️ Rack ${rackCode}`}
+                                {isUnassigned ? 'âڈ³ Unassigned' : `ًں—„ï¸ڈ Rack ${rackCode}`}
                               </span>
                               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                 isUnassigned 
@@ -337,7 +351,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
                               </span>
                             </div>
                             {!isUnassigned && rack?.location && (
-                              <p className="text-xs text-gray-600 mt-1">📍 {rack.location}</p>
+                              <p className="text-xs text-gray-600 mt-1">ًں“چ {rack.location}</p>
                             )}
                           </div>
                         </div>
@@ -415,7 +429,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-600 mb-2">Date:</p>
-                <p className="border-b border-gray-400 pb-1">{format(parsedReleaseDate, 'MMM dd, yyyy')}</p>
+                <p className="border-b border-gray-400 pb-1">{formatDate(parsedReleaseDate, 'MMM dd, yyyy')}</p>
               </div>
             </div>
           </div>
@@ -473,11 +487,11 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
               <div className="text-xs text-gray-700 whitespace-pre-wrap">{settings.releaseTerms}</div>
             ) : (
               <ul className="text-xs space-y-1 text-gray-700 ml-4">
-                <li>• All items have been inspected and released in good condition</li>
-                <li>• The company shall not be held liable for any items after the release date and time</li>
-                <li>• Payment must be completed within the specified due date on the invoice</li>
-                <li>• This document serves as official proof of shipment release and receipt</li>
-                <li>• Any disputes must be raised within 24 hours of release</li>
+                <li>â€¢ All items have been inspected and released in good condition</li>
+                <li>â€¢ The company shall not be held liable for any items after the release date and time</li>
+                <li>â€¢ Payment must be completed within the specified due date on the invoice</li>
+                <li>â€¢ This document serves as official proof of shipment release and receipt</li>
+                <li>â€¢ Any disputes must be raised within 24 hours of release</li>
               </ul>
             )}
           </div>
@@ -492,7 +506,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
                 <p className="text-sm font-semibold mb-6 text-gray-700">Released By (Company Staff)</p>
                 <div className="border-b-2 border-gray-800 mb-2 h-16"></div>
                 <p className="text-sm font-semibold">{releasedBy}</p>
-                <p className="text-xs text-gray-600 mt-1">Date: {format(parsedReleaseDate, 'MMM dd, yyyy')}</p>
+                <p className="text-xs text-gray-600 mt-1">Date: {formatDate(parsedReleaseDate, 'MMM dd, yyyy')}</p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-semibold mb-6 text-gray-700">Received By (Collector)</p>
@@ -518,7 +532,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
               </p>
               {settings.companyWebsite && <p>Website: {settings.companyWebsite}</p>}
             </div>
-            <p className="text-xs text-gray-500 mt-3">Generated on {format(new Date(), `${dateFormatStr} ${timeFormatStr}`)}</p>
+            <p className="text-xs text-gray-500 mt-3">Generated on {new Date().toLocaleString()}</p>
           </div>
         </div>
 
@@ -569,3 +583,4 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
     </div>
   );
 };
+
