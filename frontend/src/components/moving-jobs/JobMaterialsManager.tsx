@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Package, Plus, X, Save, ArrowLeftRight, Camera, Trash2, Users
+  Package, Plus, X, Save, ArrowLeftRight, Camera, Trash2
 } from 'lucide-react';
-import StaffAssignmentDialog from '../StaffAssignmentDialog';
 
 interface JobMaterialsManagerProps {
   jobId: string;
@@ -78,10 +77,6 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
   });
 
   const [loading, setLoading] = useState(false);
-  
-  // Staff Assignment Dialog State
-  const [showStaffDialog, setShowStaffDialog] = useState(false);
-  const [selectedMaterialIssueId, setSelectedMaterialIssueId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -296,25 +291,13 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
       {activeTab === 'issued' && (
         <div>
           {jobStatus !== 'COMPLETED' && jobStatus !== 'CANCELLED' && (
-            <div className="mb-4 flex gap-2">
-              <button
-                onClick={() => setShowIssueForm(true)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                <Plus className="w-4 h-4" />
-                Issue Material
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedMaterialIssueId(null);
-                  setShowStaffDialog(true);
-                }}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-              >
-                <Users className="w-4 h-4" />
-                Assign Staff
-              </button>
-            </div>
+            <button
+              onClick={() => setShowIssueForm(true)}
+              className="mb-4 flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              <Plus className="w-4 h-4" />
+              Issue Material
+            </button>
           )}
 
           {/* Issue Material Form */}
@@ -659,24 +642,6 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
             <p className="text-center text-gray-500 py-8">No returns recorded yet</p>
           )}
         </div>
-      )}
-      
-      {/* Staff Assignment Dialog */}
-      {showStaffDialog && (
-        <StaffAssignmentDialog
-          open={showStaffDialog}
-          onClose={() => {
-            setShowStaffDialog(false);
-            setSelectedMaterialIssueId(null);
-          }}
-          jobId={jobId}
-          materialIssueId={selectedMaterialIssueId || undefined}
-          onSuccess={() => {
-            setShowStaffDialog(false);
-            setSelectedMaterialIssueId(null);
-            loadData(); // Reload data after assignment
-          }}
-        />
       )}
     </div>
   );
