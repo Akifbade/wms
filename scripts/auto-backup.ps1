@@ -40,6 +40,14 @@ function Auto-Commit {
     } else {
         Write-Log "No changes detected, skipping backup"
     }
+    
+    # Update AI Context (every backup cycle)
+    try {
+        & "$projectPath\scripts\update-ai-context.ps1" -CurrentTask "Auto-backup in progress" 2>&1 | Out-Null
+        Write-Log "AI Context updated"
+    } catch {
+        Write-Log "AI Context update failed (not critical)"
+    }
 }
 
 Write-Log "=== AUTO-BACKUP STARTED ==="
