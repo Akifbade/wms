@@ -137,22 +137,38 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
     setSuccess('');
 
     try {
+      // Convert to numbers using getSafeNumber
+      const totalBoxCount = getSafeNumber(formData.totalBoxCount);
+      const currentBoxCount = getSafeNumber(formData.currentBoxCount);
+      const estimatedValue = getSafeNumber(formData.estimatedValue);
+
       // Validation
       if (!formData.clientName || !formData.clientPhone) {
         throw new Error('Client name and phone are required');
       }
-      if (formData.totalBoxCount <= 0) {
+      if (totalBoxCount <= 0) {
         throw new Error('Total box count must be greater than 0');
       }
-      if (formData.currentBoxCount > formData.totalBoxCount) {
+      if (currentBoxCount > totalBoxCount) {
         throw new Error('Current box count cannot exceed total box count');
       }
       if (!formData.rackId) {
         throw new Error('Please select a rack');
       }
 
-      // Remove totalBoxCount from the data being sent (schema only has currentBoxCount)
-      const { totalBoxCount, ...updateData } = formData;
+      // Prepare update data with converted numbers
+      const updateData = {
+        clientName: formData.clientName,
+        clientPhone: formData.clientPhone,
+        clientEmail: formData.clientEmail,
+        description: formData.description,
+        currentBoxCount,
+        rackId: formData.rackId,
+        estimatedValue,
+        notes: formData.notes,
+        status: formData.status,
+      };
+
       await shipmentsAPI.update(shipment.id, updateData);
 
       // Save custom field values
@@ -175,7 +191,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         }
       }
       
-      alert(`✅ SUCCESS!\n\nShipment ${shipment.referenceId} has been updated successfully!\n\n📦 Current Boxes: ${formData.currentBoxCount}\n📍 Rack: ${formData.rackId}`);
+      alert(`✅ SUCCESS!\n\nShipment ${shipment.referenceId} has been updated successfully!\n\n📦 Current Boxes: ${currentBoxCount}\n📍 Rack: ${formData.rackId}`);
       
       onSuccess();
       onClose();
@@ -516,4 +532,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
           setShowRackMap(false);
         }}
       />
-    <
+    </div>
+  );
+}
+
