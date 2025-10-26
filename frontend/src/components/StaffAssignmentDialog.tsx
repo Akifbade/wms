@@ -1,0 +1,434 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Grid,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControlLabel,
+  Checkbox,
+  Typography,
+  Box,
+  Chip,
+  Autocomplete,
+  IconButton,
+  Divider,
+} from '@mui/material';
+import { Add as AddIcon, Delete as DeleteIcon, Person as PersonIcon } from '@mui/icons-material';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  skills?: string;
+  position?: string;
+}
+
+interface StaffAssignment {
+  id?: string;
+  jobId: string;
+  materialIssueId?: string;
+  
+  // Internal Staff
+  packerName?: string;
+  packerUserId?: string;
+  carpenterName?: string;
+  carpenterUserId?: string;
+  driverName?: string;
+  driverUserId?: string;
+  
+  // External Resources
+  externalLaborCount?: number;
+  externalLaborNames?: string;
+  externalLaborCost?: number;
+  
+  outsideForkliftNeeded?: boolean;
+  forkliftOperatorName?: string;
+  forkliftCost?: number;
+  forkliftHours?: number;
+  
+  notes?: string;
+}
+
+interface StaffAssignmentDialogProps {
+  open: boolean;
+  onClose: () => void;
+  jobId: string;
+  materialIssueId?: string;
+  existingAssignment?: StaffAssignment;
+  onSuccess?: () => void;
+}
+
+const StaffAssignmentDialog: React.FC<StaffAssignmentDialogProps> = ({
+  open,
+  onClose,
+  jobId,
+  materialIssueId,
+  existingAssignment,
+  onSuccess,
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [externalLaborList, setExternalLaborList] = useState<string[]>([]);
+  const [newLabor, setNewLabor] = useState('');
+  
+  const [formData, setFormData] = useState<StaffAssignment>({
+    jobId,
+    materialIssueId,
+    packerName: '',
+    packerUserId: '',
+    carpenterName: '',
+    carpenterUserId: '',
+    driverName: '',
+    driverUserId: '',
+    externalLaborCount: 0,
+    externalLaborNames: '',
+    externalLaborCost: 0,
+    outsideForkliftNeeded: false,
+    forkliftOperatorName: '',
+    forkliftCost: 0,
+    forkliftHours: 0,
+    notes: '',
+  });
+
+  useEffect(() => {
+    if (open) {
+      fetchAvailableStaff();
+      if (existingAssignment) {
+        setFormData(existingAssignment);
+        if (existingAssignment.externalLaborNames) {
+          try {
+            const names = JSON.parse(existingAssignment.externalLaborNames);
+            setExternalLaborList(Array.isArray(names) ? names : []);
+          } catch (e) {
+            setExternalLaborList([]);
+          }
+        }
+      }
+    }
+  }, [open, existingAssignment]);
+
+  const fetchAvailableStaff = async () => {
+    try {
+      const response = await fetch('/api/staff-assignments/available-staff', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch staff:', error);
+    }
+  };
+
+  const handleUserSelect = (field: 'packer' | 'carpenter' | 'driver', user: User | null) => {
+    if (user) {
+      setFormData({
+        ...formData,
+        [`${field}Name`]: user.name,
+        [`${field}UserId`]: user.id,
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [`${field}Name`]: '',
+        [`${field}UserId`]: '',
+      });
+    }
+  };
+
+  const addExternalLabor = () => {
+    if (newLabor.trim()) {
+      setExternalLaborList([...externalLaborList, newLabor.trim()]);
+      setNewLabor('');
+    }
+  };
+
+  const removeExternalLabor = (index: number) => {
+    setExternalLaborList(externalLaborList.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const dataToSubmit = {
+        ...formData,
+        externalLaborCount: externalLaborList.length,
+        externalLaborNames: JSON.stringify(externalLaborList),
+      };
+
+      const url = existingAssignment?.id
+        ? `/api/staff-assignments/${existingAssignment.id}`
+        : '/api/staff-assignments';
+      
+      const method = existingAssignment?.id ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify(dataToSubmit),
+      });
+
+      if (response.ok) {
+        onSuccess?.();
+        onClose();
+      } else {
+        alert('Failed to save staff assignment');
+      }
+    } catch (error) {
+      console.error('Failed to save assignment:', error);
+      alert('Error saving staff assignment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedPacker = users.find(u => u.id === formData.packerUserId);
+  const selectedCarpenter = users.find(u => u.id === formData.carpenterUserId);
+  const selectedDriver = users.find(u => u.id === formData.driverUserId);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        <Box display="flex" alignItems="center" gap={1}>
+          <PersonIcon />
+          Staff Assignment
+        </Box>
+      </DialogTitle>
+      
+      <DialogContent dividers>
+        <Grid container spacing={3}>
+          {/* Internal Staff Section */}
+          <Grid item xs={12}>
+            <Typography variant="h6" gutterBottom>
+              Internal Staff
+            </Typography>
+          </Grid>
+
+          {/* Packer */}
+          <Grid item xs={12} md={6}>
+            <Autocomplete
+              options={users}
+              getOptionLabel={(option) => `${option.name} - ${option.position || 'Staff'}`}
+              value={selectedPacker || null}
+              onChange={(_, newValue) => handleUserSelect('packer', newValue)}
+              renderInput={(params) => (
+                <TextField {...params} label="Packer" placeholder="Select or type name" />
+              )}
+              freeSolo
+              onInputChange={(_, value) => {
+                if (!selectedPacker) {
+                  setFormData({ ...formData, packerName: value });
+                }
+              }}
+            />
+          </Grid>
+
+          {/* Carpenter */}
+          <Grid item xs={12} md={6}>
+            <Autocomplete
+              options={users}
+              getOptionLabel={(option) => `${option.name} - ${option.position || 'Staff'}`}
+              value={selectedCarpenter || null}
+              onChange={(_, newValue) => handleUserSelect('carpenter', newValue)}
+              renderInput={(params) => (
+                <TextField {...params} label="Carpenter" placeholder="Select or type name" />
+              )}
+              freeSolo
+              onInputChange={(_, value) => {
+                if (!selectedCarpenter) {
+                  setFormData({ ...formData, carpenterName: value });
+                }
+              }}
+            />
+          </Grid>
+
+          {/* Driver */}
+          <Grid item xs={12} md={6}>
+            <Autocomplete
+              options={users}
+              getOptionLabel={(option) => `${option.name} - ${option.position || 'Staff'}`}
+              value={selectedDriver || null}
+              onChange={(_, newValue) => handleUserSelect('driver', newValue)}
+              renderInput={(params) => (
+                <TextField {...params} label="Driver" placeholder="Select or type name" />
+              )}
+              freeSolo
+              onInputChange={(_, value) => {
+                if (!selectedDriver) {
+                  setFormData({ ...formData, driverName: value });
+                }
+              }}
+            />
+          </Grid>
+
+          <Grid item xs={12}>
+            <Divider />
+          </Grid>
+
+          {/* External Labor Section */}
+          <Grid item xs={12}>
+            <Typography variant="h6" gutterBottom>
+              External Labor
+            </Typography>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Box display="flex" gap={1} alignItems="flex-start">
+              <TextField
+                fullWidth
+                label="External Labor Name"
+                value={newLabor}
+                onChange={(e) => setNewLabor(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addExternalLabor()}
+                placeholder="Enter name and press Add"
+              />
+              <Button
+                variant="contained"
+                onClick={addExternalLabor}
+                startIcon={<AddIcon />}
+                sx={{ minWidth: 100 }}
+              >
+                Add
+              </Button>
+            </Box>
+          </Grid>
+
+          {externalLaborList.length > 0 && (
+            <Grid item xs={12}>
+              <Box display="flex" flexWrap="wrap" gap={1}>
+                {externalLaborList.map((name, index) => (
+                  <Chip
+                    key={index}
+                    label={name}
+                    onDelete={() => removeExternalLabor(index)}
+                    color="primary"
+                    variant="outlined"
+                  />
+                ))}
+              </Box>
+            </Grid>
+          )}
+
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              type="number"
+              label="External Labor Cost (KWD)"
+              value={formData.externalLaborCost || ''}
+              onChange={(e) =>
+                setFormData({ ...formData, externalLaborCost: parseFloat(e.target.value) || 0 })
+              }
+              InputProps={{ inputProps: { min: 0, step: 0.5 } }}
+            />
+          </Grid>
+
+          <Grid item xs={12}>
+            <Divider />
+          </Grid>
+
+          {/* Forklift Section */}
+          <Grid item xs={12}>
+            <Typography variant="h6" gutterBottom>
+              Equipment
+            </Typography>
+          </Grid>
+
+          <Grid item xs={12}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.outsideForkliftNeeded || false}
+                  onChange={(e) =>
+                    setFormData({ ...formData, outsideForkliftNeeded: e.target.checked })
+                  }
+                />
+              }
+              label="Outside Forklift Needed"
+            />
+          </Grid>
+
+          {formData.outsideForkliftNeeded && (
+            <>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  label="Forklift Operator Name"
+                  value={formData.forkliftOperatorName || ''}
+                  onChange={(e) =>
+                    setFormData({ ...formData, forkliftOperatorName: e.target.value })
+                  }
+                />
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Forklift Hours"
+                  value={formData.forkliftHours || ''}
+                  onChange={(e) =>
+                    setFormData({ ...formData, forkliftHours: parseFloat(e.target.value) || 0 })
+                  }
+                  InputProps={{ inputProps: { min: 0, step: 0.5 } }}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Forklift Cost (KWD)"
+                  value={formData.forkliftCost || ''}
+                  onChange={(e) =>
+                    setFormData({ ...formData, forkliftCost: parseFloat(e.target.value) || 0 })
+                  }
+                  InputProps={{ inputProps: { min: 0, step: 0.5 } }}
+                />
+              </Grid>
+            </>
+          )}
+
+          <Grid item xs={12}>
+            <Divider />
+          </Grid>
+
+          {/* Notes */}
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              label="Notes"
+              value={formData.notes || ''}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Any additional notes..."
+            />
+          </Grid>
+        </Grid>
+      </DialogContent>
+
+      <DialogActions>
+        <Button onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button onClick={handleSubmit} variant="contained" disabled={loading}>
+          {loading ? 'Saving...' : existingAssignment ? 'Update' : 'Assign Staff'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+export default StaffAssignmentDialog;
