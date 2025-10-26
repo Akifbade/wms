@@ -3,9 +3,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 
-// Import Parse config
-import './config/parse';
-
 // Import routes
 import authRoutes from './routes/auth';
 import shipmentRoutes from './routes/shipments';
@@ -34,10 +31,6 @@ import pluginsRoutes from './routes/plugins';
 import shipmentItemsRoutes from './routes/shipment-items';
 import customerMaterialsRoutes from './routes/customer-materials';
 import workerDashboardRoutes from './routes/worker-dashboard';
-// PARSE: Test routes
-import parseTestRoutes from './routes/parse-test';
-// PARSE: Auto-generated routes (ALL 43 models!)
-import { registerParseRoutes } from './routes-parse';
 
 // Load environment variables FIRST
 dotenv.config();
@@ -72,46 +65,38 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     message: 'Warehouse Management API is running',
-    timestamp: new Date().toISOString(),
-    database: process.env.USE_PARSE === 'true' ? 'Parse+MongoDB' : 'Prisma+MySQL'
+    timestamp: new Date().toISOString()
   });
 });
 
-// 🔥 PARSE ROUTES - ALL 43 MODELS AUTO-GENERATED!
-// Toggle with USE_PARSE=true in .env
-if (process.env.USE_PARSE === 'true') {
-  console.log('🔥 Using PARSE routes (MongoDB backend)');
-  registerParseRoutes(app);
-  app.use('/api/parse', parseTestRoutes);
-} else {
-  console.log('⚠️  Using PRISMA routes (MySQL backend)');
-  // OLD API Routes (Prisma)
-  app.use('/api/auth', authRoutes);
-  app.use('/api/shipments', shipmentRoutes);
-  app.use('/api/racks', rackRoutes);
-  app.use('/api/dashboard', dashboardRoutes);
-  app.use('/api/billing', billingRoutes);
-  app.use('/api/withdrawals', withdrawalRoutes);
-  app.use('/api/expenses', expenseRoutes);
-  app.use('/api/company', companyRoutes);
-  app.use('/api/users', userRoutes);
-  app.use('/api/invoice-settings', invoiceSettingsRoutes);
-  app.use('/api/notification-preferences', notificationPreferencesRoutes);
-  app.use('/api/custom-fields', customFieldsRoutes);
-  app.use('/api/custom-field-values', customFieldValuesRoutes);
-  app.use('/api/warehouse', warehouseRoutes);
-  app.use('/api/shipment-settings', shipmentSettingsRoutes);
-  app.use('/api/template-settings', templateRoutes);
-  app.use('/api/upload', uploadRoutes);
-  app.use('/api/permissions', permissionsRoutes);
-  app.use('/api/moving-jobs', movingJobsRoutes);
-  app.use('/api/materials', materialsRoutes);
-  app.use('/api/reports', reportsRoutes);
-  app.use('/api/plugins', pluginsRoutes);
-  app.use('/api', shipmentItemsRoutes); // Handles /api/shipments/:id/items
-  app.use('/api', customerMaterialsRoutes); // Handles /api/customers/*
-  app.use('/api', workerDashboardRoutes); // Handles /api/worker/*
-}
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/shipments', shipmentRoutes);
+app.use('/api/racks', rackRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/withdrawals', withdrawalRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/company', companyRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/invoice-settings', invoiceSettingsRoutes);
+app.use('/api/notification-preferences', notificationPreferencesRoutes);
+app.use('/api/custom-fields', customFieldsRoutes);
+app.use('/api/custom-field-values', customFieldValuesRoutes);
+app.use('/api/warehouse', warehouseRoutes);
+app.use('/api/shipment-settings', shipmentSettingsRoutes);
+app.use('/api/template-settings', templateRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/permissions', permissionsRoutes);
+app.use('/api/moving-jobs', movingJobsRoutes);
+// app.use('/api/jobs', jobsRoutes); // REMOVED: Duplicate of moving-jobs
+app.use('/api/materials', materialsRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/plugins', pluginsRoutes);
+// NEW: Enhanced warehouse routes
+app.use('/api', shipmentItemsRoutes); // Handles /api/shipments/:id/items
+app.use('/api', customerMaterialsRoutes); // Handles /api/customers/*
+app.use('/api', workerDashboardRoutes); // Handles /api/worker/*
 
 // 404 handler
 app.use((req, res) => {
@@ -131,12 +116,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 const server = app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-  if (process.env.USE_PARSE === 'true') {
-    console.log(`🗄️  Database: MongoDB (Parse Server)`);
-    console.log(`🔥 Parse Dashboard: http://localhost:4040`);
-  } else {
-    console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}`);
-  }
+  console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}`);
   console.log(`🚛 Fleet Management: ${process.env.FLEET_ENABLED === 'true' ? '✅ ENABLED' : '❌ DISABLED'}`);
 });
 

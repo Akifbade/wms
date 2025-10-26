@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: mysql://${DB_USER:-wms_user}:${DB_PASSWORD:-wmspassword}@database:3306/${DB_NAME:-warehouse_wms}
+      DATABASE_URL: mysql://${DB_USER:-wms_user}:${DB_PASSWORD:-wmspassword123}@database:3306/${DB_NAME:-warehouse_wms}
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
       PORT: 5000
     ports:
