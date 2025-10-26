@@ -58,17 +58,20 @@ export const Login: React.FC = () => {
 
     try {
       const response = await authAPI.login(email, password);
-      console.log('Login successful:', response.user);
-      console.log('Token saved, navigating to dashboard...');
+      console.log('✅ Login successful:', response.user);
+      console.log('✅ Token saved:', response.token ? 'Yes' : 'No');
+      console.log('✅ User saved:', localStorage.getItem('user') ? 'Yes' : 'No');
+      console.log('✅ Auth token:', localStorage.getItem('authToken') ? 'Yes' : 'No');
       
       // Small delay to ensure localStorage is saved
       await new Promise(resolve => setTimeout(resolve, 100));
       
+      console.log('🔄 Navigating to dashboard...');
       // Force navigation using window.location for reliability
       window.location.href = '/dashboard';
     } catch (err: any) {
       setError(err.message || 'Invalid email or password');
-      console.error('Login error:', err);
+      console.error('❌ Login error:', err);
       setLoading(false);
     }
   };
