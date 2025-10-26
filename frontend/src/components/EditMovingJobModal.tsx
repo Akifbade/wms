@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { jobsAPI } from '../services/api';
 import MaterialReturnModal from './MaterialReturnModal';
-import { parseNumberInput } from '../utils/inputHelpers';
 
 interface CustomField {
   id: string;
@@ -29,8 +28,6 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
     fromAddress: '',
     toAddress: '',
     scheduledDate: '',
-    estimatedHours: '', // Empty string instead of 0
-    totalCost: '', // Empty string instead of 0
     status: 'SCHEDULED',
   });
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
@@ -54,8 +51,6 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
         fromAddress: job.jobAddress || job.fromAddress || '',
         toAddress: job.dropoffAddress || job.toAddress || '',
         scheduledDate,
-        estimatedHours: job.estimatedHours || '', // Empty string instead of 0
-        totalCost: job.totalCost || '', // Empty string instead of 0
         status: job.status || 'PLANNED',
       });
       setError('');
@@ -107,14 +102,7 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
-    // For number fields, allow empty string (no "0" stuck)
-    if (name === 'estimatedHours' || name === 'totalCost') {
-      const parsedValue = parseNumberInput(value, true); // true = allow decimals
-      setFormData(prev => ({ ...prev, [name]: parsedValue }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -291,22 +279,6 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
                   required
                 />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estimated Hours
-                </label>
-                <input
-                  type="number"
-                  name="estimatedHours"
-                  value={formData.estimatedHours}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="0"
-                  min="0"
-                  step="0.5"
-                />
-              </div>
             </div>
           </div>
 
@@ -384,29 +356,6 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
                   </p>
                 )}
               </div>
-            </div>
-          </div>
-
-          {/* Cost Information */}
-          <div className="border-b pb-4">
-            <h3 className="text-lg font-semibold mb-4 text-gray-700">Cost Information</h3>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Total Cost (KWD)
-              </label>
-              <input
-                type="number"
-                name="totalCost"
-                value={formData.totalCost}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                placeholder="0.00"
-                min="0"
-                step="0.001"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Update cost after job completion or quote approval
-              </p>
             </div>
           </div>
 
