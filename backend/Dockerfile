@@ -18,8 +18,9 @@ COPY prisma ./prisma/
 # Use npm install as fallback if npm ci fails
 RUN npm ci --include=dev --verbose 2>&1 || npm install --include=dev
 
-# Generate Prisma Client first (before copying source)
-RUN npx prisma generate
+# Ensure Prisma CLI binaries are executable then generate client
+RUN chmod +x node_modules/.bin/prisma 2>/dev/null || true && \
+  npx prisma generate
 
 # Copy source code
 COPY . .
