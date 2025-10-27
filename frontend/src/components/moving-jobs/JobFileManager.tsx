@@ -8,12 +8,14 @@ interface JobFileManagerProps {
 }
 
 interface JobFile {
-  id: string;
+  id: number;
   jobId: string;
   fileName: string;
-  fileUrl: string;
-  fileType: string;
+  originalName: string;
+  filePath: string;
   fileSize: number;
+  mimeType: string;
+  folderName?: string;
   uploadedAt: string;
   uploadedBy: string;
 }
@@ -105,7 +107,7 @@ const JobFileManager: React.FC<JobFileManagerProps> = ({ isOpen, onClose, job })
     }
   };
 
-  const deleteFile = async (fileId: string) => {
+  const deleteFile = async (fileId: number) => {
     if (!confirm('Delete this file?')) return;
 
     try {
@@ -135,11 +137,11 @@ const JobFileManager: React.FC<JobFileManagerProps> = ({ isOpen, onClose, job })
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const getFileIcon = (fileType: string) => {
-    if (fileType.includes('image')) return '🖼️';
-    if (fileType.includes('pdf')) return '📄';
-    if (fileType.includes('word') || fileType.includes('document')) return '📝';
-    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return '📊';
+  const getFileIcon = (mimeType: string) => {
+    if (mimeType.includes('image')) return '🖼️';
+    if (mimeType.includes('pdf')) return '📄';
+    if (mimeType.includes('word') || mimeType.includes('document')) return '📝';
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return '📊';
     return '📎';
   };
 
@@ -217,9 +219,9 @@ const JobFileManager: React.FC<JobFileManagerProps> = ({ isOpen, onClose, job })
                   className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <div className="flex items-center flex-1">
-                    <span className="text-3xl mr-4">{getFileIcon(file.fileType)}</span>
+                    <span className="text-3xl mr-4">{getFileIcon(file.mimeType)}</span>
                     <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{file.fileName}</h4>
+                      <h4 className="font-medium text-gray-900">{file.originalName}</h4>
                       <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                         <span>{formatFileSize(file.fileSize)}</span>
                         <span>•</span>
@@ -235,7 +237,7 @@ const JobFileManager: React.FC<JobFileManagerProps> = ({ isOpen, onClose, job })
                   </div>
                   <div className="flex items-center gap-2">
                     <a
-                      href={file.fileUrl}
+                      href={`/uploads/job-files/${file.jobId}/${file.folderName || ''}/${file.fileName}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
@@ -244,8 +246,8 @@ const JobFileManager: React.FC<JobFileManagerProps> = ({ isOpen, onClose, job })
                       <Eye className="w-5 h-5" />
                     </a>
                     <a
-                      href={file.fileUrl}
-                      download={file.fileName}
+                      href={`/uploads/job-files/${file.jobId}/${file.folderName || ''}/${file.fileName}`}
+                      download={file.originalName}
                       className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
                       title="Download"
                     >
