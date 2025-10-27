@@ -1,45 +1,137 @@
 # PROJECT CONTEXT FILE - AI KO BATAO PROJECT KYA HAI
-# Ye file har new chat mein AI ko share karna
+# ⚠️ Ye file har new chat mein AI ko share karna - MANDATORY!
 
 ## 🎯 PROJECT OVERVIEW
 **Name:** Warehouse Management System (WMS)
 **Type:** Full-stack web application
-**Status:** PRODUCTION READY - DO NOT BREAK!
+**Status:** 🟢 **LIVE IN PRODUCTION** - PROTECT DATA AT ALL COSTS!
+**Production URL:** http://148.230.107.155 (qgocargo.cloud)
+**Live Users:** 4 users, 1 company (REAL DATA - DON'T DELETE!)
+**Last Updated:** October 27, 2025 - Logo upload system fixed + Auto-backups active
 
-## ⚠️ CRITICAL RULES FOR AI
+## 🚨 CRITICAL PRODUCTION RULES FOR AI - READ FIRST!
 
-### 🔴 RULE #1: ALWAYS BACKUP BEFORE ANY CHANGE!
-```powershell
-# Har feature add karne se pehle YE COMMAND MANDATORY!
-git tag backup-$(Get-Date -Format "yyyyMMdd-HHmmss")
-git add -A
-git commit -m "Backup before: [feature name]"
-```
-
-### 🔴 RULE #2: NEVER CHANGE DATABASE SCHEMA DIRECTLY!
-```
-Database changes sirf Prisma migrations se karo
-NEVER edit schema.prisma without migration
-```
-
-### 🔴 RULE #3: TEST BEFORE COMMIT!
-```powershell
-# Feature add karne ke baad test karo
-docker-compose -f docker-compose.dev.yml up -d
-# Browser mein check karo
-# Agar sab theek, tab hi commit
-```
-
-### 🔴 RULE #4: FEATURE BRANCHES MANDATORY!
+### 🔴 RULE #1: NEVER DELETE PRODUCTION DATA!
 ```bash
-# Main code kabhi directly edit mat karo
-git checkout -b feature/[feature-name]
-# Changes karo
-# Test karo
-# Merge karo
+# ❌ ABSOLUTELY FORBIDDEN - WILL DELETE ALL USER DATA:
+docker-compose down -v           # NEVER use -v flag!
+docker volume rm newstart_mysql-data
+npx prisma db push --accept-data-loss
+npx prisma migrate reset
+
+# ✅ SAFE COMMANDS:
+docker-compose restart backend
+docker-compose up -d --build backend
+docker logs wms-backend
 ```
 
-## 📁 PROJECT STRUCTURE (MIGRATED TO PARSE!)
+### 🔴 RULE #2: BACKUP BEFORE ANY DATABASE CHANGE!
+```bash
+# VPS pe automatic backups har 5 minutes:
+ssh root@148.230.107.155 "/root/backup-wms-db.sh"
+
+# Manual backup before changes:
+ssh root@148.230.107.155 "docker exec wms-database mysqldump -u root -prootpassword123 warehouse_wms > /root/manual-backup-$(date +%Y%m%d_%H%M%S).sql"
+
+# Verify backup created:
+ssh root@148.230.107.155 "ls -lh /root/wms-backups/ | tail -5"
+```
+
+### 🔴 RULE #3: TEST LOCALLY FIRST - NEVER ON PRODUCTION!
+```powershell
+# Local testing required:
+docker-compose -f docker-compose.dev.yml up -d
+# Test thoroughly
+# Only deploy if working perfectly
+```
+
+### 🔴 RULE #4: READ DATABASE-SAFETY-GUIDE.md BEFORE ANY WORK!
+```
+Location: DATABASE-SAFETY-GUIDE.md
+Contains: Safe commands, backup procedures, restore steps
+MANDATORY reading before database changes!
+```
+
+---
+
+## 🌐 PRODUCTION DEPLOYMENT STATUS
+
+### **Server Information:**
+- **VPS IP:** 148.230.107.155
+- **Domain:** qgocargo.cloud (DNS configured, HTTP only)
+- **OS:** Rocky Linux 9
+- **Access:** SSH root@148.230.107.155 (password: Qgocargo@123)
+- **Project Path:** /root/NEW START/
+
+### **Live Application:**
+- **Frontend URL:** http://148.230.107.155 (port 80)
+- **Backend API:** http://148.230.107.155:5000
+- **Database:** MySQL 8.0 (port 3307 external, 3306 internal)
+- **Status:** 🟢 LIVE with real user data
+
+### **Production Data:**
+- **Users:** 4 active users (admin@demo.com, manager@demo.com + 2 more)
+- **Companies:** 1 company with branding configured
+- **Database Size:** ~20KB (growing)
+- **Last Backup:** Auto-backup every 5 minutes to /root/wms-backups/
+
+### **Docker Containers:**
+```bash
+wms-frontend   - Nginx serving React app (port 80)
+wms-backend    - Node.js Express API (port 5000)
+wms-database   - MySQL 8.0 (port 3307)
+git-watcher    - Auto git-pull on push (disabled on VPS)
+```
+
+### **Database Credentials:**
+```
+Host: wms-database (internal) / localhost:3307 (external)
+Database: warehouse_wms
+Root User: root / rootpassword123
+App User: wms_user / wmspassword123
+```
+
+### **Backup System:**
+```
+Location: /root/wms-backups/
+Frequency: Every 5 minutes (cron job)
+Retention: Last 100 SQL backups
+Volume Backup: Daily at 2 AM to /root/volume-backups/
+Scripts:
+  - /root/backup-wms-db.sh (SQL backup)
+  - /root/backup-volume.sh (Volume backup)
+  - /root/restore-wms-db.sh (Restore)
+  - /root/check-backups.sh (Health check)
+```
+
+### **Recent Fixes Applied (Oct 27, 2025):**
+1. ✅ **Nginx Upload Proxy Fixed** - Logo uploads now work correctly
+   - Fixed location block ordering in nginx.conf
+   - `/uploads` proxy now has priority over static file serving
+   - Regex location excludes /uploads/* paths
+   
+2. ✅ **Auto-Backup System Deployed**
+   - Cron job backing up database every 5 minutes
+   - Daily volume backups at 2 AM
+   - 100 SQL backups + 7 volume backups retention
+
+3. ✅ **Database Safety Guide Created**
+   - Comprehensive safety procedures
+   - Safe vs dangerous commands documented
+   - Restore procedures documented
+
+### **Known Working Features:**
+- ✅ User authentication (login/logout)
+- ✅ Company branding (logo upload/display)
+- ✅ Demo credentials on login page
+- ✅ Input fields (fixed "0" stuck issue)
+- ✅ File upload system (logos, damage photos)
+- ✅ API proxying through Nginx
+- ✅ Database persistence across restarts
+
+---
+
+## 📁 PROJECT STRUCTURE (Prisma + MySQL - PRODUCTION)
 
 ### Backend (Node.js + Parse Server + MongoDB)
 ```
