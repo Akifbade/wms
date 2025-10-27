@@ -36,10 +36,13 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       include: {
         inventory: true,
         boxes: {
-          where: { status: 'IN_STORAGE' },
+          where: { 
+            status: { in: ['IN_STORAGE', 'STORED'] }  // Only count stored boxes
+          },
           select: {
             id: true,
             shipmentId: true,
+            status: true,
           },
         },
         _count: {
@@ -51,13 +54,21 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       orderBy: { code: 'asc' },
     });
 
-    // Calculate utilization
-    const racksWithStats = racks.map((rack: any) => ({
-      ...rack,
-      utilization: rack.capacityTotal > 0 
-        ? Math.round((rack.capacityUsed / rack.capacityTotal) * 100) 
-        : 0,
-    }));
+    // Calculate utilization based on actual stored boxes
+    const racksWithStats = racks.map((rack: any) => {
+      const actualCapacityUsed = rack.boxes?.filter((box: any) => 
+        box.status === 'IN_STORAGE' || box.status === 'STORED'
+      ).length || 0;
+      
+      return {
+        ...rack,
+        capacityUsed: actualCapacityUsed, // Override with actual count
+        utilization: rack.capacityTotal > 0 
+          ? Math.round((actualCapacityUsed / rack.capacityTotal) * 100) 
+          : 0,
+        status: actualCapacityUsed >= rack.capacityTotal ? 'FULL' : 'ACTIVE',
+      };
+    });
 
     res.json({ racks: racksWithStats });
   } catch (error) {
@@ -78,15 +89,15 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
         inventory: true,
         boxes: {
           where: { 
-            status: 'IN_STORAGE'  // Only show boxes currently in storage
+            status: { in: ['IN_STORAGE', 'STORED'] }  // Only show boxes currently in storage
           },
           include: {
             shipment: {
               select: {
                 id: true,
-                name: true,
                 referenceId: true,
-                clientName: true,
+                shipper: true,
+                consignee: true,
                 status: true,
               },
             },
@@ -111,7 +122,21 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Rack not found' });
     }
 
-    res.json({ rack });
+    // Calculate actual capacity used
+    const actualCapacityUsed = rack.boxes?.filter((box: any) => 
+      box.status === 'IN_STORAGE' || box.status === 'STORED'
+    ).length || 0;
+
+    const rackWithStats = {
+      ...rack,
+      capacityUsed: actualCapacityUsed,
+      utilization: rack.capacityTotal > 0 
+        ? Math.round((actualCapacityUsed / rack.capacityTotal) * 100) 
+        : 0,
+      status: actualCapacityUsed >= rack.capacityTotal ? 'FULL' : 'ACTIVE',
+    };
+
+    res.json({ rack: rackWithStats });
   } catch (error) {
     console.error('Get rack error:', error);
     res.status(500).json({ error: 'Internal server error' });
