@@ -25,8 +25,8 @@ RUN find node_modules/.bin -name "prisma" -exec chmod +x {} \; 2>/dev/null || tr
 # Copy source code
 COPY . .
 
-# Build TypeScript code
-RUN npm run build
+# Ensure all binaries are executable and build TypeScript code
+RUN chmod +x node_modules/.bin/* 2>/dev/null || true && npm run build
 
 # Expose port
 EXPOSE 5000
