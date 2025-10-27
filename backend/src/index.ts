@@ -94,7 +94,8 @@ app.use('/api/moving-jobs', movingJobsRoutes);
 app.use('/api/materials', materialsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/plugins', pluginsRoutes);
-app.use('/api/job-files', jobFilesRoutes); // NEW: Job file management
+// TEMP: Commented out until migration runs
+// app.use('/api/job-files', jobFilesRoutes); // NEW: Job file management
 // NEW: Enhanced warehouse routes
 app.use('/api', shipmentItemsRoutes); // Handles /api/shipments/:id/items
 app.use('/api', customerMaterialsRoutes); // Handles /api/customers/*
