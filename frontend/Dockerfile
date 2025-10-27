@@ -10,7 +10,8 @@ RUN rm -rf node_modules package-lock.json yarn.lock 2>/dev/null || true
 COPY package*.json ./
 
 # Install dependencies (clean install) with increased timeout
-RUN npm ci --legacy-peer-deps --verbose --no-optional 2>&1 || npm install --legacy-peer-deps --no-optional
+# Don't skip optional dependencies - they're needed for Alpine Linux (rollup)
+RUN npm ci --legacy-peer-deps --verbose 2>&1 || npm install --legacy-peer-deps
 
 # Copy source code
 COPY . .
