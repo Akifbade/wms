@@ -1,5 +1,5 @@
 ﻿# ًں¤– AI SESSION CONTEXT
-**Last Updated:** 2025-10-27 11:53:46  
+**Last Updated:** 2025-10-27 11:58:53  
 **Branch:** stable/prisma-mysql-production  
 **Auto-Generated:** This file is updated every 5 minutes automatically
 
@@ -10,10 +10,10 @@
 ### Docker Containers:
 ```
 NAMES             STATUS
-wms-frontend      Restarting (1) 8 seconds ago
-wms-backend       Up 2 minutes (healthy)
-wms-git-watcher   Up 6 minutes
-wms-database      Up 6 minutes (healthy)
+wms-backend       Up 12 seconds (health: starting)
+wms-frontend      Up 4 minutes (unhealthy)
+wms-git-watcher   Up 4 minutes
+wms-database      Up 4 minutes (healthy)
 
 ```
 
@@ -28,11 +28,11 @@ Changed Files:
 
 ### Recent Commits:
 ```
+f1ce4c9f7 AUTO-BACKUP: 2025-10-27 11:58:49
+2d6fdc9e6 Use ts-node in docker-compose for development mode
 13327faf7 AUTO-BACKUP: 2025-10-27 11:53:42
 e6a4ae9ad AUTO-BACKUP: 2025-10-27 11:48:32
 f924df04a Skip TypeScript build in Docker - run with ts-node for development
-c6d4e71cf AUTO-BACKUP: 2025-10-27 11:43:24
-7ccedb277 Add uuid package and fix schema duplicate field
 
 ```
 
@@ -55,8 +55,8 @@ Auto-backup in progress
 
 ### Recent Conversation Summary:
 Recent work completed:
+- Use ts-node in docker-compose for development mode
 - Skip TypeScript build in Docker - run with ts-node for development
-- Add uuid package and fix schema duplicate field
 
 ### Issues Faced (if any):
 
@@ -68,8 +68,8 @@ Recent work completed:
 **Auto-detected from recent commits and activity:**
 
 Recent work completed:
+- Use ts-node in docker-compose for development mode
 - Skip TypeScript build in Docker - run with ts-node for development
-- Add uuid package and fix schema duplicate field
 
 **Key Points for New AI:**
 1. Read the recent commits above to understand what was done
@@ -238,7 +238,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 ## âœ… LAST KNOWN WORKING STATE
 
-**Timestamp:** 2025-10-27 11:53:46  
+**Timestamp:** 2025-10-27 11:58:53  
 **Branch:** stable/prisma-mysql-production  
 **Frontend:** â‌Œ Not Running  
 **Backend:** â‌Œ Not Running  
@@ -252,7 +252,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 1. **Create backup:**
    ```powershell
-   git tag backup-feature-name-20251027-115346
+   git tag backup-feature-name-20251027-115853
    ```
 
 2. **Create branch:**

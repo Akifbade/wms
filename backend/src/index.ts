@@ -26,7 +26,8 @@ import movingJobsRoutes from './routes/moving-jobs';
 import materialsRoutes from './routes/materials';
 import reportsRoutes from './routes/reports';
 import pluginsRoutes from './routes/plugins';
-import jobFilesRoutes from './routes/job-files'; // NEW: Job file uploads
+// TEMP: Commented out until migration runs
+// import jobFilesRoutes from './routes/job-files'; // NEW: Job file uploads
 // NEW: Enhanced warehouse routes
 import shipmentItemsRoutes from './routes/shipment-items';
 import customerMaterialsRoutes from './routes/customer-materials';
