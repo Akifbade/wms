@@ -92,20 +92,23 @@ services:
     networks:
       - wms-network
 
-  # Automated Database Backup (runs daily at 2 AM)
+  # Automated Database Backup (runs every 5 minutes like Git auto-commit)
   db-backup:
     image: alpine:latest
     container_name: wms-db-backup
     restart: unless-stopped
     volumes:
       - ./database-backups:/backups
+      - ./scripts:/scripts
       - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      BACKUP_SCHEDULE: "0 2 * * *"  # Daily at 2 AM
-      KEEP_DAYS: 7
-    command: sh -c "
+    entrypoint: /bin/sh
+    command: -c "
       apk add --no-cache docker-cli mysql-client dcron &&
-      echo '0 2 * * * docker exec wms-database mysqldump -u root -prootpassword warehouse_wms | gzip > /backups/backup_$(date +\\%Y\\%m\\%d_\\%H\\%M\\%S).sql.gz && find /backups -name \"backup_*.sql.gz\" -mtime +7 -delete && echo \"[$(date)] Backup completed\"' > /etc/crontabs/root &&
+      mkdir -p /var/log &&
+      echo '*/5 * * * * sh /scripts/db-auto-backup.sh >> /var/log/db-backup.log 2>&1' > /etc/crontabs/root &&
+      echo 'Database auto-backup initialized - running every 5 minutes' &&
+      echo 'Cron schedule configured:' &&
+      cat /etc/crontabs/root &&
       crond -f -l 2
       "
     networks:
