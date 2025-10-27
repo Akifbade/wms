@@ -25,6 +25,9 @@ RUN find node_modules/.bin -name "prisma" -exec chmod +x {} \; 2>/dev/null || tr
 # Copy source code
 COPY . .
 
+# Build TypeScript code
+RUN npm run build
+
 # Expose port
 EXPOSE 5000
 
@@ -32,5 +35,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:5000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start server using ts-node (no build required)
-CMD ["npx", "ts-node", "src/index.ts"]
+# Start server using compiled code
+CMD ["node", "dist/index.js"]
