@@ -1,5 +1,5 @@
 ﻿# ًں¤– AI SESSION CONTEXT
-**Last Updated:** 2025-10-27 09:46:07  
+**Last Updated:** 2025-10-27 09:51:17  
 **Branch:** stable/prisma-mysql-production  
 **Auto-Generated:** This file is updated every 5 minutes automatically
 
@@ -22,31 +22,17 @@ wms-database      Up 2 hours (healthy)
 Branch: stable/prisma-mysql-production
 
 Changed Files:
- M AI-SESSION-CONTEXT.md
- D ai-conversation-backups/AI-CONTEXT-20251027-073305.md
- D ai-conversation-backups/AI-CONTEXT-20251027-073812.md
- D ai-conversation-backups/AI-CONTEXT-20251027-074318.md
- D ai-conversation-backups/AI-CONTEXT-20251027-074832.md
- D ai-conversation-backups/AI-CONTEXT-20251027-075339.md
- D ai-conversation-backups/AI-CONTEXT-20251027-075849.md
  M auto-backup.log
- M frontend/nginx.conf
-?? ai-conversation-backups/AI-CONTEXT-20251027-091544.md
-?? ai-conversation-backups/AI-CONTEXT-20251027-092048.md
-?? ai-conversation-backups/AI-CONTEXT-20251027-092551.md
-?? ai-conversation-backups/AI-CONTEXT-20251027-093055.md
-?? ai-conversation-backups/AI-CONTEXT-20251027-093558.md
-?? ai-conversation-backups/AI-CONTEXT-20251027-094101.md
 
 ```
 
 ### Recent Commits:
 ```
+c5583f922 AUTO-BACKUP: 2025-10-27 09:51:14
 6403be7e4 Fix upload paths: Change from public/uploads to uploads
 ecae30150 AUTO-BACKUP: 2025-10-27 09:15:41
 e61bda284 AUTO-BACKUP: 2025-10-27 09:10:26
 99cf921b4 Fix uploads folder configuration for logos and documents
-12a4a2715 AUTO-BACKUP: 2025-10-27 09:05:15
 
 ```
 
@@ -252,7 +238,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 ## âœ… LAST KNOWN WORKING STATE
 
-**Timestamp:** 2025-10-27 09:46:07  
+**Timestamp:** 2025-10-27 09:51:17  
 **Branch:** stable/prisma-mysql-production  
 **Frontend:** â‌Œ Not Running  
 **Backend:** â‌Œ Not Running  
@@ -266,7 +252,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 1. **Create backup:**
    ```powershell
-   git tag backup-feature-name-20251027-094607
+   git tag backup-feature-name-20251027-095117
    ```
 
 2. **Create branch:**
