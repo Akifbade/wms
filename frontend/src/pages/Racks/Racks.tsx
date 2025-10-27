@@ -144,66 +144,127 @@ export const Racks: React.FC = () => {
         </div>
       </div>
 
-      {/* Visual Rack Grid */}
+      {/* Visual Rack Grid - Modern & Clean Design */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Warehouse Layout</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">🏗️ Warehouse Layout</h3>
+          <div className="flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              <span className="text-gray-600">0-50%</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <span className="text-gray-600">50-90%</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <span className="text-gray-600">90-100%</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredRacks.map((rack: any) => {
               const utilization = rack.utilization || Math.round((rack.capacityUsed / rack.capacityTotal) * 100);
               const shipmentCount = rack.inventory?.length || 0;
+              const available = rack.capacityTotal - rack.capacityUsed;
+              
               return (
                 <div
                   key={rack.id}
-                  className="border-2 border-gray-200 rounded-lg p-4 hover:border-primary-500 transition-colors"
+                  className="group relative bg-gradient-to-br from-white to-gray-50 border-2 rounded-xl p-4 hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer"
+                  style={{
+                    borderColor: utilization >= 90 ? '#ef4444' : utilization >= 50 ? '#eab308' : '#10b981'
+                  }}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <QrCodeIcon className="h-5 w-5 text-gray-400" />
-                      <span className="text-lg font-bold text-gray-900">{rack.code}</span>
+                  {/* Status Badge */}
+                  <div className="absolute -top-2 -right-2">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold shadow-lg ${
+                      rack.status === 'ACTIVE'
+                        ? utilization >= 100 
+                          ? 'bg-red-500 text-white'
+                          : utilization >= 90
+                          ? 'bg-yellow-500 text-white'
+                          : 'bg-green-500 text-white'
+                        : 'bg-gray-400 text-white'
+                    }`}>
+                      {rack.status === 'ACTIVE' 
+                        ? utilization >= 100 
+                          ? '🔴 FULL' 
+                          : utilization >= 90 
+                          ? '🟡 BUSY' 
+                          : '🟢 OK'
+                        : '⚫ OFF'}
+                    </span>
+                  </div>
+
+                  {/* Edit Button */}
+                  <button
+                    onClick={() => {
+                      setSelectedRack(rack);
+                      setEditModalOpen(true);
+                    }}
+                    className="absolute top-2 left-2 p-1.5 bg-white rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50"
+                    title="Edit Rack"
+                  >
+                    <PencilIcon className="h-4 w-4 text-blue-600" />
+                  </button>
+                  
+                  {/* Rack Code */}
+                  <div className="flex items-center gap-2 mb-3 mt-4">
+                    <div className="p-2 bg-primary-100 rounded-lg">
+                      <QrCodeIcon className="h-5 w-5 text-primary-600" />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedRack(rack);
-                          setEditModalOpen(true);
-                        }}
-                        className="text-gray-500 hover:text-blue-600"
-                        title="Edit Rack"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${rack.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                        {rack.status}
-                      </span>
+                    <div>
+                      <span className="text-xl font-bold text-gray-900">{rack.code}</span>
+                      <p className="text-xs text-gray-500 truncate">{rack.location || 'N/A'}</p>
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Capacity</span>
-                      <span className="font-medium text-gray-900">{rack.capacityUsed}/{rack.capacityTotal}</span>
+                  {/* Capacity Info */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-gray-600">Capacity</span>
+                      <span className="text-sm font-bold text-gray-900">{rack.capacityUsed}/{rack.capacityTotal}</span>
                     </div>
                     
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    {/* Progress Bar */}
+                    <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                       <div
-                        className={`h-2 rounded-full transition-all ${getUtilizationColor(utilization)}`}
-                        style={{ width: `${utilization}%` }}
+                        className={`h-3 rounded-full transition-all duration-500 ${getUtilizationColor(utilization)}`}
+                        style={{ width: `${Math.min(utilization, 100)}%` }}
                       />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-xs font-bold text-white drop-shadow-md">{utilization}%</span>
+                      </div>
                     </div>
                     
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>{shipmentCount} shipments</span>
-                      <span>{utilization.toFixed(0)}%</span>
-                    </div>
-                    
-                    <div className="text-xs text-gray-400 mt-2">
-                      {rack.location || `Section ${rack.code.charAt(0)}`}
+                    {/* Stats */}
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500">Available</p>
+                        <p className="text-sm font-bold text-green-600">{available}</p>
+                      </div>
+                      <div className="h-8 w-px bg-gray-300"></div>
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500">Shipments</p>
+                        <p className="text-sm font-bold text-blue-600">{shipmentCount}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               );
             })}
         </div>
+
+        {filteredRacks.length === 0 && (
+          <div className="text-center py-12">
+            <CubeIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 font-medium">No racks found</p>
+            <p className="text-sm text-gray-400 mt-1">Try selecting a different section</p>
+          </div>
+        )}
       </div>
 
       {/* Create Rack Modal */}

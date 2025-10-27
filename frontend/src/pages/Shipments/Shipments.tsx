@@ -419,29 +419,31 @@ export const Shipments: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
-                      <button 
-                        onClick={() => {
-                          setSelectedShipment(shipment);
-                          setQrModalOpen(true);
-                        }}
-                        className="text-indigo-600 hover:text-indigo-900"
-                        title="View QR Codes"
-                      >
-                        <QrCodeIcon className="h-5 w-5" />
-                      </button>
-                      {/* Release button - check multiple status values and always show for debugging */}
-                      {((shipment.status === 'IN_STORAGE' || 
-                         shipment.status === 'PARTIAL' || 
-                         shipment.status === 'ACTIVE' ||
-                         shipment.status === 'IN STORAGE') && 
-                        shipment.currentBoxCount > 0) && (
+                      {/* QR Code button - only show for stored shipments */}
+                      {(shipment.status === 'IN_STORAGE' || 
+                        shipment.status === 'PARTIAL' || 
+                        shipment.status === 'STORED') && (
                         <button 
                           onClick={() => {
-                            console.log('🔍 Release button clicked:', { status: shipment.status, boxes: shipment.currentBoxCount });
-                            handleReleaseClick(shipment);
+                            setSelectedShipment(shipment);
+                            setQrModalOpen(true);
                           }}
+                          className="text-indigo-600 hover:text-indigo-900"
+                          title="View QR Codes"
+                        >
+                          <QrCodeIcon className="h-5 w-5" />
+                        </button>
+                      )}
+                      
+                      {/* Release button - only for stored shipments with boxes */}
+                      {(shipment.status === 'IN_STORAGE' || 
+                        shipment.status === 'PARTIAL' || 
+                        shipment.status === 'STORED') && 
+                        shipment.currentBoxCount > 0 && (
+                        <button 
+                          onClick={() => handleReleaseClick(shipment)}
                           className="text-green-600 hover:text-green-900"
-                          title={`Generate Invoice & Release (Status: ${shipment.status})`}
+                          title="Generate Invoice & Release"
                         >
                           <ArrowRightOnRectangleIcon className="h-5 w-5" />
                         </button>
