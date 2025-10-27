@@ -2,12 +2,47 @@ import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, authorizeRoles, AuthRequest } from '../middleware/auth';
 import { z } from 'zod';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 const router = Router();
 const prisma = new PrismaClient();
 
 // Apply authentication to all routes
 router.use(authenticateToken);
+
+// Configure multer for shipment photo uploads
+const photoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'uploads/shipments';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `shipment-${uniqueSuffix}${ext}`);
+  }
+});
+
+const photoUpload = multer({
+  storage: photoStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max per photo
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files allowed (JPEG, PNG, WebP)'));
+    }
+  }
+});
 
 // Validation schema
 const shipmentSchema = z.object({
@@ -440,28 +475,42 @@ router.get('/:id/boxes', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Assign boxes to rack (for scanner & manual)
-router.post('/:id/assign-boxes', authorizeRoles('ADMIN', 'MANAGER', 'WORKER'), async (req: AuthRequest, res: Response) => {
+// Assign boxes to rack (for scanner & manual) with optional photos
+router.post('/:id/assign-boxes', 
+  authorizeRoles('ADMIN', 'MANAGER', 'WORKER'), 
+  photoUpload.array('photos', 10), // Up to 10 photos
+  async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { rackId, boxNumbers } = req.body; // boxNumbers = [1,2,3]
+    const { rackId, boxNumbers } = req.body; // boxNumbers = JSON string "[1,2,3]"
     const companyId = req.user!.companyId;
+    const uploadedFiles = req.files as Express.Multer.File[];
 
-    if (!rackId || !boxNumbers || boxNumbers.length === 0) {
+    if (!rackId || !boxNumbers) {
       return res.status(400).json({ error: 'Rack ID and box numbers required' });
     }
 
-    // Update boxes
+    const parsedBoxNumbers = JSON.parse(boxNumbers);
+    
+    if (parsedBoxNumbers.length === 0) {
+      return res.status(400).json({ error: 'At least one box number required' });
+    }
+
+    // Prepare photo URLs
+    const photoUrls = uploadedFiles?.map(file => `/uploads/shipments/${file.filename}`) || [];
+
+    // Update boxes with photos
     await prisma.shipmentBox.updateMany({
       where: {
         shipmentId: id,
-        boxNumber: { in: boxNumbers },
+        boxNumber: { in: parsedBoxNumbers },
         companyId,
       },
       data: {
         rackId,
         status: 'IN_STORAGE',
         assignedAt: new Date(),
+        photos: photoUrls.length > 0 ? JSON.stringify(photoUrls) : null,
       },
     });
 
@@ -469,7 +518,7 @@ router.post('/:id/assign-boxes', authorizeRoles('ADMIN', 'MANAGER', 'WORKER'), a
     await prisma.rack.update({
       where: { id: rackId },
       data: {
-        capacityUsed: { increment: boxNumbers.length },
+        capacityUsed: { increment: parsedBoxNumbers.length },
         lastActivity: new Date(),
       },
     });
@@ -500,12 +549,17 @@ router.post('/:id/assign-boxes', authorizeRoles('ADMIN', 'MANAGER', 'WORKER'), a
         userId: req.user!.id,
         companyId,
         activityType: 'ASSIGN',
-        itemDetails: `${boxNumbers.length} boxes from shipment ${id}`,
-        quantityAfter: boxNumbers.length,
+        itemDetails: `${parsedBoxNumbers.length} boxes from shipment ${id}${photoUrls.length > 0 ? ` (${photoUrls.length} photos)` : ''}`,
+        quantityAfter: parsedBoxNumbers.length,
       },
     });
 
-    res.json({ success: true, assigned: boxNumbers.length });
+    res.json({ 
+      success: true, 
+      assigned: parsedBoxNumbers.length,
+      photosUploaded: photoUrls.length,
+      photoUrls 
+    });
   } catch (error) {
     console.error('Assign boxes error:', error);
     res.status(500).json({ error: 'Internal server error' });

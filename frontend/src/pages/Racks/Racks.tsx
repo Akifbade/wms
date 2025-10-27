@@ -587,7 +587,9 @@ export const Racks: React.FC = () => {
 
                       {rackDetails?.boxes && rackDetails.boxes.length > 0 ? (
                         <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                          {rackDetails.boxes.map((box: any) => (
+                          {rackDetails.boxes.map((box: any) => {
+                            const photoUrls = box.photos ? JSON.parse(box.photos) : [];
+                            return (
                             <div
                               key={box.id}
                               className="bg-gradient-to-r from-white to-blue-50 border-2 border-blue-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-md transition-all"
@@ -621,8 +623,40 @@ export const Racks: React.FC = () => {
                                   )}
                                 </div>
                               )}
+                              
+                              {/* Photo Gallery */}
+                              {photoUrls.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-blue-200">
+                                  <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                                    📷 Photos ({photoUrls.length})
+                                  </p>
+                                  <div className="grid grid-cols-4 gap-2">
+                                    {photoUrls.map((url: string, idx: number) => (
+                                      <a
+                                        key={idx}
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="group relative block aspect-square rounded-lg overflow-hidden border-2 border-blue-200 hover:border-blue-500 transition-all"
+                                      >
+                                        <img
+                                          src={url}
+                                          alt={`Box photo ${idx + 1}`}
+                                          className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                                        />
+                                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
+                                          <span className="text-white text-xs font-bold opacity-0 group-hover:opacity-100">
+                                            🔍
+                                          </span>
+                                        </div>
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">

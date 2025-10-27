@@ -327,6 +327,9 @@ model ShipmentBox {
   // Warehouse Integration Fields (Non-breaking additions)  
   pieceWeight Float? // Weight of this specific piece/box
   pieceQR     String? // Alternative QR format for warehouse pieces
+  
+  // Photo attachments - JSON array of photo URLs uploaded during rack assignment
+  photos      String? // JSON array: ["uploads/shipments/photo1.jpg", "uploads/shipments/photo2.jpg"]
 
   // Relations with proper cascading
   shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)

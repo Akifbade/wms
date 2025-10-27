@@ -8,6 +8,8 @@ import {
   CubeIcon,
   ArchiveBoxIcon,
   ArrowPathIcon,
+  PhotoIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { Html5Qrcode } from 'html5-qrcode';
 import { shipmentsAPI, racksAPI } from '../../services/api';
@@ -29,7 +31,10 @@ export const Scanner: React.FC = () => {
   const [pendingShipment, setPendingShipment] = useState<any>(null);
   const [boxQuantity, setBoxQuantity] = useState<number>(0);
   const [remainingBoxes, setRemainingBoxes] = useState<number>(0);
+  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const qrCodeRegionId = 'qr-reader';
   
   // Tab states
@@ -45,8 +50,29 @@ export const Scanner: React.FC = () => {
       if (scannerRef.current) {
         scannerRef.current.stop().catch(console.error);
       }
+      // Cleanup photo preview URLs
+      photoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
     };
-  }, []);
+  }, [photoPreviewUrls]);
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length + selectedPhotos.length > 10) {
+      setError('Maximum 10 photos allowed');
+      return;
+    }
+    
+    // Create preview URLs
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setPhotoPreviewUrls(prev => [...prev, ...newPreviews]);
+    setSelectedPhotos(prev => [...prev, ...files]);
+  };
+
+  const removePhoto = (index: number) => {
+    URL.revokeObjectURL(photoPreviewUrls[index]);
+    setPhotoPreviewUrls(prev => prev.filter((_, i) => i !== index));
+    setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
+  };
 
   const startScanning = async () => {
     try {
@@ -165,17 +191,23 @@ export const Scanner: React.FC = () => {
       // Take first N boxes based on quantity
       const boxNumbers = unassignedBoxes.slice(0, boxQuantity).map((b: any) => b.boxNumber);
       
-      // Assign boxes to rack
+      // Prepare FormData with photos
+      const formData = new FormData();
+      formData.append('rackId', scanResult.data.id);
+      formData.append('boxNumbers', JSON.stringify(boxNumbers));
+      
+      // Append photos
+      selectedPhotos.forEach((photo, index) => {
+        formData.append('photos', photo);
+      });
+      
+      // Assign boxes to rack with photos
       await fetch(`/api/shipments/${pendingShipment.id}/assign-boxes`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
-        body: JSON.stringify({
-          rackId: scanResult.data.id,
-          boxNumbers
-        })
+        body: formData
       });
       
       // Update shipment status if all boxes assigned
@@ -190,11 +222,13 @@ export const Scanner: React.FC = () => {
         });
       }
       
-      alert(`✅ ${boxQuantity} boxes assigned to ${scanResult.data.code}!\n📊 Rack capacity updated. Check Racks page for current status.`);
+      alert(`✅ ${boxQuantity} boxes assigned to ${scanResult.data.code}!${selectedPhotos.length > 0 ? `\n� ${selectedPhotos.length} photos uploaded!` : ''}\n📊 Rack capacity updated.`);
       setPendingShipment(null);
       setScanResult(null);
       setBoxQuantity(0);
       setRemainingBoxes(0);
+      setSelectedPhotos([]);
+      setPhotoPreviewUrls([]);
     } catch (err: any) {
       setError(err.message || 'Failed to assign');
     } finally {
@@ -496,6 +530,52 @@ export const Scanner: React.FC = () => {
                           </p>
                         </div>
 
+                        {/* Photo Upload Section */}
+                        <div className="mb-4 bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border-2 border-purple-300">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            📷 Upload Photos (Optional - Max 10)
+                          </label>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handlePhotoSelect}
+                            className="hidden"
+                          />
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-bold flex items-center justify-center gap-2"
+                          >
+                            <PhotoIcon className="w-5 h-5" />
+                            {selectedPhotos.length > 0 ? `${selectedPhotos.length} Photos Selected` : 'Select Photos'}
+                          </button>
+                          
+                          {/* Photo Previews */}
+                          {photoPreviewUrls.length > 0 && (
+                            <div className="mt-3 grid grid-cols-3 gap-2">
+                              {photoPreviewUrls.map((url, index) => (
+                                <div key={index} className="relative group">
+                                  <img
+                                    src={url}
+                                    alt={`Preview ${index + 1}`}
+                                    className="w-full h-20 object-cover rounded-lg border-2 border-purple-200"
+                                  />
+                                  <button
+                                    onClick={() => removePhoto(index)}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <XMarkIcon className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-xs text-gray-600 mt-2">
+                            💡 Photos will be attached to these boxes for reference
+                          </p>
+                        </div>
+
                         <div className="flex gap-3">
                           <button
                             onClick={assignShipmentToRack}
@@ -509,6 +589,9 @@ export const Scanner: React.FC = () => {
                               setPendingShipment(null);
                               setBoxQuantity(0);
                               setRemainingBoxes(0);
+                              setSelectedPhotos([]);
+                              photoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+                              setPhotoPreviewUrls([]);
                             }}
                             className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-bold"
                           >
