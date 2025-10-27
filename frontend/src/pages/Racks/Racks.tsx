@@ -7,7 +7,8 @@ import {
   PencilIcon,
   XMarkIcon,
   PrinterIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  CameraIcon
 } from '@heroicons/react/24/outline';
 import { racksAPI } from '../../services/api';
 import CreateRackModal from '../../components/CreateRackModal';
@@ -24,7 +25,9 @@ export const Racks: React.FC = () => {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [rackDetails, setRackDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [bulkQrModalOpen, setBulkQrModalOpen] = useState(false);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
+  const bulkQrCanvasRefs = useRef<{ [key: string]: HTMLCanvasElement | null }>({});
 
   useEffect(() => {
     loadRacks();
@@ -149,6 +152,110 @@ export const Racks: React.FC = () => {
     printWindow.document.close();
   };
 
+  const handleBulkQrOpen = async () => {
+    setBulkQrModalOpen(true);
+    // Generate QR codes for all racks
+    setTimeout(async () => {
+      for (const rack of racks) {
+        const canvas = bulkQrCanvasRefs.current[rack.id];
+        if (canvas) {
+          try {
+            await QRCode.toCanvas(canvas, `RACK_${rack.code}`, {
+              width: 200,
+              margin: 1,
+            });
+          } catch (err) {
+            console.error(`Failed to generate QR for ${rack.code}:`, err);
+          }
+        }
+      }
+    }, 100);
+  };
+
+  const handlePrintAllQR = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const qrGridHtml = racks.map(rack => {
+      const canvas = bulkQrCanvasRefs.current[rack.id];
+      if (!canvas) return '';
+      const qrDataUrl = canvas.toDataURL();
+      return `
+        <div class="qr-item">
+          <h3>${rack.code}</h3>
+          <p class="location">${rack.location || 'Warehouse'}</p>
+          <img src="${qrDataUrl}" alt="QR Code" />
+          <p class="code">RACK_${rack.code}</p>
+        </div>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>All Rack QR Codes</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 20px;
+              font-family: Arial, sans-serif;
+            }
+            .grid {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 20px;
+            }
+            .qr-item {
+              text-align: center;
+              border: 2px solid #000;
+              padding: 15px;
+              page-break-inside: avoid;
+            }
+            h3 {
+              margin: 0 0 5px 0;
+              font-size: 24px;
+            }
+            .location {
+              margin: 5px 0;
+              font-size: 14px;
+              color: #666;
+            }
+            img {
+              width: 100%;
+              max-width: 200px;
+              margin: 10px 0;
+            }
+            .code {
+              font-size: 16px;
+              font-weight: bold;
+              font-family: 'Courier New', monospace;
+              margin: 5px 0 0 0;
+            }
+            @media print {
+              body { padding: 10px; }
+              .grid { gap: 15px; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1 style="text-align: center; margin-bottom: 20px;">Warehouse Rack QR Codes</h1>
+          <div class="grid">
+            ${qrGridHtml}
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -157,13 +264,22 @@ export const Racks: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">Warehouse Racks</h1>
           <p className="text-gray-600 mt-1">Monitor and manage warehouse storage racks</p>
         </div>
-        <button 
-          onClick={() => setCreateModalOpen(true)}
-          className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-        >
-          <PlusIcon className="h-5 w-5 mr-2" />
-          Add Rack
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handleBulkQrOpen}
+            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <CameraIcon className="h-5 w-5 mr-2" />
+            Bulk QR Codes
+          </button>
+          <button 
+            onClick={() => setCreateModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Add Rack
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -555,6 +671,77 @@ export const Racks: React.FC = () => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Bulk QR Codes Modal */}
+      {bulkQrModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-5 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-3">
+                  <CameraIcon className="h-8 w-8" />
+                  Bulk QR Codes - All Racks
+                </h2>
+                <p className="text-sm text-purple-100 mt-1">
+                  {racks.length} racks total
+                </p>
+              </div>
+              <button
+                onClick={() => setBulkQrModalOpen(false)}
+                className="text-white hover:text-gray-200 p-2 rounded-lg hover:bg-white/10 transition"
+              >
+                <XMarkIcon className="h-7 w-7" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {racks.map((rack) => (
+                  <div
+                    key={rack.id}
+                    className="bg-white border-2 border-gray-200 rounded-xl p-4 text-center hover:border-purple-400 hover:shadow-lg transition-all"
+                  >
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">{rack.code}</h3>
+                    <p className="text-xs text-gray-500 mb-3">{rack.location || 'Warehouse'}</p>
+                    <canvas
+                      ref={(el) => {
+                        if (el) bulkQrCanvasRefs.current[rack.id] = el;
+                      }}
+                      className="mx-auto mb-3"
+                    />
+                    <p className="text-xs font-mono font-bold text-gray-600">RACK_{rack.code}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t bg-gray-50 flex justify-between items-center">
+              <div className="text-sm text-gray-600">
+                <InformationCircleIcon className="h-5 w-5 inline mr-1" />
+                Print all QR codes at once
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setBulkQrModalOpen(false)}
+                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handlePrintAllQR}
+                  className="inline-flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold shadow-lg"
+                >
+                  <PrinterIcon className="h-5 w-5" />
+                  Print All QR Codes
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
