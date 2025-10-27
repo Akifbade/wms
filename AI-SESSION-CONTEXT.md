@@ -1,5 +1,5 @@
 ﻿# ًں¤– AI SESSION CONTEXT
-**Last Updated:** 2025-10-27 12:44:42  
+**Last Updated:** 2025-10-27 12:49:51  
 **Branch:** stable/prisma-mysql-production  
 **Auto-Generated:** This file is updated every 5 minutes automatically
 
@@ -24,11 +24,11 @@ Changed Files:
 
 ### Recent Commits:
 ```
+da661a90e AUTO-BACKUP: 2025-10-27 12:49:45
+83fd4ffb5 Fix AuthRequest interface and use id instead of userId
 d8938bbe0 AUTO-BACKUP: 2025-10-27 12:44:39
 29cda9be3 Fix job-files.ts to match updated schema field names
 96c08ea3e  File management system with folders fully operational - migration complete
-5cde804df AUTO-BACKUP: 2025-10-27 12:34:30
-0862b54df fix: Update schema to match database types and re-enable job-files routes
 
 ```
 
@@ -51,9 +51,9 @@ Auto-backup in progress
 
 ### Recent Conversation Summary:
 Recent work completed:
+- Fix AuthRequest interface and use id instead of userId
 - Fix job-files.ts to match updated schema field names
 -  File management system with folders fully operational - migration complete
-- fix: Update schema to match database types and re-enable job-files routes
 
 ### Issues Faced (if any):
 
@@ -65,9 +65,9 @@ Recent work completed:
 **Auto-detected from recent commits and activity:**
 
 Recent work completed:
+- Fix AuthRequest interface and use id instead of userId
 - Fix job-files.ts to match updated schema field names
 -  File management system with folders fully operational - migration complete
-- fix: Update schema to match database types and re-enable job-files routes
 
 **Key Points for New AI:**
 1. Read the recent commits above to understand what was done
@@ -236,7 +236,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 ## âœ… LAST KNOWN WORKING STATE
 
-**Timestamp:** 2025-10-27 12:44:42  
+**Timestamp:** 2025-10-27 12:49:51  
 **Branch:** stable/prisma-mysql-production  
 **Frontend:** â‌Œ Not Running  
 **Backend:** â‌Œ Not Running  
@@ -250,7 +250,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 1. **Create backup:**
    ```powershell
-   git tag backup-feature-name-20251027-124442
+   git tag backup-feature-name-20251027-124951
    ```
 
 2. **Create branch:**
