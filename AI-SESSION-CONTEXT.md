@@ -1,5 +1,5 @@
 ﻿# ًں¤– AI SESSION CONTEXT
-**Last Updated:** 2025-10-27 20:44:17  
+**Last Updated:** 2025-10-27 20:49:27  
 **Branch:** stable/prisma-mysql-production  
 **Auto-Generated:** This file is updated every 5 minutes automatically
 
@@ -10,8 +10,8 @@
 ### Docker Containers:
 ```
 NAMES             STATUS
-wms-frontend      Up 6 minutes (unhealthy)
-wms-backend       Up 10 seconds (health: starting)
+wms-backend       Up 3 minutes (healthy)
+wms-frontend      Up 2 minutes (unhealthy)
 wms-git-watcher   Up 8 hours
 wms-database      Up 8 hours (healthy)
 
@@ -28,11 +28,11 @@ Changed Files:
 
 ### Recent Commits:
 ```
+7b2c5a4c2 AUTO-BACKUP: 2025-10-27 20:49:23
+65ba824a0 Fix Dockerfile: Generate Prisma client AFTER copying source code to use latest schema
 2aecfb87d AUTO-BACKUP: 2025-10-27 20:44:10
 67c99b840 Add photo upload functionality for shipment assignment: Upload up to 10 photos when assigning shipments to racks, display photos in rack details and shipment info
 3b3b5a900 AUTO-BACKUP: 2025-10-27 20:25:51
-237d6a4d7 Fix rack status: Calculate from actual stored boxes count, add cleanup endpoint for test data
-0bdbcabe0 AUTO-BACKUP: 2025-10-27 20:20:44
 
 ```
 
@@ -55,8 +55,8 @@ Auto-backup in progress
 
 ### Recent Conversation Summary:
 Recent work completed:
+- Fix Dockerfile: Generate Prisma client AFTER copying source code to use latest schema
 - Add photo upload functionality for shipment assignment: Upload up to 10 photos when assigning shipments to racks, display photos in rack details and shipment info
-- Fix rack status: Calculate from actual stored boxes count, add cleanup endpoint for test data
 
 ### Issues Faced (if any):
 
@@ -68,8 +68,8 @@ Recent work completed:
 **Auto-detected from recent commits and activity:**
 
 Recent work completed:
+- Fix Dockerfile: Generate Prisma client AFTER copying source code to use latest schema
 - Add photo upload functionality for shipment assignment: Upload up to 10 photos when assigning shipments to racks, display photos in rack details and shipment info
-- Fix rack status: Calculate from actual stored boxes count, add cleanup endpoint for test data
 
 **Key Points for New AI:**
 1. Read the recent commits above to understand what was done
@@ -238,7 +238,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 ## âœ… LAST KNOWN WORKING STATE
 
-**Timestamp:** 2025-10-27 20:44:17  
+**Timestamp:** 2025-10-27 20:49:27  
 **Branch:** stable/prisma-mysql-production  
 **Frontend:** â‌Œ Not Running  
 **Backend:** â‌Œ Not Running  
@@ -252,7 +252,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 1. **Create backup:**
    ```powershell
-   git tag backup-feature-name-20251027-204417
+   git tag backup-feature-name-20251027-204927
    ```
 
 2. **Create branch:**
