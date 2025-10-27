@@ -57,7 +57,7 @@ app.use((req, res, next) => {
 });
 
 // Serve static files for uploads
-app.use('/uploads', express.static('public/uploads'));
+app.use('/uploads', express.static('uploads'));
 
 // Basic health check route
 app.get('/api/health', (req, res) => {
