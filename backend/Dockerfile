@@ -26,7 +26,7 @@ RUN find node_modules/.bin -name "prisma" -exec chmod +x {} \; 2>/dev/null || tr
 COPY . .
 
 # Create upload directories
-RUN mkdir -p /app/uploads/logos /app/uploads/documents /app/uploads/temp && \
+RUN mkdir -p /app/uploads/logos /app/uploads/documents /app/uploads/damages /app/uploads/temp && \
     chmod -R 777 /app/uploads
 
 # Ensure all binaries are executable and build TypeScript code
