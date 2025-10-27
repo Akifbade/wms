@@ -7,12 +7,16 @@ WORKDIR /app
 # Install OpenSSL for Prisma
 RUN apt-get update -y && apt-get install -y openssl
 
+# Clean any existing node_modules
+RUN rm -rf node_modules package-lock.json 2>/dev/null || true
+
 # Copy package files
 COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install ALL dependencies including devDependencies (needed for Prisma CLI)
-RUN npm ci --include=dev
+# Use npm install as fallback if npm ci fails
+RUN npm ci --include=dev --verbose 2>&1 || npm install --include=dev
 
 # Generate Prisma Client first (before copying source)
 RUN npx prisma generate

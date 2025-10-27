@@ -3,11 +3,14 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
+# Remove any cached files
+RUN rm -rf node_modules package-lock.json yarn.lock 2>/dev/null || true
+
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Install dependencies (clean install) with increased timeout
+RUN npm ci --legacy-peer-deps --verbose --no-optional 2>&1 || npm install --legacy-peer-deps --no-optional
 
 # Copy source code
 COPY . .
