@@ -128,29 +128,30 @@ model User {
 
   // NEW: Activity Tracking
   activities UserActivity[]
+  
+  // NEW: File Upload Tracking
+  uploadedFiles JobFile[]     @relation("JobFileUploads")
 
   @@map("users")
 }
 
 // User Activity Tracking (NEW - Hidden Admin Feature)
 model UserActivity {
-  id         String   @id @default(cuid())
-  userId     String
-  action     String   // LOGIN, LOGOUT, CREATE, UPDATE, DELETE, VIEW, DOWNLOAD, etc.
-  resource   String?  // What was accessed (e.g., "MovingJob", "File", "Report")
-  resourceId String?  // ID of the resource
-  ipAddress  String?
-  location   String?  // IP geolocation
-  userAgent  String?  // Browser/device info
-  sessionId  String?  // Track session
-  metadata   String?  // JSON string for additional data
+  id         Int      @id @default(autoincrement())
+  userId     String   @db.VarChar(191)
+  action     String   @db.VarChar(100)
+  entityType String   @db.VarChar(50)
+  entityId   String?  @db.VarChar(191)
+  details    String?  @db.Text
+  ipAddress  String?  @db.VarChar(45)
+  userAgent  String?  @db.Text
   timestamp  DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([userId])
+  @@index([entityType, entityId])
   @@index([timestamp])
-  @@index([sessionId])
   @@map("user_activities")
 }
 
@@ -951,21 +952,24 @@ model MovingJob {
 
 // Job Files & Documents (NEW)
 model JobFile {
-  id          String   @id @default(cuid())
-  jobId       String
-  fileName    String
-  fileUrl     String
-  fileType    String   // MIME type
-  fileSize    Int      // Bytes
-  folder      String?  // Optional folder name for organization
-  uploadedBy  String?  // User ID who uploaded
-  uploadedAt  DateTime @default(now())
-  companyId   String
+  id           Int      @id @default(autoincrement())
+  jobId        String
+  fileName     String   @db.VarChar(255)
+  originalName String   @db.VarChar(255)
+  filePath     String   @db.VarChar(500)
+  fileSize     Int
+  mimeType     String   @db.VarChar(100)
+  folderName   String?  @db.VarChar(100)
+  uploadedBy   String   @db.VarChar(191)
+  uploadedAt   DateTime @default(now())
+  description  String?  @db.Text
 
-  job         MovingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job          MovingJob @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  user         User      @relation("JobFileUploads", fields: [uploadedBy], references: [id], onDelete: Restrict)
 
   @@index([jobId])
-  @@index([companyId])
+  @@index([uploadedBy])
+  @@index([folderName])
   @@map("job_files")
 }
 
