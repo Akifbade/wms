@@ -1,5 +1,5 @@
 ﻿# ًں¤– AI SESSION CONTEXT
-**Last Updated:** 2025-10-27 10:11:46  
+**Last Updated:** 2025-10-27 10:16:54  
 **Branch:** stable/prisma-mysql-production  
 **Auto-Generated:** This file is updated every 5 minutes automatically
 
@@ -28,11 +28,11 @@ Changed Files:
 
 ### Recent Commits:
 ```
+a089bb9d0 AUTO-BACKUP: 2025-10-27 10:16:50
+969e74b57 Enable HTTPS with SSL certificate and HTTPHTTPS redirect
+af8ee9bd2 Comment out HTTPS block until certificate is obtained
 c584cb8dc AUTO-BACKUP: 2025-10-27 10:11:42
 7d2bc5d3a Fix nginx config for Certbot - serve acme-challenge first
-7158c921f AUTO-BACKUP: 2025-10-27 10:06:34
-6fea2f999 Add CRITICAL RULE: Never auto-deploy to VPS without user permission
-4d98f7f4c AUTO-BACKUP: 2025-10-27 10:01:27
 
 ```
 
@@ -55,8 +55,9 @@ Auto-backup in progress
 
 ### Recent Conversation Summary:
 Recent work completed:
+- Enable HTTPS with SSL certificate and HTTPHTTPS redirect
+- Comment out HTTPS block until certificate is obtained
 - Fix nginx config for Certbot - serve acme-challenge first
-- Add CRITICAL RULE: Never auto-deploy to VPS without user permission
 
 ### Issues Faced (if any):
 
@@ -68,8 +69,9 @@ Recent work completed:
 **Auto-detected from recent commits and activity:**
 
 Recent work completed:
+- Enable HTTPS with SSL certificate and HTTPHTTPS redirect
+- Comment out HTTPS block until certificate is obtained
 - Fix nginx config for Certbot - serve acme-challenge first
-- Add CRITICAL RULE: Never auto-deploy to VPS without user permission
 
 **Key Points for New AI:**
 1. Read the recent commits above to understand what was done
@@ -238,7 +240,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 ## âœ… LAST KNOWN WORKING STATE
 
-**Timestamp:** 2025-10-27 10:11:46  
+**Timestamp:** 2025-10-27 10:16:54  
 **Branch:** stable/prisma-mysql-production  
 **Frontend:** â‌Œ Not Running  
 **Backend:** â‌Œ Not Running  
@@ -252,7 +254,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 1. **Create backup:**
    ```powershell
-   git tag backup-feature-name-20251027-101146
+   git tag backup-feature-name-20251027-101654
    ```
 
 2. **Create branch:**
