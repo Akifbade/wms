@@ -1,14 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   PlusIcon,
   QrCodeIcon,
   CubeIcon,
   ChartBarIcon,
-  PencilIcon
+  PencilIcon,
+  XMarkIcon,
+  PrinterIcon,
+  InformationCircleIcon
 } from '@heroicons/react/24/outline';
 import { racksAPI } from '../../services/api';
 import CreateRackModal from '../../components/CreateRackModal';
 import EditRackModal from '../../components/EditRackModal';
+import QRCode from 'qrcode';
 
 export const Racks: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('all');
@@ -17,6 +21,10 @@ export const Racks: React.FC = () => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedRack, setSelectedRack] = useState<any>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [rackDetails, setRackDetails] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     loadRacks();
@@ -42,6 +50,103 @@ export const Racks: React.FC = () => {
     if (percentage >= 90) return 'bg-red-500';
     if (percentage >= 75) return 'bg-yellow-500';
     return 'bg-green-500';
+  };
+
+  const handleRackClick = async (rack: any) => {
+    setDetailsModalOpen(true);
+    setLoadingDetails(true);
+    try {
+      const response = await racksAPI.getById(rack.id);
+      setRackDetails(response.rack);
+      
+      // Generate QR Code
+      if (qrCanvasRef.current) {
+        await QRCode.toCanvas(qrCanvasRef.current, `RACK_${response.rack.code}`, {
+          width: 300,
+          margin: 2,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load rack details:', err);
+      setRackDetails(rack);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const handlePrintQR = () => {
+    if (!qrCanvasRef.current || !rackDetails) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const qrDataUrl = qrCanvasRef.current.toDataURL();
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Rack QR Code - ${rackDetails.code}</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 20px;
+              font-family: Arial, sans-serif;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 100vh;
+            }
+            .qr-container {
+              text-align: center;
+              border: 2px solid #000;
+              padding: 30px;
+              background: white;
+            }
+            h1 {
+              margin: 0 0 10px 0;
+              font-size: 32px;
+              font-weight: bold;
+            }
+            .location {
+              margin: 10px 0 20px 0;
+              font-size: 18px;
+              color: #666;
+            }
+            img {
+              max-width: 300px;
+              margin: 20px 0;
+            }
+            .code {
+              font-size: 24px;
+              font-weight: bold;
+              font-family: 'Courier New', monospace;
+              margin-top: 15px;
+            }
+            @media print {
+              body { padding: 0; }
+              .qr-container { border: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="qr-container">
+            <h1>RACK ${rackDetails.code}</h1>
+            <div class="location">${rackDetails.location || 'Warehouse'}</div>
+            <img src="${qrDataUrl}" alt="QR Code" />
+            <div class="code">RACK_${rackDetails.code}</div>
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   return (
@@ -173,6 +278,7 @@ export const Racks: React.FC = () => {
               return (
                 <div
                   key={rack.id}
+                  onClick={() => handleRackClick(rack)}
                   className="group relative bg-gradient-to-br from-white to-gray-50 border-2 rounded-xl p-4 hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer"
                   style={{
                     borderColor: utilization >= 90 ? '#ef4444' : utilization >= 50 ? '#eab308' : '#10b981'
@@ -201,7 +307,8 @@ export const Racks: React.FC = () => {
 
                   {/* Edit Button */}
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSelectedRack(rack);
                       setEditModalOpen(true);
                     }}
@@ -281,6 +388,176 @@ export const Racks: React.FC = () => {
         rack={selectedRack}
         onSuccess={loadRacks}
       />
+
+      {/* Rack Details Modal */}
+      {detailsModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-primary-600 to-blue-600 text-white px-6 py-5 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-3">
+                  <QrCodeIcon className="h-8 w-8" />
+                  Rack {rackDetails?.code || '...'}
+                </h2>
+                <p className="text-sm text-blue-100 mt-1">
+                  📍 {rackDetails?.location || 'Loading...'}
+                </p>
+              </div>
+              <button
+                onClick={() => setDetailsModalOpen(false)}
+                className="text-white hover:text-gray-200 p-2 rounded-lg hover:bg-white/10 transition"
+              >
+                <XMarkIcon className="h-7 w-7" />
+              </button>
+            </div>
+
+            {loadingDetails ? (
+              <div className="flex-1 flex items-center justify-center py-20">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary-600 mx-auto mb-4"></div>
+                  <p className="text-gray-500 font-medium">Loading rack details...</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Stats Grid */}
+                <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
+                      <p className="text-xs text-gray-500 font-medium mb-1">Status</p>
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${
+                        rackDetails?.status === 'ACTIVE'
+                          ? rackDetails.capacityUsed >= rackDetails.capacityTotal
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {rackDetails?.status === 'ACTIVE'
+                          ? rackDetails.capacityUsed >= rackDetails.capacityTotal
+                            ? '🔴 FULL'
+                            : '🟢 ACTIVE'
+                          : '⚫ INACTIVE'}
+                      </span>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
+                      <p className="text-xs text-gray-500 font-medium mb-1">Capacity</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {rackDetails?.capacityUsed}/{rackDetails?.capacityTotal}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
+                      <p className="text-xs text-gray-500 font-medium mb-1">Available</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {rackDetails?.capacityTotal - rackDetails?.capacityUsed || 0}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
+                      <p className="text-xs text-gray-500 font-medium mb-1">Utilization</p>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {Math.round((rackDetails?.capacityUsed / rackDetails?.capacityTotal) * 100) || 0}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6">
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Left: Shipments List */}
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        📦 Stored Shipments ({rackDetails?.boxes?.length || 0})
+                      </h3>
+
+                      {rackDetails?.boxes && rackDetails.boxes.length > 0 ? (
+                        <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                          {rackDetails.boxes.map((box: any) => (
+                            <div
+                              key={box.id}
+                              className="bg-gradient-to-r from-white to-blue-50 border-2 border-blue-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-md transition-all"
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-sm font-bold text-blue-600">
+                                      #{box.shipment?.referenceId || 'N/A'}
+                                    </span>
+                                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                                      box.shipment?.status === 'STORED' || box.shipment?.status === 'IN_STORAGE'
+                                        ? 'bg-green-100 text-green-800'
+                                        : box.shipment?.status === 'RELEASED'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {box.shipment?.status || 'N/A'}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-500">
+                                    Box: <span className="font-semibold text-gray-700">{box.boxNumber}</span>
+                                  </p>
+                                </div>
+                              </div>
+                              {box.shipment?.shipper && (
+                                <div className="text-xs text-gray-600 mt-2 space-y-1">
+                                  <p>📤 <span className="font-medium">From:</span> {box.shipment.shipper}</p>
+                                  {box.shipment.consignee && (
+                                    <p>📥 <span className="font-medium">To:</span> {box.shipment.consignee}</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                          <div className="text-4xl mb-3">📭</div>
+                          <p className="text-gray-500 font-medium">No shipments stored</p>
+                          <p className="text-sm text-gray-400 mt-1">This rack is empty</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: QR Code */}
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <QrCodeIcon className="h-6 w-6 text-primary-600" />
+                        QR Code
+                      </h3>
+                      <div className="bg-white border-2 border-gray-200 rounded-xl p-6 text-center">
+                        <canvas ref={qrCanvasRef} className="mx-auto mb-4"></canvas>
+                        <p className="text-sm font-mono font-bold text-gray-700 mb-4">
+                          RACK_{rackDetails?.code}
+                        </p>
+                        <button
+                          onClick={handlePrintQR}
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold shadow-lg hover:shadow-xl transition-all"
+                        >
+                          <PrinterIcon className="h-5 w-5" />
+                          Print QR Code
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="p-6 border-t bg-gray-50 flex justify-between items-center">
+                  <div className="text-sm text-gray-600">
+                    <InformationCircleIcon className="h-5 w-5 inline mr-1" />
+                    Click on any shipment for more details
+                  </div>
+                  <button
+                    onClick={() => setDetailsModalOpen(false)}
+                    className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium"
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
