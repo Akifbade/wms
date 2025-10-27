@@ -476,9 +476,9 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                             )) : [];
                           } catch {
                             // Fallback: split by comma if not valid JSON
-                            return field.fieldOptions.split(',').map((option: string) => (
+                            return field.fieldOptions ? field.fieldOptions.split(',').map((option: string) => (
                               <option key={option.trim()} value={option.trim()}>{option.trim()}</option>
-                            ));
+                            )) : [];
                           }
                         })()}
                       </select>

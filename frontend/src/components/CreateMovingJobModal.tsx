@@ -511,9 +511,9 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
                               <option key={option} value={option}>{option}</option>
                             )) : [];
                           } catch {
-                            return field.fieldOptions.split(',').map((option: string) => (
+                            return field.fieldOptions ? field.fieldOptions.split(',').map((option: string) => (
                               <option key={option.trim()} value={option.trim()}>{option.trim()}</option>
-                            ));
+                            )) : [];
                           }
                         })()}
                       </select>
