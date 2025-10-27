@@ -10,6 +10,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// ENUMS
+// ============================================
+
+enum Role {
+  ADMIN    // Full access to everything
+  MANAGER  // Manage jobs, view reports, manage users
+  DRIVER   // View assigned jobs, update job status, mobile app access
+  WORKER   // General warehouse worker
+  SCANNER  // Only scan shipments, view pending shipments
+  PACKER   // Dummy user for job staff assignment only
+  LABOR    // Dummy user for job staff assignment only
+}
+
+// ============================================
+// MODELS
+// ============================================
+
 // Multi-Tenant Companies
 model Company {
   id         String  @id @default(cuid())
@@ -84,9 +102,11 @@ model User {
   password  String
   name      String
   phone     String?
-  role      String   @default("WORKER") // ADMIN, MANAGER, WORKER
+  role      Role     @default(WORKER) // Enum: ADMIN, MANAGER, DRIVER, WORKER, SCANNER, PACKER, LABOR
   skills    String? // JSON string of skills array
   isActive  Boolean  @default(true)
+  isDummy   Boolean  @default(false) // True for PACKER/LABOR (staff-only users)
+  permissions String? @db.Text // JSON string for granular permissions override
   companyId String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
