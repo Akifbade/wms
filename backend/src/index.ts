@@ -26,6 +26,7 @@ import movingJobsRoutes from './routes/moving-jobs';
 import materialsRoutes from './routes/materials';
 import reportsRoutes from './routes/reports';
 import pluginsRoutes from './routes/plugins';
+import jobFilesRoutes from './routes/job-files'; // NEW: Job file uploads
 // NEW: Enhanced warehouse routes
 import shipmentItemsRoutes from './routes/shipment-items';
 import customerMaterialsRoutes from './routes/customer-materials';
@@ -92,6 +93,7 @@ app.use('/api/moving-jobs', movingJobsRoutes);
 app.use('/api/materials', materialsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/plugins', pluginsRoutes);
+app.use('/api/job-files', jobFilesRoutes); // NEW: Job file management
 // NEW: Enhanced warehouse routes
 app.use('/api', shipmentItemsRoutes); // Handles /api/shipments/:id/items
 app.use('/api', customerMaterialsRoutes); // Handles /api/customers/*

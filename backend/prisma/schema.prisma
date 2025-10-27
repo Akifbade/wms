@@ -126,7 +126,32 @@ model User {
   shipmentsAssigned Shipment[] @relation("ShipmentAssignedBy")
   shipmentsReleased Shipment[] @relation("ShipmentReleasedBy")
 
+  // NEW: Activity Tracking
+  activities UserActivity[]
+
   @@map("users")
+}
+
+// User Activity Tracking (NEW - Hidden Admin Feature)
+model UserActivity {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String   // LOGIN, LOGOUT, CREATE, UPDATE, DELETE, VIEW, DOWNLOAD, etc.
+  resource   String?  // What was accessed (e.g., "MovingJob", "File", "Report")
+  resourceId String?  // ID of the resource
+  ipAddress  String?
+  location   String?  // IP geolocation
+  userAgent  String?  // Browser/device info
+  sessionId  String?  // Track session
+  metadata   String?  // JSON string for additional data
+  timestamp  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([timestamp])
+  @@index([sessionId])
+  @@map("user_activities")
 }
 
 // Central Rack System (Core Integration Point)
@@ -919,8 +944,29 @@ model MovingJob {
   materialReturns MaterialReturn[]
   costSnapshots   JobCostSnapshot[]
   approvals       MaterialApproval[]
+  files           JobFile[]          // NEW: Job documents and files
 
   @@map("moving_jobs")
+}
+
+// Job Files & Documents (NEW)
+model JobFile {
+  id          String   @id @default(cuid())
+  jobId       String
+  fileName    String
+  fileUrl     String
+  fileType    String   // MIME type
+  fileSize    Int      // Bytes
+  folder      String?  // Optional folder name for organization
+  uploadedBy  String?  // User ID who uploaded
+  uploadedAt  DateTime @default(now())
+  companyId   String
+
+  job         MovingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([companyId])
+  @@map("job_files")
 }
 
 model JobAssignment {
