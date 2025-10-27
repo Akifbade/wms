@@ -23,7 +23,6 @@ import templateRoutes from './routes/templates';
 import uploadRoutes from './routes/upload';
 import permissionsRoutes from './routes/permissions';
 import movingJobsRoutes from './routes/moving-jobs';
-import jobsRoutes from './routes/jobs';
 import materialsRoutes from './routes/materials';
 import reportsRoutes from './routes/reports';
 import pluginsRoutes from './routes/plugins';

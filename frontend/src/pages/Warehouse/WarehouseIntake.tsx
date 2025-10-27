@@ -235,11 +235,10 @@ export const WarehouseIntake: React.FC<WarehouseIntakeProps> = () => {
                 <input
                   type="number"
                   step="0.1"
-                  min="0"
-                  value={formData.weight}
-                  onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })}
+                  value={formData.weight === 0 ? '' : formData.weight}
+                  onChange={(e) => setFormData({ ...formData, weight: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="0.0"
+                  placeholder="Enter weight"
                   required
                 />
               </div>
@@ -252,10 +251,10 @@ export const WarehouseIntake: React.FC<WarehouseIntakeProps> = () => {
                 <input
                   type="number"
                   min="1"
-                  value={formData.pieces}
-                  onChange={(e) => setFormData({ ...formData, pieces: parseInt(e.target.value) || 1 })}
+                  value={formData.pieces === 0 ? '' : formData.pieces}
+                  onChange={(e) => setFormData({ ...formData, pieces: e.target.value === '' ? 0 : parseInt(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="1"
+                  placeholder="Enter number of pieces"
                   required
                 />
               </div>
