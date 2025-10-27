@@ -705,4 +705,72 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
   }
 });
 
+// Cleanup test/mock data - ADMIN ONLY
+router.post('/cleanup/test-data', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const companyId = req.user!.companyId;
+    const { confirmText } = req.body;
+
+    // Safety check - must type "DELETE TEST DATA" to confirm
+    if (confirmText !== 'DELETE TEST DATA') {
+      return res.status(400).json({ 
+        error: 'Confirmation text incorrect. Please type "DELETE TEST DATA" to confirm.' 
+      });
+    }
+
+    // Find shipments with test/demo indicators (case-insensitive via SQL)
+    const testShipments = await prisma.$queryRaw<any[]>`
+      SELECT id, referenceId, clientName, shipper, consignee 
+      FROM shipments 
+      WHERE companyId = ${companyId}
+      AND (
+        LOWER(referenceId) LIKE '%test%' OR 
+        LOWER(referenceId) LIKE '%demo%' OR 
+        LOWER(referenceId) LIKE '%mock%' OR
+        LOWER(clientName) LIKE '%test%' OR 
+        LOWER(clientName) LIKE '%demo%' OR
+        LOWER(shipper) LIKE '%test%' OR 
+        LOWER(shipper) LIKE '%demo%' OR
+        LOWER(consignee) LIKE '%test%' OR 
+        LOWER(consignee) LIKE '%demo%'
+      )
+    `;
+
+    if (testShipments.length === 0) {
+      return res.json({ 
+        message: 'No test data found to delete.',
+        deleted: 0 
+      });
+    }
+
+    const shipmentIds = testShipments.map((s: any) => s.id);
+
+    // Delete related boxes first
+    const deletedBoxes = await prisma.$executeRaw`
+      DELETE FROM boxes WHERE shipmentId IN (${shipmentIds.join(',')})
+    `;
+
+    // Delete shipments
+    const deletedShipments = await prisma.$executeRaw`
+      DELETE FROM shipments WHERE id IN (${shipmentIds.join(',')})
+    `;
+
+    res.json({ 
+      message: 'Test data deleted successfully',
+      deleted: testShipments.length,
+      deletedBoxes,
+      shipments: testShipments.map((s: any) => ({
+        id: s.id,
+        referenceId: s.referenceId,
+        clientName: s.clientName,
+        shipper: s.shipper,
+        consignee: s.consignee,
+      })),
+    });
+  } catch (error) {
+    console.error('Cleanup test data error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
