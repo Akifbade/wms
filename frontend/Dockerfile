@@ -12,14 +12,11 @@ COPY package*.json ./
 # Install dependencies (clean install) with increased timeout
 RUN npm ci --legacy-peer-deps --verbose --no-optional 2>&1 || npm install --legacy-peer-deps --no-optional
 
-# Fix permissions on node_modules binaries
-RUN chmod -R +x node_modules/.bin/ 2>/dev/null || true
-
 # Copy source code
 COPY . .
 
-# Build application
-RUN npm run build
+# Build application - fix permissions inline
+RUN chmod +x node_modules/.bin/* 2>/dev/null || true && npm run build
 
 # Production stage
 FROM nginx:alpine
