@@ -336,11 +336,67 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
-    // Update shipment data
-    const updateData: any = { 
-      ...req.body,
-      updatedAt: new Date(),
-    };
+    // Update shipment data - extract only valid Shipment fields
+    const {
+      name,
+      referenceId,
+      originalBoxCount,
+      currentBoxCount,
+      type,
+      arrivalDate,
+      clientName,
+      clientPhone,
+      clientEmail,
+      description,
+      estimatedValue,
+      notes,
+      status,
+      assignedAt,
+      releasedAt,
+      storageCharge,
+      isWarehouseShipment,
+      warehouseData,
+      shipper,
+      consignee,
+      category,
+      awbNumber,
+      flightNumber,
+      origin,
+      destination,
+      customerName,
+    } = req.body;
+
+    const updateData: any = {};
+    
+    // Only include fields that are provided and valid
+    if (name !== undefined) updateData.name = name;
+    if (referenceId !== undefined) updateData.referenceId = referenceId;
+    if (originalBoxCount !== undefined) updateData.originalBoxCount = originalBoxCount;
+    if (currentBoxCount !== undefined) updateData.currentBoxCount = currentBoxCount;
+    if (type !== undefined) updateData.type = type;
+    if (arrivalDate !== undefined) updateData.arrivalDate = new Date(arrivalDate);
+    if (clientName !== undefined) updateData.clientName = clientName;
+    if (clientPhone !== undefined) updateData.clientPhone = clientPhone;
+    if (clientEmail !== undefined) updateData.clientEmail = clientEmail;
+    if (description !== undefined) updateData.description = description;
+    if (estimatedValue !== undefined) updateData.estimatedValue = estimatedValue;
+    if (notes !== undefined) updateData.notes = notes;
+    if (status !== undefined) updateData.status = status;
+    if (assignedAt !== undefined) updateData.assignedAt = assignedAt;
+    if (releasedAt !== undefined) updateData.releasedAt = releasedAt;
+    if (storageCharge !== undefined) updateData.storageCharge = storageCharge;
+    if (isWarehouseShipment !== undefined) updateData.isWarehouseShipment = isWarehouseShipment;
+    if (warehouseData !== undefined) updateData.warehouseData = warehouseData;
+    if (shipper !== undefined) updateData.shipper = shipper;
+    if (consignee !== undefined) updateData.consignee = consignee;
+    if (category !== undefined) updateData.category = category;
+    if (awbNumber !== undefined) updateData.awbNumber = awbNumber;
+    if (flightNumber !== undefined) updateData.flightNumber = flightNumber;
+    if (origin !== undefined) updateData.origin = origin;
+    if (destination !== undefined) updateData.destination = destination;
+    if (customerName !== undefined) updateData.customerName = customerName;
+    
+    updateData.updatedAt = new Date();
 
     const shipment = await prisma.shipment.update({
       where: { id },
