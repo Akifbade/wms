@@ -103,12 +103,13 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     entrypoint: /bin/sh
     command: -c "
-      apk add --no-cache docker-cli mysql-client dcron &&
+      apk add --no-cache docker-cli dcron &&
       mkdir -p /var/log &&
       echo '*/5 * * * * sh /scripts/db-auto-backup.sh >> /var/log/db-backup.log 2>&1' > /etc/crontabs/root &&
-      echo 'Database auto-backup initialized - running every 5 minutes' &&
-      echo 'Cron schedule configured:' &&
+      echo '[INFO] Database auto-backup initialized - running every 5 minutes' &&
+      echo '[INFO] Cron schedule:' &&
       cat /etc/crontabs/root &&
+      echo '[INFO] Starting cron daemon...' &&
       crond -f -l 2
       "
     networks:
