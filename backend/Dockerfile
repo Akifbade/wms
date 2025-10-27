@@ -19,8 +19,8 @@ COPY prisma ./prisma/
 RUN npm ci --include=dev --verbose 2>&1 || npm install --include=dev
 
 # Ensure Prisma CLI binaries are executable then generate client
-RUN chmod +x node_modules/.bin/prisma 2>/dev/null || true && \
-  npx prisma generate
+RUN find node_modules/.bin -name "prisma" -exec chmod +x {} \; 2>/dev/null || true && \
+    npx prisma generate
 
 # Copy source code
 COPY . .
