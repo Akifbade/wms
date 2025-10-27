@@ -255,10 +255,56 @@ export const Login: React.FC = () => {
         </form>
 
         {/* Demo Credentials */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-sm text-yellow-800 font-medium mb-1">Demo Credentials:</p>
-          <p className="text-xs text-yellow-700">Email: admin@warehouse.com</p>
-          <p className="text-xs text-yellow-700">Password: admin123</p>
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-blue-900">🎯 Demo Login Credentials</p>
+          </div>
+          
+          <div className="space-y-2">
+            {/* Admin Account */}
+            <div className="bg-white rounded-md p-3 border border-blue-100">
+              <p className="text-xs font-semibold text-blue-800 mb-1">👑 Admin Account</p>
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-xs text-gray-700"><span className="font-medium">Email:</span> admin@demo.com</p>
+                  <p className="text-xs text-gray-700"><span className="font-medium">Password:</span> demo123</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('admin@demo.com');
+                    setPassword('demo123');
+                  }}
+                  className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                  Use
+                </button>
+              </div>
+            </div>
+
+            {/* Manager Account */}
+            <div className="bg-white rounded-md p-3 border border-blue-100">
+              <p className="text-xs font-semibold text-blue-800 mb-1">👔 Manager Account</p>
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-xs text-gray-700"><span className="font-medium">Email:</span> manager@demo.com</p>
+                  <p className="text-xs text-gray-700"><span className="font-medium">Password:</span> demo123</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('manager@demo.com');
+                    setPassword('demo123');
+                  }}
+                  className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                  Use
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <p className="text-xs text-blue-600 italic text-center">Click "Use" to auto-fill credentials</p>
         </div>
       </div>
     </div>
