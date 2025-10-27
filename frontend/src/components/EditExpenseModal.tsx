@@ -381,7 +381,7 @@ export const EditExpenseModal: React.FC<EditExpenseModalProps> = ({
                                 <option key={option} value={option}>{option}</option>
                               )) : [];
                             } catch {
-                              return field.fieldOptions ? field.fieldOptions.split(',').map((option: string) => (
+                              return typeof field.fieldOptions === 'string' ? field.fieldOptions.split(',').map((option: string) => (
                                 <option key={option.trim()} value={option.trim()}>{option.trim()}</option>
                               )) : [];
                             }
