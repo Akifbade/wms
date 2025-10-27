@@ -18,15 +18,17 @@ COPY prisma ./prisma/
 # Use npm install as fallback if npm ci fails
 RUN npm ci --include=dev --verbose 2>&1 || npm install --include=dev
 
-# Ensure Prisma CLI binaries are executable then generate client
-RUN find node_modules/.bin -name "prisma" -exec chmod +x {} \; 2>/dev/null || true && \
-    npx prisma generate
+# Ensure Prisma CLI binaries are executable
+RUN find node_modules/.bin -name "prisma" -exec chmod +x {} \; 2>/dev/null || true
 
-# Copy source code
+# Copy source code BEFORE generating Prisma client
 COPY . .
 
+# NOW generate Prisma client with the final schema
+RUN npx prisma generate
+
 # Create upload directories
-RUN mkdir -p /app/uploads/logos /app/uploads/documents /app/uploads/damages /app/uploads/temp && \
+RUN mkdir -p /app/uploads/logos /app/uploads/documents /app/uploads/damages /app/uploads/temp /app/uploads/shipments && \
     chmod -R 777 /app/uploads
 
 # Ensure all binaries are executable
