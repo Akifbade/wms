@@ -67,9 +67,9 @@ router.post('/upload', authenticateToken as any, upload.array('files', 10), asyn
       return res.status(400).json({ error: 'Job ID and files are required' });
     }
 
-    // Verify job belongs to company
+    // Verify job exists
     const job = await prisma.movingJob.findFirst({
-      where: { id: jobId, companyId }
+      where: { id: jobId }
     });
 
     if (!job) {
@@ -82,13 +82,13 @@ router.post('/upload', authenticateToken as any, upload.array('files', 10), asyn
         prisma.jobFile.create({
           data: {
             jobId,
-            fileName: file.originalname,
-            fileUrl: `/uploads/job-files/${jobId}/${folder || ''}/${file.filename}`,
-            fileType: file.mimetype,
+            fileName: file.filename,
+            originalName: file.originalname,
+            filePath: `/uploads/job-files/${jobId}/${folder || ''}/${file.filename}`,
+            mimeType: file.mimetype,
             fileSize: file.size,
-            folder: folder || null,
-            uploadedBy: userId,
-            companyId
+            folderName: folder || null,
+            uploadedBy: userId
           }
         })
       )
@@ -124,7 +124,7 @@ router.get('/:jobId', authenticateToken as any, async (req: AuthRequest, res) =>
     }
 
     const files = await prisma.jobFile.findMany({
-      where: { jobId, companyId },
+      where: { jobId },
       orderBy: { uploadedAt: 'desc' }
     });
 
@@ -143,10 +143,9 @@ router.get('/:jobId', authenticateToken as any, async (req: AuthRequest, res) =>
 router.delete('/:fileId', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { fileId } = req.params;
-    const { companyId } = req.user!;
 
     const file = await prisma.jobFile.findFirst({
-      where: { id: fileId, companyId }
+      where: { id: parseInt(fileId) }
     });
 
     if (!file) {
@@ -154,14 +153,14 @@ router.delete('/:fileId', authenticateToken as any, async (req: AuthRequest, res
     }
 
     // Delete physical file
-    const filePath = path.join(__dirname, '../..', file.fileUrl);
+    const filePath = path.join(__dirname, '../..', file.filePath);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 
     // Delete database record
     await prisma.jobFile.delete({
-      where: { id: fileId }
+      where: { id: parseInt(fileId) }
     });
 
     res.json({ success: true, message: 'File deleted successfully' });
@@ -217,11 +216,10 @@ router.post('/folder', authenticateToken as any, async (req: AuthRequest, res) =
 router.get('/:jobId/folders', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { jobId } = req.params;
-    const { companyId } = req.user!;
 
-    // Verify job belongs to company
+    // Verify job exists
     const job = await prisma.movingJob.findFirst({
-      where: { id: jobId, companyId }
+      where: { id: jobId }
     });
 
     if (!job) {
@@ -230,14 +228,14 @@ router.get('/:jobId/folders', authenticateToken as any, async (req: AuthRequest,
 
     // Get unique folders from files
     const files = await prisma.jobFile.findMany({
-      where: { jobId, companyId },
-      select: { folder: true },
-      distinct: ['folder']
+      where: { jobId },
+      select: { folderName: true },
+      distinct: ['folderName']
     });
 
     const folders = files
-      .map(f => f.folder)
-      .filter(f => f !== null)
+      .map((f: any) => f.folderName)
+      .filter((f: any) => f !== null)
       .sort();
 
     res.json({ folders });
