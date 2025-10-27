@@ -1,5 +1,5 @@
 ﻿# ًں¤– AI SESSION CONTEXT
-**Last Updated:** 2025-10-27 08:34:28  
+**Last Updated:** 2025-10-27 08:39:40  
 **Branch:** stable/prisma-mysql-production  
 **Auto-Generated:** This file is updated every 5 minutes automatically
 
@@ -10,7 +10,7 @@
 ### Docker Containers:
 ```
 NAMES             STATUS
-wms-backend       Up 59 minutes (healthy)
+wms-backend       Up About an hour (healthy)
 wms-frontend      Up About an hour (unhealthy)
 wms-git-watcher   Up About an hour
 wms-database      Up About an hour (healthy)
@@ -23,16 +23,17 @@ Branch: stable/prisma-mysql-production
 
 Changed Files:
  M auto-backup.log
+?? SSL-SETUP-GUIDE.md
 
 ```
 
 ### Recent Commits:
 ```
+0d0231ffd AUTO-BACKUP: 2025-10-27 08:39:31
+8bfc40ee5 Fix tsc permissions - chmod all binaries before build
 ec4e304ec AUTO-BACKUP: 2025-10-27 08:34:25
 20edcc2b9 Fix backend - build TypeScript and use compiled code
 9f15d7b7f Fix backend start command - use ts-node instead of compiled JS
-fe16ec592 AUTO-BACKUP: 2025-10-27 08:29:19
-dd62e9f93 Fix rollup native module issue - include optional deps for Alpine
 
 ```
 
@@ -55,9 +56,9 @@ Auto-backup in progress
 
 ### Recent Conversation Summary:
 Recent work completed:
+- Fix tsc permissions - chmod all binaries before build
 - Fix backend - build TypeScript and use compiled code
 - Fix backend start command - use ts-node instead of compiled JS
-- Fix rollup native module issue - include optional deps for Alpine
 
 ### Issues Faced (if any):
 
@@ -69,9 +70,9 @@ Recent work completed:
 **Auto-detected from recent commits and activity:**
 
 Recent work completed:
+- Fix tsc permissions - chmod all binaries before build
 - Fix backend - build TypeScript and use compiled code
 - Fix backend start command - use ts-node instead of compiled JS
-- Fix rollup native module issue - include optional deps for Alpine
 
 **Key Points for New AI:**
 1. Read the recent commits above to understand what was done
@@ -240,7 +241,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 ## âœ… LAST KNOWN WORKING STATE
 
-**Timestamp:** 2025-10-27 08:34:28  
+**Timestamp:** 2025-10-27 08:39:40  
 **Branch:** stable/prisma-mysql-production  
 **Frontend:** â‌Œ Not Running  
 **Backend:** â‌Œ Not Running  
@@ -254,7 +255,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 1. **Create backup:**
    ```powershell
-   git tag backup-feature-name-20251027-083428
+   git tag backup-feature-name-20251027-083940
    ```
 
 2. **Create branch:**
