@@ -140,7 +140,6 @@ async function main() {
         clientPhone: customer.phone,
         qrCode: `QR-SH-${1001 + i}`,
         status: 'ACTIVE',
-        rackId: assignedRack.id,
         assignedAt: new Date(),
         storageCharge: boxCount * company.ratePerDay * 30, // 30 days estimate
       },
