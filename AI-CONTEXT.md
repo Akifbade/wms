@@ -11,6 +11,23 @@
 
 ## 🚨 CRITICAL PRODUCTION RULES FOR AI - READ FIRST!
 
+### 🔴 RULE #0: NEVER AUTO-DEPLOY TO VPS - ALWAYS GET PERMISSION FIRST!
+```
+⚠️ MANDATORY WORKFLOW BEFORE VPS DEPLOYMENT:
+1. Make changes locally on Windows
+2. Test locally: docker-compose up --build
+3. ASK USER: "Local me test kar lo, sabi hai to VPS deploy karu?"
+4. WAIT for explicit permission ("haan karo", "deploy karo", etc.)
+5. Create backup on VPS before deployment
+6. Only then deploy to production VPS
+
+❌ NEVER deploy without asking
+❌ NEVER assume changes are safe for production  
+❌ NEVER skip local testing
+✅ ALWAYS get user confirmation first
+✅ ALWAYS backup before deployment
+```
+
 ### 🔴 RULE #1: NEVER DELETE PRODUCTION DATA!
 ```bash
 # ❌ ABSOLUTELY FORBIDDEN - WILL DELETE ALL USER DATA:

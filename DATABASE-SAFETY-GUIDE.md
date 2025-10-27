@@ -1,5 +1,24 @@
 # 🛡️ DATABASE SAFETY & BACKUP SYSTEM
 
+## 🚨 DEPLOYMENT RULE #1 - MOST CRITICAL
+
+### **⚠️ NEVER DEPLOY TO VPS WITHOUT USER PERMISSION**
+
+```
+MANDATORY WORKFLOW:
+1. Make changes locally in Windows
+2. Test locally: docker-compose up --build
+3. Ask user: "Local me test kar lo, sahi hai to VPS deploy karu?"
+4. WAIT for user confirmation ("haan deploy karo" or "deply karo")
+5. Create VPS backup BEFORE deployment
+6. Only then deploy to VPS (148.230.107.155)
+
+❌ DO NOT auto-deploy to production
+❌ DO NOT assume changes are safe
+❌ DO NOT skip local testing
+✅ ALWAYS get user permission first
+```
+
 ## ⚠️ CRITICAL PRODUCTION RULES
 
 ### **NEVER RUN THESE COMMANDS ON PRODUCTION:**
