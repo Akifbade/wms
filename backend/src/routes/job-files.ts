@@ -21,16 +21,17 @@ interface AuthRequest extends Request {
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req: any, file, cb) => {
-    const { jobId } = req.body;
-    const folder = req.body.folder || '';
-    const uploadPath = path.join(__dirname, '../../uploads/job-files', jobId, folder);
+    // Use temp folder first, will organize by job/folder after upload
+    const uploadPath = path.join(__dirname, '../../uploads/temp');
     
     // Create directory if it doesn't exist
-    fs.mkdirSync(uploadPath, { recursive: true });
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
-    const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
+    const uniqueName = `${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`;
     cb(null, uniqueName);
   }
 });
@@ -77,10 +78,22 @@ router.post('/upload', authenticateToken as any, upload.array('files', 10), asyn
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    // Create file records
+    // Move files from temp to proper location and create records
     const fileRecords = await Promise.all(
-      files.map(file => 
-        prisma.jobFile.create({
+      files.map(async file => {
+        // Create destination directory
+        const destFolder = path.join(__dirname, '../../uploads/job-files', jobId, folder || '');
+        if (!fs.existsSync(destFolder)) {
+          fs.mkdirSync(destFolder, { recursive: true });
+        }
+
+        // Move file from temp to destination
+        const tempPath = file.path;
+        const destPath = path.join(destFolder, file.filename);
+        fs.renameSync(tempPath, destPath);
+
+        // Create database record
+        return prisma.jobFile.create({
           data: {
             jobId,
             fileName: file.filename,
@@ -91,8 +104,8 @@ router.post('/upload', authenticateToken as any, upload.array('files', 10), asyn
             folderName: folder || null,
             uploadedBy: userId
           }
-        })
-      )
+        });
+      })
     );
 
     res.status(201).json({
