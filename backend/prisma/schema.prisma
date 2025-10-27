@@ -101,7 +101,7 @@ model User {
 
   // Relations
   company                 Company            @relation(fields: [companyId], references: [id])
-  activities              RackActivity[]
+  rackActivities          RackActivity[]
   jobAssignments          JobAssignment[]
   movingJobsLead          MovingJob[]        @relation("MovingJobTeamLead")
   stockBatchesReceived    StockBatch[]       @relation("StockBatchReceivedBy")
