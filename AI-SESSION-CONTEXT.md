@@ -1,5 +1,5 @@
 ﻿# ًں¤– AI SESSION CONTEXT
-**Last Updated:** 2025-10-27 09:51:17  
+**Last Updated:** 2025-10-27 09:56:24  
 **Branch:** stable/prisma-mysql-production  
 **Auto-Generated:** This file is updated every 5 minutes automatically
 
@@ -28,11 +28,11 @@ Changed Files:
 
 ### Recent Commits:
 ```
+f379326b6 AUTO-BACKUP: 2025-10-27 09:56:20
+91383e437 Add production database safety system with auto-backups every 5 min + fix nginx uploads proxy
 c5583f922 AUTO-BACKUP: 2025-10-27 09:51:14
 6403be7e4 Fix upload paths: Change from public/uploads to uploads
 ecae30150 AUTO-BACKUP: 2025-10-27 09:15:41
-e61bda284 AUTO-BACKUP: 2025-10-27 09:10:26
-99cf921b4 Fix uploads folder configuration for logos and documents
 
 ```
 
@@ -56,7 +56,6 @@ Auto-backup in progress
 ### Recent Conversation Summary:
 Recent work completed:
 - Fix upload paths: Change from public/uploads to uploads
-- Fix uploads folder configuration for logos and documents
 
 ### Issues Faced (if any):
 
@@ -69,7 +68,6 @@ Recent work completed:
 
 Recent work completed:
 - Fix upload paths: Change from public/uploads to uploads
-- Fix uploads folder configuration for logos and documents
 
 **Key Points for New AI:**
 1. Read the recent commits above to understand what was done
@@ -238,7 +236,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 ## âœ… LAST KNOWN WORKING STATE
 
-**Timestamp:** 2025-10-27 09:51:17  
+**Timestamp:** 2025-10-27 09:56:24  
 **Branch:** stable/prisma-mysql-production  
 **Frontend:** â‌Œ Not Running  
 **Backend:** â‌Œ Not Running  
@@ -252,7 +250,7 @@ Get-Process | Where-Object {$_.CommandLine -like "*auto-backup*"}
 
 1. **Create backup:**
    ```powershell
-   git tag backup-feature-name-20251027-095117
+   git tag backup-feature-name-20251027-095624
    ```
 
 2. **Create branch:**
