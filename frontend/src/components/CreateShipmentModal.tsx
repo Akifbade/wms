@@ -57,6 +57,21 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
   const [success, setSuccess] = useState('');
   const [showRackMap, setShowRackMap] = useState(false);
 
+  // Helper function to safely parse fieldOptions
+  const parseFieldOptions = (fieldOptions: any): string[] => {
+    if (!fieldOptions) return [];
+    if (Array.isArray(fieldOptions)) return fieldOptions;
+    if (typeof fieldOptions === 'string') {
+      try {
+        const parsed = JSON.parse(fieldOptions);
+        return Array.isArray(parsed) ? parsed : fieldOptions.split(',').map((s: string) => s.trim());
+      } catch {
+        return fieldOptions.split(',').map((s: string) => s.trim());
+      }
+    }
+    return [];
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadRacks();
@@ -179,7 +194,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
             required={field.isRequired}
           >
             <option value="">Select {field.fieldName.toLowerCase()}</option>
-            {field.fieldOptions && field.fieldOptions.map((option: string, index: number) => (
+            {parseFieldOptions(field.fieldOptions).map((option: string, index: number) => (
               <option key={index} value={option}>{option}</option>
             ))}
           </select>

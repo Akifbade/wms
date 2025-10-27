@@ -106,6 +106,21 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     'custom',
     'pricing'
   ]);
+
+  // Helper function to safely parse fieldOptions
+  const parseFieldOptions = (fieldOptions: any): string[] => {
+    if (!fieldOptions) return [];
+    if (Array.isArray(fieldOptions)) return fieldOptions;
+    if (typeof fieldOptions === 'string') {
+      try {
+        const parsed = JSON.parse(fieldOptions);
+        return Array.isArray(parsed) ? parsed : fieldOptions.split(',').map((s: string) => s.trim());
+      } catch {
+        return fieldOptions.split(',').map((s: string) => s.trim());
+      }
+    }
+    return [];
+  };
   const [draggedSection, setDraggedSection] = useState<string | null>(null);
 
   useEffect(() => {
@@ -315,7 +330,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             required={field.isRequired}
           >
             <option value="">Select {field.fieldName.toLowerCase()}</option>
-            {field.fieldOptions && field.fieldOptions.map((option: string, index: number) => (
+            {parseFieldOptions(field.fieldOptions).map((option: string, index: number) => (
               <option key={index} value={option}>{option}</option>
             ))}
           </select>
