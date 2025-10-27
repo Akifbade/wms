@@ -468,6 +468,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                       >
                         <option value="">-- Select --</option>
                         {(() => {
+                          if (!field.fieldOptions) return [];
                           try {
                             // Try to parse as JSON array
                             const options = JSON.parse(field.fieldOptions);
@@ -476,7 +477,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                             )) : [];
                           } catch {
                             // Fallback: split by comma if not valid JSON
-                            return field.fieldOptions ? field.fieldOptions.split(',').map((option: string) => (
+                            return typeof field.fieldOptions === 'string' ? field.fieldOptions.split(',').map((option: string) => (
                               <option key={option.trim()} value={option.trim()}>{option.trim()}</option>
                             )) : [];
                           }
