@@ -11,14 +11,14 @@ RUN apt-get update -y && apt-get install -y openssl
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (including dev dependencies for Prisma)
+RUN npm ci
 
 # Copy source code
 COPY . .
 
 # Generate Prisma Client
-RUN npx prisma generate
+RUN npm run prisma:generate || npx prisma generate
 
 # Expose port
 EXPOSE 5000
