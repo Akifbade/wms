@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
@@ -11,7 +11,8 @@ const prisma = new PrismaClient();
 
 interface AuthRequest extends Request {
   user?: {
-    userId: string;
+    id: string;
+    email: string;
     companyId: string;
     role: string;
   };
@@ -60,7 +61,7 @@ const upload = multer({
 router.post('/upload', authenticateToken as any, upload.array('files', 10), async (req: any, res) => {
   try {
     const { jobId, folder } = req.body;
-    const { companyId, userId } = req.user;
+    const { id: userId } = req.user;
     const files = req.files as Express.Multer.File[];
 
     if (!jobId || !files || files.length === 0) {
