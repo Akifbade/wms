@@ -1,6 +1,6 @@
--- Update admin password with fresh hash for 'admin123'
+-- Update admin password with correct hash for 'demo123'
 UPDATE users 
-SET password='$2a$10$gqVlRz2N/mRdOZrvpvqeTO8GULsch/9lKBCELFwGPX1y0vzGPClOq' 
+SET password='$2b$10$4iTO7hJ5BUbiWMlYVd0/VOXENTdgt/cobkRPF55wfUr6DGci3qs4O' 
 WHERE email='admin@demo.com';
 
 -- Verify user
