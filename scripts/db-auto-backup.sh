@@ -7,7 +7,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 CONTAINER_NAME="wms-database"
 DB_NAME="warehouse_wms"
 DB_USER="root"
-DB_PASS="rootpassword"
+DB_PASS="rootpassword123"
 
 # Create backup directory
 mkdir -p $BACKUP_DIR
