@@ -1,0 +1,178 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # STAGING ENVIRONMENT
+  # ============================================
+  
+  # Staging Database
+  staging-database:
+    image: mysql:8.0
+    container_name: wms-staging-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${STAGING_DB_ROOT_PASSWORD:-stagingroot}
+      MYSQL_DATABASE: ${STAGING_DB_NAME:-warehouse_wms_staging}
+      MYSQL_USER: ${STAGING_DB_USER:-staging_user}
+      MYSQL_PASSWORD: ${STAGING_DB_PASSWORD:-stagingpass123}
+    ports:
+      - "${STAGING_DB_PORT:-3308}:3306"
+    volumes:
+      - staging_mysql_data:/var/lib/mysql
+    networks:
+      - staging-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Staging Backend
+  staging-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wms-staging-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      DATABASE_URL: mysql://${STAGING_DB_USER:-staging_user}:${STAGING_DB_PASSWORD:-stagingpass123}@staging-database:3306/${STAGING_DB_NAME:-warehouse_wms_staging}
+      JWT_SECRET: ${STAGING_JWT_SECRET:-staging-secret-key-change-me}
+      PORT: 5001
+    ports:
+      - "${STAGING_BACKEND_PORT:-5001}:5001"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    depends_on:
+      staging-database:
+        condition: service_healthy
+    networks:
+      - staging-network
+    command: sh -c "npx prisma db push --skip-generate && npx ts-node src/index.ts"
+
+  # Staging Frontend
+  staging-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: wms-staging-frontend
+    restart: unless-stopped
+    ports:
+      - "${STAGING_FRONTEND_PORT_HTTP:-8080}:80"
+      - "${STAGING_FRONTEND_PORT_HTTPS:-8443}:443"
+    volumes:
+      - ./frontend/staging.nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - staging-backend
+    networks:
+      - staging-network
+    environment:
+      - ENVIRONMENT=staging
+
+  # ============================================
+  # PRODUCTION ENVIRONMENT
+  # ============================================
+
+  # Production Database
+  production-database:
+    image: mysql:8.0
+    container_name: wms-production-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${PROD_DB_ROOT_PASSWORD:-prodroot}
+      MYSQL_DATABASE: ${PROD_DB_NAME:-warehouse_wms}
+      MYSQL_USER: ${PROD_DB_USER:-wms_user}
+      MYSQL_PASSWORD: ${PROD_DB_PASSWORD:-wmspassword123}
+    ports:
+      - "${PROD_DB_PORT:-3307}:3306"
+    volumes:
+      - production_mysql_data:/var/lib/mysql
+    networks:
+      - production-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Production Backend
+  production-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wms-production-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mysql://${PROD_DB_USER:-wms_user}:${PROD_DB_PASSWORD:-wmspassword123}@production-database:3306/${PROD_DB_NAME:-warehouse_wms}
+      JWT_SECRET: ${PROD_JWT_SECRET:-your-production-secret-key}
+      PORT: 5000
+    ports:
+      - "${PROD_BACKEND_PORT:-5000}:5000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    depends_on:
+      production-database:
+        condition: service_healthy
+    networks:
+      - production-network
+    command: sh -c "npx prisma db push --skip-generate && npx ts-node src/index.ts"
+
+  # Production Frontend (HTTPS with SSL)
+  production-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: wms-production-frontend
+    restart: unless-stopped
+    ports:
+      - "${PROD_FRONTEND_PORT_HTTP:-80}:80"
+      - "${PROD_FRONTEND_PORT_HTTPS:-443}:443"
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - production-backend
+    networks:
+      - production-network
+    environment:
+      - ENVIRONMENT=production
+
+  # Optional: Auto Git Commit (Staging)
+  staging-git-watcher:
+    image: alpine:latest
+    container_name: wms-staging-git-watcher
+    restart: unless-stopped
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace
+    command: sh -c "apk add --no-cache git && git config user.email 'staging@wms.local' && git config user.name 'Staging Bot' && echo 'Staging Git Watcher Started'"
+    networks:
+      - staging-network
+
+  # Optional: Auto Git Commit (Production)
+  production-git-watcher:
+    image: alpine:latest
+    container_name: wms-production-git-watcher
+    restart: unless-stopped
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace
+    command: sh -c "apk add --no-cache git && git config user.email 'production@wms.local' && git config user.name 'Production Bot' && echo 'Production Git Watcher Started'"
+    networks:
+      - production-network
+
+networks:
+  staging-network:
+    driver: bridge
+  production-network:
+    driver: bridge
+
+volumes:
+  staging_mysql_data:
+  production_mysql_data:
