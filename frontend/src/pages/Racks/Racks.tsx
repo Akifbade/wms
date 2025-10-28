@@ -17,6 +17,7 @@ import QRCode from 'qrcode';
 
 export const Racks: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [racks, setRacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -45,9 +46,13 @@ export const Racks: React.FC = () => {
     }
   };
 
-  const filteredRacks = selectedSection === 'all' 
-    ? racks 
-    : racks.filter((r: any) => r.code.startsWith(selectedSection));
+  const filteredRacks = racks.filter((r: any) => {
+    // Section filter
+    const sectionMatch = selectedSection === 'all' || r.code.startsWith(selectedSection);
+    // Category filter
+    const categoryMatch = selectedCategory === 'all' || r.category === selectedCategory;
+    return sectionMatch && categoryMatch;
+  });
 
   const getUtilizationColor = (percentage: number) => {
     if (percentage >= 90) return 'bg-red-500';
@@ -342,26 +347,79 @@ export const Racks: React.FC = () => {
 
       {/* Section Filter */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setSelectedSection('all')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              selectedSection === 'all' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            All Sections
-          </button>
-          {['A', 'B', 'C'].map((section) => (
-            <button
-              key={section}
-              onClick={() => setSelectedSection(section)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                selectedSection === section ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Section {section}
-            </button>
-          ))}
+        <div className="space-y-3">
+          {/* Section Buttons */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-2">📍 SECTION</p>
+            <div className="flex items-center flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedSection('all')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedSection === 'all' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Sections
+              </button>
+              {['A', 'B', 'C'].map((section) => (
+                <button
+                  key={section}
+                  onClick={() => setSelectedSection(section)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    selectedSection === section ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Section {section}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Category Buttons */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-2">📂 CATEGORY</p>
+            <div className="flex items-center flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedCategory === 'all' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Categories
+              </button>
+              <button
+                onClick={() => setSelectedCategory('DIOR')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedCategory === 'DIOR' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                }`}
+              >
+                👜 Dior
+              </button>
+              <button
+                onClick={() => setSelectedCategory('COMPANY_MATERIAL')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedCategory === 'COMPANY_MATERIAL' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                }`}
+              >
+                🏢 Company Material
+              </button>
+              <button
+                onClick={() => setSelectedCategory('JAZEERA')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedCategory === 'JAZEERA' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'
+                }`}
+              >
+                🏝️ Jazeera
+              </button>
+              <button
+                onClick={() => setSelectedCategory('OTHERS')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedCategory === 'OTHERS' ? 'bg-gray-600 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                📦 Others
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -439,11 +497,32 @@ export const Racks: React.FC = () => {
                     <div className="p-2 bg-primary-100 rounded-lg">
                       <QrCodeIcon className="h-5 w-5 text-primary-600" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <span className="text-xl font-bold text-gray-900">{rack.code}</span>
                       <p className="text-xs text-gray-500 truncate">{rack.location || 'N/A'}</p>
                     </div>
                   </div>
+
+                  {/* Category Badge */}
+                  {rack.category && (
+                    <div className="mb-3">
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${
+                        rack.category === 'DIOR' 
+                          ? 'bg-purple-100 text-purple-700'
+                          : rack.category === 'COMPANY_MATERIAL'
+                          ? 'bg-blue-100 text-blue-700'
+                          : rack.category === 'JAZEERA'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {rack.category === 'DIOR' && '👜'}
+                        {rack.category === 'COMPANY_MATERIAL' && '🏢'}
+                        {rack.category === 'JAZEERA' && '🏝️'}
+                        {rack.category === 'OTHERS' && '📦'}
+                        {rack.category.replace('_', ' ')}
+                      </span>
+                    </div>
+                  )}
                   
                   {/* Capacity Info */}
                   <div className="space-y-3">
@@ -574,6 +653,65 @@ export const Racks: React.FC = () => {
                         {Math.round((rackDetails?.capacityUsed / rackDetails?.capacityTotal) * 100) || 0}%
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                {/* Rack Information */}
+                <div className="px-6 pt-4 pb-2 bg-white border-b">
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Category */}
+                    {rackDetails?.category && (
+                      <div>
+                        <p className="text-xs text-gray-500 font-medium mb-2">📂 Category</p>
+                        <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold ${
+                          rackDetails.category === 'DIOR' 
+                            ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                            : rackDetails.category === 'COMPANY_MATERIAL'
+                            ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                            : rackDetails.category === 'JAZEERA'
+                            ? 'bg-green-100 text-green-800 border border-green-300'
+                            : 'bg-gray-100 text-gray-800 border border-gray-300'
+                        }`}>
+                          {rackDetails.category === 'DIOR' && '👜 Dior'}
+                          {rackDetails.category === 'COMPANY_MATERIAL' && '🏢 Company Material'}
+                          {rackDetails.category === 'JAZEERA' && '🏝️ Jazeera'}
+                          {rackDetails.category === 'OTHERS' && '📦 Others'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Dimensions */}
+                    {(rackDetails?.length || rackDetails?.width || rackDetails?.height) && (
+                      <div>
+                        <p className="text-xs text-gray-500 font-medium mb-2">📏 Dimensions</p>
+                        <div className="flex items-center gap-2 text-sm font-mono bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+                          {rackDetails.length && (
+                            <span className="font-bold text-gray-900">
+                              L: {rackDetails.length}
+                            </span>
+                          )}
+                          {rackDetails.width && (
+                            <>
+                              <span className="text-gray-400">×</span>
+                              <span className="font-bold text-gray-900">
+                                W: {rackDetails.width}
+                              </span>
+                            </>
+                          )}
+                          {rackDetails.height && (
+                            <>
+                              <span className="text-gray-400">×</span>
+                              <span className="font-bold text-gray-900">
+                                H: {rackDetails.height}
+                              </span>
+                            </>
+                          )}
+                          <span className="text-xs text-gray-500 ml-1">
+                            {rackDetails.dimensionUnit === 'FEET' ? 'ft' : 'm'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

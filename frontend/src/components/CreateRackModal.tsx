@@ -14,8 +14,13 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
     code: '',
     location: '',
     rackType: 'STORAGE',
+    category: '',
     capacityTotal: 100,
     status: 'ACTIVE',
+    length: '',
+    width: '',
+    height: '',
+    dimensionUnit: 'METERS',
   });
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [error, setError] = useState('');
@@ -28,8 +33,13 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
         code: '',
         location: '',
         rackType: 'STORAGE',
+        category: '',
         capacityTotal: 100,
         status: 'ACTIVE',
+        length: '',
+        width: '',
+        height: '',
+        dimensionUnit: 'METERS',
       });
       setQrCodeUrl('');
       setError('');
@@ -107,6 +117,11 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
         ...formData,
         qrCode,
         capacityUsed: 0,
+        // Convert dimension strings to numbers or null
+        length: formData.length ? parseFloat(formData.length) : null,
+        width: formData.width ? parseFloat(formData.width) : null,
+        height: formData.height ? parseFloat(formData.height) : null,
+        category: formData.category || null,
       };
 
       await racksAPI.create(dataToSubmit);
@@ -214,6 +229,27 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category
+                </label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="">Select Category...</option>
+                  <option value="DIOR">Dior</option>
+                  <option value="COMPANY_MATERIAL">Company Material</option>
+                  <option value="JAZEERA">Jazeera</option>
+                  <option value="OTHERS">Others</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Line-wise categorization (optional)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Total Capacity <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -248,6 +284,78 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
                 </select>
               </div>
             </div>
+          </div>
+
+          {/* Dimensions */}
+          <div className="border-b pb-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">📏 Dimensions (Size Information)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Length
+                </label>
+                <input
+                  type="number"
+                  name="length"
+                  value={formData.length}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="0.0"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Width
+                </label>
+                <input
+                  type="number"
+                  name="width"
+                  value={formData.width}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="0.0"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Height
+                </label>
+                <input
+                  type="number"
+                  name="height"
+                  value={formData.height}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="0.0"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit
+                </label>
+                <select
+                  name="dimensionUnit"
+                  value={formData.dimensionUnit}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="METERS">Meters</option>
+                  <option value="FEET">Feet</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              💡 Optional: Enter rack physical dimensions for detailed tracking
+            </p>
           </div>
 
           {/* QR Code Preview */}

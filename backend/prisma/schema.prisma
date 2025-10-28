@@ -181,7 +181,15 @@ model Rack {
   code          String // A1, A2, B1, etc.
   qrCode        String    @unique
   rackType      String    @default("STORAGE") // STORAGE, MATERIALS, EQUIPMENT
+  category      String?   // DIOR, COMPANY_MATERIAL, JAZEERA, OTHERS
   location      String?
+  
+  // Size/Dimensions
+  length        Float?    // Length in meters/feet
+  width         Float?    // Width in meters/feet
+  height        Float?    // Height in meters/feet
+  dimensionUnit String    @default("METERS") // METERS, FEET
+  
   capacityTotal Float     @default(100)
   capacityUsed  Float     @default(0)
   minCapacity   Int       @default(2) // Minimum capacity requirement
