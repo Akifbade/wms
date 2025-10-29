@@ -147,6 +147,10 @@ export const racksAPI = {
     return apiCall<{ rack: any }>(`/racks/${id}`);
   },
 
+  getCategories: async () => {
+    return apiCall<{ categories: any[] }>('/racks/categories/list');
+  },
+
   create: async (data: any) => {
     return apiCall<{ rack: any }>('/racks', {
       method: 'POST',

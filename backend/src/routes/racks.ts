@@ -14,10 +14,60 @@ const rackSchema = z.object({
   location: z.string().optional(),
   capacityTotal: z.number().positive().optional(),
   categoryId: z.string().optional(), // NEW: Category reference
+  companyProfileId: z.string().optional(), // NEW: Company profile reference
   length: z.number().positive().optional(),
   width: z.number().positive().optional(),
   height: z.number().positive().optional(),
   dimensionUnit: z.enum(['CM', 'INCHES', 'METERS']).optional(),
+});
+
+// Get categories for rack assignment
+router.get('/categories/list', async (req: AuthRequest, res: Response) => {
+  try {
+    const companyId = req.user!.companyId;
+
+    const profiles = await prisma.companyProfile.findMany({
+      where: {
+        companyId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        logo: true,
+        contractStatus: true,
+        contactPerson: true,
+        contactPhone: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    console.log(
+      'Loaded company profiles for racks dropdown',
+      profiles.length,
+      'companyId:',
+      companyId
+    );
+
+    res.json({
+      categories: profiles.map(profile => ({
+        id: profile.id,
+        name: profile.name,
+        description: profile.description,
+        logo: profile.logo,
+        // Frontend still expects optional color/icon fields when rendering badges
+        color: '#5B21B6',
+        icon: '🏢',
+        contractStatus: profile.contractStatus,
+        contactPerson: profile.contactPerson,
+        contactPhone: profile.contactPhone,
+      })),
+    });
+  } catch (error) {
+    console.error('Get rack company profiles error:', error);
+    res.status(500).json({ error: 'Failed to fetch company profiles' });
+  }
 });
 
 // Get all racks
@@ -47,6 +97,13 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             logo: true,
             color: true,
             icon: true,
+          },
+        },
+        companyProfile: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
           },
         },
         boxes: {
@@ -108,6 +165,16 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
             logo: true,
             color: true,
             icon: true,
+          },
+        },
+        companyProfile: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+            description: true,
+            contactPerson: true,
+            contactPhone: true,
           },
         },
         boxes: {
@@ -198,12 +265,27 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
       }
     }
 
+    // Validate companyProfileId if provided
+    if (data.companyProfileId) {
+      const companyProfile = await prisma.companyProfile.findFirst({
+        where: {
+          id: data.companyProfileId,
+          companyId,
+        },
+      });
+
+      if (!companyProfile) {
+        return res.status(404).json({ error: 'Company profile not found' });
+      }
+    }
+
     const rack = await prisma.rack.create({
       data: {
         code: data.code,
         rackType: data.rackType || 'STORAGE',
         location: data.location,
         categoryId: data.categoryId,
+        companyProfileId: data.companyProfileId,
         length: data.length,
         width: data.width,
         height: data.height,
@@ -222,6 +304,13 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
             logo: true,
             color: true,
             icon: true,
+          },
+        },
+        companyProfile: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
           },
         },
       },
@@ -265,6 +354,20 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
       }
     }
 
+    // Validate companyProfileId if provided
+    if (req.body.companyProfileId) {
+      const companyProfile = await prisma.companyProfile.findFirst({
+        where: {
+          id: req.body.companyProfileId,
+          companyId,
+        },
+      });
+
+      if (!companyProfile) {
+        return res.status(404).json({ error: 'Company profile not found' });
+      }
+    }
+
     const rack = await prisma.rack.update({
       where: { id },
       data: req.body,
@@ -276,6 +379,13 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
             logo: true,
             color: true,
             icon: true,
+          },
+        },
+        companyProfile: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
           },
         },
       },

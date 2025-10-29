@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { racksAPI, categoriesAPI } from '../services/api';
+import { racksAPI, companiesAPI } from '../services/api';
 import QRCode from 'qrcode';
 
 interface Category {
   id: string;
   name: string;
-  logo: string;
-  color: string;
+  logo?: string;
+  color?: string;
+  icon?: string;
+  description?: string;
+  contractStatus?: string;
+  contactPerson?: string;
+  contactPhone?: string;
 }
 
 interface EditRackModalProps {
@@ -14,10 +19,9 @@ interface EditRackModalProps {
   onClose: () => void;
   onSuccess: () => void;
   rack: any;
-  companyId?: string;
 }
 
-export default function EditRackModal({ isOpen, onClose, onSuccess, rack, companyId }: EditRackModalProps) {
+export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: EditRackModalProps) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [formData, setFormData] = useState({
@@ -25,6 +29,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack, compan
     location: '',
     rackType: 'STORAGE',
     categoryId: '',
+    companyProfileId: '',
     capacityTotal: 100,
     status: 'ACTIVE',
     length: '',
@@ -35,20 +40,38 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack, compan
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedCategoryInfo, setSelectedCategoryInfo] = useState<Category | null>(null);
 
-  // Load categories when modal opens and companyId changes
+  const resolveLogoUrl = (logo?: string | null) => {
+    if (!logo) return '';
+    if (logo.startsWith('http')) return logo;
+    return logo.startsWith('/') ? logo : `/uploads/${logo}`;
+  };
+
+  // Load categories when modal opens
   useEffect(() => {
-    if (isOpen && companyId) {
+    if (isOpen) {
       loadCategories();
     }
-  }, [isOpen, companyId]);
+  }, [isOpen]);
 
   const loadCategories = async () => {
     try {
-      if (companyId) {
-        const data = await categoriesAPI.listByCompany(companyId);
-        setCategories(data);
-      }
+      const profiles = await companiesAPI.listProfiles();
+      const options: Category[] = (profiles || [])
+        .filter((profile: any) => profile.isActive !== false)
+        .map((profile: any) => ({
+          id: profile.id,
+          name: profile.name,
+          description: profile.description,
+          logo: profile.logo,
+          contractStatus: profile.contractStatus,
+          contactPerson: profile.contactPerson,
+          contactPhone: profile.contactPhone,
+          color: '#5B21B6',
+          icon: '🏢',
+        }));
+      setCategories(options);
     } catch (err) {
       console.error('Failed to load categories:', err);
     }
@@ -61,7 +84,8 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack, compan
         code: rack.code || '',
         location: rack.location || '',
         rackType: rack.rackType || 'STORAGE',
-        categoryId: rack.categoryId || '',
+  categoryId: rack.companyProfileId || rack.categoryId || '',
+  companyProfileId: rack.companyProfileId || '',
         capacityTotal: rack.capacityTotal || 100,
         status: rack.status || 'ACTIVE',
         length: rack.length || '',
@@ -69,6 +93,21 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack, compan
         height: rack.height || '',
         dimensionUnit: rack.dimensionUnit || 'METERS',
       });
+
+      // Set selected category info
+      if (rack.companyProfile) {
+        setSelectedCategoryInfo({
+          id: rack.companyProfile.id,
+          name: rack.companyProfile.name,
+          logo: rack.companyProfile.logo,
+          description: rack.companyProfile.description,
+          contractStatus: rack.companyProfile.contractStatus,
+          contactPerson: rack.companyProfile.contactPerson,
+          contactPhone: rack.companyProfile.contactPhone,
+          color: '#5B21B6',
+          icon: '🏢',
+        });
+      }
       
       // Generate QR code for existing rack
       if (rack.code) {
@@ -82,10 +121,24 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack, compan
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'capacityTotal' ? Number(value) : value
-    }));
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        [name]: name === 'capacityTotal' ? Number(value) : value
+      } as typeof prev;
+
+      if (name === 'categoryId') {
+        next.companyProfileId = value;
+      }
+
+      return next;
+    });
+
+    // If category changed, update the selected category info
+    if (name === 'categoryId') {
+      const selected = categories.find(c => c.id === value);
+      setSelectedCategoryInfo(selected || null);
+    }
   };
 
   const generateQRCode = async (code: string) => {
@@ -152,7 +205,8 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack, compan
         length: formData.length ? parseFloat(formData.length as string) : null,
         width: formData.width ? parseFloat(formData.width as string) : null,
         height: formData.height ? parseFloat(formData.height as string) : null,
-        categoryId: formData.categoryId || null,
+        categoryId: null,
+        companyProfileId: formData.categoryId || null,
       };
 
       await racksAPI.update(rack.id, dataToSubmit);
@@ -274,7 +328,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack, compan
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category
+                  Category / Company
                 </label>
                 <select
                   name="categoryId"
@@ -282,15 +336,46 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack, compan
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="">Select Category...</option>
+                  <option value="">Select Category / Company...</option>
                   {categories.map(cat => (
                     <option key={cat.id} value={cat.id}>
-                      {cat.name}
+                      🏢 {cat.name}
                     </option>
                   ))}
                 </select>
+                {selectedCategoryInfo && (
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                    <div className="flex items-center gap-2">
+                      {selectedCategoryInfo.logo && (
+                        <img
+                          src={resolveLogoUrl(selectedCategoryInfo.logo)}
+                          alt={`${selectedCategoryInfo.name} logo`}
+                          className="h-10 w-10 rounded-md object-contain bg-white border border-blue-200"
+                        />
+                      )}
+                      <div>
+                        <p className="font-medium text-blue-900">{selectedCategoryInfo.name}</p>
+                        {selectedCategoryInfo.contractStatus && (
+                          <p className="text-blue-600 text-xs uppercase font-semibold">
+                            {selectedCategoryInfo.contractStatus}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {selectedCategoryInfo.description && (
+                      <p className="text-blue-700 text-xs mt-1">{selectedCategoryInfo.description}</p>
+                    )}
+                    {(selectedCategoryInfo.contactPerson || selectedCategoryInfo.contactPhone) && (
+                      <p className="text-blue-700 text-xs mt-1">
+                        {selectedCategoryInfo.contactPerson && `Contact: ${selectedCategoryInfo.contactPerson}`}
+                        {selectedCategoryInfo.contactPerson && selectedCategoryInfo.contactPhone && ' · '}
+                        {selectedCategoryInfo.contactPhone && `Phone: ${selectedCategoryInfo.contactPhone}`}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <p className="text-xs text-gray-500 mt-1">
-                  Assign to a category (optional)
+                  Select which company/category this rack belongs to
                 </p>
               </div>
 

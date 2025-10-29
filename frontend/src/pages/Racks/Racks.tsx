@@ -30,6 +30,12 @@ export const Racks: React.FC = () => {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const bulkQrCanvasRefs = useRef<{ [key: string]: HTMLCanvasElement | null }>({});
 
+  const resolveLogoUrl = (logo?: string | null) => {
+    if (!logo) return '';
+    if (logo.startsWith('http')) return logo;
+    return logo.startsWith('/') ? logo : `/uploads/${logo}`;
+  };
+
   useEffect(() => {
     loadRacks();
   }, []);
@@ -47,10 +53,20 @@ export const Racks: React.FC = () => {
   };
 
   const filteredRacks = racks.filter((r: any) => {
-    // Section filter
     const sectionMatch = selectedSection === 'all' || r.code.startsWith(selectedSection);
-    // Category filter
-    const categoryMatch = selectedCategory === 'all' || r.category === selectedCategory;
+    const selected = selectedCategory?.toLowerCase();
+    const categoryName = r.category?.name?.toLowerCase();
+    const rawCategory = typeof r.category === 'string' ? r.category.toLowerCase() : undefined;
+    const profileName = r.companyProfile?.name?.toLowerCase();
+    const profileId = r.companyProfile?.id?.toLowerCase();
+
+    const categoryMatch =
+      selectedCategory === 'all' ||
+      selected === categoryName ||
+      selected === rawCategory ||
+      selected === profileName ||
+      selected === profileId;
+
     return sectionMatch && categoryMatch;
   });
 
@@ -493,36 +509,26 @@ export const Racks: React.FC = () => {
                   </button>
                   
                   {/* Rack Code */}
-                  <div className="flex items-center gap-2 mb-3 mt-4">
+                  <div className="flex items-center gap-2 mb-2 mt-4">
                     <div className="p-2 bg-primary-100 rounded-lg">
                       <QrCodeIcon className="h-5 w-5 text-primary-600" />
                     </div>
                     <div className="flex-1">
-                      <span className="text-xl font-bold text-gray-900">{rack.code}</span>
+                      <span className="text-2xl font-bold text-gray-900">{rack.code}</span>
                       <p className="text-xs text-gray-500 truncate">{rack.location || 'N/A'}</p>
                     </div>
                   </div>
 
-                  {/* Category Badge */}
-                  {rack.category && (
-                    <div className="mb-3">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${
-                        rack.category === 'DIOR' 
-                          ? 'bg-purple-100 text-purple-700'
-                          : rack.category === 'COMPANY_MATERIAL'
-                          ? 'bg-blue-100 text-blue-700'
-                          : rack.category === 'JAZEERA'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {rack.category === 'DIOR' && '👜'}
-                        {rack.category === 'COMPANY_MATERIAL' && '🏢'}
-                        {rack.category === 'JAZEERA' && '🏝️'}
-                        {rack.category === 'OTHERS' && '📦'}
-                        {rack.category.replace('_', ' ')}
-                      </span>
-                    </div>
-                  )}
+                  {/* Category / Company Name - LARGE */}
+                  <div className="mb-3 p-3 bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg border-2 border-purple-300">
+                    <p className="text-xs font-bold text-purple-600 uppercase">📦 BELONGS TO:</p>
+                    <p className="text-lg font-bold text-purple-900 truncate">
+                      {rack.category?.name || rack.companyProfile?.name || 'Unassigned'}
+                    </p>
+                    {rack.category?.description && (
+                      <p className="text-xs text-gray-700 mt-1 line-clamp-1">{rack.category.description}</p>
+                    )}
+                  </div>
                   
                   {/* Capacity Info */}
                   <div className="space-y-3">
