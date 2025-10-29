@@ -1,0 +1,133 @@
+# 🚀 STAGING CLONE - QUICK REFERENCE
+
+## ⚡ Quick Access
+
+| Item | Details |
+|------|---------|
+| **Staging URL** | http://staging.qgocargo.cloud:8080 |
+| **Username** | staging |
+| **Password** | Qgocargo@321 |
+| **SSH** | ssh staging@148.230.107.155 |
+| **Database Port** | 3308 |
+| **Backend Port** | 5001 |
+| **Status** | ✅ Running (Complete Production Clone) |
+
+---
+
+## 🎯 Staging = Production Clone
+
+```
+EXACTLY SAME:
+✅ Code (backend, frontend)
+✅ Database structure
+✅ Database data (3 shipments)
+✅ Configuration
+✅ All containers (database, backend, frontend, etc)
+
+DIFFERENT:
+❌ Ports (8080 vs 80, 5001 vs 5000, 3308 vs 3307)
+❌ User account (staging vs root)
+❌ URL domain (staging.qgocargo.cloud vs qgocargo.cloud)
+❌ Purpose (testing vs production)
+```
+
+---
+
+## 🚀 Use Cases
+
+### 1. Test New Feature
+```
+1. Deploy code to staging
+2. Test at staging.qgocargo.cloud:8080
+3. Verify everything works
+4. If OK, deploy to production
+```
+
+### 2. Test Database Migration
+```
+1. Run migration on staging database (port 3308)
+2. Verify data integrity
+3. If OK, run on production (port 3307)
+```
+
+### 3. Test CBM Feature
+```
+1. Go to staging.qgocargo.cloud:8080
+2. Login
+3. Create shipment
+4. Test dimensions/CBM calculation
+5. Verify it works
+6. If OK, already in production too
+```
+
+### 4. Debug Issues
+```
+1. Access staging database (port 3308)
+2. Run queries without affecting production
+3. Test fixes
+4. Deploy to production when ready
+```
+
+---
+
+## 🔐 Remember
+
+✅ **Staging is SAFE** - Won't affect production  
+✅ **Use staging USER** - NOT root  
+✅ **Test before production** - Always!  
+✅ **Same credentials for staging DB** - wms_user / wms_pass  
+✅ **Different ports** - Production: 3307, Staging: 3308  
+
+---
+
+## 📱 Access Methods
+
+### Browser (Easiest)
+```
+http://staging.qgocargo.cloud:8080
+```
+
+### SSH as Staging User
+```bash
+ssh staging@148.230.107.155
+Password: Qgocargo@321
+
+# Inside:
+cd ~/staging-app
+docker-compose ps
+```
+
+### SSH as Root (If Needed)
+```bash
+ssh root@148.230.107.155
+Password: Qgocargo@123
+
+# Inside:
+cd /home/staging/staging-app
+docker-compose ps
+```
+
+---
+
+## 📊 Port Map
+
+| Service | Production | Staging |
+|---------|-----------|---------|
+| Frontend (HTTP) | 80 | 8080 |
+| Frontend (HTTPS) | 443 | 8443 |
+| Backend | 5000 | 5001 |
+| Database | 3307 | 3308 |
+
+---
+
+## ✅ Current Status
+
+- **Staging Database:** warehouse_wms (3 shipments from production)
+- **Staging Backend:** Running on port 5001
+- **Staging Frontend:** Running on port 8080
+- **All Containers:** Healthy ✅
+- **Ready for:** Testing ✅
+
+---
+
+**Happy Testing!** 🎉
