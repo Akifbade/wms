@@ -64,6 +64,12 @@ const shipmentSchema = zod_1.z.object({
     companyProfileId: zod_1.z.string().optional(),
     palletCount: zod_1.z.number().int().positive().optional(),
     boxesPerPallet: zod_1.z.number().int().positive().optional(),
+    // NEW: Dimension & CBM fields for volume-based charging
+    length: zod_1.z.number().positive().optional(), // in cm
+    width: zod_1.z.number().positive().optional(), // in cm
+    height: zod_1.z.number().positive().optional(), // in cm
+    cbm: zod_1.z.number().positive().optional(), // auto-calculated or provided (m³)
+    weight: zod_1.z.number().positive().optional(), // in kg
     // NEW: Enhanced warehouse fields
     category: zod_1.z.enum(['CUSTOMER_STORAGE', 'AIRPORT_CARGO', 'WAREHOUSE_STOCK']).optional(),
     awbNumber: zod_1.z.string().optional(),
@@ -237,14 +243,19 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         const userId = req.user.id;
         const palletCount = parseOptionalInt(data.palletCount);
         const boxesPerPallet = parseOptionalInt(data.boxesPerPallet);
-        const providedOriginalBoxCount = parseOptionalInt(data.originalBoxCount);
-        const computedBoxCount = palletCount && boxesPerPallet ? palletCount * boxesPerPallet : null;
-        const originalBoxCount = providedOriginalBoxCount ?? computedBoxCount;
-        if (!originalBoxCount || originalBoxCount <= 0) {
-            return res.status(400).json({ error: 'Box count must be greater than zero' });
+        if (!palletCount || palletCount <= 0) {
+            return res.status(400).json({ error: 'Pallet count must be greater than zero' });
         }
-        const totalBoxCount = parseOptionalInt(data.totalBoxCount) ?? originalBoxCount;
+        if (!boxesPerPallet || boxesPerPallet <= 0) {
+            return res.status(400).json({ error: 'Boxes per pallet must be greater than zero' });
+        }
+        const computedBoxCount = palletCount * boxesPerPallet;
+        const originalBoxCount = computedBoxCount;
+        const totalBoxCount = computedBoxCount;
         const currentBoxCount = parseOptionalInt(data.currentBoxCount) ?? totalBoxCount;
+        if (!currentBoxCount || currentBoxCount <= 0) {
+            return res.status(400).json({ error: 'Current box count must be greater than zero' });
+        }
         let arrivalDate = new Date();
         if (data.arrivalDate) {
             const parsedArrival = new Date(data.arrivalDate);
@@ -256,7 +267,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         let companyProfileName = null;
         if (data.companyProfileId) {
             const profile = await prisma.companyProfile.findFirst({
-                where: { id: data.companyProfileId, companyId },
+                where: { id: data.companyProfileId, companyId, isActive: true },
                 select: { id: true, name: true },
             });
             if (!profile) {
@@ -264,6 +275,28 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
             }
             companyProfileId = profile.id;
             companyProfileName = profile.name;
+        }
+        let normalizedWarehouseData = null;
+        if (data.warehouseData) {
+            try {
+                const parsedWarehouse = typeof data.warehouseData === 'string' ? JSON.parse(data.warehouseData) : data.warehouseData;
+                parsedWarehouse.palletCount = palletCount;
+                parsedWarehouse.boxesPerPallet = boxesPerPallet;
+                parsedWarehouse.totalBoxes = totalBoxCount;
+                normalizedWarehouseData = JSON.stringify(parsedWarehouse);
+            }
+            catch (warehouseParseError) {
+                normalizedWarehouseData = typeof data.warehouseData === 'string'
+                    ? data.warehouseData
+                    : JSON.stringify(data.warehouseData);
+            }
+        }
+        else if (data.isWarehouseShipment) {
+            normalizedWarehouseData = JSON.stringify({
+                palletCount,
+                boxesPerPallet,
+                totalBoxes: totalBoxCount,
+            });
         }
         // 🚀 FETCH SHIPMENT SETTINGS
         let settings = await prisma.shipmentSettings.findUnique({
@@ -290,50 +323,57 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         }
         // Generate master QR code for shipment using settings prefix
         const qrPrefix = settings.autoGenerateQR ? settings.qrCodePrefix : 'QR-SH';
-        const qrBaseSegments = [`${qrPrefix}-${Date.now()}`];
-        if (palletCount && palletCount > 0) {
-            qrBaseSegments.push(`P${palletCount}`);
-        }
-        if (boxesPerPallet && boxesPerPallet > 0) {
-            qrBaseSegments.push(`B${boxesPerPallet}`);
-        }
-        qrBaseSegments.push(`T${totalBoxCount}`);
-        const masterQR = qrBaseSegments.join('-');
+        const qrTimestamp = Date.now();
+        const qrBase = `${qrPrefix}-${qrTimestamp}`;
+        const qrMetaSegments = [`P${palletCount}`, `B${boxesPerPallet}`, `T${totalBoxCount}`];
+        const masterQR = [qrBase, ...qrMetaSegments].join('-');
         // 🚀 USE DEFAULT STORAGE TYPE FROM SETTINGS IF NOT PROVIDED
         const shipmentType = data.type || settings.defaultStorageType;
         const normalizedCustomerName = data.customerName || companyProfileName || data.clientName || null;
+        const referenceId = data.referenceId || `SH-${qrTimestamp}`;
+        // Build create payload as `any` to avoid TS type mismatch if Prisma client
+        // hasn't been regenerated yet. Fields are nullable to ensure non-destructive
+        // migrations and safe inserts.
+        const createPayload = {
+            name: data.name || `Shipment for ${data.clientName || companyProfileName || 'Client'}`,
+            referenceId,
+            originalBoxCount,
+            currentBoxCount,
+            palletCount,
+            boxesPerPallet,
+            type: shipmentType,
+            clientName: data.clientName,
+            clientPhone: data.clientPhone,
+            clientEmail: data.clientEmail,
+            description: data.description,
+            estimatedValue: data.estimatedValue,
+            notes: data.notes,
+            companyId,
+            companyProfileId,
+            qrCode: masterQR,
+            arrivalDate,
+            status: 'PENDING',
+            createdById: userId,
+            // Warehouse fields
+            isWarehouseShipment: data.isWarehouseShipment || false,
+            shipper: data.shipper,
+            consignee: data.consignee,
+            category: data.category || 'CUSTOMER_STORAGE',
+            awbNumber: data.awbNumber,
+            flightNumber: data.flightNumber,
+            origin: data.origin,
+            destination: data.destination,
+            customerName: normalizedCustomerName,
+            // Dimension fields (nullable)
+            length: data.length !== undefined ? parseFloat(data.length) : undefined,
+            width: data.width !== undefined ? parseFloat(data.width) : undefined,
+            height: data.height !== undefined ? parseFloat(data.height) : undefined,
+            cbm: data.cbm !== undefined ? parseFloat(data.cbm) : undefined,
+            weight: data.weight !== undefined ? parseFloat(data.weight) : undefined,
+            warehouseData: normalizedWarehouseData,
+        };
         const shipment = await prisma.shipment.create({
-            data: {
-                name: data.name || `Shipment for ${data.clientName || companyProfileName || 'Client'}`,
-                referenceId: data.referenceId || `SH-${Date.now()}`,
-                originalBoxCount,
-                currentBoxCount,
-                palletCount,
-                boxesPerPallet,
-                type: shipmentType, // 🚀 FROM SETTINGS
-                clientName: data.clientName,
-                clientPhone: data.clientPhone,
-                clientEmail: data.clientEmail,
-                description: data.description,
-                estimatedValue: data.estimatedValue,
-                notes: data.notes,
-                companyId,
-                companyProfileId,
-                qrCode: masterQR,
-                arrivalDate,
-                status: 'PENDING', // All shipments start as PENDING
-                createdById: userId, // User ID who created
-                // Warehouse fields
-                isWarehouseShipment: data.isWarehouseShipment || false,
-                shipper: data.shipper,
-                consignee: data.consignee,
-                category: data.category || 'CUSTOMER_STORAGE',
-                awbNumber: data.awbNumber,
-                flightNumber: data.flightNumber,
-                origin: data.origin,
-                destination: data.destination,
-                customerName: normalizedCustomerName,
-            },
+            data: createPayload,
             include: {
                 companyProfile: {
                     select: { id: true, name: true },
@@ -343,14 +383,23 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         // ✅ CREATE INDIVIDUAL QR CODES FOR EACH BOX
         const boxesToCreate = [];
         for (let i = 1; i <= totalBoxCount; i++) {
+            const palletNumber = Math.ceil(i / boxesPerPallet);
             boxesToCreate.push({
                 shipmentId: shipment.id,
                 boxNumber: i,
-                qrCode: `${masterQR}-BOX-${i}-OF-${totalBoxCount}`,
+                qrCode: `${masterQR}-BOX-${i}-OF-${totalBoxCount}-PAL-${palletNumber}`,
                 rackId: data.rackId || null, // Assign to rack if provided
                 status: data.rackId ? 'IN_STORAGE' : 'PENDING', // ✅ PENDING if no rack, IN_STORAGE if rack assigned
                 assignedAt: data.rackId ? new Date() : null,
                 companyId,
+                pieceQR: JSON.stringify({
+                    masterQRCode: masterQR,
+                    boxNumber: i,
+                    palletNumber,
+                    palletCount,
+                    boxesPerPallet,
+                    totalBoxes: totalBoxCount,
+                }),
             });
         }
         await prisma.shipmentBox.createMany({
@@ -382,7 +431,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                     userId: req.user.id,
                     companyId,
                     activityType: 'ASSIGN',
-                    itemDetails: `Shipment ${shipment.referenceId} - ${totalBoxCount} boxes${palletCount && palletCount > 0 ? ` (${palletCount} pallets)` : ''}`,
+                    itemDetails: `Shipment ${shipment.referenceId} - ${totalBoxCount} boxes (${palletCount} pallets x ${boxesPerPallet} boxes)`,
                     quantityAfter: totalBoxCount,
                 },
             });
@@ -410,7 +459,9 @@ router.put('/:id', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, r
             return res.status(404).json({ error: 'Shipment not found' });
         }
         // Update shipment data - extract only valid Shipment fields
-        const { name, referenceId, originalBoxCount, currentBoxCount, type, arrivalDate, clientName, clientPhone, clientEmail, description, estimatedValue, notes, status, assignedAt, releasedAt, storageCharge, isWarehouseShipment, warehouseData, shipper, consignee, category, awbNumber, flightNumber, origin, destination, customerName, companyProfileId, palletCount, boxesPerPallet, } = req.body;
+        const { name, referenceId, originalBoxCount, currentBoxCount, type, arrivalDate, clientName, clientPhone, clientEmail, description, estimatedValue, notes, status, assignedAt, releasedAt, storageCharge, isWarehouseShipment, warehouseData, shipper, consignee, category, awbNumber, flightNumber, origin, destination, customerName, companyProfileId, palletCount, boxesPerPallet, 
+        // Dimensions
+        length, width, height, cbm, weight, } = req.body;
         const updateData = {};
         // Only include fields that are provided and valid
         if (name !== undefined)
@@ -487,6 +538,16 @@ router.put('/:id', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, r
             updateData.palletCount = parseOptionalInt(palletCount);
         if (boxesPerPallet !== undefined)
             updateData.boxesPerPallet = parseOptionalInt(boxesPerPallet);
+        if (length !== undefined)
+            updateData.length = parseFloat(length);
+        if (width !== undefined)
+            updateData.width = parseFloat(width);
+        if (height !== undefined)
+            updateData.height = parseFloat(height);
+        if (cbm !== undefined)
+            updateData.cbm = parseFloat(cbm);
+        if (weight !== undefined)
+            updateData.weight = parseFloat(weight);
         updateData.updatedAt = new Date();
         const shipment = await prisma.shipment.update({
             where: { id },

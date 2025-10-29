@@ -65,6 +65,12 @@ const shipmentSchema = z.object({
   companyProfileId: z.string().optional(),
   palletCount: z.number().int().positive().optional(),
   boxesPerPallet: z.number().int().positive().optional(),
+  // NEW: Dimension & CBM fields for volume-based charging
+  length: z.number().positive().optional(), // in cm
+  width: z.number().positive().optional(),  // in cm
+  height: z.number().positive().optional(), // in cm
+  cbm: z.number().positive().optional(),    // auto-calculated or provided (m³)
+  weight: z.number().positive().optional(), // in kg
   // NEW: Enhanced warehouse fields
   category: z.enum(['CUSTOMER_STORAGE', 'AIRPORT_CARGO', 'WAREHOUSE_STOCK']).optional(),
   awbNumber: z.string().optional(),
@@ -358,39 +364,50 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
     const normalizedCustomerName = data.customerName || companyProfileName || data.clientName || null;
     const referenceId = data.referenceId || `SH-${qrTimestamp}`;
 
+    // Build create payload as `any` to avoid TS type mismatch if Prisma client
+    // hasn't been regenerated yet. Fields are nullable to ensure non-destructive
+    // migrations and safe inserts.
+    const createPayload: any = {
+      name: data.name || `Shipment for ${data.clientName || companyProfileName || 'Client'}`,
+      referenceId,
+      originalBoxCount,
+      currentBoxCount,
+      palletCount,
+      boxesPerPallet,
+      type: shipmentType,
+      clientName: data.clientName,
+      clientPhone: data.clientPhone,
+      clientEmail: data.clientEmail,
+      description: data.description,
+      estimatedValue: data.estimatedValue,
+      notes: data.notes,
+      companyId,
+      companyProfileId,
+      qrCode: masterQR,
+      arrivalDate,
+      status: 'PENDING',
+      createdById: userId,
+      // Warehouse fields
+      isWarehouseShipment: data.isWarehouseShipment || false,
+      shipper: data.shipper,
+      consignee: data.consignee,
+      category: data.category || 'CUSTOMER_STORAGE',
+      awbNumber: data.awbNumber,
+      flightNumber: data.flightNumber,
+      origin: data.origin,
+      destination: data.destination,
+      customerName: normalizedCustomerName,
+      // Dimension fields (nullable)
+      length: data.length !== undefined ? parseFloat(data.length) : undefined,
+      width: data.width !== undefined ? parseFloat(data.width) : undefined,
+      height: data.height !== undefined ? parseFloat(data.height) : undefined,
+      cbm: data.cbm !== undefined ? parseFloat(data.cbm) : undefined,
+      weight: data.weight !== undefined ? parseFloat(data.weight) : undefined,
+      warehouseData: normalizedWarehouseData,
+    };
+
     const shipment = await prisma.shipment.create({
-      data: {
-        name: data.name || `Shipment for ${data.clientName || companyProfileName || 'Client'}`,
-        referenceId,
-        originalBoxCount,
-        currentBoxCount,
-        palletCount,
-        boxesPerPallet,
-        type: shipmentType, // 🚀 FROM SETTINGS
-        clientName: data.clientName,
-        clientPhone: data.clientPhone,
-        clientEmail: data.clientEmail,
-        description: data.description,
-        estimatedValue: data.estimatedValue,
-        notes: data.notes,
-        companyId,
-        companyProfileId,
-        qrCode: masterQR,
-        arrivalDate,
-        status: 'PENDING', // All shipments start as PENDING
-        createdById: userId, // User ID who created
-        // Warehouse fields
-        isWarehouseShipment: data.isWarehouseShipment || false,
-        shipper: data.shipper,
-        consignee: data.consignee,
-        category: data.category || 'CUSTOMER_STORAGE',
-        awbNumber: data.awbNumber,
-        flightNumber: data.flightNumber,
-        origin: data.origin,
-        destination: data.destination,
-        customerName: normalizedCustomerName,
-        warehouseData: normalizedWarehouseData,
-      },
+      data: createPayload,
       include: {
         companyProfile: {
           select: { id: true, name: true },
@@ -515,6 +532,12 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
       companyProfileId,
       palletCount,
       boxesPerPallet,
+      // Dimensions
+      length,
+      width,
+      height,
+      cbm,
+      weight,
     } = req.body;
 
     const updateData: any = {};
@@ -568,6 +591,11 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
     }
     if (palletCount !== undefined) updateData.palletCount = parseOptionalInt(palletCount);
     if (boxesPerPallet !== undefined) updateData.boxesPerPallet = parseOptionalInt(boxesPerPallet);
+  if (length !== undefined) updateData.length = parseFloat(length);
+  if (width !== undefined) updateData.width = parseFloat(width);
+  if (height !== undefined) updateData.height = parseFloat(height);
+  if (cbm !== undefined) updateData.cbm = parseFloat(cbm);
+  if (weight !== undefined) updateData.weight = parseFloat(weight);
     
     updateData.updatedAt = new Date();
 
