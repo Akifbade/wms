@@ -61,6 +61,10 @@ const shipmentSchema = z.object({
   clientName: z.string().optional(),
   clientPhone: z.string().optional(),
   rackId: z.string().optional(),
+  arrivalDate: z.union([z.string(), z.date()]).optional(),
+  companyProfileId: z.string().optional(),
+  palletCount: z.number().int().positive().optional(),
+  boxesPerPallet: z.number().int().positive().optional(),
   // NEW: Enhanced warehouse fields
   category: z.enum(['CUSTOMER_STORAGE', 'AIRPORT_CARGO', 'WAREHOUSE_STOCK']).optional(),
   awbNumber: z.string().optional(),
@@ -473,6 +477,9 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
       origin,
       destination,
       customerName,
+      companyProfileId,
+      palletCount,
+      boxesPerPallet,
     } = req.body;
 
     const updateData: any = {};
@@ -504,12 +511,42 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
     if (origin !== undefined) updateData.origin = origin;
     if (destination !== undefined) updateData.destination = destination;
     if (customerName !== undefined) updateData.customerName = customerName;
+    if (companyProfileId !== undefined) {
+      if (!companyProfileId) {
+        updateData.companyProfileId = null;
+      } else {
+        const profile = await prisma.companyProfile.findFirst({
+          where: { id: companyProfileId, companyId },
+          select: { id: true, name: true },
+        });
+
+        if (!profile) {
+          return res.status(400).json({ error: 'Selected company profile is not available' });
+        }
+
+        updateData.companyProfileId = profile.id;
+
+        if (customerName === undefined && !existing.customerName) {
+          updateData.customerName = profile.name;
+        }
+      }
+    }
+    if (palletCount !== undefined) updateData.palletCount = parseOptionalInt(palletCount);
+    if (boxesPerPallet !== undefined) updateData.boxesPerPallet = parseOptionalInt(boxesPerPallet);
     
     updateData.updatedAt = new Date();
 
     const shipment = await prisma.shipment.update({
       where: { id },
       data: updateData,
+      include: {
+        companyProfile: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     res.json({ shipment });
