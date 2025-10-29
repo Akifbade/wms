@@ -1,0 +1,78 @@
+version: '3.8'
+
+# STAGING ENVIRONMENT - staging.qgocargo.cloud
+# This runs SEPARATELY from production
+# Staging user has LIMITED permissions - cannot access production
+
+services:
+  # Staging Database (separate from production)
+  staging-database:
+    image: mysql:8.0
+    container_name: staging-database
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: stagingpass123
+      MYSQL_DATABASE: warehouse_wms_staging
+      MYSQL_USER: staging_user
+      MYSQL_PASSWORD: stagingpass123
+    ports:
+      - "3308:3306"  # Note: Different port (3308) from production (3307)
+    volumes:
+      - staging_mysql_data:/var/lib/mysql
+      - ./backend/prisma/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - staging-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pstagingpass123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Staging Backend
+  staging-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: staging-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      DATABASE_URL: mysql://staging_user:stagingpass123@staging-database:3306/warehouse_wms_staging
+      JWT_SECRET: staging-secret-key-change-in-production
+      PORT: 5001
+    ports:
+      - "5001:5001"  # Note: Different port (5001) from production (5000)
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    depends_on:
+      staging-database:
+        condition: service_healthy
+    networks:
+      - staging-network
+    command: sh -c "npx prisma migrate deploy && npx ts-node src/index.ts"
+
+  # Staging Frontend (Nginx)
+  staging-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: staging-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./frontend/nginx-staging.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - staging-backend
+    networks:
+      - staging-network
+
+volumes:
+  staging_mysql_data:
+
+networks:
+  staging-network:
+    driver: bridge
