@@ -107,6 +107,8 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
           color: '#5B21B6',
           icon: '🏢',
         });
+      } else if (rack.category) {
+        setSelectedCategoryInfo(rack.category);
       }
       
       // Generate QR code for existing rack
@@ -199,14 +201,22 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
         throw new Error(`Cannot reduce capacity below current usage (${rack.capacityUsed})`);
       }
 
+      const {
+        categoryId: _unusedCategoryId,
+        companyProfileId: _unusedCompanyProfileId,
+        length,
+        width,
+        height,
+        ...rest
+      } = formData;
+
       const dataToSubmit = {
-        ...formData,
-        // Convert dimension strings to numbers or null
-        length: formData.length ? parseFloat(formData.length as string) : null,
-        width: formData.width ? parseFloat(formData.width as string) : null,
-        height: formData.height ? parseFloat(formData.height as string) : null,
-        categoryId: null,
-        companyProfileId: formData.categoryId || null,
+        ...rest,
+        length: length ? parseFloat(length as string) : undefined,
+        width: width ? parseFloat(width as string) : undefined,
+        height: height ? parseFloat(height as string) : undefined,
+        categoryId: undefined,
+        companyProfileId: (formData.companyProfileId || formData.categoryId) || undefined,
       };
 
       await racksAPI.update(rack.id, dataToSubmit);

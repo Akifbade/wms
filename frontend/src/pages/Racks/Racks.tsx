@@ -459,24 +459,31 @@ export const Racks: React.FC = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {filteredRacks.map((rack: any) => {
-              const utilization = rack.utilization || Math.round((rack.capacityUsed / rack.capacityTotal) * 100);
+              const totalCapacity = rack.capacityTotal && rack.capacityTotal > 0 ? rack.capacityTotal : 1;
+              const utilization = typeof rack.utilization === 'number'
+                ? rack.utilization
+                : Math.round((rack.capacityUsed / totalCapacity) * 100);
               const shipmentCount = rack.inventory?.length || 0;
-              const available = rack.capacityTotal - rack.capacityUsed;
+              const available = Math.max(totalCapacity - rack.capacityUsed, 0);
+        const companyProfile = rack.companyProfile;
+        const companyName = companyProfile?.name || rack.category?.name || 'Unassigned';
+        const companyDescription = companyProfile?.description || rack.category?.description;
+        const companyStatus = companyProfile?.contractStatus;
               
               return (
                 <div
                   key={rack.id}
                   onClick={() => handleRackClick(rack)}
-                  className="group relative bg-gradient-to-br from-white to-gray-50 border-2 rounded-xl p-4 hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer"
+                  className="group relative bg-gradient-to-br from-white to-gray-50 border rounded-xl p-3 hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer"
                   style={{
                     borderColor: utilization >= 90 ? '#ef4444' : utilization >= 50 ? '#eab308' : '#10b981'
                   }}
                 >
                   {/* Status Badge */}
                   <div className="absolute -top-2 -right-2">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold shadow-lg ${
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold shadow ${
                       rack.status === 'ACTIVE'
                         ? utilization >= 100 
                           ? 'bg-red-500 text-white'
@@ -502,62 +509,74 @@ export const Racks: React.FC = () => {
                       setSelectedRack(rack);
                       setEditModalOpen(true);
                     }}
-                    className="absolute top-2 left-2 p-1.5 bg-white rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50"
+                    className="absolute top-2 left-2 p-1.5 bg-white rounded-lg shadow opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50"
                     title="Edit Rack"
                   >
                     <PencilIcon className="h-4 w-4 text-blue-600" />
                   </button>
                   
                   {/* Rack Code */}
-                  <div className="flex items-center gap-2 mb-2 mt-4">
-                    <div className="p-2 bg-primary-100 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1 mt-3">
+                    <div className="p-1.5 bg-primary-100 rounded-lg">
                       <QrCodeIcon className="h-5 w-5 text-primary-600" />
                     </div>
                     <div className="flex-1">
-                      <span className="text-2xl font-bold text-gray-900">{rack.code}</span>
-                      <p className="text-xs text-gray-500 truncate">{rack.location || 'N/A'}</p>
+                      <span className="text-xl font-semibold text-gray-900 leading-tight">{rack.code}</span>
+                      <p className="text-[11px] text-gray-500 truncate">{rack.location || 'N/A'}</p>
                     </div>
                   </div>
 
                   {/* Category / Company Name - LARGE */}
-                  <div className="mb-3 p-3 bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg border-2 border-purple-300">
-                    <p className="text-xs font-bold text-purple-600 uppercase">📦 BELONGS TO:</p>
-                    <p className="text-lg font-bold text-purple-900 truncate">
-                      {rack.category?.name || rack.companyProfile?.name || 'Unassigned'}
-                    </p>
-                    {rack.category?.description && (
-                      <p className="text-xs text-gray-700 mt-1 line-clamp-1">{rack.category.description}</p>
+                  <div className="mb-3 p-2.5 bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg border border-purple-200">
+                    <p className="text-[11px] font-semibold text-purple-600 uppercase">📦 Belongs To</p>
+                    <div className="flex items-center gap-3 mt-1">
+                      {companyProfile?.logo && (
+                        <img
+                          src={resolveLogoUrl(companyProfile.logo)}
+                          alt={`${companyName} logo`}
+                          className="h-10 w-10 rounded-lg object-contain bg-white border border-purple-200"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-base font-semibold text-purple-900 truncate leading-tight">{companyName}</p>
+                        {companyStatus && (
+                          <p className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide">{companyStatus}</p>
+                        )}
+                      </div>
+                    </div>
+                    {companyDescription && (
+                      <p className="text-[11px] text-gray-700 mt-2 line-clamp-2">{companyDescription}</p>
                     )}
                   </div>
                   
                   {/* Capacity Info */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-gray-600">Capacity</span>
-                      <span className="text-sm font-bold text-gray-900">{rack.capacityUsed}/{rack.capacityTotal}</span>
+                      <span className="text-[11px] font-medium text-gray-600">Capacity (pallets)</span>
+                      <span className="text-sm font-semibold text-gray-900">{rack.capacityUsed}/{rack.capacityTotal}</span>
                     </div>
                     
                     {/* Progress Bar */}
-                    <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div className="relative w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                       <div
-                        className={`h-3 rounded-full transition-all duration-500 ${getUtilizationColor(utilization)}`}
+                        className={`h-2.5 rounded-full transition-all duration-500 ${getUtilizationColor(utilization)}`}
                         style={{ width: `${Math.min(utilization, 100)}%` }}
                       />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-xs font-bold text-white drop-shadow-md">{utilization}%</span>
+                        <span className="text-[11px] font-bold text-white drop-shadow-md">{utilization}%</span>
                       </div>
                     </div>
                     
                     {/* Stats */}
                     <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                       <div className="text-center">
-                        <p className="text-xs text-gray-500">Available</p>
-                        <p className="text-sm font-bold text-green-600">{available}</p>
+                        <p className="text-[11px] text-gray-500">Available</p>
+                        <p className="text-sm font-semibold text-green-600">{available}</p>
                       </div>
                       <div className="h-8 w-px bg-gray-300"></div>
                       <div className="text-center">
-                        <p className="text-xs text-gray-500">Shipments</p>
-                        <p className="text-sm font-bold text-blue-600">{shipmentCount}</p>
+                        <p className="text-[11px] text-gray-500">Shipments</p>
+                        <p className="text-sm font-semibold text-blue-600">{shipmentCount}</p>
                       </div>
                     </div>
                   </div>
@@ -642,21 +661,23 @@ export const Racks: React.FC = () => {
                       </span>
                     </div>
                     <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
-                      <p className="text-xs text-gray-500 font-medium mb-1">Capacity</p>
+                      <p className="text-xs text-gray-500 font-medium mb-1">Pallet Capacity</p>
                       <p className="text-2xl font-bold text-gray-900">
                         {rackDetails?.capacityUsed}/{rackDetails?.capacityTotal}
                       </p>
                     </div>
                     <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
-                      <p className="text-xs text-gray-500 font-medium mb-1">Available</p>
+                      <p className="text-xs text-gray-500 font-medium mb-1">Available Pallets</p>
                       <p className="text-2xl font-bold text-green-600">
-                        {rackDetails?.capacityTotal - rackDetails?.capacityUsed || 0}
+                        {Math.max((rackDetails?.capacityTotal || 0) - (rackDetails?.capacityUsed || 0), 0)}
                       </p>
                     </div>
                     <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
                       <p className="text-xs text-gray-500 font-medium mb-1">Utilization</p>
                       <p className="text-2xl font-bold text-blue-600">
-                        {Math.round((rackDetails?.capacityUsed / rackDetails?.capacityTotal) * 100) || 0}%
+                        {rackDetails && rackDetails.capacityTotal > 0
+                          ? Math.round((rackDetails.capacityUsed / rackDetails.capacityTotal) * 100)
+                          : 0}%
                       </p>
                     </div>
                   </div>
@@ -665,6 +686,38 @@ export const Racks: React.FC = () => {
                 {/* Rack Information */}
                 <div className="px-6 pt-4 pb-2 bg-white border-b">
                   <div className="grid grid-cols-2 gap-6">
+                    {rackDetails?.companyProfile && (
+                      <div className="flex items-center gap-3 bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        {rackDetails.companyProfile.logo && (
+                          <img
+                            src={resolveLogoUrl(rackDetails.companyProfile.logo)}
+                            alt={`${rackDetails.companyProfile.name} logo`}
+                            className="h-16 w-16 rounded-lg object-contain bg-white border border-purple-200"
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs text-purple-600 font-semibold uppercase mb-1">Company / Profile</p>
+                          <p className="text-lg font-bold text-purple-900 truncate">{rackDetails.companyProfile.name}</p>
+                          {rackDetails.companyProfile.contractStatus && (
+                            <p className="text-xs font-semibold text-purple-700 uppercase">
+                              {rackDetails.companyProfile.contractStatus}
+                            </p>
+                          )}
+                          {(rackDetails.companyProfile.contactPerson || rackDetails.companyProfile.contactPhone) && (
+                            <p className="text-xs text-purple-700 mt-1">
+                              {rackDetails.companyProfile.contactPerson && `Contact: ${rackDetails.companyProfile.contactPerson}`}
+                              {rackDetails.companyProfile.contactPerson && rackDetails.companyProfile.contactPhone && ' · '}
+                              {rackDetails.companyProfile.contactPhone && `Phone: ${rackDetails.companyProfile.contactPhone}`}
+                            </p>
+                          )}
+                          {rackDetails.companyProfile.description && (
+                            <p className="text-xs text-purple-700 mt-2 line-clamp-3">
+                              {rackDetails.companyProfile.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     {/* Category */}
                     {rackDetails?.category && (
                       <div>
@@ -732,7 +785,16 @@ export const Racks: React.FC = () => {
                       {rackDetails?.boxes && rackDetails.boxes.length > 0 ? (
                         <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                           {rackDetails.boxes.map((box: any) => {
-                            const photoUrls = box.photos ? JSON.parse(box.photos) : [];
+                            let photoUrls: string[] = [];
+                            if (box.photos) {
+                              try {
+                                const parsed = JSON.parse(box.photos);
+                                photoUrls = Array.isArray(parsed) ? parsed : [];
+                              } catch (error) {
+                                console.warn('Failed to parse box photos', error);
+                                photoUrls = [];
+                              }
+                            }
                             return (
                             <div
                               key={box.id}

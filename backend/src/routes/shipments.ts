@@ -5,6 +5,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { recomputeRackPalletUsage } from '../utils/rackCapacity';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -51,6 +52,32 @@ const photoUpload = multer({
     }
   }
 });
+
+// Upload endpoint for pallet and shipment imagery
+router.post(
+  '/upload/photo',
+  authorizeRoles('ADMIN', 'MANAGER', 'WORKER'),
+  photoUpload.single('photo'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No photo uploaded' });
+      }
+
+      const photoUrl = `/uploads/shipments/${req.file.filename}`;
+
+      res.json({
+        success: true,
+        photoUrl,
+        filename: req.file.filename,
+        size: req.file.size,
+      });
+    } catch (error) {
+      console.error('Shipment photo upload error:', error);
+      res.status(500).json({ error: 'Failed to upload shipment photo' });
+    }
+  }
+);
 
 // Validation schema
 const shipmentSchema = z.object({
@@ -416,6 +443,8 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
     });
 
     // ✅ CREATE INDIVIDUAL QR CODES FOR EACH BOX
+    const palletImagesMap: Record<number, string[]> = {};
+    const palletPhotosPayload = Array.isArray(data.palletPhotos) ? data.palletPhotos : [];
     const boxesToCreate = [];
     for (let i = 1; i <= totalBoxCount; i++) {
       const palletNumber = Math.ceil(i / boxesPerPallet);
@@ -436,18 +465,51 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
           totalBoxes: totalBoxCount,
         }),
       });
+
+      const palletEntry = palletPhotosPayload[palletNumber - 1];
+      if (palletEntry) {
+        const photoList = (Array.isArray(palletEntry) ? palletEntry : [palletEntry]) as string[];
+        const filtered = photoList.filter((url: string) => typeof url === 'string' && url.trim() !== '');
+        if (filtered.length > 0) {
+          palletImagesMap[palletNumber] = palletImagesMap[palletNumber] || [];
+          palletImagesMap[palletNumber].push(...filtered);
+        }
+      }
     }
 
     await prisma.shipmentBox.createMany({
       data: boxesToCreate,
     });
 
-    // If rack assigned, update rack capacity
+    // Attach pallet-level photos to boxes (if provided)
+    const palletUpdates = Object.entries(palletImagesMap).map(([palletNumber, urls]) =>
+      prisma.shipmentBox.updateMany({
+        where: {
+          shipmentId: shipment.id,
+          boxNumber: {
+            gte: (Number(palletNumber) - 1) * boxesPerPallet + 1,
+            lte: Number(palletNumber) * boxesPerPallet,
+          },
+          companyId,
+        },
+        data: {
+          photos: JSON.stringify(urls),
+        },
+      })
+    );
+
+    if (palletUpdates.length > 0) {
+      await prisma.$transaction(palletUpdates);
+    }
+
+    // If rack assigned, recalculate capacity based on pallets
     if (data.rackId) {
+      const palletsUsed = await recomputeRackPalletUsage(prisma, data.rackId, companyId);
+
       await prisma.rack.update({
         where: { id: data.rackId },
         data: {
-          capacityUsed: { increment: totalBoxCount },
+          capacityUsed: palletsUsed,
           lastActivity: new Date(),
         },
       });
@@ -656,7 +718,7 @@ router.post('/:id/assign-boxes',
   async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { rackId, boxNumbers } = req.body; // boxNumbers = JSON string "[1,2,3]"
+    const { rackId, boxNumbers } = req.body; // boxNumbers can be array or JSON string
     const companyId = req.user!.companyId;
     const uploadedFiles = req.files as Express.Multer.File[];
 
@@ -664,34 +726,80 @@ router.post('/:id/assign-boxes',
       return res.status(400).json({ error: 'Rack ID and box numbers required' });
     }
 
-    const parsedBoxNumbers = JSON.parse(boxNumbers);
-    
-    if (parsedBoxNumbers.length === 0) {
+    const parsedBoxNumbers = Array.isArray(boxNumbers)
+      ? boxNumbers
+      : typeof boxNumbers === 'string'
+        ? JSON.parse(boxNumbers)
+        : [];
+
+    const normalizedBoxNumbers = parsedBoxNumbers
+      .map((value: any) => (typeof value === 'number' ? value : parseInt(value, 10)))
+      .filter((value: number) => Number.isInteger(value) && value > 0);
+
+    if (normalizedBoxNumbers.length === 0) {
       return res.status(400).json({ error: 'At least one box number required' });
     }
 
     // Prepare photo URLs
     const photoUrls = uploadedFiles?.map(file => `/uploads/shipments/${file.filename}`) || [];
 
-    // Update boxes with photos
+    const boxUpdateData: Record<string, any> = {
+      rackId,
+      status: 'IN_STORAGE',
+      assignedAt: new Date(),
+    };
+
+    if (photoUrls.length > 0) {
+      const existingSample = await prisma.shipmentBox.findFirst({
+        where: {
+          shipmentId: id,
+          boxNumber: {
+            in: normalizedBoxNumbers,
+          },
+          companyId,
+        },
+        select: { photos: true },
+      });
+
+      let mergedPhotos: string[] = [];
+
+      if (existingSample?.photos) {
+        try {
+          const parsed = JSON.parse(existingSample.photos);
+          if (Array.isArray(parsed)) {
+            mergedPhotos = parsed.filter((url: any) => typeof url === 'string');
+          }
+        } catch (parseError) {
+          console.warn('Failed to parse existing shipment box photos', parseError);
+        }
+      }
+
+      photoUrls.forEach(url => {
+        if (!mergedPhotos.includes(url)) {
+          mergedPhotos.push(url);
+        }
+      });
+
+      boxUpdateData.photos = JSON.stringify(mergedPhotos);
+    }
+
+    // Update boxes with photos (if provided)
     await prisma.shipmentBox.updateMany({
       where: {
         shipmentId: id,
-        boxNumber: { in: parsedBoxNumbers },
+        boxNumber: { in: normalizedBoxNumbers },
         companyId,
       },
-      data: {
-        rackId,
-        status: 'IN_STORAGE',
-        assignedAt: new Date(),
-      },
+      data: boxUpdateData,
     });
 
-    // Update rack capacity
+    const palletsUsed = await recomputeRackPalletUsage(prisma, rackId, companyId);
+
+    // Update rack capacity based on pallet usage
     await prisma.rack.update({
       where: { id: rackId },
       data: {
-        capacityUsed: { increment: parsedBoxNumbers.length },
+        capacityUsed: palletsUsed,
         lastActivity: new Date(),
       },
     });
@@ -722,14 +830,15 @@ router.post('/:id/assign-boxes',
         userId: req.user!.id,
         companyId,
         activityType: 'ASSIGN',
-        itemDetails: `${parsedBoxNumbers.length} boxes from shipment ${id}${photoUrls.length > 0 ? ` (${photoUrls.length} photos)` : ''}`,
-        quantityAfter: parsedBoxNumbers.length,
+        itemDetails: `${normalizedBoxNumbers.length} boxes from shipment ${id}${photoUrls.length > 0 ? ` (${photoUrls.length} photos)` : ''}`,
+        quantityAfter: palletsUsed,
       },
     });
 
     res.json({ 
       success: true, 
-      assigned: parsedBoxNumbers.length,
+      assigned: normalizedBoxNumbers.length,
+      palletsUsed,
       photosUploaded: photoUrls.length,
       photoUrls 
     });
@@ -820,12 +929,14 @@ router.post('/:id/release-boxes', authorizeRoles('ADMIN', 'MANAGER'), async (req
       },
     });
 
-    // Update rack capacities
+    // Update rack capacities using pallet-based calculations
     for (const [rackId, count] of Object.entries(rackUpdates)) {
+      const palletsUsed = await recomputeRackPalletUsage(prisma, rackId, companyId);
+
       await prisma.rack.update({
         where: { id: rackId },
         data: {
-          capacityUsed: { decrement: count },
+          capacityUsed: palletsUsed,
           lastActivity: new Date(),
         },
       });
@@ -838,7 +949,7 @@ router.post('/:id/release-boxes', authorizeRoles('ADMIN', 'MANAGER'), async (req
           companyId,
           activityType: 'RELEASE',
           itemDetails: `Released ${count} boxes from shipment ${shipment.referenceId}`,
-          quantityAfter: count,
+          quantityAfter: palletsUsed,
         },
       });
     }

@@ -445,7 +445,16 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                   {selectedRackDetails.boxes && selectedRackDetails.boxes.length > 0 ? (
                     <div className="space-y-3">
                       {selectedRackDetails.boxes.map((box) => {
-                        const photoUrls = box.photos ? JSON.parse(box.photos) : [];
+                        let photoUrls: string[] = [];
+                        if (box.photos) {
+                          try {
+                            const parsed = JSON.parse(box.photos);
+                            photoUrls = Array.isArray(parsed) ? parsed : [];
+                          } catch (error) {
+                            console.warn('Failed to parse box photos', error);
+                            photoUrls = [];
+                          }
+                        }
                         return (
                         <div
                           key={box.id}

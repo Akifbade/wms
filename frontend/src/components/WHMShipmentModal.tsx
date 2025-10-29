@@ -110,6 +110,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
   // 🚀 INTAKE MODE STATE (Pallet vs Box mode)
   const [intakeMode, setIntakeMode] = useState<'pallet' | 'box'>('pallet');
+  const [palletPhotoMap, setPalletPhotoMap] = useState<Record<number, string[]>>({});
+  const [palletUploadState, setPalletUploadState] = useState<Record<number, boolean>>({});
   
   // 🚀 SHIPMENT SETTINGS STATE
   const [shipmentSettings, setShipmentSettings] = useState<any>({
@@ -295,6 +297,10 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       pieces: defaultPalletCount * defaultBoxesPerPallet,
       palletCount: defaultPalletCount,
       boxesPerPallet: defaultBoxesPerPallet,
+      length: 0,
+      width: 0,
+      height: 0,
+      cbm: 0,
       weight: 0,
       dimensions: '',
       description: '',
@@ -312,6 +318,9 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       estimatedDays: 30,
       notes: '',
     });
+    setIntakeMode('pallet');
+    setPalletPhotoMap({});
+    setPalletUploadState({});
     const initialCustomValues: Record<string, string> = {};
     customFields.forEach(field => {
       initialCustomValues[field.id] = '';
@@ -368,6 +377,28 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
       return updated;
     });
+
+    if (name === 'palletCount') {
+      const nextCount = getSafeNumber(parsedValue as number | string, 0);
+      setPalletPhotoMap(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(key => {
+          if (Number(key) > nextCount) {
+            delete next[Number(key)];
+          }
+        });
+        return next;
+      });
+      setPalletUploadState(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(key => {
+          if (Number(key) > nextCount) {
+            delete next[Number(key)];
+          }
+        });
+        return next;
+      });
+    }
   };
 
   const generateQRPreview = () => {
@@ -387,6 +418,80 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
     setQRCodeValue(qrValue);
     setShowQRPreview(true);
+  };
+
+  const resolveMediaUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return url.startsWith('/') ? url : `/${url}`;
+  };
+
+  const handlePalletPhotoUpload = async (palletNumber: number, files: FileList | null) => {
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setError('Authentication token missing. Please log in again.');
+      return;
+    }
+
+    setPalletUploadState(prev => ({ ...prev, [palletNumber]: true }));
+
+    try {
+      const uploadedUrls: string[] = [];
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        const response = await fetch('/api/shipments/upload/photo', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorPayload = await response.json().catch(() => ({}));
+          throw new Error(errorPayload.error || 'Failed to upload pallet photo');
+        }
+
+        const payload = await response.json();
+        if (payload?.photoUrl) {
+          uploadedUrls.push(payload.photoUrl);
+        }
+      }
+
+      if (uploadedUrls.length > 0) {
+        setPalletPhotoMap(prev => {
+          const next = { ...prev };
+          const current = next[palletNumber] || [];
+          next[palletNumber] = [...current, ...uploadedUrls];
+          return next;
+        });
+      }
+    } catch (uploadError: any) {
+      console.error('Pallet photo upload failed:', uploadError);
+      setError(uploadError?.message || 'Failed to upload pallet photos');
+    } finally {
+      setPalletUploadState(prev => ({ ...prev, [palletNumber]: false }));
+    }
+  };
+
+  const handleRemovePalletPhoto = (palletNumber: number, photoIndex: number) => {
+    setPalletPhotoMap(prev => {
+      const current = prev[palletNumber] || [];
+      const nextPhotos = current.filter((_, idx) => idx !== photoIndex);
+      const nextMap = { ...prev };
+      if (nextPhotos.length > 0) {
+        nextMap[palletNumber] = nextPhotos;
+      } else {
+        delete nextMap[palletNumber];
+      }
+      return nextMap;
+    });
   };
 
   const renderCustomField = (field: CustomField) => {
@@ -512,8 +617,12 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         throw new Error('Estimated storage days are required by company settings');
       }
       
-      const palletCount = getSafeNumber(formData.palletCount, 0);
-      const boxesPerPallet = getSafeNumber(formData.boxesPerPallet, 0);
+      const palletCount = intakeMode === 'pallet'
+        ? getSafeNumber(formData.palletCount, 0)
+        : 1;
+      const boxesPerPallet = intakeMode === 'pallet'
+        ? getSafeNumber(formData.boxesPerPallet, 0)
+        : getSafeNumber(formData.pieces, 0);
       const computedPieces = palletCount * boxesPerPallet;
 
       if (palletCount <= 0) {
@@ -537,6 +646,10 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       }
 
       // Prepare submission data
+      const palletPhotosPayload = intakeMode === 'pallet'
+        ? Array.from({ length: palletCount }, (_, idx) => palletPhotoMap[idx + 1] || [])
+        : [];
+
       const submissionData = {
         // Map to existing shipment fields
         referenceId: formData.barcode,
@@ -546,14 +659,15 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         clientEmail: formData.clientEmail,
         clientAddress: formData.clientAddress,
         arrivalDate: formData.arrivalDate,
-        palletCount: getSafeNumber(formData.palletCount, 0),
-        boxesPerPallet: getSafeNumber(formData.boxesPerPallet, 0),
+  palletCount,
+        boxesPerPallet,
         description: formData.description,
         originalBoxCount: computedPieces,
         currentBoxCount: computedPieces,
         estimatedValue: formData.value,
         notes: formData.notes,
         rackId: formData.rackId || undefined,
+  palletPhotos: palletPhotosPayload.map(photos => photos.filter(url => !!url)),
         // Backend will set: PENDING if no rack, IN_STORAGE if rack assigned
         // status: not needed here, backend handles it
         
@@ -635,6 +749,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                   boxesPerPallet: 1,
                   pieces: 1
                 }));
+                setPalletPhotoMap({});
+                setPalletUploadState({});
               }}
               className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
                 intakeMode === 'pallet'
@@ -650,10 +766,12 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 setIntakeMode('box');
                 setFormData(prev => ({
                   ...prev,
-                  palletCount: 0,
-                  boxesPerPallet: 0,
+                  palletCount: 1,
+                  boxesPerPallet: 1,
                   pieces: 1
                 }));
+                setPalletPhotoMap({});
+                setPalletUploadState({});
               }}
               className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
                 intakeMode === 'box'
@@ -786,6 +904,90 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             />
           </div>
         )}
+
+        {intakeMode === 'pallet' && (() => {
+          const palletCountValue = Math.max(getSafeNumber(formData.palletCount, 0), 0);
+          if (palletCountValue === 0) return null;
+          const palletNumbers = Array.from({ length: palletCountValue }, (_, idx) => idx + 1);
+
+          return (
+            <div className="md:col-span-3">
+              <div className="bg-white border-2 border-blue-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-blue-800 flex items-center gap-2">
+                    📸 Pallet Photos (optional)
+                  </h4>
+                  <span className="text-xs text-gray-500">
+                    {palletNumbers.length} pallet{palletNumbers.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {palletNumbers.map((palletNumber) => {
+                    const photos = palletPhotoMap[palletNumber] || [];
+                    const isUploading = palletUploadState[palletNumber];
+                    return (
+                      <div
+                        key={`pallet-${palletNumber}`}
+                        className="border border-blue-100 rounded-lg p-3 bg-blue-50/60"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-xs font-semibold text-blue-700 uppercase">Pallet #{palletNumber}</p>
+                            <p className="text-[11px] text-gray-500">Add up to 5 photos for reference</p>
+                          </div>
+                          {photos.length > 0 && (
+                            <span className="text-xs font-medium text-blue-600">{photos.length} photo{photos.length !== 1 ? 's' : ''}</span>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-blue-300 rounded-md py-6 hover:border-blue-500 hover:bg-blue-100/40 transition-colors cursor-pointer text-center text-xs text-blue-700 font-medium">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={(event) => {
+                                handlePalletPhotoUpload(palletNumber, event.target.files);
+                                event.target.value = '';
+                              }}
+                              disabled={isUploading || photos.length >= 5}
+                            />
+                            {isUploading
+                              ? 'Uploading...'
+                              : photos.length >= 5
+                                ? 'Limit reached'
+                                : 'Upload Photos'}
+                          </label>
+                          {photos.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {photos.map((photoUrl, index) => (
+                                <div key={`${palletNumber}-photo-${index}`} className="relative">
+                                  <img
+                                    src={resolveMediaUrl(photoUrl)}
+                                    alt={`Pallet ${palletNumber} photo ${index + 1}`}
+                                    className="h-16 w-16 object-cover rounded-md border border-blue-200"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemovePalletPhoto(palletNumber, index)}
+                                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white text-xs flex items-center justify-center shadow"
+                                    title="Remove photo"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* DIMENSIONS & CBM SECTION */}
         <div className="md:col-span-3">

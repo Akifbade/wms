@@ -179,18 +179,26 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
       // Generate unique QR code for the rack
       const qrCode = `RACK-${formData.code}-${Date.now()}`;
       
-      const selectedCompanyProfileId = formData.categoryId || null;
+      const selectedCompanyProfileId = formData.companyProfileId || formData.categoryId || '';
+
+      const {
+        categoryId: _unusedCategoryId,
+        companyProfileId: _unusedCompanyProfileId,
+        length,
+        width,
+        height,
+        ...rest
+      } = formData;
 
       const dataToSubmit = {
-        ...formData,
+        ...rest,
         qrCode,
         capacityUsed: 0,
-        // Convert dimension strings to numbers or null
-        length: formData.length ? parseFloat(formData.length) : null,
-        width: formData.width ? parseFloat(formData.width) : null,
-        height: formData.height ? parseFloat(formData.height) : null,
-        categoryId: null,
-        companyProfileId: selectedCompanyProfileId,
+        length: length ? parseFloat(length) : undefined,
+        width: width ? parseFloat(width) : undefined,
+        height: height ? parseFloat(height) : undefined,
+        categoryId: undefined,
+        companyProfileId: selectedCompanyProfileId ? selectedCompanyProfileId : undefined,
       };
 
       await racksAPI.create(dataToSubmit);

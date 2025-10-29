@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, authorizeRoles, AuthRequest } from '../middleware/auth';
 import { z } from 'zod';
+import { calculatePalletUsage } from '../utils/rackCapacity';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -104,6 +105,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             id: true,
             name: true,
             logo: true,
+            description: true,
+            contractStatus: true,
+            contactPerson: true,
+            contactPhone: true,
           },
         },
         boxes: {
@@ -114,6 +119,15 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             id: true,
             shipmentId: true,
             status: true,
+            boxNumber: true,
+            photos: true,
+            shipment: {
+              select: {
+                id: true,
+                boxesPerPallet: true,
+                palletCount: true,
+              },
+            },
           },
         },
         _count: {
@@ -125,19 +139,18 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       orderBy: { code: 'asc' },
     });
 
-    // Calculate utilization based on actual stored boxes
+    // Calculate utilization based on pallet usage rather than raw boxes
     const racksWithStats = racks.map((rack: any) => {
-      const actualCapacityUsed = rack.boxes?.filter((box: any) => 
-        box.status === 'IN_STORAGE' || box.status === 'STORED'
-      ).length || 0;
-      
+      const palletUsage = calculatePalletUsage(rack.boxes || []);
+      const derivedStatus = palletUsage >= rack.capacityTotal ? 'FULL' : (rack.status || 'ACTIVE');
+
       return {
         ...rack,
-        capacityUsed: actualCapacityUsed, // Override with actual count
+        capacityUsed: palletUsage,
         utilization: rack.capacityTotal > 0 
-          ? Math.round((actualCapacityUsed / rack.capacityTotal) * 100) 
+          ? Math.round((palletUsage / rack.capacityTotal) * 100) 
           : 0,
-        status: actualCapacityUsed >= rack.capacityTotal ? 'FULL' : 'ACTIVE',
+        status: derivedStatus,
       };
     });
 
@@ -175,6 +188,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
             description: true,
             contactPerson: true,
             contactPhone: true,
+            contractStatus: true,
           },
         },
         boxes: {
@@ -189,6 +203,8 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
                 shipper: true,
                 consignee: true,
                 status: true,
+                boxesPerPallet: true,
+                palletCount: true,
               },
             },
           },
@@ -212,18 +228,18 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Rack not found' });
     }
 
-    // Calculate actual capacity used
-    const actualCapacityUsed = rack.boxes?.filter((box: any) => 
-      box.status === 'IN_STORAGE' || box.status === 'STORED'
-    ).length || 0;
+    // Calculate actual capacity used in pallet slots
+    const palletUsage = calculatePalletUsage(rack.boxes || []);
+
+    const derivedStatus = palletUsage >= rack.capacityTotal ? 'FULL' : (rack.status || 'ACTIVE');
 
     const rackWithStats = {
       ...rack,
-      capacityUsed: actualCapacityUsed,
+      capacityUsed: palletUsage,
       utilization: rack.capacityTotal > 0 
-        ? Math.round((actualCapacityUsed / rack.capacityTotal) * 100) 
+        ? Math.round((palletUsage / rack.capacityTotal) * 100) 
         : 0,
-      status: actualCapacityUsed >= rack.capacityTotal ? 'FULL' : 'ACTIVE',
+      status: derivedStatus,
     };
 
     res.json({ rack: rackWithStats });
