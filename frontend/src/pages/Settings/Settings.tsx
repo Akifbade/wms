@@ -15,6 +15,7 @@ import {
 
 // Settings Sub-components
 import { CompanySettings } from './components/CompanySettings';
+import { CompanyProfiles } from './components/CompanyProfiles';
 import { UserManagement } from './components/UserManagement';
 import { InvoiceSettings } from './components/InvoiceSettings';
 import { BillingSettings } from './components/BillingSettings';
@@ -39,6 +40,13 @@ const settingsNavigation: SettingsNavItem[] = [
     icon: BuildingOfficeIcon,
     path: 'company',
     description: 'Company details, logo, colors, and branding settings'
+  },
+  {
+    id: 'company-profiles',
+    name: 'Company Profiles',
+    icon: UserGroupIcon,
+    path: 'company-profiles',
+    description: 'Manage customer/vendor profiles (DIOR, JAZEERA, etc.)'
   },
   {
     id: 'users',
@@ -181,6 +189,7 @@ export const Settings: React.FC = () => {
         <div className="max-w-4xl mx-auto p-8">
           {/* Dynamic Content Based on Active Section */}
           {activeSection === 'company' && <CompanySettings />}
+          {activeSection === 'company-profiles' && <CompanyProfiles />}
           {activeSection === 'users' && <UserManagement />}
           {activeSection === 'invoice' && <InvoiceSettings />}
           {activeSection === 'billing' && <BillingSettings />}

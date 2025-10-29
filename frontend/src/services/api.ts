@@ -223,6 +223,59 @@ export const categoriesAPI = {
   },
 };
 
+// Company Profiles API (DIOR, JAZEERA, etc)
+export const companiesAPI = {
+  listProfiles: async () => {
+    return apiCall<any[]>(`/company-profiles/`);
+  },
+
+  getProfile: async (profileId: string) => {
+    return apiCall<any>(`/company-profiles/${profileId}`);
+  },
+
+  createProfile: async (data: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/company-profiles/`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: data,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  updateProfile: async (profileId: string, data: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/company-profiles/${profileId}`, {
+      method: 'PUT',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: data,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  deleteProfile: async (profileId: string) => {
+    return apiCall<{ message: string }>(`/company-profiles/${profileId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Jobs API
 export const jobsAPI = {
   getAll: async (params?: { status?: string; search?: string; startDate?: string; endDate?: string }) => {
@@ -574,6 +627,7 @@ export default {
   shipments: shipmentsAPI,
   racks: racksAPI,
   categories: categoriesAPI,
+  companies: companiesAPI,
   jobs: jobsAPI,
   billing: billingAPI,
   withdrawals: withdrawalsAPI,
