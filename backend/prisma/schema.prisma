@@ -49,6 +49,12 @@ model Company {
   showCompanyName Boolean @default(true)
   logoSize        String? @default("medium") // small, medium, large
 
+  // NEW: Contract & Contact Info
+  contactPerson      String?
+  contactPhone       String?
+  contractStatus     String? @default("ACTIVE") // ACTIVE, INACTIVE, EXPIRED
+  contractDocument   String? // File path to contract PDF/DOC
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -58,6 +64,7 @@ model Company {
   shipments         Shipment[]
   movingJobs        MovingJob[]
   expenses          Expense[]
+  categories        Category[] // NEW: One-to-many with categories
   invoiceSettings   InvoiceSettings?
   customFields      CustomField[]
   billingSettings   BillingSettings?
@@ -175,13 +182,34 @@ model UserActivity {
   @@map("user_activities")
 }
 
+// NEW: Rack Category System (Company-specific categories with branding)
+model Category {
+  id          String    @id @default(cuid())
+  name        String    // DIOR, COMPANY_MATERIAL, JAZEERA, etc.
+  description String?   @db.Text
+  logo        String?   // Logo/icon file path
+  color       String?   // Hex color code (e.g., #FF5733)
+  icon        String?   // Icon name or emoji
+  companyId   String
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  racks       Rack[]    // One-to-many: A category has many racks
+
+  @@unique([name, companyId]) // Category name unique per company
+  @@map("categories")
+}
+
 // Central Rack System (Core Integration Point)
 model Rack {
   id            String    @id @default(cuid())
   code          String // A1, A2, B1, etc.
   qrCode        String    @unique
   rackType      String    @default("STORAGE") // STORAGE, MATERIALS, EQUIPMENT
-  category      String?   // DIOR, COMPANY_MATERIAL, JAZEERA, OTHERS
+  categoryId    String?   // NEW: FK to Category (instead of string category)
   location      String?
   
   // Size/Dimensions
@@ -201,6 +229,7 @@ model Rack {
 
   // Relations
   company        Company          @relation(fields: [companyId], references: [id])
+  category       Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull) // NEW: FK to Category
   boxes          ShipmentBox[] // Individual boxes assigned
   activities     RackActivity[]
   inventory      RackInventory[]

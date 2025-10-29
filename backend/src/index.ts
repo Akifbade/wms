@@ -31,6 +31,7 @@ import jobFilesRoutes from './routes/job-files'; // NEW: Job file uploads
 import shipmentItemsRoutes from './routes/shipment-items';
 import customerMaterialsRoutes from './routes/customer-materials';
 import workerDashboardRoutes from './routes/worker-dashboard';
+import categoriesRoutes from './routes/categories'; // NEW: Category management
 
 // Load environment variables FIRST
 dotenv.config();
