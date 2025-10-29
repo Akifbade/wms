@@ -419,26 +419,23 @@ export const Shipments: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
-                      {/* QR Code button - only show for stored shipments */}
-                      {(shipment.status === 'IN_STORAGE' || 
-                        shipment.status === 'PARTIAL' || 
-                        shipment.status === 'STORED') && (
-                        <button 
-                          onClick={() => {
-                            setSelectedShipment(shipment);
-                            setQrModalOpen(true);
-                          }}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          title="View QR Codes"
-                        >
-                          <QrCodeIcon className="h-5 w-5" />
-                        </button>
-                      )}
+                      {/* QR Code button - show for ALL shipments */}
+                      <button 
+                        onClick={() => {
+                          setSelectedShipment(shipment);
+                          setQrModalOpen(true);
+                        }}
+                        className="text-indigo-600 hover:text-indigo-900 transition-colors"
+                        title="View/Print QR Codes"
+                      >
+                        <QrCodeIcon className="h-5 w-5" />
+                      </button>
                       
                       {/* Release button - only for stored shipments with boxes */}
                       {(shipment.status === 'IN_STORAGE' || 
                         shipment.status === 'PARTIAL' || 
-                        shipment.status === 'STORED') && 
+                        shipment.status === 'STORED' ||
+                        shipment.status === 'ACTIVE') && 
                         shipment.currentBoxCount > 0 && (
                         <button 
                           onClick={() => handleReleaseClick(shipment)}

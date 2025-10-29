@@ -62,11 +62,15 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     arrivalDate: new Date().toISOString().split('T')[0], // Today's date by default
     
     // Shipment Details
-  pieces: 1,
+    pieces: 1,
     palletCount: 1,
-  boxesPerPallet: 1,
+    boxesPerPallet: 1,
     weight: 0,
     dimensions: '',
+    length: 0, // in cm
+    width: 0,  // in cm
+    height: 0, // in cm
+    cbm: 0, // auto-calculated (m³)
     description: '',
     value: 0,
     
@@ -99,6 +103,13 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     currency: 'KWD',
     taxRate: 0,
   });
+
+  // 🚀 QR CODE STATE
+  const [showQRPreview, setShowQRPreview] = useState(false);
+  const [qrCodeValue, setQRCodeValue] = useState('');
+
+  // 🚀 INTAKE MODE STATE (Pallet vs Box mode)
+  const [intakeMode, setIntakeMode] = useState<'pallet' | 'box'>('pallet');
   
   // 🚀 SHIPMENT SETTINGS STATE
   const [shipmentSettings, setShipmentSettings] = useState<any>({
@@ -337,8 +348,45 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         };
       }
 
+      // Auto-calculate CBM when dimensions change
+      if (name === 'length' || name === 'width' || name === 'height') {
+        const length = getSafeNumber(updated.length, 0);
+        const width = getSafeNumber(updated.width, 0);
+        const height = getSafeNumber(updated.height, 0);
+        
+        // CBM = (Length × Width × Height) / 1,000,000 (since input is in cm)
+        // Or: (L × W × H in cm) / 1,000,000 = CBM in m³
+        const cbm = length > 0 && width > 0 && height > 0 
+          ? (length * width * height) / 1000000
+          : 0;
+
+        return {
+          ...updated,
+          cbm: parseFloat(cbm.toFixed(4)), // Round to 4 decimals
+        };
+      }
+
       return updated;
     });
+  };
+
+  const generateQRPreview = () => {
+    const timestamp = Math.floor(Date.now() / 1000);
+    let qrValue = '';
+
+    if (intakeMode === 'pallet') {
+      const palletCount = getSafeNumber(formData.palletCount, 1);
+      const boxesPerPallet = getSafeNumber(formData.boxesPerPallet, 1);
+      const totalBoxes = palletCount * boxesPerPallet;
+      qrValue = `QR-SH-${timestamp}-P${palletCount}B${boxesPerPallet}T${totalBoxes}`;
+    } else {
+      // Box mode
+      const totalBoxes = getSafeNumber(formData.pieces, 1);
+      qrValue = `QR-SH-${timestamp}-BOX-T${totalBoxes}`;
+    }
+
+    setQRCodeValue(qrValue);
+    setShowQRPreview(true);
   };
 
   const renderCustomField = (field: CustomField) => {
@@ -567,10 +615,58 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
   // 🚀 SECTION RENDER FUNCTIONS
   const renderBasicSection = () => (
-    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-      <h3 className="text-lg font-semibold mb-4 text-blue-800 flex items-center">
-        📦 Basic Shipment Info
-      </h3>
+    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 space-y-4">
+      <div>
+        <h3 className="text-lg font-semibold mb-4 text-blue-800 flex items-center">
+          📦 Basic Shipment Info
+        </h3>
+        
+        {/* INTAKE MODE TOGGLE */}
+        <div className="bg-white p-3 rounded-lg border-2 border-blue-300 mb-4">
+          <p className="text-sm font-medium text-gray-700 mb-3">📋 Intake Mode:</p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setIntakeMode('pallet');
+                setFormData(prev => ({
+                  ...prev,
+                  palletCount: 1,
+                  boxesPerPallet: 1,
+                  pieces: 1
+                }));
+              }}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+                intakeMode === 'pallet'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              🪵 Pallet Mode
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIntakeMode('box');
+                setFormData(prev => ({
+                  ...prev,
+                  palletCount: 0,
+                  boxesPerPallet: 0,
+                  pieces: 1
+                }));
+              }}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+                intakeMode === 'box'
+                  ? 'bg-green-600 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              📦 Box Mode
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-3">
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -616,45 +712,161 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             required
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Pallet Count <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            name="palletCount"
-            value={formData.palletCount}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            min="1"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Boxes per Pallet <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            name="boxesPerPallet"
-            value={formData.boxesPerPallet}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            min="1"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Total Boxes (auto)
-          </label>
-          <input
-            type="number"
-            name="pieces"
-            value={formData.pieces}
-            readOnly
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+
+        {/* PALLET MODE FIELDS */}
+        {intakeMode === 'pallet' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🪵 Pallet Count <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                name="palletCount"
+                value={formData.palletCount}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50"
+                min="1"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🧱 Boxes per Pallet <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                name="boxesPerPallet"
+                value={formData.boxesPerPallet}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50"
+                min="1"
+                required
+              />
+            </div>
+          </>
+        )}
+
+        {/* BOX MODE FIELDS */}
+        {intakeMode === 'box' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              📦 Total Boxes <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              name="pieces"
+              value={formData.pieces}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 1;
+                setFormData(prev => ({
+                  ...prev,
+                  pieces: value
+                }));
+              }}
+              className="w-full px-4 py-3 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-green-50"
+              min="1"
+              required
+            />
+          </div>
+        )}
+
+        {/* AUTO-CALCULATED TOTAL BOXES (for pallet mode) */}
+        {intakeMode === 'pallet' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              📊 Total Boxes (auto)
+            </label>
+            <input
+              type="number"
+              name="pieces"
+              value={formData.pieces}
+              readOnly
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        )}
+
+        {/* DIMENSIONS & CBM SECTION */}
+        <div className="md:col-span-3">
+          <div className="bg-orange-50 border-2 border-orange-300 p-4 rounded-lg">
+            <h4 className="text-sm font-semibold text-orange-900 mb-3 flex items-center">
+              📏 Shipment Size & Volume
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Length (cm)
+                </label>
+                <input
+                  type="number"
+                  name="length"
+                  value={formData.length || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                  placeholder="0"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Width (cm)
+                </label>
+                <input
+                  type="number"
+                  name="width"
+                  value={formData.width || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                  placeholder="0"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Height (cm)
+                </label>
+                <input
+                  type="number"
+                  name="height"
+                  value={formData.height || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                  placeholder="0"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Weight (kg)
+                </label>
+                <input
+                  type="number"
+                  name="weight"
+                  value={formData.weight || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="0"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-orange-900 font-bold mb-2">
+                  CBM (m³) 📦
+                </label>
+                <div className="w-full px-3 py-2 border-2 border-orange-400 rounded-lg bg-orange-100 text-orange-900 font-bold text-center">
+                  {formData.cbm > 0 ? formData.cbm.toFixed(4) : '0'}
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 mt-2">
+              💡 CBM auto-calculates: (Length × Width × Height) ÷ 1,000,000
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -1000,6 +1212,76 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 <div className="flex items-center">
                   <span className="mr-2">✅</span>
                   {success}
+                </div>
+              </div>
+            )}
+
+            {/* QR Code Preview Modal */}
+            {showQRPreview && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-800">🎯 Shipment QR Code</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowQRPreview(false)}
+                      className="text-gray-500 hover:text-gray-700 text-2xl"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="bg-gray-50 p-6 rounded-lg flex flex-col items-center mb-4">
+                    <div className="mb-4 text-center">
+                      <p className="text-sm text-gray-600 mb-2">Master QR Code</p>
+                      <p className="font-mono bg-white p-4 rounded border border-gray-300 text-sm break-all">
+                        {qrCodeValue}
+                      </p>
+                    </div>
+                    <div className="w-full border-t pt-4 mt-4">
+                      {intakeMode === 'pallet' ? (
+                        <>
+                          <h4 className="font-semibold text-gray-700 mb-2">📊 Pallet Details:</h4>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="bg-blue-50 p-2 rounded">
+                              <p className="text-gray-600">Pallets</p>
+                              <p className="text-lg font-bold text-blue-600">{formData.palletCount}</p>
+                            </div>
+                            <div className="bg-green-50 p-2 rounded">
+                              <p className="text-gray-600">Boxes/Pallet</p>
+                              <p className="text-lg font-bold text-green-600">{formData.boxesPerPallet}</p>
+                            </div>
+                            <div className="bg-purple-50 p-2 rounded col-span-2">
+                              <p className="text-gray-600">Total Boxes</p>
+                              <p className="text-lg font-bold text-purple-600">{formData.pieces}</p>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <h4 className="font-semibold text-gray-700 mb-2">📦 Box Details:</h4>
+                          <div className="grid grid-cols-1 gap-2 text-sm">
+                            <div className="bg-green-50 p-3 rounded">
+                              <p className="text-gray-600">Total Boxes</p>
+                              <p className="text-2xl font-bold text-green-600">{formData.pieces}</p>
+                            </div>
+                            <p className="text-xs text-gray-500 text-center mt-2">
+                              ℹ️ This shipment contains individual boxes (no pallets)
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(qrCodeValue);
+                      alert('QR Code copied to clipboard!');
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors"
+                  >
+                    📋 Copy QR Code
+                  </button>
                 </div>
               </div>
             )}
@@ -1516,6 +1798,14 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4 border-t">
+              <button
+                type="button"
+                onClick={generateQRPreview}
+                className="px-6 py-3 border-2 border-purple-500 text-purple-600 rounded-lg hover:bg-purple-50 font-medium transition-colors flex items-center gap-2"
+                disabled={loading || (intakeMode === 'pallet' && (!formData.palletCount || !formData.boxesPerPallet)) || (intakeMode === 'box' && !formData.pieces)}
+              >
+                {intakeMode === 'pallet' ? '🎯 View Pallet QR' : '📦 View Box QR'}
+              </button>
               <button
                 type="button"
                 onClick={onClose}
