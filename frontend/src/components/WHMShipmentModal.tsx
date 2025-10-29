@@ -51,9 +51,9 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     arrivalDate: new Date().toISOString().split('T')[0], // Today's date by default
     
     // Shipment Details
-    pieces: 0,
+  pieces: 1,
     palletCount: 1,
-    boxesPerPallet: 0,
+  boxesPerPallet: 1,
     weight: 0,
     dimensions: '',
     description: '',
@@ -139,6 +139,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       await Promise.all([
         loadCustomFields(),
         loadRacks(),
+        loadCompanyProfiles(),
         loadPricingSettings(),
         loadShipmentSettings(), // 🚀 LOAD SETTINGS
       ]);
@@ -193,13 +194,13 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const loadCompanyProfiles = async () => {
     try {
       const profiles = await companiesAPI.listProfiles();
-      if (Array.isArray(profiles)) {
-        setCompanyProfiles(profiles);
-      } else if (profiles && Array.isArray((profiles as any).profiles)) {
-        setCompanyProfiles((profiles as any).profiles);
-      } else {
-        setCompanyProfiles([]);
-      }
+      const profileList = Array.isArray(profiles)
+        ? profiles
+        : profiles && Array.isArray((profiles as any).profiles)
+          ? (profiles as any).profiles
+          : [];
+      const activeProfiles = profileList.filter((profile: any) => profile?.isActive !== false);
+      setCompanyProfiles(activeProfiles);
     } catch (err) {
       console.error('Failed to load company profiles:', err);
       setCompanyProfiles([]);
@@ -257,14 +258,19 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   };
 
   const resetForm = () => {
+    const defaultPalletCount = 1;
+    const defaultBoxesPerPallet = 1;
     setFormData({
       barcode: '',
+      companyProfileId: '',
       clientName: '',
       clientPhone: '',
       clientEmail: '',
       clientAddress: '',
       arrivalDate: new Date().toISOString().split('T')[0], // ADD MISSING FIELD
-      pieces: 0,
+      pieces: defaultPalletCount * defaultBoxesPerPallet,
+      palletCount: defaultPalletCount,
+      boxesPerPallet: defaultBoxesPerPallet,
       weight: 0,
       dimensions: '',
       description: '',
@@ -282,7 +288,11 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       estimatedDays: 30,
       notes: '',
     });
-    setCustomFieldValues({});
+    const initialCustomValues: Record<string, string> = {};
+    customFields.forEach(field => {
+      initialCustomValues[field.id] = '';
+    });
+    setCustomFieldValues(initialCustomValues);
     setError('');
     setSuccess('');
     generateBarcode();
@@ -290,11 +300,32 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number' ? parseNumberInput(value, true) : 
-               type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }));
+    const isCheckbox = type === 'checkbox';
+    const isNumber = type === 'number';
+    const parsedValue = isCheckbox
+      ? (e.target as HTMLInputElement).checked
+      : isNumber
+        ? parseNumberInput(value, true)
+        : value;
+
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [name]: parsedValue,
+      } as typeof prev;
+
+      if (name === 'palletCount' || name === 'boxesPerPallet') {
+        const palletCount = getSafeNumber(updated.palletCount, 0);
+        const boxesPerPallet = getSafeNumber(updated.boxesPerPallet, 0);
+
+        return {
+          ...updated,
+          pieces: palletCount * boxesPerPallet,
+        };
+      }
+
+      return updated;
+    });
   };
 
   const renderCustomField = (field: CustomField) => {
@@ -420,8 +451,18 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         throw new Error('Estimated storage days are required by company settings');
       }
       
-      if (formData.pieces <= 0) {
-        throw new Error('Number of pieces must be greater than 0');
+      const palletCount = getSafeNumber(formData.palletCount, 0);
+      const boxesPerPallet = getSafeNumber(formData.boxesPerPallet, 0);
+      const computedPieces = palletCount * boxesPerPallet;
+
+      if (palletCount <= 0) {
+        throw new Error('Pallet count must be at least 1');
+      }
+      if (boxesPerPallet <= 0) {
+        throw new Error('Boxes per pallet must be at least 1');
+      }
+      if (computedPieces <= 0) {
+        throw new Error('Number of boxes must be greater than 0');
       }
       if (formData.isWarehouseShipment && (!formData.shipper || !formData.consignee)) {
         throw new Error('Shipper and consignee are required for warehouse shipments');
@@ -438,13 +479,17 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       const submissionData = {
         // Map to existing shipment fields
         referenceId: formData.barcode,
+        companyProfileId: formData.companyProfileId || undefined,
         clientName: formData.clientName,
         clientPhone: formData.clientPhone,
         clientEmail: formData.clientEmail,
         clientAddress: formData.clientAddress,
+        arrivalDate: formData.arrivalDate,
+        palletCount: getSafeNumber(formData.palletCount, 0),
+        boxesPerPallet: getSafeNumber(formData.boxesPerPallet, 0),
         description: formData.description,
-        originalBoxCount: formData.pieces,
-        currentBoxCount: formData.pieces,
+        originalBoxCount: computedPieces,
+        currentBoxCount: computedPieces,
         estimatedValue: formData.value,
         notes: formData.notes,
         rackId: formData.rackId || undefined,
@@ -491,7 +536,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       }
 
       // Show success message
-      alert(`✅ SUCCESS!\n\nShipment ${formData.barcode} has been created successfully!\n\n📦 Boxes: ${formData.pieces}\n👤 Client: ${formData.clientName}${formData.rackId ? `\n📍 Assigned to Rack` : ''}`);
+  alert(`✅ SUCCESS!\n\nShipment ${formData.barcode} has been created successfully!\n\n📦 Boxes: ${computedPieces}\n🪵 Pallets: ${palletCount}\n🧱 Boxes per pallet: ${boxesPerPallet}\n👤 Client: ${formData.clientName}${formData.rackId ? `\n📍 Assigned to Rack` : ''}`);
       
       onSuccess();
       onClose();
@@ -513,7 +558,25 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       <h3 className="text-lg font-semibold mb-4 text-blue-800 flex items-center">
         📦 Basic Shipment Info
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-3">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Company Profile
+          </label>
+          <select
+            name="companyProfileId"
+            value={formData.companyProfileId}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">Select company (optional)</option>
+            {companyProfiles.map(profile => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Barcode ID
@@ -529,20 +592,6 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Number of Pieces <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            name="pieces"
-            value={formData.pieces}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            min="1"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
             📅 Arrival Date <span className="text-red-500">*</span>
           </label>
           <input
@@ -552,6 +601,46 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             onChange={handleChange}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Pallet Count <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            name="palletCount"
+            value={formData.palletCount}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            min="1"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Boxes per Pallet <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            name="boxesPerPallet"
+            value={formData.boxesPerPallet}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            min="1"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Total Boxes (auto)
+          </label>
+          <input
+            type="number"
+            name="pieces"
+            value={formData.pieces}
+            readOnly
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
       </div>
