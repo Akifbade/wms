@@ -254,16 +254,23 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
     const userId = req.user!.id;
     const palletCount = parseOptionalInt(data.palletCount);
     const boxesPerPallet = parseOptionalInt(data.boxesPerPallet);
-    const providedOriginalBoxCount = parseOptionalInt(data.originalBoxCount);
-    const computedBoxCount = palletCount && boxesPerPallet ? palletCount * boxesPerPallet : null;
-    const originalBoxCount = providedOriginalBoxCount ?? computedBoxCount;
 
-    if (!originalBoxCount || originalBoxCount <= 0) {
-      return res.status(400).json({ error: 'Box count must be greater than zero' });
+    if (!palletCount || palletCount <= 0) {
+      return res.status(400).json({ error: 'Pallet count must be greater than zero' });
     }
 
-    const totalBoxCount = parseOptionalInt(data.totalBoxCount) ?? originalBoxCount;
+    if (!boxesPerPallet || boxesPerPallet <= 0) {
+      return res.status(400).json({ error: 'Boxes per pallet must be greater than zero' });
+    }
+
+    const computedBoxCount = palletCount * boxesPerPallet;
+    const originalBoxCount = computedBoxCount;
+    const totalBoxCount = computedBoxCount;
     const currentBoxCount = parseOptionalInt(data.currentBoxCount) ?? totalBoxCount;
+
+    if (!currentBoxCount || currentBoxCount <= 0) {
+      return res.status(400).json({ error: 'Current box count must be greater than zero' });
+    }
 
     let arrivalDate = new Date();
     if (data.arrivalDate) {
