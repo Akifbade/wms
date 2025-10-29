@@ -95,6 +95,7 @@ app.use('/api/materials', materialsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/plugins', pluginsRoutes);
 app.use('/api/job-files', jobFilesRoutes); // NEW: Job file management
+app.use('/api/categories', categoriesRoutes); // NEW: Category management
 // NEW: Enhanced warehouse routes
 app.use('/api', shipmentItemsRoutes); // Handles /api/shipments/:id/items
 app.use('/api', customerMaterialsRoutes); // Handles /api/customers/*
