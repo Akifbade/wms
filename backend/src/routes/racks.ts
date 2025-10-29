@@ -13,6 +13,11 @@ const rackSchema = z.object({
   rackType: z.enum(['STORAGE', 'MATERIALS', 'EQUIPMENT']).optional(),
   location: z.string().optional(),
   capacityTotal: z.number().positive().optional(),
+  categoryId: z.string().optional(), // NEW: Category reference
+  length: z.number().positive().optional(),
+  width: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+  dimensionUnit: z.enum(['CM', 'INCHES', 'METERS']).optional(),
 });
 
 // Get all racks
@@ -35,6 +40,15 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       where,
       include: {
         inventory: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+            color: true,
+            icon: true,
+          },
+        },
         boxes: {
           where: { 
             status: { in: ['IN_STORAGE', 'STORED'] }  // Only count stored boxes
@@ -87,6 +101,15 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       where: { id, companyId },
       include: {
         inventory: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+            color: true,
+            icon: true,
+          },
+        },
         boxes: {
           where: { 
             status: { in: ['IN_STORAGE', 'STORED'] }  // Only show boxes currently in storage
@@ -161,14 +184,46 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
       return res.status(400).json({ error: 'Rack code already exists' });
     }
 
+    // Validate categoryId if provided
+    if (data.categoryId) {
+      const category = await prisma.category.findFirst({
+        where: {
+          id: data.categoryId,
+          companyId,
+        },
+      });
+
+      if (!category) {
+        return res.status(404).json({ error: 'Category not found' });
+      }
+    }
+
     const rack = await prisma.rack.create({
       data: {
-        ...data,
+        code: data.code,
+        rackType: data.rackType || 'STORAGE',
+        location: data.location,
+        categoryId: data.categoryId,
+        length: data.length,
+        width: data.width,
+        height: data.height,
+        dimensionUnit: data.dimensionUnit,
         companyId,
         qrCode: `QR-${data.code}`,
         capacityTotal: data.capacityTotal || 100,
         capacityUsed: 0,
         status: 'ACTIVE',
+      },
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+            color: true,
+            icon: true,
+          },
+        },
       },
     });
 
@@ -196,9 +251,34 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
       return res.status(404).json({ error: 'Rack not found' });
     }
 
+    // Validate categoryId if provided
+    if (req.body.categoryId) {
+      const category = await prisma.category.findFirst({
+        where: {
+          id: req.body.categoryId,
+          companyId,
+        },
+      });
+
+      if (!category) {
+        return res.status(404).json({ error: 'Category not found' });
+      }
+    }
+
     const rack = await prisma.rack.update({
       where: { id },
       data: req.body,
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+            color: true,
+            icon: true,
+          },
+        },
+      },
     });
 
     res.json({ rack });
