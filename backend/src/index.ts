@@ -34,8 +34,8 @@ import workerDashboardRoutes from './routes/worker-dashboard';
 import categoriesRoutes from './routes/categories'; // NEW: Category management
 import companiesRoutes from './routes/companies'; // NEW: Company profiles management
 
-// Load environment variables FIRST
-dotenv.config();
+// Load environment variables FIRST (but allow env vars to override .env)
+dotenv.config({ override: false });
 
 // Initialize Express app
 const app = express();

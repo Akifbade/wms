@@ -1,9 +1,9 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -26,23 +26,17 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Get all company profiles for current company
-router.get('/', authenticateToken, async (req: Request, res: Response) => {
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    
-    // Get current user's company
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { company: true }
-    });
+    const companyId = req.user?.companyId;
 
-    if (!user || !user.companyId) {
+    if (!companyId) {
       return res.status(404).json({ error: 'Company not found' });
     }
 
     // Get all company profiles for this company
     const profiles = await prisma.companyProfile.findMany({
-      where: { companyId: user.companyId },
+      where: { companyId },
       orderBy: { name: 'asc' }
     });
 
@@ -54,24 +48,19 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
 });
 
 // Get single company profile
-router.get('/:profileId', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:profileId', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { profileId } = req.params;
-    const userId = (req as any).userId;
+    const companyId = req.user?.companyId;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { company: true }
-    });
-
-    if (!user || !user.companyId) {
+    if (!companyId) {
       return res.status(404).json({ error: 'Company not found' });
     }
 
     const profile = await prisma.companyProfile.findFirst({
       where: {
         id: profileId,
-        companyId: user.companyId
+        companyId
       }
     });
 
@@ -87,17 +76,12 @@ router.get('/:profileId', authenticateToken, async (req: Request, res: Response)
 });
 
 // Create new company profile
-router.post('/', authenticateToken, upload.single('logo'), async (req: Request, res: Response) => {
+router.post('/', authenticateToken, upload.single('logo'), async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, contactPerson, contactPhone, contractStatus, isActive } = req.body;
-    const userId = (req as any).userId;
+    const companyId = req.user?.companyId;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { company: true }
-    });
-
-    if (!user || !user.companyId) {
+    if (!companyId) {
       return res.status(404).json({ error: 'Company not found' });
     }
 
@@ -105,7 +89,7 @@ router.post('/', authenticateToken, upload.single('logo'), async (req: Request, 
     const existing = await prisma.companyProfile.findFirst({
       where: {
         name: name,
-        companyId: user.companyId
+        companyId
       }
     });
 
@@ -124,7 +108,7 @@ router.post('/', authenticateToken, upload.single('logo'), async (req: Request, 
         logo: logoPath,
         contractStatus: contractStatus || 'ACTIVE',
         isActive: isActive !== false,
-        companyId: user.companyId
+        companyId
       }
     });
 
@@ -136,18 +120,13 @@ router.post('/', authenticateToken, upload.single('logo'), async (req: Request, 
 });
 
 // Update company profile
-router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: Request, res: Response) => {
+router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: AuthRequest, res: Response) => {
   try {
     const { profileId } = req.params;
     const { name, description, contactPerson, contactPhone, contractStatus, isActive } = req.body;
-    const userId = (req as any).userId;
+    const companyId = req.user?.companyId;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { company: true }
-    });
-
-    if (!user || !user.companyId) {
+    if (!companyId) {
       return res.status(404).json({ error: 'Company not found' });
     }
 
@@ -155,7 +134,7 @@ router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: 
     const profile = await prisma.companyProfile.findFirst({
       where: {
         id: profileId,
-        companyId: user.companyId
+        companyId
       }
     });
 
@@ -168,7 +147,7 @@ router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: 
       const existing = await prisma.companyProfile.findFirst({
         where: {
           name: name,
-          companyId: user.companyId,
+          companyId,
           NOT: { id: profileId }
         }
       });
@@ -211,24 +190,19 @@ router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: 
 });
 
 // Delete company profile
-router.delete('/:profileId', authenticateToken, async (req: Request, res: Response) => {
+router.delete('/:profileId', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { profileId } = req.params;
-    const userId = (req as any).userId;
+    const companyId = req.user?.companyId;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { company: true }
-    });
-
-    if (!user || !user.companyId) {
+    if (!companyId) {
       return res.status(404).json({ error: 'Company not found' });
     }
 
     const profile = await prisma.companyProfile.findFirst({
       where: {
         id: profileId,
-        companyId: user.companyId
+        companyId
       }
     });
 
