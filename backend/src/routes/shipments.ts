@@ -510,7 +510,6 @@ router.post('/:id/assign-boxes',
         rackId,
         status: 'IN_STORAGE',
         assignedAt: new Date(),
-        photos: photoUrls.length > 0 ? JSON.stringify(photoUrls) : null,
       },
     });
 
