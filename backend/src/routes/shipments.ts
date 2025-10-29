@@ -285,7 +285,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
 
     if (data.companyProfileId) {
       const profile = await prisma.companyProfile.findFirst({
-        where: { id: data.companyProfileId, companyId },
+        where: { id: data.companyProfileId, companyId, isActive: true },
         select: { id: true, name: true },
       });
 
@@ -295,6 +295,28 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
 
       companyProfileId = profile.id;
       companyProfileName = profile.name;
+    }
+
+    let normalizedWarehouseData: string | null = null;
+
+    if (data.warehouseData) {
+      try {
+        const parsedWarehouse = typeof data.warehouseData === 'string' ? JSON.parse(data.warehouseData) : data.warehouseData;
+        parsedWarehouse.palletCount = palletCount;
+        parsedWarehouse.boxesPerPallet = boxesPerPallet;
+        parsedWarehouse.totalBoxes = totalBoxCount;
+        normalizedWarehouseData = JSON.stringify(parsedWarehouse);
+      } catch (warehouseParseError) {
+        normalizedWarehouseData = typeof data.warehouseData === 'string'
+          ? data.warehouseData
+          : JSON.stringify(data.warehouseData);
+      }
+    } else if (data.isWarehouseShipment) {
+      normalizedWarehouseData = JSON.stringify({
+        palletCount,
+        boxesPerPallet,
+        totalBoxes: totalBoxCount,
+      });
     }
 
     // 🚀 FETCH SHIPMENT SETTINGS
@@ -325,25 +347,21 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
 
     // Generate master QR code for shipment using settings prefix
     const qrPrefix = settings.autoGenerateQR ? settings.qrCodePrefix : 'QR-SH';
-    const qrBaseSegments = [`${qrPrefix}-${Date.now()}`];
-    if (palletCount && palletCount > 0) {
-      qrBaseSegments.push(`P${palletCount}`);
-    }
-    if (boxesPerPallet && boxesPerPallet > 0) {
-      qrBaseSegments.push(`B${boxesPerPallet}`);
-    }
-    qrBaseSegments.push(`T${totalBoxCount}`);
-    const masterQR = qrBaseSegments.join('-');
+    const qrTimestamp = Date.now();
+    const qrBase = `${qrPrefix}-${qrTimestamp}`;
+  const qrMetaSegments = [`P${palletCount}`, `B${boxesPerPallet}`, `T${totalBoxCount}`];
+  const masterQR = [qrBase, ...qrMetaSegments].join('-');
 
     // 🚀 USE DEFAULT STORAGE TYPE FROM SETTINGS IF NOT PROVIDED
     const shipmentType = data.type || settings.defaultStorageType;
 
     const normalizedCustomerName = data.customerName || companyProfileName || data.clientName || null;
+    const referenceId = data.referenceId || `SH-${qrTimestamp}`;
 
     const shipment = await prisma.shipment.create({
       data: {
         name: data.name || `Shipment for ${data.clientName || companyProfileName || 'Client'}`,
-        referenceId: data.referenceId || `SH-${Date.now()}`,
+        referenceId,
         originalBoxCount,
         currentBoxCount,
         palletCount,
@@ -371,6 +389,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
         origin: data.origin,
         destination: data.destination,
         customerName: normalizedCustomerName,
+        warehouseData: normalizedWarehouseData,
       },
       include: {
         companyProfile: {
@@ -382,14 +401,23 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
     // ✅ CREATE INDIVIDUAL QR CODES FOR EACH BOX
     const boxesToCreate = [];
     for (let i = 1; i <= totalBoxCount; i++) {
+      const palletNumber = Math.ceil(i / boxesPerPallet);
       boxesToCreate.push({
         shipmentId: shipment.id,
         boxNumber: i,
-        qrCode: `${masterQR}-BOX-${i}-OF-${totalBoxCount}`,
+        qrCode: `${masterQR}-BOX-${i}-OF-${totalBoxCount}-PAL-${palletNumber}`,
         rackId: data.rackId || null, // Assign to rack if provided
         status: data.rackId ? 'IN_STORAGE' : 'PENDING', // ✅ PENDING if no rack, IN_STORAGE if rack assigned
         assignedAt: data.rackId ? new Date() : null,
         companyId,
+        pieceQR: JSON.stringify({
+          masterQRCode: masterQR,
+          boxNumber: i,
+          palletNumber,
+          palletCount,
+          boxesPerPallet,
+          totalBoxes: totalBoxCount,
+        }),
       });
     }
 
@@ -425,7 +453,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
           userId: req.user!.id,
           companyId,
           activityType: 'ASSIGN',
-          itemDetails: `Shipment ${shipment.referenceId} - ${totalBoxCount} boxes${palletCount && palletCount > 0 ? ` (${palletCount} pallets)` : ''}`,
+          itemDetails: `Shipment ${shipment.referenceId} - ${totalBoxCount} boxes (${palletCount} pallets x ${boxesPerPallet} boxes)`,
           quantityAfter: totalBoxCount,
         },
       });
