@@ -30,8 +30,15 @@ const moving_jobs_1 = __importDefault(require("./routes/moving-jobs"));
 const materials_1 = __importDefault(require("./routes/materials"));
 const reports_1 = __importDefault(require("./routes/reports"));
 const plugins_1 = __importDefault(require("./routes/plugins"));
-// Load environment variables FIRST
-dotenv_1.default.config();
+const job_files_1 = __importDefault(require("./routes/job-files")); // NEW: Job file uploads
+// NEW: Enhanced warehouse routes
+const shipment_items_1 = __importDefault(require("./routes/shipment-items"));
+const customer_materials_1 = __importDefault(require("./routes/customer-materials"));
+const worker_dashboard_1 = __importDefault(require("./routes/worker-dashboard"));
+const categories_1 = __importDefault(require("./routes/categories")); // NEW: Category management
+const companies_1 = __importDefault(require("./routes/companies")); // NEW: Company profiles management
+// Load environment variables FIRST (but allow env vars to override .env)
+dotenv_1.default.config({ override: false });
 // Initialize Express app
 const app = (0, express_1.default)();
 const prisma = new client_1.PrismaClient();
@@ -52,7 +59,7 @@ app.use((req, res, next) => {
     next();
 });
 // Serve static files for uploads
-app.use('/uploads', express_1.default.static('public/uploads'));
+app.use('/uploads', express_1.default.static('uploads'));
 // Basic health check route
 app.get('/api/health', (req, res) => {
     res.json({
@@ -81,9 +88,17 @@ app.use('/api/template-settings', templates_1.default);
 app.use('/api/upload', upload_1.default);
 app.use('/api/permissions', permissions_1.default);
 app.use('/api/moving-jobs', moving_jobs_1.default);
+// app.use('/api/jobs', jobsRoutes); // REMOVED: Duplicate of moving-jobs
 app.use('/api/materials', materials_1.default);
 app.use('/api/reports', reports_1.default);
 app.use('/api/plugins', plugins_1.default);
+app.use('/api/job-files', job_files_1.default); // NEW: Job file management
+app.use('/api/categories', categories_1.default); // NEW: Category management
+app.use('/api/company-profiles', companies_1.default); // NEW: Company profiles (DIOR, JAZEERA, etc)
+// NEW: Enhanced warehouse routes
+app.use('/api', shipment_items_1.default); // Handles /api/shipments/:id/items
+app.use('/api', customer_materials_1.default); // Handles /api/customers/*
+app.use('/api', worker_dashboard_1.default); // Handles /api/worker/*
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ error: 'Route not found' });

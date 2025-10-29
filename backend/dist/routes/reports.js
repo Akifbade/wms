@@ -174,4 +174,113 @@ router.get("/material-costs", auth_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: "Failed to generate report" });
     }
 });
+/**
+ * GET /api/reports/damages
+ * Get comprehensive damage report with photos and job details
+ */
+router.get("/damages", auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { companyId } = req.user;
+        const { startDate, endDate, materialId } = req.query;
+        // Build where clause
+        const where = { companyId };
+        if (startDate || endDate) {
+            where.recordedAt = {};
+            if (startDate)
+                where.recordedAt.gte = new Date(startDate);
+            if (endDate)
+                where.recordedAt.lte = new Date(endDate);
+        }
+        if (materialId) {
+            where.materialId = materialId;
+        }
+        // Get all damage records with full details
+        const damageRecords = await prisma.materialDamage.findMany({
+            where,
+            include: {
+                material: {
+                    select: {
+                        id: true,
+                        sku: true,
+                        name: true,
+                        unit: true
+                    }
+                },
+                return: {
+                    include: {
+                        issue: {
+                            include: {
+                                job: {
+                                    select: {
+                                        jobCode: true,
+                                        jobTitle: true,
+                                        jobAddress: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                recordedBy: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                }
+            },
+            orderBy: { recordedAt: 'desc' }
+        });
+        // Transform data for frontend
+        const damages = damageRecords.map((damage) => {
+            // Get unit cost from the issue to calculate estimated value
+            const issue = damage.return?.issue;
+            const unitCost = issue?.unitCost || 0;
+            return {
+                id: damage.id,
+                material: {
+                    sku: damage.material.sku,
+                    name: damage.material.name,
+                    unit: damage.material.unit
+                },
+                quantity: damage.quantity,
+                reason: damage.reason,
+                photoUrls: damage.photoUrls ? damage.photoUrls.split(',').filter((url) => url.trim()) : [],
+                recordedAt: damage.recordedAt,
+                job: {
+                    jobCode: issue?.job?.jobCode || 'N/A',
+                    jobTitle: issue?.job?.jobTitle || 'N/A',
+                    jobAddress: issue?.job?.jobAddress || 'N/A'
+                },
+                recordedBy: {
+                    name: damage.recordedBy?.name || 'System'
+                },
+                estimatedValue: damage.quantity * unitCost
+            };
+        });
+        // Calculate summary
+        const totalItems = damages.reduce((sum, d) => sum + d.quantity, 0);
+        const totalValue = damages.reduce((sum, d) => sum + d.estimatedValue, 0);
+        // Find most damaged material
+        const materialDamageCounts = damages.reduce((acc, d) => {
+            const key = d.material.name;
+            acc[key] = (acc[key] || 0) + d.quantity;
+            return acc;
+        }, {});
+        const mostDamagedMaterial = Object.entries(materialDamageCounts).length > 0
+            ? Object.entries(materialDamageCounts).sort((a, b) => b[1] - a[1])[0][0]
+            : 'N/A';
+        const recentDamageDate = damages.length > 0 ? damages[0].recordedAt : new Date();
+        const summary = {
+            totalItems,
+            totalValue,
+            mostDamagedMaterial,
+            recentDamageDate
+        };
+        res.json({ damages, summary });
+    }
+    catch (error) {
+        console.error("Error fetching damage report:", error);
+        res.status(500).json({ error: "Failed to fetch damage report" });
+    }
+});
 exports.default = router;

@@ -11,7 +11,7 @@ const router = express_1.default.Router();
 // Configure multer storage
 const storage = multer_1.default.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'public/uploads/logos');
+        cb(null, 'uploads/logos');
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);

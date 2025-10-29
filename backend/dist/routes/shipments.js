@@ -1,13 +1,56 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const client_1 = require("@prisma/client");
 const auth_1 = require("../middleware/auth");
 const zod_1 = require("zod");
+const multer_1 = __importDefault(require("multer"));
+const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
+const parseOptionalInt = (value) => {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+    const parsed = typeof value === 'number' ? Math.trunc(value) : parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+};
 // Apply authentication to all routes
 router.use(auth_1.authenticateToken);
+// Configure multer for shipment photo uploads
+const photoStorage = multer_1.default.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = 'uploads/shipments';
+        if (!fs_1.default.existsSync(uploadDir)) {
+            fs_1.default.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path_1.default.extname(file.originalname);
+        cb(null, `shipment-${uniqueSuffix}${ext}`);
+    }
+});
+const photoUpload = (0, multer_1.default)({
+    storage: photoStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max per photo
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|webp/;
+        const extname = allowedTypes.test(path_1.default.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        if (mimetype && extname) {
+            cb(null, true);
+        }
+        else {
+            cb(new Error('Only image files allowed (JPEG, PNG, WebP)'));
+        }
+    }
+});
 // Validation schema
 const shipmentSchema = zod_1.z.object({
     name: zod_1.z.string().min(2),
@@ -17,11 +60,25 @@ const shipmentSchema = zod_1.z.object({
     clientName: zod_1.z.string().optional(),
     clientPhone: zod_1.z.string().optional(),
     rackId: zod_1.z.string().optional(),
+    arrivalDate: zod_1.z.union([zod_1.z.string(), zod_1.z.date()]).optional(),
+    companyProfileId: zod_1.z.string().optional(),
+    palletCount: zod_1.z.number().int().positive().optional(),
+    boxesPerPallet: zod_1.z.number().int().positive().optional(),
+    // NEW: Enhanced warehouse fields
+    category: zod_1.z.enum(['CUSTOMER_STORAGE', 'AIRPORT_CARGO', 'WAREHOUSE_STOCK']).optional(),
+    awbNumber: zod_1.z.string().optional(),
+    flightNumber: zod_1.z.string().optional(),
+    origin: zod_1.z.string().optional(),
+    destination: zod_1.z.string().optional(),
+    customerName: zod_1.z.string().optional(),
+    shipper: zod_1.z.string().optional(),
+    consignee: zod_1.z.string().optional(),
+    isWarehouseShipment: zod_1.z.boolean().optional(),
 });
 // Get all shipments
 router.get('/', async (req, res) => {
     try {
-        const { status, search, isWarehouseShipment, page = '1', limit = '50' } = req.query;
+        const { status, search, isWarehouseShipment, category, customerName, page = '1', limit = '50' } = req.query;
         const companyId = req.user.companyId;
         const where = { companyId };
         if (status) {
@@ -30,30 +87,47 @@ router.get('/', async (req, res) => {
         if (isWarehouseShipment !== undefined) {
             where.isWarehouseShipment = isWarehouseShipment === 'true';
         }
+        // NEW: Category filter
+        if (category && category !== 'all') {
+            where.category = category;
+        }
+        // NEW: Customer name filter
+        if (customerName) {
+            where.customerName = { contains: customerName };
+        }
         if (search) {
             where.OR = [
                 { name: { contains: search } },
                 { referenceId: { contains: search } },
                 { clientName: { contains: search } },
+                { customerName: { contains: search } },
+                { shipper: { contains: search } },
+                { awbNumber: { contains: search } },
             ];
         }
         const [shipments, total] = await Promise.all([
             prisma.shipment.findMany({
                 where,
                 include: {
-                    rack: {
-                        select: {
-                            id: true,
-                            code: true,
-                            location: true,
-                        },
-                    },
                     boxes: {
                         select: {
                             id: true,
                             boxNumber: true,
                             status: true,
                             rackId: true,
+                            rack: {
+                                select: {
+                                    id: true,
+                                    code: true,
+                                    location: true,
+                                },
+                            },
+                        },
+                    },
+                    companyProfile: {
+                        select: {
+                            id: true,
+                            name: true,
                         },
                     },
                 },
@@ -109,7 +183,6 @@ router.get('/:id', async (req, res) => {
         const shipment = await prisma.shipment.findFirst({
             where: { id, companyId },
             include: {
-                rack: true,
                 boxes: {
                     include: {
                         rack: {
@@ -123,6 +196,12 @@ router.get('/:id', async (req, res) => {
                 },
                 withdrawals: {
                     orderBy: { withdrawalDate: 'desc' },
+                },
+                companyProfile: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
                 },
             },
         });
@@ -156,7 +235,36 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         const data = req.body;
         const companyId = req.user.companyId;
         const userId = req.user.id;
-        const totalBoxCount = data.totalBoxCount || data.originalBoxCount;
+        const palletCount = parseOptionalInt(data.palletCount);
+        const boxesPerPallet = parseOptionalInt(data.boxesPerPallet);
+        const providedOriginalBoxCount = parseOptionalInt(data.originalBoxCount);
+        const computedBoxCount = palletCount && boxesPerPallet ? palletCount * boxesPerPallet : null;
+        const originalBoxCount = providedOriginalBoxCount ?? computedBoxCount;
+        if (!originalBoxCount || originalBoxCount <= 0) {
+            return res.status(400).json({ error: 'Box count must be greater than zero' });
+        }
+        const totalBoxCount = parseOptionalInt(data.totalBoxCount) ?? originalBoxCount;
+        const currentBoxCount = parseOptionalInt(data.currentBoxCount) ?? totalBoxCount;
+        let arrivalDate = new Date();
+        if (data.arrivalDate) {
+            const parsedArrival = new Date(data.arrivalDate);
+            if (!Number.isNaN(parsedArrival.getTime())) {
+                arrivalDate = parsedArrival;
+            }
+        }
+        let companyProfileId = null;
+        let companyProfileName = null;
+        if (data.companyProfileId) {
+            const profile = await prisma.companyProfile.findFirst({
+                where: { id: data.companyProfileId, companyId },
+                select: { id: true, name: true },
+            });
+            if (!profile) {
+                return res.status(400).json({ error: 'Selected company profile is not available' });
+            }
+            companyProfileId = profile.id;
+            companyProfileName = profile.name;
+        }
         // 🚀 FETCH SHIPMENT SETTINGS
         let settings = await prisma.shipmentSettings.findUnique({
             where: { companyId }
@@ -182,15 +290,26 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         }
         // Generate master QR code for shipment using settings prefix
         const qrPrefix = settings.autoGenerateQR ? settings.qrCodePrefix : 'QR-SH';
-        const masterQR = `${qrPrefix}-${Date.now()}`;
+        const qrBaseSegments = [`${qrPrefix}-${Date.now()}`];
+        if (palletCount && palletCount > 0) {
+            qrBaseSegments.push(`P${palletCount}`);
+        }
+        if (boxesPerPallet && boxesPerPallet > 0) {
+            qrBaseSegments.push(`B${boxesPerPallet}`);
+        }
+        qrBaseSegments.push(`T${totalBoxCount}`);
+        const masterQR = qrBaseSegments.join('-');
         // 🚀 USE DEFAULT STORAGE TYPE FROM SETTINGS IF NOT PROVIDED
         const shipmentType = data.type || settings.defaultStorageType;
+        const normalizedCustomerName = data.customerName || companyProfileName || data.clientName || null;
         const shipment = await prisma.shipment.create({
             data: {
-                name: data.name || `Shipment for ${data.clientName}`,
+                name: data.name || `Shipment for ${data.clientName || companyProfileName || 'Client'}`,
                 referenceId: data.referenceId || `SH-${Date.now()}`,
-                originalBoxCount: totalBoxCount,
-                currentBoxCount: data.currentBoxCount || totalBoxCount,
+                originalBoxCount,
+                currentBoxCount,
+                palletCount,
+                boxesPerPallet,
                 type: shipmentType, // 🚀 FROM SETTINGS
                 clientName: data.clientName,
                 clientPhone: data.clientPhone,
@@ -198,16 +317,28 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                 description: data.description,
                 estimatedValue: data.estimatedValue,
                 notes: data.notes,
-                rackId: data.rackId,
                 companyId,
+                companyProfileId,
                 qrCode: masterQR,
-                arrivalDate: new Date(),
-                status: data.rackId ? 'IN_STORAGE' : 'PENDING', // ✅ PENDING if no rack, IN_STORAGE if rack assigned
+                arrivalDate,
+                status: 'PENDING', // All shipments start as PENDING
                 createdById: userId, // User ID who created
-                assignedById: data.rackId ? userId : null, // Track who assigned if rack is provided
-                assignedAt: data.rackId ? new Date() : null,
+                // Warehouse fields
+                isWarehouseShipment: data.isWarehouseShipment || false,
+                shipper: data.shipper,
+                consignee: data.consignee,
+                category: data.category || 'CUSTOMER_STORAGE',
+                awbNumber: data.awbNumber,
+                flightNumber: data.flightNumber,
+                origin: data.origin,
+                destination: data.destination,
+                customerName: normalizedCustomerName,
             },
-            include: { rack: true },
+            include: {
+                companyProfile: {
+                    select: { id: true, name: true },
+                },
+            },
         });
         // ✅ CREATE INDIVIDUAL QR CODES FOR EACH BOX
         const boxesToCreate = [];
@@ -215,7 +346,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
             boxesToCreate.push({
                 shipmentId: shipment.id,
                 boxNumber: i,
-                qrCode: `${masterQR}-BOX-${i}`,
+                qrCode: `${masterQR}-BOX-${i}-OF-${totalBoxCount}`,
                 rackId: data.rackId || null, // Assign to rack if provided
                 status: data.rackId ? 'IN_STORAGE' : 'PENDING', // ✅ PENDING if no rack, IN_STORAGE if rack assigned
                 assignedAt: data.rackId ? new Date() : null,
@@ -230,7 +361,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
             await prisma.rack.update({
                 where: { id: data.rackId },
                 data: {
-                    capacityUsed: { increment: data.originalBoxCount },
+                    capacityUsed: { increment: totalBoxCount },
                     lastActivity: new Date(),
                 },
             });
@@ -241,7 +372,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                     companyId,
                     itemType: 'SHIPMENT',
                     itemId: shipment.id,
-                    quantityCurrent: data.originalBoxCount,
+                    quantityCurrent: totalBoxCount,
                 },
             });
             // Log activity
@@ -251,8 +382,8 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                     userId: req.user.id,
                     companyId,
                     activityType: 'ASSIGN',
-                    itemDetails: `Shipment ${data.referenceId} - ${data.originalBoxCount} boxes`,
-                    quantityAfter: data.originalBoxCount,
+                    itemDetails: `Shipment ${shipment.referenceId} - ${totalBoxCount} boxes${palletCount && palletCount > 0 ? ` (${palletCount} pallets)` : ''}`,
+                    quantityAfter: totalBoxCount,
                 },
             });
         }
@@ -274,36 +405,100 @@ router.put('/:id', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, r
         const userId = req.user.id;
         const existing = await prisma.shipment.findFirst({
             where: { id, companyId },
-            include: { rack: true }
         });
         if (!existing) {
             return res.status(404).json({ error: 'Shipment not found' });
         }
-        // If shipment is being RELEASED, clear the rack assignment
-        const updateData = {
-            ...req.body
-        };
-        if (req.body.status === 'RELEASED' && existing.rackId) {
-            updateData.rackId = null; // Remove from rack
-            updateData.releasedAt = new Date();
-            updateData.releasedById = userId; // Track who released
-            // Update rack capacity (decrease by released boxes)
-            const boxesToRelease = req.body.currentBoxCount !== undefined
-                ? existing.currentBoxCount - req.body.currentBoxCount
-                : existing.currentBoxCount;
-            await prisma.rack.update({
-                where: { id: existing.rackId },
-                data: {
-                    capacityUsed: {
-                        decrement: boxesToRelease
-                    }
+        // Update shipment data - extract only valid Shipment fields
+        const { name, referenceId, originalBoxCount, currentBoxCount, type, arrivalDate, clientName, clientPhone, clientEmail, description, estimatedValue, notes, status, assignedAt, releasedAt, storageCharge, isWarehouseShipment, warehouseData, shipper, consignee, category, awbNumber, flightNumber, origin, destination, customerName, companyProfileId, palletCount, boxesPerPallet, } = req.body;
+        const updateData = {};
+        // Only include fields that are provided and valid
+        if (name !== undefined)
+            updateData.name = name;
+        if (referenceId !== undefined)
+            updateData.referenceId = referenceId;
+        if (originalBoxCount !== undefined)
+            updateData.originalBoxCount = originalBoxCount;
+        if (currentBoxCount !== undefined)
+            updateData.currentBoxCount = currentBoxCount;
+        if (type !== undefined)
+            updateData.type = type;
+        if (arrivalDate !== undefined)
+            updateData.arrivalDate = new Date(arrivalDate);
+        if (clientName !== undefined)
+            updateData.clientName = clientName;
+        if (clientPhone !== undefined)
+            updateData.clientPhone = clientPhone;
+        if (clientEmail !== undefined)
+            updateData.clientEmail = clientEmail;
+        if (description !== undefined)
+            updateData.description = description;
+        if (estimatedValue !== undefined)
+            updateData.estimatedValue = estimatedValue;
+        if (notes !== undefined)
+            updateData.notes = notes;
+        if (status !== undefined)
+            updateData.status = status;
+        if (assignedAt !== undefined)
+            updateData.assignedAt = assignedAt;
+        if (releasedAt !== undefined)
+            updateData.releasedAt = releasedAt;
+        if (storageCharge !== undefined)
+            updateData.storageCharge = storageCharge;
+        if (isWarehouseShipment !== undefined)
+            updateData.isWarehouseShipment = isWarehouseShipment;
+        if (warehouseData !== undefined)
+            updateData.warehouseData = warehouseData;
+        if (shipper !== undefined)
+            updateData.shipper = shipper;
+        if (consignee !== undefined)
+            updateData.consignee = consignee;
+        if (category !== undefined)
+            updateData.category = category;
+        if (awbNumber !== undefined)
+            updateData.awbNumber = awbNumber;
+        if (flightNumber !== undefined)
+            updateData.flightNumber = flightNumber;
+        if (origin !== undefined)
+            updateData.origin = origin;
+        if (destination !== undefined)
+            updateData.destination = destination;
+        if (customerName !== undefined)
+            updateData.customerName = customerName;
+        if (companyProfileId !== undefined) {
+            if (!companyProfileId) {
+                updateData.companyProfileId = null;
+            }
+            else {
+                const profile = await prisma.companyProfile.findFirst({
+                    where: { id: companyProfileId, companyId },
+                    select: { id: true, name: true },
+                });
+                if (!profile) {
+                    return res.status(400).json({ error: 'Selected company profile is not available' });
                 }
-            });
+                updateData.companyProfileId = profile.id;
+                if (customerName === undefined && !existing.customerName) {
+                    updateData.customerName = profile.name;
+                }
+            }
         }
+        if (palletCount !== undefined)
+            updateData.palletCount = parseOptionalInt(palletCount);
+        if (boxesPerPallet !== undefined)
+            updateData.boxesPerPallet = parseOptionalInt(boxesPerPallet);
+        updateData.updatedAt = new Date();
         const shipment = await prisma.shipment.update({
             where: { id },
             data: updateData,
-            include: { rack: true },
+            include: {
+                companyProfile: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+            },
         });
         res.json({ shipment });
     }
@@ -340,20 +535,28 @@ router.get('/:id/boxes', async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
-// Assign boxes to rack (for scanner & manual)
-router.post('/:id/assign-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), async (req, res) => {
+// Assign boxes to rack (for scanner & manual) with optional photos
+router.post('/:id/assign-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), photoUpload.array('photos', 10), // Up to 10 photos
+async (req, res) => {
     try {
         const { id } = req.params;
-        const { rackId, boxNumbers } = req.body; // boxNumbers = [1,2,3]
+        const { rackId, boxNumbers } = req.body; // boxNumbers = JSON string "[1,2,3]"
         const companyId = req.user.companyId;
-        if (!rackId || !boxNumbers || boxNumbers.length === 0) {
+        const uploadedFiles = req.files;
+        if (!rackId || !boxNumbers) {
             return res.status(400).json({ error: 'Rack ID and box numbers required' });
         }
-        // Update boxes
+        const parsedBoxNumbers = JSON.parse(boxNumbers);
+        if (parsedBoxNumbers.length === 0) {
+            return res.status(400).json({ error: 'At least one box number required' });
+        }
+        // Prepare photo URLs
+        const photoUrls = uploadedFiles?.map(file => `/uploads/shipments/${file.filename}`) || [];
+        // Update boxes with photos
         await prisma.shipmentBox.updateMany({
             where: {
                 shipmentId: id,
-                boxNumber: { in: boxNumbers },
+                boxNumber: { in: parsedBoxNumbers },
                 companyId,
             },
             data: {
@@ -366,7 +569,7 @@ router.post('/:id/assign-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 
         await prisma.rack.update({
             where: { id: rackId },
             data: {
-                capacityUsed: { increment: boxNumbers.length },
+                capacityUsed: { increment: parsedBoxNumbers.length },
                 lastActivity: new Date(),
             },
         });
@@ -393,11 +596,16 @@ router.post('/:id/assign-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 
                 userId: req.user.id,
                 companyId,
                 activityType: 'ASSIGN',
-                itemDetails: `${boxNumbers.length} boxes from shipment ${id}`,
-                quantityAfter: boxNumbers.length,
+                itemDetails: `${parsedBoxNumbers.length} boxes from shipment ${id}${photoUrls.length > 0 ? ` (${photoUrls.length} photos)` : ''}`,
+                quantityAfter: parsedBoxNumbers.length,
             },
         });
-        res.json({ success: true, assigned: boxNumbers.length });
+        res.json({
+            success: true,
+            assigned: parsedBoxNumbers.length,
+            photosUploaded: photoUrls.length,
+            photoUrls
+        });
     }
     catch (error) {
         console.error('Assign boxes error:', error);
@@ -568,6 +776,67 @@ router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     }
     catch (error) {
         console.error('Delete shipment error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+// Cleanup test/mock data - ADMIN ONLY
+router.post('/cleanup/test-data', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const { confirmText } = req.body;
+        // Safety check - must type "DELETE TEST DATA" to confirm
+        if (confirmText !== 'DELETE TEST DATA') {
+            return res.status(400).json({
+                error: 'Confirmation text incorrect. Please type "DELETE TEST DATA" to confirm.'
+            });
+        }
+        // Find shipments with test/demo indicators (case-insensitive via SQL)
+        const testShipments = await prisma.$queryRaw `
+      SELECT id, referenceId, clientName, shipper, consignee 
+      FROM shipments 
+      WHERE companyId = ${companyId}
+      AND (
+        LOWER(referenceId) LIKE '%test%' OR 
+        LOWER(referenceId) LIKE '%demo%' OR 
+        LOWER(referenceId) LIKE '%mock%' OR
+        LOWER(clientName) LIKE '%test%' OR 
+        LOWER(clientName) LIKE '%demo%' OR
+        LOWER(shipper) LIKE '%test%' OR 
+        LOWER(shipper) LIKE '%demo%' OR
+        LOWER(consignee) LIKE '%test%' OR 
+        LOWER(consignee) LIKE '%demo%'
+      )
+    `;
+        if (testShipments.length === 0) {
+            return res.json({
+                message: 'No test data found to delete.',
+                deleted: 0
+            });
+        }
+        const shipmentIds = testShipments.map((s) => s.id);
+        // Delete related boxes first
+        const deletedBoxes = await prisma.$executeRaw `
+      DELETE FROM boxes WHERE shipmentId IN (${shipmentIds.join(',')})
+    `;
+        // Delete shipments
+        const deletedShipments = await prisma.$executeRaw `
+      DELETE FROM shipments WHERE id IN (${shipmentIds.join(',')})
+    `;
+        res.json({
+            message: 'Test data deleted successfully',
+            deleted: testShipments.length,
+            deletedBoxes,
+            shipments: testShipments.map((s) => ({
+                id: s.id,
+                referenceId: s.referenceId,
+                clientName: s.clientName,
+                shipper: s.shipper,
+                consignee: s.consignee,
+            })),
+        });
+    }
+    catch (error) {
+        console.error('Cleanup test data error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

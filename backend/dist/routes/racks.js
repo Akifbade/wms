@@ -12,6 +12,11 @@ const rackSchema = zod_1.z.object({
     rackType: zod_1.z.enum(['STORAGE', 'MATERIALS', 'EQUIPMENT']).optional(),
     location: zod_1.z.string().optional(),
     capacityTotal: zod_1.z.number().positive().optional(),
+    categoryId: zod_1.z.string().optional(), // NEW: Category reference
+    length: zod_1.z.number().positive().optional(),
+    width: zod_1.z.number().positive().optional(),
+    height: zod_1.z.number().positive().optional(),
+    dimensionUnit: zod_1.z.enum(['CM', 'INCHES', 'METERS']).optional(),
 });
 // Get all racks
 router.get('/', async (req, res) => {
@@ -29,24 +34,45 @@ router.get('/', async (req, res) => {
             where,
             include: {
                 inventory: true,
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        logo: true,
+                        color: true,
+                        icon: true,
+                    },
+                },
+                boxes: {
+                    where: {
+                        status: { in: ['IN_STORAGE', 'STORED'] } // Only count stored boxes
+                    },
+                    select: {
+                        id: true,
+                        shipmentId: true,
+                        status: true,
+                    },
+                },
                 _count: {
                     select: {
-                        shipments: {
-                            where: { status: 'IN_STORAGE' } // Count only active shipments, exclude RELEASED
-                        },
                         activities: true,
                     },
                 },
             },
             orderBy: { code: 'asc' },
         });
-        // Calculate utilization
-        const racksWithStats = racks.map((rack) => ({
-            ...rack,
-            utilization: rack.capacityTotal > 0
-                ? Math.round((rack.capacityUsed / rack.capacityTotal) * 100)
-                : 0,
-        }));
+        // Calculate utilization based on actual stored boxes
+        const racksWithStats = racks.map((rack) => {
+            const actualCapacityUsed = rack.boxes?.filter((box) => box.status === 'IN_STORAGE' || box.status === 'STORED').length || 0;
+            return {
+                ...rack,
+                capacityUsed: actualCapacityUsed, // Override with actual count
+                utilization: rack.capacityTotal > 0
+                    ? Math.round((actualCapacityUsed / rack.capacityTotal) * 100)
+                    : 0,
+                status: actualCapacityUsed >= rack.capacityTotal ? 'FULL' : 'ACTIVE',
+            };
+        });
         res.json({ racks: racksWithStats });
     }
     catch (error) {
@@ -63,16 +89,29 @@ router.get('/:id', async (req, res) => {
             where: { id, companyId },
             include: {
                 inventory: true,
-                shipments: {
-                    where: {
-                        status: 'IN_STORAGE' // Only show shipments currently in storage, exclude RELEASED
-                    },
+                category: {
                     select: {
                         id: true,
-                        referenceId: true,
-                        clientName: true,
-                        currentBoxCount: true,
-                        status: true,
+                        name: true,
+                        logo: true,
+                        color: true,
+                        icon: true,
+                    },
+                },
+                boxes: {
+                    where: {
+                        status: { in: ['IN_STORAGE', 'STORED'] } // Only show boxes currently in storage
+                    },
+                    include: {
+                        shipment: {
+                            select: {
+                                id: true,
+                                referenceId: true,
+                                shipper: true,
+                                consignee: true,
+                                status: true,
+                            },
+                        },
                     },
                 },
                 activities: {
@@ -92,7 +131,17 @@ router.get('/:id', async (req, res) => {
         if (!rack) {
             return res.status(404).json({ error: 'Rack not found' });
         }
-        res.json({ rack });
+        // Calculate actual capacity used
+        const actualCapacityUsed = rack.boxes?.filter((box) => box.status === 'IN_STORAGE' || box.status === 'STORED').length || 0;
+        const rackWithStats = {
+            ...rack,
+            capacityUsed: actualCapacityUsed,
+            utilization: rack.capacityTotal > 0
+                ? Math.round((actualCapacityUsed / rack.capacityTotal) * 100)
+                : 0,
+            status: actualCapacityUsed >= rack.capacityTotal ? 'FULL' : 'ACTIVE',
+        };
+        res.json({ rack: rackWithStats });
     }
     catch (error) {
         console.error('Get rack error:', error);
@@ -114,14 +163,44 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         if (existing) {
             return res.status(400).json({ error: 'Rack code already exists' });
         }
+        // Validate categoryId if provided
+        if (data.categoryId) {
+            const category = await prisma.category.findFirst({
+                where: {
+                    id: data.categoryId,
+                    companyId,
+                },
+            });
+            if (!category) {
+                return res.status(404).json({ error: 'Category not found' });
+            }
+        }
         const rack = await prisma.rack.create({
             data: {
-                ...data,
+                code: data.code,
+                rackType: data.rackType || 'STORAGE',
+                location: data.location,
+                categoryId: data.categoryId,
+                length: data.length,
+                width: data.width,
+                height: data.height,
+                dimensionUnit: data.dimensionUnit,
                 companyId,
                 qrCode: `QR-${data.code}`,
                 capacityTotal: data.capacityTotal || 100,
                 capacityUsed: 0,
                 status: 'ACTIVE',
+            },
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        logo: true,
+                        color: true,
+                        icon: true,
+                    },
+                },
             },
         });
         res.status(201).json({ rack });
@@ -145,9 +224,32 @@ router.put('/:id', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, r
         if (!existing) {
             return res.status(404).json({ error: 'Rack not found' });
         }
+        // Validate categoryId if provided
+        if (req.body.categoryId) {
+            const category = await prisma.category.findFirst({
+                where: {
+                    id: req.body.categoryId,
+                    companyId,
+                },
+            });
+            if (!category) {
+                return res.status(404).json({ error: 'Category not found' });
+            }
+        }
         const rack = await prisma.rack.update({
             where: { id },
             data: req.body,
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        logo: true,
+                        color: true,
+                        icon: true,
+                    },
+                },
+            },
         });
         res.json({ rack });
     }
@@ -164,15 +266,17 @@ router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
         const existing = await prisma.rack.findFirst({
             where: { id, companyId },
             include: {
-                shipments: true,
+                boxes: {
+                    where: { status: 'IN_STORAGE' },
+                },
             },
         });
         if (!existing) {
             return res.status(404).json({ error: 'Rack not found' });
         }
-        if (existing.shipments.length > 0) {
+        if (existing.boxes.length > 0) {
             return res.status(400).json({
-                error: 'Cannot delete rack with active shipments'
+                error: 'Cannot delete rack with boxes in storage'
             });
         }
         await prisma.rack.delete({ where: { id } });
