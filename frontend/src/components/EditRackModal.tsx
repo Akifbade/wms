@@ -1,21 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { racksAPI } from '../services/api';
+import { racksAPI, categoriesAPI } from '../services/api';
 import QRCode from 'qrcode';
+
+interface Category {
+  id: string;
+  name: string;
+  logo: string;
+  color: string;
+}
 
 interface EditRackModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   rack: any;
+  companyId?: string;
 }
 
-export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: EditRackModalProps) {
+export default function EditRackModal({ isOpen, onClose, onSuccess, rack, companyId }: EditRackModalProps) {
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [formData, setFormData] = useState({
     code: '',
     location: '',
     rackType: 'STORAGE',
-    category: '',
+    categoryId: '',
     capacityTotal: 100,
     status: 'ACTIVE',
     length: '',
@@ -27,6 +36,24 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Load categories when modal opens and companyId changes
+  useEffect(() => {
+    if (isOpen && companyId) {
+      loadCategories();
+    }
+  }, [isOpen, companyId]);
+
+  const loadCategories = async () => {
+    try {
+      if (companyId) {
+        const data = await categoriesAPI.listByCompany(companyId);
+        setCategories(data);
+      }
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+    }
+  };
+
   useEffect(() => {
     if (isOpen && rack) {
       // Populate form with existing data
@@ -34,7 +61,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
         code: rack.code || '',
         location: rack.location || '',
         rackType: rack.rackType || 'STORAGE',
-        category: rack.category || '',
+        categoryId: rack.categoryId || '',
         capacityTotal: rack.capacityTotal || 100,
         status: rack.status || 'ACTIVE',
         length: rack.length || '',
@@ -125,7 +152,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
         length: formData.length ? parseFloat(formData.length as string) : null,
         width: formData.width ? parseFloat(formData.width as string) : null,
         height: formData.height ? parseFloat(formData.height as string) : null,
-        category: formData.category || null,
+        categoryId: formData.categoryId || null,
       };
 
       await racksAPI.update(rack.id, dataToSubmit);
@@ -250,19 +277,20 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
                   Category
                 </label>
                 <select
-                  name="category"
-                  value={formData.category}
+                  name="categoryId"
+                  value={formData.categoryId}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
                   <option value="">Select Category...</option>
-                  <option value="DIOR">Dior</option>
-                  <option value="COMPANY_MATERIAL">Company Material</option>
-                  <option value="JAZEERA">Jazeera</option>
-                  <option value="OTHERS">Others</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Line-wise categorization (optional)
+                  Assign to a category (optional)
                 </p>
               </div>
 

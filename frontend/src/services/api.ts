@@ -168,6 +168,61 @@ export const racksAPI = {
   },
 };
 
+// NEW: Categories API
+export const categoriesAPI = {
+  listByCompany: async (companyId: string) => {
+    const response = await apiCall<{ categories: any[] }>(`/categories/${companyId}`);
+    return response.categories;
+  },
+
+  getDetail: async (categoryId: string) => {
+    const response = await apiCall<{ category: any }>(`/categories/detail/${categoryId}`);
+    return response.category;
+  },
+
+  create: async (data: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/categories/`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: data,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  update: async (categoryId: string, data: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
+      method: 'PUT',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: data,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  delete: async (categoryId: string) => {
+    return apiCall<{ message: string }>(`/categories/${categoryId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Jobs API
 export const jobsAPI = {
   getAll: async (params?: { status?: string; search?: string; startDate?: string; endDate?: string }) => {
@@ -518,6 +573,7 @@ export default {
   dashboard: dashboardAPI,
   shipments: shipmentsAPI,
   racks: racksAPI,
+  categories: categoriesAPI,
   jobs: jobsAPI,
   billing: billingAPI,
   withdrawals: withdrawalsAPI,
