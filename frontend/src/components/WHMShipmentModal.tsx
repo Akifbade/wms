@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { racksAPI, shipmentsAPI } from '../services/api';
+import { racksAPI, shipmentsAPI, companiesAPI } from '../services/api';
 import { parseNumberInput, getSafeNumber } from '../utils/inputHelpers';
 
 interface WHMShipmentModalProps {
@@ -43,6 +43,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const [formData, setFormData] = useState({
     // Basic Info
     barcode: '',
+    companyProfileId: '',
     clientName: '',
     clientPhone: '',
     clientEmail: '',
@@ -51,6 +52,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     
     // Shipment Details
     pieces: 0,
+    palletCount: 1,
+    boxesPerPallet: 0,
     weight: 0,
     dimensions: '',
     description: '',
@@ -78,6 +81,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [racks, setRacks] = useState<Rack[]>([]);
+  const [companyProfiles, setCompanyProfiles] = useState<any[]>([]);
   const [pricing, setPricing] = useState<PricingSettings>({
     storageRate: 0.5,
     minimumCharge: 5.0,
@@ -121,7 +125,6 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     }
     return [];
   };
-  const [draggedSection, setDraggedSection] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -184,6 +187,22 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       setRacks(availableRacks);
     } catch (err: any) {
       console.error('Failed to load racks:', err);
+    }
+  };
+
+  const loadCompanyProfiles = async () => {
+    try {
+      const profiles = await companiesAPI.listProfiles();
+      if (Array.isArray(profiles)) {
+        setCompanyProfiles(profiles);
+      } else if (profiles && Array.isArray((profiles as any).profiles)) {
+        setCompanyProfiles((profiles as any).profiles);
+      } else {
+        setCompanyProfiles([]);
+      }
+    } catch (err) {
+      console.error('Failed to load company profiles:', err);
+      setCompanyProfiles([]);
     }
   };
 
