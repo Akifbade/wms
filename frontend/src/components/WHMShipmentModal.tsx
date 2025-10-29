@@ -34,6 +34,17 @@ interface Rack {
   status: string;
 }
 
+interface CompanyProfile {
+  id: string;
+  name: string;
+  description?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  logo?: string;
+  contractStatus?: string;
+  isActive?: boolean;
+}
+
 export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShipmentModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -81,7 +92,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [racks, setRacks] = useState<Rack[]>([]);
-  const [companyProfiles, setCompanyProfiles] = useState<any[]>([]);
+  const [companyProfiles, setCompanyProfiles] = useState<CompanyProfile[]>([]);
   const [pricing, setPricing] = useState<PricingSettings>({
     storageRate: 0.5,
     minimumCharge: 5.0,
@@ -194,12 +205,14 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const loadCompanyProfiles = async () => {
     try {
       const profiles = await companiesAPI.listProfiles();
-      const profileList = Array.isArray(profiles)
+      const profileListRaw = Array.isArray(profiles)
         ? profiles
         : profiles && Array.isArray((profiles as any).profiles)
           ? (profiles as any).profiles
           : [];
-      const activeProfiles = profileList.filter((profile: any) => profile?.isActive !== false);
+      const activeProfiles = (profileListRaw as CompanyProfile[]).filter(
+        (profile) => profile?.isActive !== false
+      );
       setCompanyProfiles(activeProfiles);
     } catch (err) {
       console.error('Failed to load company profiles:', err);
