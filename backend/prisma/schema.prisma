@@ -65,6 +65,7 @@ model Company {
   movingJobs        MovingJob[]
   expenses          Expense[]
   categories        Category[] // NEW: One-to-many with categories
+  companyProfiles   CompanyProfile[] // NEW: Customer/vendor company profiles (DIOR, JAZEERA, etc)
   invoiceSettings   InvoiceSettings?
   customFields      CustomField[]
   billingSettings   BillingSettings?
@@ -203,14 +204,38 @@ model Category {
   @@map("categories")
 }
 
+// Company Profiles (DIOR, JAZEERA, etc - Customer/Vendor companies)
+model CompanyProfile {
+  id               String   @id @default(cuid())
+  name             String   // e.g., "DIOR", "JAZEERA", "COMPANY_MATERIAL"
+  description      String?
+  logo             String?  // File path to logo
+  contactPerson    String?  // Contact person name
+  contactPhone     String?  // Contact phone number
+  contractStatus   String   @default("ACTIVE") // ACTIVE, INACTIVE, EXPIRED, PENDING
+  isActive         Boolean  @default(true)
+  companyId        String   // Parent company
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  racks            Rack[]   // One-to-many: Profile can have many racks assigned
+  shipments        Shipment[] // One-to-many: Shipments from/to this company profile
+
+  @@unique([name, companyId]) // Company profile name unique per company
+  @@map("company_profiles")
+}
+
 // Central Rack System (Core Integration Point)
 model Rack {
-  id            String    @id @default(cuid())
-  code          String // A1, A2, B1, etc.
-  qrCode        String    @unique
-  rackType      String    @default("STORAGE") // STORAGE, MATERIALS, EQUIPMENT
-  categoryId    String?   // NEW: FK to Category (instead of string category)
-  location      String?
+  id               String    @id @default(cuid())
+  code             String // A1, A2, B1, etc.
+  qrCode           String    @unique
+  rackType         String    @default("STORAGE") // STORAGE, MATERIALS, EQUIPMENT
+  categoryId       String?   // FK to Category (instead of string category)
+  companyProfileId String?   // NEW: FK to CompanyProfile (DIOR, JAZEERA, etc)
+  location         String?
   
   // Size/Dimensions
   length        Float?    // Length in meters/feet
@@ -228,12 +253,13 @@ model Rack {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  company        Company          @relation(fields: [companyId], references: [id])
-  category       Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull) // NEW: FK to Category
-  boxes          ShipmentBox[] // Individual boxes assigned
-  activities     RackActivity[]
-  inventory      RackInventory[]
-  materialLevels RackStockLevel[] @relation("RackMaterialLevels")
+  company           Company           @relation(fields: [companyId], references: [id])
+  category          Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull) // FK to Category
+  companyProfile    CompanyProfile?   @relation(fields: [companyProfileId], references: [id], onDelete: SetNull) // NEW: FK to CompanyProfile
+  boxes             ShipmentBox[] // Individual boxes assigned
+  activities        RackActivity[]
+  inventory         RackInventory[]
+  materialLevels    RackStockLevel[] @relation("RackMaterialLevels")
   MaterialReturn MaterialReturn[]
   jobMaterials   MaterialIssue[]  @relation("JobMaterialRack") // Materials assigned to jobs
   transfersFrom  MaterialTransfer[] @relation("TransferFromRack") // NEW: Transfers from this rack
@@ -320,21 +346,23 @@ model Shipment {
   consignee           String? // Receiver information for warehouse
 
   // NEW: Enhanced Warehouse Fields
-  category      String  @default("CUSTOMER_STORAGE") // CUSTOMER_STORAGE, AIRPORT_CARGO, WAREHOUSE_STOCK
-  awbNumber     String? // Air Waybill number for airport shipments
-  flightNumber  String? // Flight number for airport tracking
-  origin        String? // Origin airport/location
-  destination   String? // Destination airport/location
-  customerName  String? // Normalized customer name for grouping (e.g., "Dior", "Boodai Trading")
+  category           String    @default("CUSTOMER_STORAGE") // CUSTOMER_STORAGE, AIRPORT_CARGO, WAREHOUSE_STOCK
+  companyProfileId   String?   // NEW: FK to CompanyProfile (DIOR, JAZEERA, etc)
+  awbNumber          String?   // Air Waybill number for airport shipments
+  flightNumber       String?   // Flight number for airport tracking
+  origin             String?   // Origin airport/location
+  destination        String?   // Destination airport/location
+  customerName       String?   // Normalized customer name for grouping (e.g., "Dior", "Boodai Trading")
 
   // Relations
-  company     Company          @relation(fields: [companyId], references: [id])
-  boxes       ShipmentBox[] // Individual boxes with QR codes - USE THIS for rack assignment
-  withdrawals Withdrawal[]
-  invoices    Invoice[]
-  charges     ShipmentCharges?
-  items       ShipmentItem[] // NEW: Detailed item tracking
-  materialUsages MaterialUsage[] // NEW: Materials used for this shipment
+  company            Company           @relation(fields: [companyId], references: [id])
+  companyProfile     CompanyProfile?   @relation(fields: [companyProfileId], references: [id], onDelete: SetNull) // NEW: FK to CompanyProfile
+  boxes              ShipmentBox[]     // Individual boxes with QR codes - USE THIS for rack assignment
+  withdrawals        Withdrawal[]
+  invoices           Invoice[]
+  charges            ShipmentCharges?
+  items              ShipmentItem[]    // NEW: Detailed item tracking
+  materialUsages     MaterialUsage[]   // NEW: Materials used for this shipment
 
   // User Relations for Tracking
   createdBy  User? @relation("ShipmentCreatedBy", fields: [createdById], references: [id])

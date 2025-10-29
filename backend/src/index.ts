@@ -32,6 +32,7 @@ import shipmentItemsRoutes from './routes/shipment-items';
 import customerMaterialsRoutes from './routes/customer-materials';
 import workerDashboardRoutes from './routes/worker-dashboard';
 import categoriesRoutes from './routes/categories'; // NEW: Category management
+import companiesRoutes from './routes/companies'; // NEW: Company profiles management
 
 // Load environment variables FIRST
 dotenv.config();
@@ -96,6 +97,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/plugins', pluginsRoutes);
 app.use('/api/job-files', jobFilesRoutes); // NEW: Job file management
 app.use('/api/categories', categoriesRoutes); // NEW: Category management
+app.use('/api/company-profiles', companiesRoutes); // NEW: Company profiles (DIOR, JAZEERA, etc)
 // NEW: Enhanced warehouse routes
 app.use('/api', shipmentItemsRoutes); // Handles /api/shipments/:id/items
 app.use('/api', customerMaterialsRoutes); // Handles /api/customers/*
