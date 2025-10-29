@@ -9,6 +9,14 @@ import fs from 'fs';
 const router = Router();
 const prisma = new PrismaClient();
 
+const parseOptionalInt = (value: any): number | null => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  const parsed = typeof value === 'number' ? Math.trunc(value) : parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
 // Apply authentication to all routes
 router.use(authenticateToken);
 
@@ -121,6 +129,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
               },
             },
           },
+          companyProfile: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (parseInt(page as string) - 1) * parseInt(limit as string),
@@ -193,6 +207,12 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
         withdrawals: {
           orderBy: { withdrawalDate: 'desc' },
         },
+        companyProfile: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
 
@@ -228,7 +248,43 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
     const data = req.body;
     const companyId = req.user!.companyId;
     const userId = req.user!.id;
-    const totalBoxCount = data.totalBoxCount || data.originalBoxCount;
+    const palletCount = parseOptionalInt(data.palletCount);
+    const boxesPerPallet = parseOptionalInt(data.boxesPerPallet);
+    const providedOriginalBoxCount = parseOptionalInt(data.originalBoxCount);
+    const computedBoxCount = palletCount && boxesPerPallet ? palletCount * boxesPerPallet : null;
+    const originalBoxCount = providedOriginalBoxCount ?? computedBoxCount;
+
+    if (!originalBoxCount || originalBoxCount <= 0) {
+      return res.status(400).json({ error: 'Box count must be greater than zero' });
+    }
+
+    const totalBoxCount = parseOptionalInt(data.totalBoxCount) ?? originalBoxCount;
+    const currentBoxCount = parseOptionalInt(data.currentBoxCount) ?? totalBoxCount;
+
+    let arrivalDate = new Date();
+    if (data.arrivalDate) {
+      const parsedArrival = new Date(data.arrivalDate);
+      if (!Number.isNaN(parsedArrival.getTime())) {
+        arrivalDate = parsedArrival;
+      }
+    }
+
+    let companyProfileId: string | null = null;
+    let companyProfileName: string | null = null;
+
+    if (data.companyProfileId) {
+      const profile = await prisma.companyProfile.findFirst({
+        where: { id: data.companyProfileId, companyId },
+        select: { id: true, name: true },
+      });
+
+      if (!profile) {
+        return res.status(400).json({ error: 'Selected company profile is not available' });
+      }
+
+      companyProfileId = profile.id;
+      companyProfileName = profile.name;
+    }
 
     // 🚀 FETCH SHIPMENT SETTINGS
     let settings = await prisma.shipmentSettings.findUnique({
@@ -258,17 +314,29 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
 
     // Generate master QR code for shipment using settings prefix
     const qrPrefix = settings.autoGenerateQR ? settings.qrCodePrefix : 'QR-SH';
-    const masterQR = `${qrPrefix}-${Date.now()}`;
+    const qrBaseSegments = [`${qrPrefix}-${Date.now()}`];
+    if (palletCount && palletCount > 0) {
+      qrBaseSegments.push(`P${palletCount}`);
+    }
+    if (boxesPerPallet && boxesPerPallet > 0) {
+      qrBaseSegments.push(`B${boxesPerPallet}`);
+    }
+    qrBaseSegments.push(`T${totalBoxCount}`);
+    const masterQR = qrBaseSegments.join('-');
 
     // 🚀 USE DEFAULT STORAGE TYPE FROM SETTINGS IF NOT PROVIDED
     const shipmentType = data.type || settings.defaultStorageType;
 
+    const normalizedCustomerName = data.customerName || companyProfileName || data.clientName || null;
+
     const shipment = await prisma.shipment.create({
       data: {
-        name: data.name || `Shipment for ${data.clientName}`,
+        name: data.name || `Shipment for ${data.clientName || companyProfileName || 'Client'}`,
         referenceId: data.referenceId || `SH-${Date.now()}`,
-        originalBoxCount: totalBoxCount,
-        currentBoxCount: data.currentBoxCount || totalBoxCount,
+        originalBoxCount,
+        currentBoxCount,
+        palletCount,
+        boxesPerPallet,
         type: shipmentType, // 🚀 FROM SETTINGS
         clientName: data.clientName,
         clientPhone: data.clientPhone,
@@ -277,8 +345,9 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
         estimatedValue: data.estimatedValue,
         notes: data.notes,
         companyId,
+        companyProfileId,
         qrCode: masterQR,
-        arrivalDate: new Date(),
+        arrivalDate,
         status: 'PENDING', // All shipments start as PENDING
         createdById: userId, // User ID who created
         // Warehouse fields
@@ -290,7 +359,12 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
         flightNumber: data.flightNumber,
         origin: data.origin,
         destination: data.destination,
-        customerName: data.customerName,
+        customerName: normalizedCustomerName,
+      },
+      include: {
+        companyProfile: {
+          select: { id: true, name: true },
+        },
       },
     });
 
@@ -300,7 +374,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
       boxesToCreate.push({
         shipmentId: shipment.id,
         boxNumber: i,
-        qrCode: `${masterQR}-BOX-${i}`,
+        qrCode: `${masterQR}-BOX-${i}-OF-${totalBoxCount}`,
         rackId: data.rackId || null, // Assign to rack if provided
         status: data.rackId ? 'IN_STORAGE' : 'PENDING', // ✅ PENDING if no rack, IN_STORAGE if rack assigned
         assignedAt: data.rackId ? new Date() : null,
@@ -317,7 +391,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
       await prisma.rack.update({
         where: { id: data.rackId },
         data: {
-          capacityUsed: { increment: data.originalBoxCount },
+          capacityUsed: { increment: totalBoxCount },
           lastActivity: new Date(),
         },
       });
@@ -329,7 +403,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
           companyId,
           itemType: 'SHIPMENT',
           itemId: shipment.id,
-          quantityCurrent: data.originalBoxCount,
+          quantityCurrent: totalBoxCount,
         },
       });
 
@@ -340,8 +414,8 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
           userId: req.user!.id,
           companyId,
           activityType: 'ASSIGN',
-          itemDetails: `Shipment ${data.referenceId} - ${data.originalBoxCount} boxes`,
-          quantityAfter: data.originalBoxCount,
+          itemDetails: `Shipment ${shipment.referenceId} - ${totalBoxCount} boxes${palletCount && palletCount > 0 ? ` (${palletCount} pallets)` : ''}`,
+          quantityAfter: totalBoxCount,
         },
       });
     }
