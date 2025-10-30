@@ -282,8 +282,13 @@ export const Racks: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Warehouse Racks</h1>
-          <p className="text-gray-600 mt-1">Monitor and manage warehouse storage racks</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-gray-900">Warehouse Racks</h1>
+            <span className="px-3 py-1 bg-gradient-to-r from-green-500 to-blue-500 text-white text-xs font-bold rounded-full animate-pulse">
+              ✨ UPDATED
+            </span>
+          </div>
+          <p className="text-gray-600 mt-1">Monitor and manage warehouse storage racks - Now with enhanced UI!</p>
         </div>
         <div className="flex items-center gap-3">
           <button 
