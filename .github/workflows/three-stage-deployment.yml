@@ -1,24 +1,34 @@
 name: Three-Stage Deployment Pipeline
 
 # =============================================================================
-# 3-STAGE DEPLOYMENT WORKFLOW
+# 3-STAGE AUTOMATED DEPLOYMENT WORKFLOW
 # =============================================================================
 # Stage 1: Local Testing (Developer machine)
-# Stage 2: Deploy to Staging VPS (148.230.107.155:8080) - Manual trigger
+# Stage 2: Deploy to Staging VPS (148.230.107.155:8080) - AUTO ON PUSH
 # Stage 3: Deploy to Production (qgocargo.cloud) - Manual approval required
 #
 # WORKFLOW:
-# 1. Developer tests locally (npm run dev)
-# 2. Developer manually triggers "Deploy to Staging" workflow
-# 3. Test on staging: http://148.230.107.155:8080
-# 4. If staging is good, manually approve "Deploy to Production"
-# 5. Production goes live: http://qgocargo.cloud
+# 1. Developer makes changes locally
+# 2. Run .\quick-commit.ps1 OR let auto-commit-watcher.ps1 auto-push
+# 3. GitHub Actions AUTOMATICALLY deploys to staging
+# 4. Test on staging: http://148.230.107.155:8080
+# 5. If staging is good, manually trigger production deployment
+# 6. Production goes live: http://qgocargo.cloud
 #
 # Server: Rocky Linux 9.x (RHEL-based)
 # Container Engine: Docker + Docker Compose
 # =============================================================================
 
 on:
+  # Automatic deployment to staging on every push
+  push:
+    branches:
+      - stable/prisma-mysql-production
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/**'
+  
+  # Manual deployment option (for production or re-deployment)
   workflow_dispatch:
     inputs:
       environment:
@@ -82,7 +92,8 @@ jobs:
     name: Deploy to Staging VPS
     needs: build
     runs-on: ubuntu-latest
-    if: github.event.inputs.environment == 'staging'
+    # Auto-deploy on push, OR manual trigger with staging selected
+    if: github.event_name == 'push' || github.event.inputs.environment == 'staging'
     
     environment:
       name: staging
