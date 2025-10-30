@@ -1,0 +1,300 @@
+name: Three-Stage Deployment Pipeline
+
+# =============================================================================
+# 3-STAGE DEPLOYMENT WORKFLOW
+# =============================================================================
+# Stage 1: Local Testing (Developer machine)
+# Stage 2: Deploy to Staging VPS (148.230.107.155:8080) - Manual trigger
+# Stage 3: Deploy to Production (qgocargo.cloud) - Manual approval required
+#
+# WORKFLOW:
+# 1. Developer tests locally (npm run dev)
+# 2. Developer manually triggers "Deploy to Staging" workflow
+# 3. Test on staging: http://148.230.107.155:8080
+# 4. If staging is good, manually approve "Deploy to Production"
+# 5. Production goes live: http://qgocargo.cloud
+#
+# Server: Rocky Linux 9.x (RHEL-based)
+# Container Engine: Docker + Docker Compose
+# =============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: 'staging'
+
+env:
+  NODE_VERSION: '18'
+  PRODUCTION_PATH: '/root/NEW START'
+
+jobs:
+  # =============================================================================
+  # STAGE 1: BUILD FRONTEND
+  # =============================================================================
+  build:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm install --legacy-peer-deps
+
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist-${{ github.sha }}
+          path: frontend/dist/
+          retention-days: 7
+
+  # =============================================================================
+  # STAGE 2: DEPLOY TO STAGING (Manual Trigger)
+  # =============================================================================
+  deploy-staging:
+    name: Deploy to Staging VPS
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.environment == 'staging'
+    
+    environment:
+      name: staging
+      url: http://148.230.107.155:8080
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist-${{ github.sha }}
+          path: frontend/dist/
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy to Staging (Rocky Linux)
+        env:
+          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+          VPS_USER: ${{ secrets.PROD_VPS_USER }}
+        run: |
+          echo "================================================"
+          echo "🧪 DEPLOYING TO STAGING (Rocky Linux)"
+          echo "================================================"
+          
+          # Copy built files to server
+          scp -i ~/.ssh/deploy_key -r frontend/dist/* ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/frontend/staging-dist/"
+          
+          # Deploy to staging container
+          ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
+          cd "${{ env.PRODUCTION_PATH }}"
+          
+          echo "📦 Copying to staging container..."
+          docker cp frontend/staging-dist/. wms-staging-frontend:/usr/share/nginx/html/
+          
+          echo "🔄 Reloading nginx..."
+          docker exec wms-staging-frontend nginx -s reload
+          
+          echo "✅ Staging deployment complete!"
+          echo "🌐 Test at: http://148.230.107.155:8080"
+          EOF
+
+      - name: Deployment Summary
+        run: |
+          echo "================================================"
+          echo "🧪 STAGING DEPLOYMENT COMPLETE"
+          echo "================================================"
+          echo "🌐 Staging URL: http://148.230.107.155:8080"
+          echo "📝 Commit: ${{ github.sha }}"
+          echo ""
+          echo "✅ Next Steps:"
+          echo "1. Test thoroughly on staging"
+          echo "2. If good, run this workflow again with 'production' option"
+          echo "================================================"
+
+  # =============================================================================
+  # STAGE 3: DEPLOY TO PRODUCTION (Requires Manual Approval)
+  # =============================================================================
+  deploy-production:
+    name: Deploy to Production (Manual Approval Required)
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.environment == 'production'
+    
+    environment:
+      name: production
+      url: http://qgocargo.cloud
+
+    steps:
+      - name: Manual Approval Notice
+        run: |
+          echo "================================================"
+          echo "⚠️  PRODUCTION DEPLOYMENT"
+          echo "================================================"
+          echo "This requires manual approval in GitHub."
+          echo "Review staging first: http://148.230.107.155:8080"
+          echo "================================================"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Copy Staging to Production (Rocky Linux)
+        env:
+          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+          VPS_USER: ${{ secrets.PROD_VPS_USER }}
+        run: |
+          echo "================================================"
+          echo "🚀 DEPLOYING TO PRODUCTION (Rocky Linux)"
+          echo "================================================"
+          
+          ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
+          set -e
+          cd "${{ env.PRODUCTION_PATH }}"
+          
+          echo "📊 Current Status:"
+          docker ps --filter "name=frontend" --format "table {{.Names}}\t{{.Status}}"
+          
+          echo ""
+          echo "📦 Creating backup..."
+          mkdir -p backups/frontend
+          docker cp wms-frontend:/usr/share/nginx/html/. "backups/frontend/backup-$(date +%Y%m%d-%H%M%S)/"
+          
+          echo ""
+          echo "🔄 Copying from staging to production..."
+          docker cp wms-staging-frontend:/usr/share/nginx/html/. /tmp/staging-to-prod/
+          docker cp /tmp/staging-to-prod/. wms-frontend:/usr/share/nginx/html/
+          rm -rf /tmp/staging-to-prod
+          
+          echo ""
+          echo "🔄 Restarting production container..."
+          docker-compose restart frontend
+          
+          echo ""
+          echo "⏳ Waiting for health check..."
+          sleep 10
+          
+          echo ""
+          echo "✅ Verifying deployment..."
+          docker ps --filter "name=wms-frontend" --format "table {{.Names}}\t{{.Status}}"
+          
+          echo ""
+          echo "🔍 Testing endpoint..."
+          curl -f http://localhost:80 > /dev/null 2>&1 && echo "✅ Production is responding!" || echo "⚠️  Warning: Health check failed"
+          
+          echo ""
+          echo "================================================"
+          echo "🎉 PRODUCTION DEPLOYMENT COMPLETE"
+          echo "================================================"
+          EOF
+
+      - name: Verify Production
+        env:
+          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+        run: |
+          echo "🔍 External health check..."
+          sleep 5
+          
+          # Test direct IP
+          if curl -f -s http://$VPS_HOST > /dev/null; then
+            echo "✅ Direct IP accessible"
+          else
+            echo "❌ Direct IP failed"
+            exit 1
+          fi
+          
+          # Test domain
+          if curl -f -s http://qgocargo.cloud > /dev/null; then
+            echo "✅ Domain accessible"
+          else
+            echo "⚠️  Domain check failed (may be DNS propagation)"
+          fi
+
+      - name: Production Deployment Summary
+        if: always()
+        run: |
+          echo "================================================"
+          echo "🚀 PRODUCTION DEPLOYMENT SUMMARY"
+          echo "================================================"
+          echo "🏷️  Repository: ${{ github.repository }}"
+          echo "🌿 Branch: ${{ github.ref_name }}"
+          echo "📝 Commit: ${{ github.sha }}"
+          echo "👤 Deployed by: ${{ github.actor }}"
+          echo "🕐 Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          echo "🖥️  Server: Rocky Linux 9.x"
+          echo "📍 IP: ${{ secrets.PROD_VPS_HOST }}"
+          echo ""
+          echo "🌐 Access URLs:"
+          echo "   Production: http://qgocargo.cloud"
+          echo "   Direct IP: http://${{ secrets.PROD_VPS_HOST }}"
+          echo "   Portainer: https://${{ secrets.PROD_VPS_HOST }}:9443"
+          echo ""
+          echo "📊 Status: ${{ job.status }}"
+          echo "================================================"
+          echo ""
+          echo "⚠️  IMPORTANT: Clear browser cache to see changes!"
+          echo "   Press Ctrl + Shift + R or open in Incognito"
+          echo "================================================"
+
+      - name: Rollback Instructions (On Failure)
+        if: failure()
+        env:
+          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+          VPS_USER: ${{ secrets.PROD_VPS_USER }}
+        run: |
+          echo "================================================"
+          echo "❌ DEPLOYMENT FAILED - ROLLBACK NEEDED"
+          echo "================================================"
+          
+          ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
+          cd "${{ env.PRODUCTION_PATH }}"
+          
+          echo "📋 Container logs:"
+          docker logs wms-frontend --tail 30
+          
+          echo ""
+          echo "🔙 To rollback manually:"
+          echo "1. SSH to server: ssh root@148.230.107.155"
+          echo "2. cd /root/NEW\ START"
+          echo "3. Find backup: ls -lht backups/frontend/"
+          echo "4. Restore: docker cp backups/frontend/backup-XXXXXX/. wms-frontend:/usr/share/nginx/html/"
+          echo "5. Restart: docker-compose restart frontend"
+          EOF
