@@ -1,0 +1,338 @@
+name: Production Deployment
+
+# =============================================================================
+# PRODUCTION CI/CD PIPELINE
+# =============================================================================
+# Server: Rocky Linux 9.x (148.230.107.155)
+# Domain: qgocargo.cloud (HTTP only - no SSL yet)
+# Containers: wms-frontend, wms-backend, wms-database
+# Branch: stable/prisma-mysql-production
+# 
+# DEPLOYMENT PROCESS:
+# 1. Build frontend locally in GitHub Actions runner (Ubuntu)
+# 2. Deploy built files to Rocky Linux production server via SSH/SCP
+# 3. Restart Docker containers on production server
+# 4. Verify deployment via health checks
+#
+# IMPORTANT NOTES:
+# - Production server runs Rocky Linux, NOT Ubuntu
+# - Docker commands work the same (docker, docker-compose)
+# - Path on server: /root/NEW START/ (with space in directory name)
+# - nginx-http-only.conf is used (no SSL redirect)
+# - Frontend served by nginx:alpine container
+# - Backend is Node.js/Express with Prisma ORM
+# - Database is MySQL 8.0
+#
+# REQUIRED SECRETS:
+# - PROD_VPS_HOST: 148.230.107.155
+# - PROD_VPS_USER: root
+# - PROD_VPS_SSH_KEY: Private SSH key for deployment
+# - PROD_VPS_PORT: 22
+# =============================================================================
+
+on:
+  push:
+    branches:
+      - stable/prisma-mysql-production
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  PRODUCTION_PATH: '/root/NEW START'
+
+jobs:
+  # ==========================================
+  # STAGE 1: BUILD FRONTEND
+  # ==========================================
+  # Note: Build runs on Ubuntu (GitHub Actions runner)
+  # Output: frontend/dist/ directory with compiled React app
+  # Dependencies: Node.js 18, npm, Vite build system
+  # ==========================================
+  build:
+    name: Build Frontend & Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Upload Frontend Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 1
+
+  # ==========================================
+  # STAGE 2: DEPLOY TO PRODUCTION (ROCKY LINUX)
+  # ==========================================
+  # Target Server: Rocky Linux 9.x (RHEL-based, NOT Ubuntu)
+  # Deployment Method: SSH/SCP from GitHub Actions runner
+  # Production Path: /root/NEW START/ (note: directory has space)
+  # Container Engine: Docker + Docker Compose
+  # Web Server: nginx:alpine serving static files from /usr/share/nginx/html
+  # 
+  # Deployment Steps:
+  # 1. Download frontend build artifact from previous job
+  # 2. Setup SSH connection to Rocky Linux server
+  # 3. Copy files via SCP: dist/, nginx config, docker-compose.yml
+  # 4. SSH into server and restart containers
+  # 5. Verify deployment with health checks
+  # ==========================================
+  deploy:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: http://qgocargo.cloud
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Frontend Build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy Frontend to Production (Rocky Linux)
+        env:
+          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+          VPS_USER: ${{ secrets.PROD_VPS_USER }}
+        run: |
+          echo "📦 Deploying to Rocky Linux production server..."
+          echo "Target: ${VPS_USER}@${VPS_HOST}"
+          
+          # Copy updated source files (for reference/debugging)
+          echo "📁 Copying source files..."
+          scp -i ~/.ssh/deploy_key -r frontend/src/ ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/frontend/" || true
+          
+          # Copy built dist files (main deployment files)
+          echo "🚀 Copying built frontend (dist/)..."
+          scp -i ~/.ssh/deploy_key -r frontend/dist/* ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/frontend/dist/"
+          
+          # Copy nginx HTTP-only config (no SSL redirect)
+          echo "⚙️  Copying nginx config..."
+          scp -i ~/.ssh/deploy_key frontend/nginx-http-only.conf ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/frontend/"
+          
+          # Copy docker-compose configuration
+          echo "🐳 Copying docker-compose.yml..."
+          scp -i ~/.ssh/deploy_key docker-compose.yml ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/"
+          
+          echo "✅ Files copied successfully to Rocky Linux server"
+
+      - name: Restart Production Containers (Rocky Linux)
+        env:
+          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+          VPS_USER: ${{ secrets.PROD_VPS_USER }}
+        run: |
+          echo "🔄 Connecting to Rocky Linux production server..."
+          ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
+          set -e  # Exit on any error
+          
+          echo "================================================"
+          echo "🚀 PRODUCTION DEPLOYMENT - ROCKY LINUX"
+          echo "================================================"
+          echo "Server OS: Rocky Linux 9.x"
+          echo "Path: /root/NEW START/"
+          echo "Time: $(date)"
+          echo "================================================"
+          
+          cd "${{ env.PRODUCTION_PATH }}"
+          
+          # Show current state
+          echo ""
+          echo "📊 Current Container Status:"
+          docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep wms
+          
+          # Create database backup before deployment
+          echo ""
+          echo "📦 Creating MySQL backup..."
+          mkdir -p backups
+          BACKUP_FILE="backups/pre-deploy-$(date +%Y%m%d-%H%M%S).sql"
+          docker exec wms-database mysqldump -u root -prootpassword warehouse_wms > "$BACKUP_FILE" 2>/dev/null || echo "⚠️  Backup failed (non-critical)"
+          [ -f "$BACKUP_FILE" ] && echo "✅ Backup saved: $BACKUP_FILE"
+          
+          # Set correct permissions for nginx to read files
+          echo ""
+          echo "🔐 Setting file permissions..."
+          chmod -R 755 frontend/dist
+          chown -R root:root frontend/dist
+          
+          # Restart frontend container (nginx)
+          echo ""
+          echo "🔄 Restarting frontend container..."
+          docker-compose restart frontend
+          
+          # Wait for container to become healthy
+          echo ""
+          echo "⏳ Waiting for container health check (10s)..."
+          sleep 10
+          
+          # Verify deployment
+          echo ""
+          echo "✅ Verifying deployment..."
+          docker ps --filter "name=wms-frontend" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          
+          # Test local endpoint
+          echo ""
+          echo "🔍 Testing local endpoint..."
+          curl -f http://localhost:80 > /dev/null 2>&1 && echo "✅ Local endpoint OK" || echo "⚠️  Local endpoint check failed"
+          
+          # Show nginx logs (last 10 lines)
+          echo ""
+          echo "📋 Recent nginx logs:"
+          docker logs wms-frontend --tail 10
+          
+          echo ""
+          echo "================================================"
+          echo "✅ DEPLOYMENT COMPLETE"
+          echo "================================================"
+          EOF
+
+      - name: Verify Deployment (External Health Check)
+        env:
+          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+        run: |
+          echo "================================================"
+          echo "🔍 EXTERNAL HEALTH CHECKS"
+          echo "================================================"
+          
+          # Wait for services to stabilize
+          echo "⏳ Waiting 5s for services to stabilize..."
+          sleep 5
+          
+          # Check direct IP access
+          echo ""
+          echo "Testing direct IP: http://$VPS_HOST"
+          if curl -f -s -o /dev/null -w "%{http_code}" http://$VPS_HOST | grep -q "200"; then
+            echo "✅ Direct IP access OK (200)"
+          else
+            echo "❌ Direct IP access FAILED"
+            exit 1
+          fi
+          
+          # Check domain access
+          echo ""
+          echo "Testing domain: http://qgocargo.cloud"
+          HTTP_CODE=$(curl -f -s -o /dev/null -w "%{http_code}" http://qgocargo.cloud || echo "000")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Domain access OK (200)"
+          else
+            echo "⚠️  Domain returned status: $HTTP_CODE"
+          fi
+          
+          # Check API endpoint
+          echo ""
+          echo "Testing API: http://qgocargo.cloud/api/health"
+          curl -s http://qgocargo.cloud/api/health || echo "API health check not available"
+          
+          echo ""
+          echo "================================================"
+          echo "✅ HEALTH CHECKS COMPLETE"
+          echo "================================================"
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "================================================"
+          echo "� DEPLOYMENT SUMMARY"
+          echo "================================================"
+          echo "🏷️  Repository: ${{ github.repository }}"
+          echo "🌿 Branch: stable/prisma-mysql-production"
+          echo "📝 Commit: ${{ github.sha }}"
+          echo "👤 Author: ${{ github.actor }}"
+          echo "🕐 Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          echo "🖥️  Server Details:"
+          echo "   OS: Rocky Linux 9.x (RHEL-based)"
+          echo "   IP: ${{ secrets.PROD_VPS_HOST }}"
+          echo "   Path: ${{ env.PRODUCTION_PATH }}"
+          echo ""
+          echo "🌐 Access URLs:"
+          echo "   Main: http://qgocargo.cloud"
+          echo "   Direct IP: http://${{ secrets.PROD_VPS_HOST }}"
+          echo "   Portainer: https://${{ secrets.PROD_VPS_HOST }}:9443"
+          echo ""
+          echo "📦 Containers:"
+          echo "   - wms-frontend (nginx:alpine) - ports 80,443"
+          echo "   - wms-backend (node:18) - port 5000"
+          echo "   - wms-database (mysql:8.0) - port 3307"
+          echo ""
+          echo "📊 Status: ${{ job.status }}"
+          echo "================================================"
+
+      - name: Rollback & Debug on Failure
+        if: failure()
+        env:
+          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+          VPS_USER: ${{ secrets.PROD_VPS_USER }}
+        run: |
+          echo "================================================"
+          echo "❌ DEPLOYMENT FAILED - GATHERING DEBUG INFO"
+          echo "================================================"
+          
+          ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
+          cd "${{ env.PRODUCTION_PATH }}"
+          
+          echo ""
+          echo "📊 Container Status:"
+          docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          
+          echo ""
+          echo "📋 Frontend Container Logs (last 50 lines):"
+          docker logs wms-frontend --tail 50
+          
+          echo ""
+          echo "📋 Backend Container Logs (last 30 lines):"
+          docker logs wms-backend --tail 30
+          
+          echo ""
+          echo "🔍 Disk Space:"
+          df -h /
+          
+          echo ""
+          echo "💾 Recent Backups:"
+          ls -lth backups/ | head -5
+          
+          echo ""
+          echo "⚠️  To manually rollback, SSH to server and run:"
+          echo "   cd '/root/NEW START'"
+          echo "   docker-compose restart frontend"
+          echo "   # Or restore from backup if needed"
+          
+          EOF
+          
+          echo ""
+          echo "================================================"
+          echo "❌ DEPLOYMENT FAILED"
+          echo "================================================"
+          echo "Check the logs above for details."
+          echo "Manual intervention may be required on Rocky Linux server."
+          echo "================================================"
