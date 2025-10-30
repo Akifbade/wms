@@ -70,7 +70,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     length: 0, // in cm
     width: 0,  // in cm
     height: 0, // in cm
-    cbm: 0, // auto-calculated (m³)
+    cbm: 0, // auto-calculated (m??)
     description: '',
     value: 0,
     
@@ -104,16 +104,20 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     taxRate: 0,
   });
 
-  // 🚀 QR CODE STATE
+  // ???? QR CODE STATE
   const [showQRPreview, setShowQRPreview] = useState(false);
   const [qrCodeValue, setQRCodeValue] = useState('');
 
-  // 🚀 INTAKE MODE STATE (Pallet vs Box mode)
+  // ???? INTAKE MODE STATE (Pallet vs Box mode)
   const [intakeMode, setIntakeMode] = useState<'pallet' | 'box'>('pallet');
   const [palletPhotoMap, setPalletPhotoMap] = useState<Record<number, string[]>>({});
   const [palletUploadState, setPalletUploadState] = useState<Record<number, boolean>>({});
+  // Variable pallet boxes support
+  const [variablePerPallet, setVariablePerPallet] = useState(false);
+  const [boxesDistribution, setBoxesDistribution] = useState<number[]>([1]);
+  const [extraBoxes, setExtraBoxes] = useState<number>(0);
   
-  // 🚀 SHIPMENT SETTINGS STATE
+  // ???? SHIPMENT SETTINGS STATE
   const [shipmentSettings, setShipmentSettings] = useState<any>({
     requireClientEmail: false,
     requireClientPhone: true,
@@ -125,7 +129,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     formSectionOrder: null, // Will be loaded from settings
   });
 
-  // 🚀 FORM SECTION ORDERING STATE
+  // ???? FORM SECTION ORDERING STATE
   const [sectionOrder, setSectionOrder] = useState<string[]>([
     'basic',
     'client',
@@ -165,7 +169,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         loadRacks(),
         loadCompanyProfiles(),
         loadPricingSettings(),
-        loadShipmentSettings(), // 🚀 LOAD SETTINGS
+        loadShipmentSettings(), // ???? LOAD SETTINGS
       ]);
     } catch (err: any) {
       setError('Failed to load data: ' + err.message);
@@ -254,7 +258,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     }
   };
 
-  // 🚀 LOAD SHIPMENT SETTINGS
+  // ???? LOAD SHIPMENT SETTINGS
   const loadShipmentSettings = async () => {
     try {
       const response = await fetch('/api/shipment-settings', {
@@ -265,18 +269,18 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         const settings = data.settings || data;
         setShipmentSettings(settings);
         
-        // 🚀 LOAD SECTION ORDER FROM SETTINGS
+        // ???? LOAD SECTION ORDER FROM SETTINGS
         if (settings.formSectionOrder) {
           try {
             const order = JSON.parse(settings.formSectionOrder);
             setSectionOrder(order);
-            console.log('✅ Section order loaded:', order);
+            console.log('??? Section order loaded:', order);
           } catch (e) {
             console.log('Using default section order');
           }
         }
         
-        console.log('✅ Shipment settings loaded:', settings);
+        console.log('??? Shipment settings loaded:', settings);
       }
     } catch (err: any) {
       console.error('Failed to load shipment settings:', err);
@@ -321,6 +325,9 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     setIntakeMode('pallet');
     setPalletPhotoMap({});
     setPalletUploadState({});
+  setVariablePerPallet(false);
+  setBoxesDistribution([1]);
+  setExtraBoxes(0);
     const initialCustomValues: Record<string, string> = {};
     customFields.forEach(field => {
       initialCustomValues[field.id] = '';
@@ -351,10 +358,17 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         const palletCount = getSafeNumber(updated.palletCount, 0);
         const boxesPerPallet = getSafeNumber(updated.boxesPerPallet, 0);
 
-        return {
-          ...updated,
-          pieces: palletCount * boxesPerPallet,
-        };
+        // Keep boxesDistribution in sync with palletCount/boxesPerPallet when not in variable mode
+        if (!variablePerPallet) {
+          const dist = Array.from({ length: Math.max(palletCount, 0) }, () => Math.max(boxesPerPallet, 0));
+          setBoxesDistribution(dist.length ? dist : []);
+          return {
+            ...updated,
+            pieces: palletCount * boxesPerPallet,
+          };
+        }
+        // In variable mode, pieces are computed via distribution + extraBoxes (handled by effect below)
+        return updated;
       }
 
       // Auto-calculate CBM when dimensions change
@@ -363,8 +377,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         const width = getSafeNumber(updated.width, 0);
         const height = getSafeNumber(updated.height, 0);
         
-        // CBM = (Length × Width × Height) / 1,000,000 (since input is in cm)
-        // Or: (L × W × H in cm) / 1,000,000 = CBM in m³
+        // CBM = (Length ?? Width ?? Height) / 1,000,000 (since input is in cm)
+        // Or: (L ?? W ?? H in cm) / 1,000,000 = CBM in m??
         const cbm = length > 0 && width > 0 && height > 0 
           ? (length * width * height) / 1000000
           : 0;
@@ -398,18 +412,52 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         });
         return next;
       });
+      // Resize boxesDistribution when variable mode is on
+      if (variablePerPallet) {
+        setBoxesDistribution(prev => {
+          const count = Math.max(nextCount, 0);
+          const next = prev.slice(0, count);
+          while (next.length < count) {
+            // default new pallets use current boxesPerPallet as hint
+            next.push(getSafeNumber((e.target as any).form?.boxesPerPallet?.value ?? 1, 1));
+          }
+          return next;
+        });
+      }
     }
   };
+
+  // Recompute total pieces when variable distribution changes
+  useEffect(() => {
+    if (intakeMode === 'pallet' && variablePerPallet) {
+      const sum = boxesDistribution.reduce((acc, n) => acc + (Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0), 0);
+      setFormData(prev => ({ ...prev, pieces: sum + Math.max(0, Math.trunc(extraBoxes)) }));
+    } else if (intakeMode === 'pallet' && !variablePerPallet) {
+      const palletCount = getSafeNumber(formData.palletCount, 0);
+      const bpp = getSafeNumber(formData.boxesPerPallet, 0);
+      if (formData.pieces !== palletCount * bpp) {
+        setFormData(prev => ({ ...prev, pieces: palletCount * bpp }));
+      }
+    }
+  }, [boxesDistribution, extraBoxes, variablePerPallet, intakeMode, formData.palletCount, formData.boxesPerPallet]);
 
   const generateQRPreview = () => {
     const timestamp = Math.floor(Date.now() / 1000);
     let qrValue = '';
 
     if (intakeMode === 'pallet') {
-      const palletCount = getSafeNumber(formData.palletCount, 1);
-      const boxesPerPallet = getSafeNumber(formData.boxesPerPallet, 1);
-      const totalBoxes = palletCount * boxesPerPallet;
-      qrValue = `QR-SH-${timestamp}-P${palletCount}B${boxesPerPallet}T${totalBoxes}`;
+      if (variablePerPallet) {
+        const palletCount = Math.max(getSafeNumber(formData.palletCount, 1), 1);
+        const dist = boxesDistribution.slice(0, palletCount);
+        const totalBoxes = dist.reduce((a, b) => a + (Number.isFinite(b) ? Math.max(0, Math.trunc(b)) : 0), 0) + Math.max(0, Math.trunc(extraBoxes));
+        const maxBPP = dist.reduce((m, n) => Math.max(m, Math.max(0, Math.trunc(n || 0))), 0);
+        qrValue = `QR-SH-${timestamp}-P${palletCount}B${maxBPP}T${totalBoxes}`;
+      } else {
+        const palletCount = getSafeNumber(formData.palletCount, 1);
+        const boxesPerPallet = getSafeNumber(formData.boxesPerPallet, 1);
+        const totalBoxes = palletCount * boxesPerPallet;
+        qrValue = `QR-SH-${timestamp}-P${palletCount}B${boxesPerPallet}T${totalBoxes}`;
+      }
     } else {
       // Box mode
       const totalBoxes = getSafeNumber(formData.pieces, 1);
@@ -586,7 +634,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     setSuccess('');
 
     try {
-      // 🚀 VALIDATE AGAINST SHIPMENT SETTINGS
+      // ???? VALIDATE AGAINST SHIPMENT SETTINGS
       if (!formData.clientName) {
         throw new Error('Client name is required');
       }
@@ -603,7 +651,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         throw new Error('Rack assignment is required by company settings');
       }
       
-      // 🚀 ADDITIONAL CONDITIONAL VALIDATIONS
+      // ???? ADDITIONAL CONDITIONAL VALIDATIONS
       if (shipmentSettings.requireClientAddress && !formData.clientAddress) {
         throw new Error('Client address is required by company settings');
       }
@@ -620,15 +668,22 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       const palletCount = intakeMode === 'pallet'
         ? getSafeNumber(formData.palletCount, 0)
         : 1;
-      const boxesPerPallet = intakeMode === 'pallet'
+      const uniformBoxesPerPallet = intakeMode === 'pallet'
         ? getSafeNumber(formData.boxesPerPallet, 0)
         : getSafeNumber(formData.pieces, 0);
-      const computedPieces = palletCount * boxesPerPallet;
+
+      const dist = variablePerPallet
+        ? boxesDistribution.slice(0, Math.max(palletCount, 0)).map(n => Math.max(0, Math.trunc(n || 0)))
+        : [];
+      const loose = variablePerPallet ? Math.max(0, Math.trunc(extraBoxes || 0)) : 0;
+      const computedPieces = variablePerPallet
+        ? dist.reduce((a, b) => a + b, 0) + loose
+        : palletCount * uniformBoxesPerPallet;
 
       if (palletCount <= 0) {
         throw new Error('Pallet count must be at least 1');
       }
-      if (boxesPerPallet <= 0) {
+      if (!variablePerPallet && uniformBoxesPerPallet <= 0) {
         throw new Error('Boxes per pallet must be at least 1');
       }
       if (computedPieces <= 0) {
@@ -658,16 +713,18 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         clientPhone: formData.clientPhone,
         clientEmail: formData.clientEmail,
         clientAddress: formData.clientAddress,
-        arrivalDate: formData.arrivalDate,
-  palletCount,
-        boxesPerPallet,
+    arrivalDate: formData.arrivalDate,
+    palletCount,
+    boxesPerPallet: variablePerPallet ? Math.max(0, dist.reduce((m, n) => Math.max(m, n), 0)) : uniformBoxesPerPallet,
         description: formData.description,
         originalBoxCount: computedPieces,
         currentBoxCount: computedPieces,
         estimatedValue: formData.value,
         notes: formData.notes,
         rackId: formData.rackId || undefined,
-  palletPhotos: palletPhotosPayload.map(photos => photos.filter(url => !!url)),
+    palletPhotos: palletPhotosPayload.map(photos => photos.filter(url => !!url)),
+    // Variable per-pallet payload (backend optional)
+    ...(variablePerPallet ? { boxesDistribution: dist, extraBoxes: loose } : {}),
         // Backend will set: PENDING if no rack, IN_STORAGE if rack assigned
         // status: not needed here, backend handles it
         
@@ -711,7 +768,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       }
 
       // Show success message
-  alert(`✅ SUCCESS!\n\nShipment ${formData.barcode} has been created successfully!\n\n📦 Boxes: ${computedPieces}\n🪵 Pallets: ${palletCount}\n🧱 Boxes per pallet: ${boxesPerPallet}\n👤 Client: ${formData.clientName}${formData.rackId ? `\n📍 Assigned to Rack` : ''}`);
+    alert(`SUCCESS!\n\nShipment ${formData.barcode} has been created successfully!\n\nBoxes: ${computedPieces}\nPallets: ${palletCount}${variablePerPallet ? '' : `\nBoxes per pallet: ${uniformBoxesPerPallet}`}${variablePerPallet ? `\nVariable pallets: [${dist.join(', ')}]${loose ? ` + ${loose} loose` : ''}` : ''}\nClient: ${formData.clientName}${formData.rackId ? `\nAssigned to Rack` : ''}`);
       
       onSuccess();
       onClose();
@@ -727,17 +784,17 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
   const estimatedCost = calculateEstimatedCost();
 
-  // 🚀 SECTION RENDER FUNCTIONS
+  // ???? SECTION RENDER FUNCTIONS
   const renderBasicSection = () => (
     <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 space-y-4">
       <div>
         <h3 className="text-lg font-semibold mb-4 text-blue-800 flex items-center">
-          📦 Basic Shipment Info
+          Basic Shipment Info
         </h3>
         
         {/* INTAKE MODE TOGGLE */}
         <div className="bg-white p-3 rounded-lg border-2 border-blue-300 mb-4">
-          <p className="text-sm font-medium text-gray-700 mb-3">📋 Intake Mode:</p>
+          <p className="text-sm font-medium text-gray-700 mb-3">Intake Mode:</p>
           <div className="flex gap-3">
             <button
               type="button"
@@ -751,6 +808,9 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 }));
                 setPalletPhotoMap({});
                 setPalletUploadState({});
+                setVariablePerPallet(false);
+                setBoxesDistribution([1]);
+                setExtraBoxes(0);
               }}
               className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
                 intakeMode === 'pallet'
@@ -758,7 +818,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              🪵 Pallet Mode
+              Pallet Mode
             </button>
             <button
               type="button"
@@ -766,12 +826,15 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 setIntakeMode('box');
                 setFormData(prev => ({
                   ...prev,
-                  palletCount: 1,
-                  boxesPerPallet: 1,
+                  palletCount: 0,
+                  boxesPerPallet: 0,
                   pieces: 1
                 }));
                 setPalletPhotoMap({});
                 setPalletUploadState({});
+                setVariablePerPallet(false);
+                setBoxesDistribution([]);
+                setExtraBoxes(0);
               }}
               className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
                 intakeMode === 'box'
@@ -779,7 +842,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              📦 Box Mode
+              Box Mode
             </button>
           </div>
         </div>
@@ -819,7 +882,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            📅 Arrival Date <span className="text-red-500">*</span>
+            Arrival Date <span className="text-red-500">*</span>
           </label>
           <input
             type="date"
@@ -836,7 +899,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
           <>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                🪵 Pallet Count <span className="text-red-500">*</span>
+                Pallet Count <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -850,7 +913,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                🧱 Boxes per Pallet <span className="text-red-500">*</span>
+                Boxes per Pallet <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -860,7 +923,72 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 className="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50"
                 min="1"
                 required
+                disabled={variablePerPallet}
               />
+            </div>
+            <div className="md:col-span-3">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-3">
+                <div className="flex items-center gap-3">
+                  <input
+                    id="variablePerPallet"
+                    type="checkbox"
+                    checked={variablePerPallet}
+                    onChange={(ev) => {
+                      const checked = ev.target.checked;
+                      setVariablePerPallet(checked);
+                      if (checked) {
+                        const count = Math.max(getSafeNumber(formData.palletCount, 0), 0);
+                        const dist = Array.from({ length: count }, () => Math.max(getSafeNumber(formData.boxesPerPallet, 0), 0) || 1);
+                        setBoxesDistribution(dist);
+                      } else {
+                        setBoxesDistribution([]);
+                        setExtraBoxes(0);
+                        // reset pieces to uniform formula
+                        const palletCount = getSafeNumber(formData.palletCount, 0);
+                        const bpp = getSafeNumber(formData.boxesPerPallet, 0);
+                        setFormData(prev => ({ ...prev, pieces: palletCount * bpp }));
+                      }
+                    }}
+                    className="w-5 h-5"
+                  />
+                  <label htmlFor="variablePerPallet" className="text-sm font-medium text-blue-900">Variable boxes per pallet + extra loose boxes</label>
+                </div>
+                {variablePerPallet && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {Array.from({ length: Math.max(getSafeNumber(formData.palletCount, 0), 0) }, (_, idx) => idx).map((idx) => (
+                        <div key={`bpp-${idx}`} className="bg-white border border-blue-200 rounded-md p-2">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Pallet #{idx + 1} boxes</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={boxesDistribution[idx] ?? 0}
+                            onChange={(ev) => {
+                              const val = parseInt(ev.target.value) || 0;
+                              setBoxesDistribution(prev => {
+                                const next = prev.slice();
+                                next[idx] = Math.max(0, val);
+                                return next;
+                              });
+                            }}
+                            className="w-full px-2 py-2 border border-gray-300 rounded"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="max-w-xs">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Extra loose boxes (not on pallets)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={extraBoxes}
+                        onChange={(ev) => setExtraBoxes(Math.max(0, parseInt(ev.target.value) || 0))}
+                        className="w-full px-2 py-2 border border-gray-300 rounded"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
@@ -869,7 +997,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         {intakeMode === 'box' && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              📦 Total Boxes <span className="text-red-500">*</span>
+              Total Boxes <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -893,7 +1021,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         {intakeMode === 'pallet' && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              📊 Total Boxes (auto)
+              Total Boxes (auto)
             </label>
             <input
               type="number"
@@ -915,7 +1043,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               <div className="bg-white border-2 border-blue-200 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-semibold text-blue-800 flex items-center gap-2">
-                    📸 Pallet Photos (optional)
+                    Pallet Photos (optional)
                   </h4>
                   <span className="text-xs text-gray-500">
                     {palletNumbers.length} pallet{palletNumbers.length !== 1 ? 's' : ''}
@@ -993,7 +1121,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         <div className="md:col-span-3">
           <div className="bg-orange-50 border-2 border-orange-300 p-4 rounded-lg">
             <h4 className="text-sm font-semibold text-orange-900 mb-3 flex items-center">
-              📏 Shipment Size & Volume
+              Shipment Size & Volume
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               <div>
@@ -1058,7 +1186,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </div>
               <div>
                 <label className="block text-xs font-medium text-orange-900 font-bold mb-2">
-                  CBM (m³) 📦
+                  CBM (m3)
                 </label>
                 <div className="w-full px-3 py-2 border-2 border-orange-400 rounded-lg bg-orange-100 text-orange-900 font-bold text-center">
                   {formData.cbm > 0 ? formData.cbm.toFixed(4) : '0'}
@@ -1066,7 +1194,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </div>
             </div>
             <p className="text-xs text-gray-600 mt-2">
-              💡 CBM auto-calculates: (Length × Width × Height) ÷ 1,000,000
+              CBM auto-calculates: (Length x Width x Height) / 1,000,000
             </p>
           </div>
         </div>
@@ -1077,7 +1205,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const renderClientSection = () => (
     <div className="bg-gray-50 p-4 rounded-lg">
       <h3 className="text-lg font-semibold mb-4 text-gray-800 flex items-center">
-        👤 Client Information
+        Client Information
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -1158,7 +1286,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               className="w-5 h-5 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500"
             />
             <label htmlFor="isWarehouseShipment" className="text-sm font-semibold text-orange-800">
-              🏭 This is a warehouse shipment (import/export with shipper/consignee details)
+              This is a warehouse shipment (import/export with shipper/consignee details)
             </label>
           </div>
         </div>
@@ -1166,7 +1294,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         {formData.isWarehouseShipment && (
           <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
             <h3 className="text-lg font-semibold mb-4 text-orange-800 flex items-center">
-              🏭 Warehouse Details
+              Warehouse Details
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1217,7 +1345,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               {shipmentSettings.showDimensions !== false && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Dimensions (L×W×H) {shipmentSettings.requireDimensions && <span className="text-red-500">*</span>}
+                    Dimensions (L??W??H) {shipmentSettings.requireDimensions && <span className="text-red-500">*</span>}
                   </label>
                   <input
                     type="text"
@@ -1225,7 +1353,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                     value={formData.dimensions}
                     onChange={handleChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="100×50×30 cm"
+                    placeholder="100??50??30 cm"
                     required={shipmentSettings.requireDimensions}
                   />
                 </div>
@@ -1256,7 +1384,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const renderStorageSection = () => (
     <div className="bg-green-50 p-4 rounded-lg border border-green-200">
       <h3 className="text-lg font-semibold mb-4 text-green-800 flex items-center">
-        🏪 Storage Assignment
+        Storage Assignment
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -1321,7 +1449,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     return (
       <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
         <h3 className="text-lg font-semibold mb-4 text-purple-800 flex items-center">
-          ✨ Custom Fields
+          Custom Fields
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {customFields.map(field => (
@@ -1340,7 +1468,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const renderPricingSection = () => (
     <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
       <h3 className="text-lg font-semibold mb-4 text-yellow-800 flex items-center">
-        💰 Estimated Cost
+        Estimated Cost
       </h3>
       <div className="space-y-3">
         <div className="flex justify-between text-sm">
@@ -1367,7 +1495,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     </div>
   );
 
-  // 🚀 SECTION MAPPING
+  // ???? SECTION MAPPING
   const formSections: Record<string, () => JSX.Element | null> = {
     basic: renderBasicSection,
     client: renderClientSection,
@@ -1384,14 +1512,14 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 text-white">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-2xl font-bold">📦 New Shipment Intake</h2>
+              <h2 className="text-2xl font-bold">New Shipment Intake</h2>
               <p className="text-blue-100">WHM Warehouse Management System</p>
             </div>
             <button 
               onClick={onClose}
               className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
-            >
-              ✕
+              >
+              ×
             </button>
           </div>
         </div>
@@ -1404,7 +1532,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             {error && (
               <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-r-lg">
                 <div className="flex items-center">
-                  <span className="mr-2">⚠️</span>
+                  <span className="mr-2">!</span>
                   {error}
                 </div>
               </div>
@@ -1412,7 +1540,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             {success && (
               <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-4 rounded-r-lg">
                 <div className="flex items-center">
-                  <span className="mr-2">✅</span>
+                  <span className="mr-2">✓</span>
                   {success}
                 </div>
               </div>
@@ -1423,13 +1551,13 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-gray-800">🎯 Shipment QR Code</h3>
+                    <h3 className="text-xl font-bold text-gray-800">Shipment QR Code</h3>
                     <button
                       type="button"
                       onClick={() => setShowQRPreview(false)}
                       className="text-gray-500 hover:text-gray-700 text-2xl"
-                    >
-                      ✕
+                      >
+                      ×
                     </button>
                   </div>
                   <div className="bg-gray-50 p-6 rounded-lg flex flex-col items-center mb-4">
@@ -1442,7 +1570,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                     <div className="w-full border-t pt-4 mt-4">
                       {intakeMode === 'pallet' ? (
                         <>
-                          <h4 className="font-semibold text-gray-700 mb-2">📊 Pallet Details:</h4>
+                          <h4 className="font-semibold text-gray-700 mb-2">Pallet Details:</h4>
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div className="bg-blue-50 p-2 rounded">
                               <p className="text-gray-600">Pallets</p>
@@ -1460,14 +1588,14 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                         </>
                       ) : (
                         <>
-                          <h4 className="font-semibold text-gray-700 mb-2">📦 Box Details:</h4>
+                          <h4 className="font-semibold text-gray-700 mb-2">Box Details:</h4>
                           <div className="grid grid-cols-1 gap-2 text-sm">
                             <div className="bg-green-50 p-3 rounded">
                               <p className="text-gray-600">Total Boxes</p>
                               <p className="text-2xl font-bold text-green-600">{formData.pieces}</p>
                             </div>
                             <p className="text-xs text-gray-500 text-center mt-2">
-                              ℹ️ This shipment contains individual boxes (no pallets)
+                              This shipment contains individual boxes (no pallets)
                             </p>
                           </div>
                         </>
@@ -1482,7 +1610,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                     }}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors"
                   >
-                    📋 Copy QR Code
+                    Copy QR Code
                   </button>
                 </div>
               </div>
@@ -1492,7 +1620,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             {(shipmentSettings.requireClientEmail || shipmentSettings.requireEstimatedValue || shipmentSettings.requireRackAssignment) && (
               <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-800 p-4 rounded-r-lg">
                 <div className="flex items-start">
-                  <span className="mr-2 text-lg">ℹ️</span>
+                  <span className="mr-2 text-lg">i</span>
                   <div>
                     <p className="font-semibold mb-1">Company Settings Applied</p>
                     <ul className="text-sm space-y-1 list-disc list-inside">
@@ -1505,22 +1633,22 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </div>
             )}
 
-            {/* 🚀 SECTION ORDERING CONTROLS */}
+            {/* ???? SECTION ORDERING CONTROLS */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700">📋 Form Sections Order:</span>
-                  <span className="text-xs text-gray-500">Click ↑↓ to reorder</span>
+                  <span className="text-sm font-medium text-gray-700">Form Sections Order:</span>
+                  <span className="text-xs text-gray-500">Click arrows to reorder</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {sectionOrder.map((section, index) => {
                     const sectionLabels: Record<string, string> = {
-                      basic: '📦 Basic',
-                      client: '👤 Client',
-                      warehouse: '🏭 Warehouse',
-                      storage: '🏪 Storage',
-                      custom: '⚙️ Custom',
-                      pricing: '💰 Pricing'
+                      basic: 'Basic',
+                      client: 'Client',
+                      warehouse: 'Warehouse',
+                      storage: 'Storage',
+                      custom: 'Custom',
+                      pricing: 'Pricing'
                     };
                     
                     return (
@@ -1539,7 +1667,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                             disabled={index === 0}
                             className="text-xs text-gray-500 hover:text-blue-600 disabled:opacity-30 leading-none"
                           >
-                            ▲
+                            Up
                           </button>
                           <button
                             type="button"
@@ -1553,7 +1681,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                             disabled={index === sectionOrder.length - 1}
                             className="text-xs text-gray-500 hover:text-blue-600 disabled:opacity-30 leading-none"
                           >
-                            ▼
+                            Down
                           </button>
                         </div>
                       </div>
@@ -1563,7 +1691,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </div>
             </div>
 
-            {/* 🚀 DYNAMIC SECTIONS - RENDER IN ORDER */}
+            {/* ???? DYNAMIC SECTIONS - RENDER IN ORDER */}
             {sectionOrder.map((sectionId) => {
               const SectionComponent = formSections[sectionId];
               return SectionComponent ? (
@@ -1573,7 +1701,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               ) : null;
             })}
 
-            {/* 🚀 CONDITIONAL: Notes */}
+            {/* ???? CONDITIONAL: Notes */}
             {shipmentSettings.showNotes !== false && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1596,7 +1724,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             
             <div style={{display: 'none'}} className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-semibold mb-4 text-gray-800 flex items-center">
-                🏷️ Shipment Information
+                ??????? Shipment Information
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1632,7 +1760,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             {/* Client Information */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-semibold mb-4 text-gray-800 flex items-center">
-                👤 Client Information
+                Client Information
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1677,7 +1805,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                   />
                 </div>
                 
-                {/* 🚀 CONDITIONAL: Client Address */}
+                {/* ???? CONDITIONAL: Client Address */}
                 {shipmentSettings.showClientAddress !== false && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1697,7 +1825,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </div>
             </div>
 
-            {/* 🚀 CONDITIONAL: Warehouse Toggle */}
+            {/* ???? CONDITIONAL: Warehouse Toggle */}
             {shipmentSettings.showWarehouseMode !== false && (
               <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
               <div className="flex items-center space-x-3">
@@ -1710,7 +1838,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                   className="w-5 h-5 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500"
                 />
                 <label htmlFor="isWarehouseShipment" className="text-sm font-semibold text-orange-800">
-                  🏭 This is a warehouse shipment (import/export with shipper/consignee details)
+                  This is a warehouse shipment (import/export with shipper/consignee details)
                 </label>
               </div>
             </div>
@@ -1720,7 +1848,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             {formData.isWarehouseShipment && shipmentSettings.showWarehouseMode !== false && (
               <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
                 <h3 className="text-lg font-semibold mb-4 text-orange-800 flex items-center">
-                  🏭 Warehouse Details
+                  Warehouse Details
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -1784,7 +1912,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             {/* Shipment Details */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-semibold mb-4 text-gray-800 flex items-center">
-                📦 Shipment Details
+                Shipment Details
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1803,7 +1931,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Dimensions (L×W×H)
+                    Dimensions (L x W x H)
                   </label>
                   <input
                     type="text"
@@ -1811,7 +1939,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                     value={formData.dimensions}
                     onChange={handleChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="100×50×30 cm"
+                    placeholder="100 x 50 x 30 cm"
                   />
                 </div>
                 <div>
@@ -1847,7 +1975,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                   </select>
                 </div>
                 
-                {/* 🚀 CONDITIONAL: Description */}
+                {/* ???? CONDITIONAL: Description */}
                 {shipmentSettings.showDescription !== false && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1869,8 +1997,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
             {/* Storage Assignment */}
             <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <h3 className="text-lg font-semibold mb-4 text-green-800 flex items-center">
-                🏪 Storage Assignment
+                <h3 className="text-lg font-semibold mb-4 text-green-800 flex items-center">
+                  Storage Assignment
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1893,7 +2021,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                   </select>
                 </div>
                 
-                {/* 🚀 CONDITIONAL: Estimated Storage Days */}
+                {/* ???? CONDITIONAL: Estimated Storage Days */}
                 {shipmentSettings.showEstimatedDays !== false && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1911,7 +2039,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                   </div>
                 )}
                 
-                {/* 🚀 CONDITIONAL: Special Instructions */}
+                {/* ???? CONDITIONAL: Special Instructions */}
                 {shipmentSettings.showSpecialInstructions !== false && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1934,7 +2062,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             {customFields.length > 0 && (
               <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
                 <h3 className="text-lg font-semibold mb-4 text-purple-800 flex items-center">
-                  ✨ Custom Fields
+                  ??? Custom Fields
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {customFields.map(field => (
@@ -1953,7 +2081,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             {/* Cost Estimation */}
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <h3 className="text-lg font-semibold mb-4 text-blue-800 flex items-center">
-                💰 Estimated Storage Cost
+                Estimated Storage Cost
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div className="text-center">
@@ -1962,7 +2090,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                     {estimatedCost.baseCost.toFixed(3)} {pricing.currency}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {formData.pieces} pieces × {formData.estimatedDays} days × {pricing.storageRate} rate
+                    {formData.pieces} pieces x {formData.estimatedDays} days x {pricing.storageRate} rate
                   </div>
                 </div>
                 <div className="text-center">
@@ -1980,7 +2108,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </div>
             </div>
 
-            {/* 🚀 CONDITIONAL: Notes */}
+            {/* ???? CONDITIONAL: Notes */}
             {shipmentSettings.showNotes !== false && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2006,7 +2134,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 className="px-6 py-3 border-2 border-purple-500 text-purple-600 rounded-lg hover:bg-purple-50 font-medium transition-colors flex items-center gap-2"
                 disabled={loading || (intakeMode === 'pallet' && (!formData.palletCount || !formData.boxesPerPallet)) || (intakeMode === 'box' && !formData.pieces)}
               >
-                {intakeMode === 'pallet' ? '🎯 View Pallet QR' : '📦 View Box QR'}
+                {intakeMode === 'pallet' ? 'View Pallet QR' : 'View Box QR'}
               </button>
               <button
                 type="button"
@@ -2029,7 +2157,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={loading}
               >
-                {loading ? '🔄 Creating...' : '📦 Create Shipment'}
+                {loading ? 'Creating...' : 'Create Shipment'}
               </button>
             </div>
           </form>
@@ -2038,3 +2166,4 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     </div>
   );
 }
+

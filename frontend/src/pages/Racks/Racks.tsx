@@ -8,12 +8,95 @@ import {
   XMarkIcon,
   PrinterIcon,
   InformationCircleIcon,
-  CameraIcon
+  CameraIcon,
+  MapPinIcon,
+  TagIcon,
+  BuildingOfficeIcon,
+  TruckIcon,
+  SquaresPlusIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  RectangleStackIcon
 } from '@heroicons/react/24/outline';
 import { racksAPI } from '../../services/api';
 import CreateRackModal from '../../components/CreateRackModal';
 import EditRackModal from '../../components/EditRackModal';
 import QRCode from 'qrcode';
+
+// Shipment Box Card Component (to avoid hooks in loops)
+const ShipmentBoxCard: React.FC<{
+  shipment: any;
+  boxCount: number;
+  photos: string[];
+}> = ({ shipment, boxCount, photos }) => {
+  const [showPhotos, setShowPhotos] = useState(false);
+
+  return (
+    <div className="bg-gradient-to-r from-white to-blue-50 border-2 border-blue-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-md transition-all">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-bold text-blue-600">
+              #{shipment?.referenceId || 'N/A'}
+            </span>
+            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+              shipment?.status === 'IN_WAREHOUSE' || shipment?.status === 'PARTIAL'
+                ? 'bg-green-100 text-green-800'
+                : shipment?.status === 'RELEASED'
+                ? 'bg-blue-100 text-blue-800'
+                : 'bg-gray-100 text-gray-800'
+            }`}>
+              {shipment?.status || 'N/A'}
+            </span>
+          </div>
+          <p className="text-xs text-gray-700 font-semibold">
+            📦 {shipment?.companyProfile?.name || shipment?.clientName || 'Unknown Company'}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Boxes: <span className="font-semibold text-gray-700">{boxCount}</span>
+          </p>
+        </div>
+      </div>
+      
+      {photos.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-blue-200">
+          <button
+            onClick={() => setShowPhotos(!showPhotos)}
+            className="w-full flex items-center justify-between text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <span className="flex items-center gap-1">
+              📷 Photos ({photos.length})
+            </span>
+            <span className="text-lg">{showPhotos ? '▲' : '▼'}</span>
+          </button>
+          
+          {showPhotos && (
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {photos.map((url: string, idx: number) => (
+                <a
+                  key={idx}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative block aspect-square rounded-lg overflow-hidden border-2 border-blue-200 hover:border-blue-500 transition-all"
+                >
+                  <img
+                    src={url}
+                    alt={`Photo ${idx + 1}`}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                  />
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
+                    <span className="text-white text-xl opacity-0 group-hover:opacity-100">🔍</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const Racks: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('all');
@@ -25,9 +108,9 @@ export const Racks: React.FC = () => {
   const [selectedRack, setSelectedRack] = useState<any>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [rackDetails, setRackDetails] = useState<any>(null);
+  const [companyFilter, setCompanyFilter] = useState<string | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [bulkQrModalOpen, setBulkQrModalOpen] = useState(false);
-  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const bulkQrCanvasRefs = useRef<{ [key: string]: HTMLCanvasElement | null }>({});
 
   const resolveLogoUrl = (logo?: string | null) => {
@@ -82,95 +165,12 @@ export const Racks: React.FC = () => {
     try {
       const response = await racksAPI.getById(rack.id);
       setRackDetails(response.rack);
-      
-      // Generate QR Code
-      if (qrCanvasRef.current) {
-        await QRCode.toCanvas(qrCanvasRef.current, `RACK_${response.rack.code}`, {
-          width: 300,
-          margin: 2,
-        });
-      }
     } catch (err) {
       console.error('Failed to load rack details:', err);
       setRackDetails(rack);
     } finally {
       setLoadingDetails(false);
     }
-  };
-
-  const handlePrintQR = () => {
-    if (!qrCanvasRef.current || !rackDetails) return;
-    
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const qrDataUrl = qrCanvasRef.current.toDataURL();
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Rack QR Code - ${rackDetails.code}</title>
-          <style>
-            body {
-              margin: 0;
-              padding: 20px;
-              font-family: Arial, sans-serif;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-            }
-            .qr-container {
-              text-align: center;
-              border: 2px solid #000;
-              padding: 30px;
-              background: white;
-            }
-            h1 {
-              margin: 0 0 10px 0;
-              font-size: 32px;
-              font-weight: bold;
-            }
-            .location {
-              margin: 10px 0 20px 0;
-              font-size: 18px;
-              color: #666;
-            }
-            img {
-              max-width: 300px;
-              margin: 20px 0;
-            }
-            .code {
-              font-size: 24px;
-              font-weight: bold;
-              font-family: 'Courier New', monospace;
-              margin-top: 15px;
-            }
-            @media print {
-              body { padding: 0; }
-              .qr-container { border: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="qr-container">
-            <h1>RACK ${rackDetails.code}</h1>
-            <div class="location">${rackDetails.location || 'Warehouse'}</div>
-            <img src="${qrDataUrl}" alt="QR Code" />
-            <div class="code">RACK_${rackDetails.code}</div>
-          </div>
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
   };
 
   const handleBulkQrOpen = async () => {
@@ -366,7 +366,9 @@ export const Racks: React.FC = () => {
         <div className="space-y-3">
           {/* Section Buttons */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 mb-2">📍 SECTION</p>
+            <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1">
+              <MapPinIcon className="h-4 w-4" /> SECTION
+            </p>
             <div className="flex items-center flex-wrap gap-2">
               <button
                 onClick={() => setSelectedSection('all')}
@@ -392,7 +394,9 @@ export const Racks: React.FC = () => {
 
           {/* Category Buttons */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 mb-2">📂 CATEGORY</p>
+            <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1">
+              <TagIcon className="h-4 w-4" /> CATEGORY
+            </p>
             <div className="flex items-center flex-wrap gap-2">
               <button
                 onClick={() => setSelectedCategory('all')}
@@ -408,7 +412,7 @@ export const Racks: React.FC = () => {
                   selectedCategory === 'DIOR' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
                 }`}
               >
-                👜 Dior
+                Dior
               </button>
               <button
                 onClick={() => setSelectedCategory('COMPANY_MATERIAL')}
@@ -416,7 +420,7 @@ export const Racks: React.FC = () => {
                   selectedCategory === 'COMPANY_MATERIAL' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
                 }`}
               >
-                🏢 Company Material
+                Company Material
               </button>
               <button
                 onClick={() => setSelectedCategory('JAZEERA')}
@@ -424,7 +428,7 @@ export const Racks: React.FC = () => {
                   selectedCategory === 'JAZEERA' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'
                 }`}
               >
-                🏝️ Jazeera
+                Jazeera
               </button>
               <button
                 onClick={() => setSelectedCategory('OTHERS')}
@@ -432,7 +436,7 @@ export const Racks: React.FC = () => {
                   selectedCategory === 'OTHERS' ? 'bg-gray-600 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                📦 Others
+                Others
               </button>
             </div>
           </div>
@@ -442,7 +446,9 @@ export const Racks: React.FC = () => {
       {/* Visual Rack Grid - Modern & Clean Design */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">🏗️ Warehouse Layout</h3>
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <BuildingOfficeIcon className="h-5 w-5" /> Warehouse Layout
+          </h3>
           <div className="flex items-center gap-4 text-xs">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-full bg-green-500"></div>
@@ -465,12 +471,18 @@ export const Racks: React.FC = () => {
               const utilization = typeof rack.utilization === 'number'
                 ? rack.utilization
                 : Math.round((rack.capacityUsed / totalCapacity) * 100);
-              const shipmentCount = rack.inventory?.length || 0;
+              
+              // Count unique shipments from boxes
+              const uniqueShipments = new Set();
+              if (rack.boxes && Array.isArray(rack.boxes)) {
+                rack.boxes.forEach((box: any) => {
+                  if (box.shipmentId) {
+                    uniqueShipments.add(box.shipmentId);
+                  }
+                });
+              }
+              const shipmentCount = uniqueShipments.size;
               const available = Math.max(totalCapacity - rack.capacityUsed, 0);
-        const companyProfile = rack.companyProfile;
-        const companyName = companyProfile?.name || rack.category?.name || 'Unassigned';
-        const companyDescription = companyProfile?.description || rack.category?.description;
-        const companyStatus = companyProfile?.contractStatus;
               
               return (
                 <div
@@ -494,11 +506,11 @@ export const Racks: React.FC = () => {
                     }`}>
                       {rack.status === 'ACTIVE' 
                         ? utilization >= 100 
-                          ? '🔴 FULL' 
+                          ? 'FULL' 
                           : utilization >= 90 
-                          ? '🟡 BUSY' 
-                          : '🟢 OK'
-                        : '⚫ OFF'}
+                          ? 'BUSY' 
+                          : 'OK'
+                        : 'OFF'}
                     </span>
                   </div>
 
@@ -515,68 +527,47 @@ export const Racks: React.FC = () => {
                     <PencilIcon className="h-4 w-4 text-blue-600" />
                   </button>
                   
-                  {/* Rack Code */}
-                  <div className="flex items-center gap-2 mb-1 mt-3">
-                    <div className="p-1.5 bg-primary-100 rounded-lg">
-                      <QrCodeIcon className="h-5 w-5 text-primary-600" />
-                    </div>
-                    <div className="flex-1">
-                      <span className="text-xl font-semibold text-gray-900 leading-tight">{rack.code}</span>
-                      <p className="text-[11px] text-gray-500 truncate">{rack.location || 'N/A'}</p>
-                    </div>
-                  </div>
-
-                  {/* Category / Company Name - LARGE */}
-                  <div className="mb-3 p-2.5 bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg border border-purple-200">
-                    <p className="text-[11px] font-semibold text-purple-600 uppercase">📦 Belongs To</p>
-                    <div className="flex items-center gap-3 mt-1">
-                      {companyProfile?.logo && (
-                        <img
-                          src={resolveLogoUrl(companyProfile.logo)}
-                          alt={`${companyName} logo`}
-                          className="h-10 w-10 rounded-lg object-contain bg-white border border-purple-200"
-                        />
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-base font-semibold text-purple-900 truncate leading-tight">{companyName}</p>
-                        {companyStatus && (
-                          <p className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide">{companyStatus}</p>
-                        )}
+                  {/* Rack Code - ENHANCED SIZE */}
+                  <div className="mb-4 mt-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="p-2 bg-primary-100 rounded-lg">
+                        <QrCodeIcon className="h-6 w-6 text-primary-600" />
+                      </div>
+                      <div className="flex-1">
+                        <span className="text-2xl font-bold text-gray-900 leading-tight">{rack.code}</span>
                       </div>
                     </div>
-                    {companyDescription && (
-                      <p className="text-[11px] text-gray-700 mt-2 line-clamp-2">{companyDescription}</p>
-                    )}
+                    <p className="text-sm text-gray-600 font-medium">{rack.location || 'N/A'}</p>
                   </div>
                   
                   {/* Capacity Info */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-medium text-gray-600">Capacity (pallets)</span>
-                      <span className="text-sm font-semibold text-gray-900">{rack.capacityUsed}/{rack.capacityTotal}</span>
+                      <span className="text-sm font-semibold text-gray-700">Capacity (pallets)</span>
+                      <span className="text-lg font-bold text-gray-900">{rack.capacityUsed}/{rack.capacityTotal}</span>
                     </div>
                     
                     {/* Progress Bar */}
-                    <div className="relative w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                       <div
-                        className={`h-2.5 rounded-full transition-all duration-500 ${getUtilizationColor(utilization)}`}
+                        className={`h-3 rounded-full transition-all duration-500 ${getUtilizationColor(utilization)}`}
                         style={{ width: `${Math.min(utilization, 100)}%` }}
                       />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-[11px] font-bold text-white drop-shadow-md">{utilization}%</span>
+                        <span className="text-xs font-bold text-white drop-shadow-md">{utilization}%</span>
                       </div>
                     </div>
                     
-                    {/* Stats */}
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                    {/* Stats - ENHANCED SIZE */}
+                    <div className="flex items-center justify-between pt-2 border-t-2 border-gray-200">
                       <div className="text-center">
-                        <p className="text-[11px] text-gray-500">Available</p>
-                        <p className="text-sm font-semibold text-green-600">{available}</p>
+                        <p className="text-xs font-semibold text-gray-500 uppercase">Available</p>
+                        <p className="text-xl font-bold text-green-600">{available}</p>
                       </div>
-                      <div className="h-8 w-px bg-gray-300"></div>
+                      <div className="h-10 w-px bg-gray-300"></div>
                       <div className="text-center">
-                        <p className="text-[11px] text-gray-500">Shipments</p>
-                        <p className="text-sm font-semibold text-blue-600">{shipmentCount}</p>
+                        <p className="text-xs font-semibold text-gray-500 uppercase">Shipments</p>
+                        <p className="text-xl font-bold text-blue-600">{shipmentCount}</p>
                       </div>
                     </div>
                   </div>
@@ -620,8 +611,8 @@ export const Racks: React.FC = () => {
                   <QrCodeIcon className="h-8 w-8" />
                   Rack {rackDetails?.code || '...'}
                 </h2>
-                <p className="text-sm text-blue-100 mt-1">
-                  📍 {rackDetails?.location || 'Loading...'}
+                <p className="text-sm text-blue-100 mt-1 flex items-center gap-1">
+                  <MapPinIcon className="h-4 w-4" /> {rackDetails?.location || 'Loading...'}
                 </p>
               </div>
               <button
@@ -655,9 +646,9 @@ export const Racks: React.FC = () => {
                       }`}>
                         {rackDetails?.status === 'ACTIVE'
                           ? rackDetails.capacityUsed >= rackDetails.capacityTotal
-                            ? '🔴 FULL'
-                            : '🟢 ACTIVE'
-                          : '⚫ INACTIVE'}
+                            ? <><ExclamationCircleIcon className="h-4 w-4" /> FULL</>
+                            : <><CheckCircleIcon className="h-4 w-4" /> ACTIVE</>
+                          : 'INACTIVE'}
                       </span>
                     </div>
                     <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
@@ -697,7 +688,13 @@ export const Racks: React.FC = () => {
                         )}
                         <div className="min-w-0">
                           <p className="text-xs text-purple-600 font-semibold uppercase mb-1">Company / Profile</p>
-                          <p className="text-lg font-bold text-purple-900 truncate">{rackDetails.companyProfile.name}</p>
+                          <p
+                            className="text-lg font-bold text-purple-900 truncate cursor-pointer underline-offset-2 hover:underline"
+                            title="Filter boxes by this company"
+                            onClick={() => setCompanyFilter(prev => prev === rackDetails.companyProfile.name ? null : rackDetails.companyProfile.name)}
+                          >
+                            {rackDetails.companyProfile.name}
+                          </p>
                           {rackDetails.companyProfile.contractStatus && (
                             <p className="text-xs font-semibold text-purple-700 uppercase">
                               {rackDetails.companyProfile.contractStatus}
@@ -706,7 +703,7 @@ export const Racks: React.FC = () => {
                           {(rackDetails.companyProfile.contactPerson || rackDetails.companyProfile.contactPhone) && (
                             <p className="text-xs text-purple-700 mt-1">
                               {rackDetails.companyProfile.contactPerson && `Contact: ${rackDetails.companyProfile.contactPerson}`}
-                              {rackDetails.companyProfile.contactPerson && rackDetails.companyProfile.contactPhone && ' · '}
+                              {rackDetails.companyProfile.contactPerson && rackDetails.companyProfile.contactPhone && ' ?? '}
                               {rackDetails.companyProfile.contactPhone && `Phone: ${rackDetails.companyProfile.contactPhone}`}
                             </p>
                           )}
@@ -721,7 +718,9 @@ export const Racks: React.FC = () => {
                     {/* Category */}
                     {rackDetails?.category && (
                       <div>
-                        <p className="text-xs text-gray-500 font-medium mb-2">📂 Category</p>
+                        <p className="text-xs text-gray-500 font-medium mb-2 flex items-center gap-1">
+                          <TagIcon className="h-4 w-4" /> Category
+                        </p>
                         <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold ${
                           rackDetails.category === 'DIOR' 
                             ? 'bg-purple-100 text-purple-800 border border-purple-300'
@@ -731,10 +730,10 @@ export const Racks: React.FC = () => {
                             ? 'bg-green-100 text-green-800 border border-green-300'
                             : 'bg-gray-100 text-gray-800 border border-gray-300'
                         }`}>
-                          {rackDetails.category === 'DIOR' && '👜 Dior'}
-                          {rackDetails.category === 'COMPANY_MATERIAL' && '🏢 Company Material'}
-                          {rackDetails.category === 'JAZEERA' && '🏝️ Jazeera'}
-                          {rackDetails.category === 'OTHERS' && '📦 Others'}
+                          {rackDetails.category === 'DIOR' && 'Dior'}
+                          {rackDetails.category === 'COMPANY_MATERIAL' && 'Company Material'}
+                          {rackDetails.category === 'JAZEERA' && 'Jazeera'}
+                          {rackDetails.category === 'OTHERS' && 'Others'}
                         </span>
                       </div>
                     )}
@@ -742,7 +741,9 @@ export const Racks: React.FC = () => {
                     {/* Dimensions */}
                     {(rackDetails?.length || rackDetails?.width || rackDetails?.height) && (
                       <div>
-                        <p className="text-xs text-gray-500 font-medium mb-2">📏 Dimensions</p>
+                        <p className="text-xs text-gray-500 font-medium mb-2 flex items-center gap-1">
+                          <SquaresPlusIcon className="h-4 w-4" /> Dimensions
+                        </p>
                         <div className="flex items-center gap-2 text-sm font-mono bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
                           {rackDetails.length && (
                             <span className="font-bold text-gray-900">
@@ -751,7 +752,7 @@ export const Racks: React.FC = () => {
                           )}
                           {rackDetails.width && (
                             <>
-                              <span className="text-gray-400">×</span>
+                              <span className="text-gray-400">??</span>
                               <span className="font-bold text-gray-900">
                                 W: {rackDetails.width}
                               </span>
@@ -759,7 +760,7 @@ export const Racks: React.FC = () => {
                           )}
                           {rackDetails.height && (
                             <>
-                              <span className="text-gray-400">×</span>
+                              <span className="text-gray-400">??</span>
                               <span className="font-bold text-gray-900">
                                 H: {rackDetails.height}
                               </span>
@@ -775,126 +776,116 @@ export const Racks: React.FC = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6">
-                  <div className="grid grid-cols-2 gap-6">
-                    {/* Left: Shipments List */}
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        📦 Stored Shipments ({rackDetails?.boxes?.length || 0})
-                      </h3>
+                  {/* Shipments List - Full Width */}
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <RectangleStackIcon className="h-5 w-5" /> Stored Shipments ({rackDetails?.boxes?.length || 0})
+                    </h3>
 
                       {rackDetails?.boxes && rackDetails.boxes.length > 0 ? (
-                        <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                          {rackDetails.boxes.map((box: any) => {
-                            let photoUrls: string[] = [];
-                            if (box.photos) {
+                        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                          {(() => {
+                            // Group boxes by pallet number
+                            const groups = new Map<number, any[]>();
+                            const filtered = rackDetails.boxes.filter((box: any) => {
+                              if (!companyFilter) return true;
+                              const name = box.shipment?.companyProfile?.name || box.shipment?.clientName || '';
+                              return name === companyFilter;
+                            });
+                            filtered.forEach((box: any) => {
+                              let pn = 0;
                               try {
-                                const parsed = JSON.parse(box.photos);
-                                photoUrls = Array.isArray(parsed) ? parsed : [];
-                              } catch (error) {
-                                console.warn('Failed to parse box photos', error);
-                                photoUrls = [];
+                                const meta = box.pieceQR ? JSON.parse(box.pieceQR) : undefined;
+                                pn = Number(meta?.palletNumber || 0);
+                              } catch {
+                                const m = /-PAL-(\d+)/.exec(box.qrCode || '');
+                                pn = m ? parseInt(m[1], 10) : 0;
                               }
-                            }
-                            return (
-                            <div
-                              key={box.id}
-                              className="bg-gradient-to-r from-white to-blue-50 border-2 border-blue-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-md transition-all"
-                            >
-                              <div className="flex items-start justify-between mb-2">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-sm font-bold text-blue-600">
-                                      #{box.shipment?.referenceId || 'N/A'}
-                                    </span>
-                                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                                      box.shipment?.status === 'STORED' || box.shipment?.status === 'IN_STORAGE'
-                                        ? 'bg-green-100 text-green-800'
-                                        : box.shipment?.status === 'RELEASED'
-                                        ? 'bg-blue-100 text-blue-800'
-                                        : 'bg-gray-100 text-gray-800'
-                                    }`}>
-                                      {box.shipment?.status || 'N/A'}
-                                    </span>
+                              if (!groups.has(pn)) groups.set(pn, []);
+                              groups.get(pn)!.push(box);
+                            });
+                            // Render groups: pallets first in order, then loose (0)
+                            const ordered = Array.from(groups.entries()).sort((a,b) => {
+                              if (a[0] === 0) return 1;
+                              if (b[0] === 0) return -1;
+                              return a[0] - b[0];
+                            });
+                            return ordered.map(([pn, boxes]) => (
+                              <div key={`grp-${pn}`}>
+                                <div className={`flex items-center justify-between mb-2 ${pn===0 ? 'text-purple-800' : 'text-amber-800'}`}>
+                                  <h4 className={`text-sm font-bold ${pn===0 ? '' : ''}`}>
+                                    {pn === 0 ? 'Loose' : `Pallet #${pn}`} ({boxes.length} pcs)
+                                  </h4>
+                                  <div className={`text-[10px] px-2 py-0.5 rounded-full border ${pn===0 ? 'border-dashed border-purple-400 text-purple-600' : 'border-amber-400 text-amber-600'}`}>
+                                    {pn === 0 ? 'LOOSE' : 'PALLET'}
                                   </div>
-                                  <p className="text-xs text-gray-500">
-                                    Box: <span className="font-semibold text-gray-700">{box.boxNumber}</span>
-                                  </p>
+                                </div>
+                                <div className="space-y-3">
+                                  {(() => {
+                                    // Group boxes by shipment
+                                    const shipmentGroups = new Map<string, any[]>();
+                                    boxes.forEach((box: any) => {
+                                      const shipmentId = box.shipment?.id || 'unknown';
+                                      if (!shipmentGroups.has(shipmentId)) {
+                                        shipmentGroups.set(shipmentId, []);
+                                      }
+                                      shipmentGroups.get(shipmentId)!.push(box);
+                                    });
+
+                                    return Array.from(shipmentGroups.values()).map((shipmentBoxes: any[], shipmentIdx: number) => {
+                                      const firstBox = shipmentBoxes[0];
+                                      const shipment = firstBox.shipment;
+                                      
+                                      // Collect all photos from all boxes in this shipment
+                                      const allPhotos: string[] = [];
+                                      shipmentBoxes.forEach((box: any) => {
+                                        if (box.photos) {
+                                          try {
+                                            const parsed = JSON.parse(box.photos);
+                                            if (Array.isArray(parsed)) {
+                                              allPhotos.push(...parsed);
+                                            }
+                                          } catch (error) {
+                                            console.warn('Failed to parse box photos', error);
+                                          }
+                                        }
+                                      });
+
+                                      return (
+                                        <ShipmentBoxCard
+                                          key={`shipment-${shipmentIdx}`}
+                                          shipment={shipment}
+                                          boxCount={shipmentBoxes.length}
+                                          photos={allPhotos}
+                                        />
+                                      );
+                                    });
+                                  })()}
                                 </div>
                               </div>
-                              {box.shipment?.shipper && (
-                                <div className="text-xs text-gray-600 mt-2 space-y-1">
-                                  <p>📤 <span className="font-medium">From:</span> {box.shipment.shipper}</p>
-                                  {box.shipment.consignee && (
-                                    <p>📥 <span className="font-medium">To:</span> {box.shipment.consignee}</p>
-                                  )}
-                                </div>
-                              )}
-                              
-                              {/* Photo Gallery */}
-                              {photoUrls.length > 0 && (
-                                <div className="mt-3 pt-3 border-t border-blue-200">
-                                  <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
-                                    📷 Photos ({photoUrls.length})
-                                  </p>
-                                  <div className="grid grid-cols-4 gap-2">
-                                    {photoUrls.map((url: string, idx: number) => (
-                                      <a
-                                        key={idx}
-                                        href={url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="group relative block aspect-square rounded-lg overflow-hidden border-2 border-blue-200 hover:border-blue-500 transition-all"
-                                      >
-                                        <img
-                                          src={url}
-                                          alt={`Box photo ${idx + 1}`}
-                                          className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                                        />
-                                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
-                                          <span className="text-white text-xs font-bold opacity-0 group-hover:opacity-100">
-                                            🔍
-                                          </span>
-                                        </div>
-                                      </a>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            );
-                          })}
+                            ));
+                          })()}
                         </div>
                       ) : (
                         <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                          <div className="text-4xl mb-3">📭</div>
+                          <div className="text-4xl mb-3">????</div>
                           <p className="text-gray-500 font-medium">No shipments stored</p>
                           <p className="text-sm text-gray-400 mt-1">This rack is empty</p>
                         </div>
                       )}
                     </div>
-
-                    {/* Right: QR Code */}
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <QrCodeIcon className="h-6 w-6 text-primary-600" />
-                        QR Code
-                      </h3>
-                      <div className="bg-white border-2 border-gray-200 rounded-xl p-6 text-center">
-                        <canvas ref={qrCanvasRef} className="mx-auto mb-4"></canvas>
-                        <p className="text-sm font-mono font-bold text-gray-700 mb-4">
-                          RACK_{rackDetails?.code}
-                        </p>
-                        <button
-                          onClick={handlePrintQR}
-                          className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold shadow-lg hover:shadow-xl transition-all"
-                        >
-                          <PrinterIcon className="h-5 w-5" />
-                          Print QR Code
-                        </button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
+
+                {companyFilter && (
+                  <div className="px-6 pb-4 -mt-2">
+                    <button
+                      onClick={() => setCompanyFilter(null)}
+                      className="text-xs px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-full text-gray-700"
+                    >
+                      Clear company filter
+                    </button>
+                  </div>
+                )}
 
                 {/* Footer */}
                 <div className="p-6 border-t bg-gray-50 flex justify-between items-center">
@@ -988,3 +979,4 @@ export const Racks: React.FC = () => {
     </div>
   );
 };
+

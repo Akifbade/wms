@@ -8,8 +8,6 @@ import {
   CubeIcon,
   ArchiveBoxIcon,
   ArrowPathIcon,
-  PhotoIcon,
-  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { Html5Qrcode } from 'html5-qrcode';
 import { shipmentsAPI, racksAPI } from '../../services/api';
@@ -31,10 +29,7 @@ export const Scanner: React.FC = () => {
   const [pendingShipment, setPendingShipment] = useState<any>(null);
   const [boxQuantity, setBoxQuantity] = useState<number>(0);
   const [remainingBoxes, setRemainingBoxes] = useState<number>(0);
-  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
-  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const qrCodeRegionId = 'qr-reader';
   
   // Tab states
@@ -44,40 +39,35 @@ export const Scanner: React.FC = () => {
   const [racks, setRacks] = useState<any[]>([]);
   const [selectedShipmentForRack, setSelectedShipmentForRack] = useState<any>(null);
   const [showRackSelection, setShowRackSelection] = useState(false);
+  
+  // Pallet + Box assignment states
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [selectedRackForAssignment, setSelectedRackForAssignment] = useState<any>(null);
+  const [palletQuantity, setPalletQuantity] = useState<number>(0);
+  const [looseBoxQuantity, setLooseBoxQuantity] = useState<number>(0);
+  const [assignmentPhotos, setAssignmentPhotos] = useState<File[]>([]);
 
   useEffect(() => {
     return () => {
       if (scannerRef.current) {
         scannerRef.current.stop().catch(console.error);
       }
-      // Cleanup photo preview URLs
-      photoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [photoPreviewUrls]);
-
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length + selectedPhotos.length > 10) {
-      setError('Maximum 10 photos allowed');
-      return;
-    }
-    
-    // Create preview URLs
-    const newPreviews = files.map(file => URL.createObjectURL(file));
-    setPhotoPreviewUrls(prev => [...prev, ...newPreviews]);
-    setSelectedPhotos(prev => [...prev, ...files]);
-  };
-
-  const removePhoto = (index: number) => {
-    URL.revokeObjectURL(photoPreviewUrls[index]);
-    setPhotoPreviewUrls(prev => prev.filter((_, i) => i !== index));
-    setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
   const startScanning = async () => {
     try {
       setError('');
       setScanning(true);
+      
+      // Check if we have HTTPS or localhost
+      const isSecureContext = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+      console.log('🔒 Secure context:', isSecureContext, 'Protocol:', window.location.protocol);
+      
+      // Check if mediaDevices is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API not available. Please use HTTPS or localhost.');
+      }
       
       const html5QrCode = new Html5Qrcode(qrCodeRegionId);
       scannerRef.current = html5QrCode;
@@ -89,7 +79,22 @@ export const Scanner: React.FC = () => {
         () => {}  // onScanFailure
       );
     } catch (err: any) {
-      setError('❌ Camera access denied. Please allow camera permission.');
+      console.error('❌ Camera error:', err);
+      let errorMsg = '❌ Camera access denied.';
+      
+      if (err.message?.includes('HTTPS') || err.message?.includes('localhost')) {
+        errorMsg = '🔒 Camera requires HTTPS or localhost. Please use: https://staging.qgocargo.cloud';
+      } else if (err.name === 'NotAllowedError') {
+        errorMsg = '❌ Camera permission denied. Please allow camera access in browser settings.';
+      } else if (err.name === 'NotFoundError') {
+        errorMsg = '❌ No camera found on device.';
+      } else if (err.name === 'NotReadableError') {
+        errorMsg = '❌ Camera is already in use by another application.';
+      } else {
+        errorMsg = `❌ Camera error: ${err.message || 'Unknown error'}`;
+      }
+      
+      setError(errorMsg);
       setScanning(false);
     }
   };
@@ -191,23 +196,17 @@ export const Scanner: React.FC = () => {
       // Take first N boxes based on quantity
       const boxNumbers = unassignedBoxes.slice(0, boxQuantity).map((b: any) => b.boxNumber);
       
-      // Prepare FormData with photos
-      const formData = new FormData();
-      formData.append('rackId', scanResult.data.id);
-      formData.append('boxNumbers', JSON.stringify(boxNumbers));
-      
-      // Append photos
-      selectedPhotos.forEach((photo, index) => {
-        formData.append('photos', photo);
-      });
-      
-      // Assign boxes to rack with photos
+      // Assign boxes to rack
       await fetch(`/api/shipments/${pendingShipment.id}/assign-boxes`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
-        body: formData
+        body: JSON.stringify({
+          rackId: scanResult.data.id,
+          boxNumbers
+        })
       });
       
       // Update shipment status if all boxes assigned
@@ -222,13 +221,11 @@ export const Scanner: React.FC = () => {
         });
       }
       
-      alert(`✅ ${boxQuantity} boxes assigned to ${scanResult.data.code}!${selectedPhotos.length > 0 ? `\n� ${selectedPhotos.length} photos uploaded!` : ''}\n📊 Rack capacity updated.`);
+      alert(`✅ ${boxQuantity} boxes assigned to ${scanResult.data.code}!\n📊 Rack capacity updated. Check Racks page for current status.`);
       setPendingShipment(null);
       setScanResult(null);
       setBoxQuantity(0);
       setRemainingBoxes(0);
-      setSelectedPhotos([]);
-      setPhotoPreviewUrls([]);
     } catch (err: any) {
       setError(err.message || 'Failed to assign');
     } finally {
@@ -242,13 +239,14 @@ export const Scanner: React.FC = () => {
     setPendingShipment(null);
   };
 
-  // Load pending shipments
+  // Load pending shipments (including PARTIAL status)
   const loadPendingShipments = async () => {
     try {
       setLoading(true);
       console.log('Loading pending shipments...');
       const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/shipments?status=PENDING', {
+      // Fetch both PENDING and PARTIAL status shipments
+      const response = await fetch('/api/shipments', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -260,24 +258,31 @@ export const Scanner: React.FC = () => {
         console.log('Loaded shipments:', data);
         const shipments = data.shipments || data || [];
         
-        // Filter shipments to only show those with unassigned boxes
+        // Filter shipments to only show PENDING and PARTIAL status with unassigned boxes
         const shipmentsWithBoxes = await Promise.all(
-          shipments.map(async (shipment: any) => {
-            try {
-              const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-              });
-              const boxData = await boxResponse.json();
-              const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
-              return unassignedBoxes > 0 ? { ...shipment, remainingBoxes: unassignedBoxes } : null;
-            } catch {
-              return shipment; // Keep shipment if error checking boxes
-            }
-          })
+          shipments
+            .filter((s: any) => s.status === 'PENDING' || s.status === 'PARTIAL')
+            .map(async (shipment: any) => {
+              try {
+                const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
+                  headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const boxData = await boxResponse.json();
+                const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
+                const totalBoxes = boxData.boxes.length;
+                return unassignedBoxes > 0 ? { 
+                  ...shipment, 
+                  remainingBoxes: unassignedBoxes,
+                  totalBoxes: totalBoxes 
+                } : null;
+              } catch {
+                return shipment; // Keep shipment if error checking boxes
+              }
+            })
         );
         
         const validShipments = shipmentsWithBoxes.filter((s: any) => s !== null);
-        console.log('Shipments with unassigned boxes:', validShipments);
+        console.log('Shipments with unassigned boxes (PENDING + PARTIAL):', validShipments);
         setAllShipments(validShipments);
         setFilteredShipments(validShipments);
       } else {
@@ -292,35 +297,41 @@ export const Scanner: React.FC = () => {
     }
   };
 
-  // Handle rack selection from pending list
+  // Handle rack selection from pending list - NOW OPENS ASSIGNMENT MODAL
   const handleRackSelectionFromList = async (shipment: any, rack: any) => {
     try {
       setLoading(true);
       
-      // Get box count
+      // Get box count and shipment details
       const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
       });
       const boxData = await boxResponse.json();
       const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
       
-      // Set rack as scanned
-      setScanResult({
-        type: 'rack',
-        data: rack,
-        rawCode: rack.code
-      });
+      // Calculate pallet info
+      const boxesPerPallet = shipment.boxesPerPallet || 0;
+      const totalPallets = boxesPerPallet > 0 ? Math.floor(unassignedBoxes / boxesPerPallet) : 0;
+      const looseBoxes = boxesPerPallet > 0 ? unassignedBoxes % boxesPerPallet : unassignedBoxes;
       
-      // Set shipment as pending
-      setPendingShipment({
+      // Set selected shipment and rack
+      setSelectedShipmentForRack({
         ...shipment,
-        remainingBoxes: unassignedBoxes
+        remainingBoxes: unassignedBoxes,
+        totalPallets,
+        looseBoxes,
+        boxesPerPallet
       });
-      setRemainingBoxes(unassignedBoxes);
+      setSelectedRackForAssignment(rack);
       
-      // Switch to scanner tab to complete assignment
-      setActiveTab('scanner');
+      // Set initial quantities
+      setPalletQuantity(totalPallets);
+      setLooseBoxQuantity(looseBoxes);
+      
+      // Hide rack selection and show assignment modal
       setShowRackSelection(false);
+      setShowAssignmentModal(true);
+      
     } catch (err) {
       setError('Failed to load rack/shipment details');
     } finally {
@@ -363,6 +374,84 @@ export const Scanner: React.FC = () => {
     } catch (err) {
       console.error('Error loading racks:', err);
       setRacks([]);
+    }
+  };
+
+  // Confirm pallet + box assignment to rack
+  const handleConfirmAssignment = async () => {
+    if (!selectedShipmentForRack || !selectedRackForAssignment) return;
+    
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('authToken');
+      
+      // Calculate total boxes to assign
+      const boxesPerPallet = selectedShipmentForRack.boxesPerPallet || 0;
+      const totalBoxesToAssign = (palletQuantity * boxesPerPallet) + looseBoxQuantity;
+      
+      console.log('🎯 Assigning:', {
+        pallets: palletQuantity,
+        looseBoxes: looseBoxQuantity,
+        totalBoxes: totalBoxesToAssign,
+        rack: selectedRackForAssignment.code,
+        shipment: selectedShipmentForRack.referenceId,
+        photos: assignmentPhotos.length
+      });
+
+      // Upload photos first if any
+      let photoUrls: string[] = [];
+      if (assignmentPhotos.length > 0) {
+        for (const photo of assignmentPhotos) {
+          const formData = new FormData();
+          formData.append('photo', photo);
+          
+          const uploadRes = await fetch('/api/shipments/upload/photo', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+          });
+          
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            photoUrls.push(uploadData.photoUrl);
+          }
+        }
+        console.log('📸 Uploaded photos:', photoUrls);
+      }
+      
+      // Assign boxes to rack with photos
+      const response = await fetch(`/api/shipments/${selectedShipmentForRack.id}/assign-rack`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          rackId: selectedRackForAssignment.id,
+          quantity: totalBoxesToAssign,
+          pallets: palletQuantity,
+          looseBoxes: looseBoxQuantity,
+          photos: photoUrls
+        })
+      });
+      
+      if (response.ok) {
+        // Success - refresh lists and close modal
+        alert(`✅ Successfully assigned ${palletQuantity} pallets + ${looseBoxQuantity} boxes to ${selectedRackForAssignment.code}${photoUrls.length > 0 ? ` with ${photoUrls.length} photos` : ''}`);
+        setShowAssignmentModal(false);
+        setPalletQuantity(0);
+        setLooseBoxQuantity(0);
+        setAssignmentPhotos([]);
+        loadPendingShipments();
+        loadRacks();
+      } else {
+        const error = await response.json();
+        setError(error.message || 'Failed to assign boxes to rack');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to assign boxes to rack');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -530,52 +619,6 @@ export const Scanner: React.FC = () => {
                           </p>
                         </div>
 
-                        {/* Photo Upload Section */}
-                        <div className="mb-4 bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border-2 border-purple-300">
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            📷 Upload Photos (Optional - Max 10)
-                          </label>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            onChange={handlePhotoSelect}
-                            className="hidden"
-                          />
-                          <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-bold flex items-center justify-center gap-2"
-                          >
-                            <PhotoIcon className="w-5 h-5" />
-                            {selectedPhotos.length > 0 ? `${selectedPhotos.length} Photos Selected` : 'Select Photos'}
-                          </button>
-                          
-                          {/* Photo Previews */}
-                          {photoPreviewUrls.length > 0 && (
-                            <div className="mt-3 grid grid-cols-3 gap-2">
-                              {photoPreviewUrls.map((url, index) => (
-                                <div key={index} className="relative group">
-                                  <img
-                                    src={url}
-                                    alt={`Preview ${index + 1}`}
-                                    className="w-full h-20 object-cover rounded-lg border-2 border-purple-200"
-                                  />
-                                  <button
-                                    onClick={() => removePhoto(index)}
-                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  >
-                                    <XMarkIcon className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <p className="text-xs text-gray-600 mt-2">
-                            💡 Photos will be attached to these boxes for reference
-                          </p>
-                        </div>
-
                         <div className="flex gap-3">
                           <button
                             onClick={assignShipmentToRack}
@@ -589,9 +632,6 @@ export const Scanner: React.FC = () => {
                               setPendingShipment(null);
                               setBoxQuantity(0);
                               setRemainingBoxes(0);
-                              setSelectedPhotos([]);
-                              photoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
-                              setPhotoPreviewUrls([]);
                             }}
                             className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-bold"
                           >
@@ -842,8 +882,12 @@ export const Scanner: React.FC = () => {
                             <span className="text-2xl font-bold text-primary-600">
                               {shipment.referenceId}
                             </span>
-                            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-sm font-semibold rounded-full">
-                              PENDING
+                            <span className={`px-3 py-1 text-sm font-semibold rounded-full ${
+                              shipment.status === 'PARTIAL' 
+                                ? 'bg-orange-100 text-orange-800' 
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {shipment.status === 'PARTIAL' ? '🔄 PARTIAL' : '⏳ PENDING'}
                             </span>
                           </div>
                           <div className="grid grid-cols-2 gap-4 text-lg">
@@ -853,7 +897,14 @@ export const Scanner: React.FC = () => {
                             </div>
                             <div>
                               <span className="text-gray-500">Boxes:</span>
-                              <p className="font-semibold text-gray-900">{shipment.totalBoxes || shipment.currentBoxCount || 0} 📦</p>
+                              <p className="font-semibold text-gray-900">
+                                {shipment.remainingBoxes || 0} / {shipment.totalBoxes || shipment.currentBoxCount || 0} 📦
+                                {shipment.status === 'PARTIAL' && (
+                                  <span className="text-sm text-orange-600 ml-2">
+                                    ({shipment.remainingBoxes} remaining)
+                                  </span>
+                                )}
+                              </p>
                             </div>
                           </div>
                           {shipment.notes && (
@@ -963,6 +1014,263 @@ export const Scanner: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* PALLET + BOX ASSIGNMENT MODAL */}
+      {showAssignmentModal && selectedShipmentForRack && selectedRackForAssignment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-5">
+              <div className="flex items-center gap-3 mb-2">
+                <CheckCircleIcon className="h-8 w-8" />
+                <h2 className="text-2xl font-bold">Scan Successful! ✅</h2>
+              </div>
+              <p className="text-lg font-semibold">{selectedRackForAssignment.code}</p>
+            </div>
+
+            {/* Rack Information */}
+            <div className="p-6 bg-blue-50 border-b-2 border-blue-200">
+              <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center gap-2">
+                📦 Rack Information
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-gray-600">Code:</span>
+                  <p className="text-xl font-bold text-gray-900">{selectedRackForAssignment.code}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600">Location:</span>
+                  <p className="text-xl font-bold text-gray-900">{selectedRackForAssignment.location || 'Section B, Row 2'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600">Section:</span>
+                  <p className="text-xl font-bold text-gray-900">{selectedRackForAssignment.section || '-'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600">Capacity:</span>
+                  <p className="text-xl font-bold text-gray-900">
+                    {selectedRackForAssignment.capacityUsed || 0} / {selectedRackForAssignment.capacityTotal || 100}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Assignment Section */}
+            <div className="p-6">
+              <div className="mb-6">
+                <h3 className="text-lg font-bold text-purple-900 mb-2 flex items-center gap-2">
+                  📦 Assign "{selectedShipmentForRack.referenceId}" to this rack?
+                </h3>
+                <p className="text-gray-600">
+                  Client: <strong>{selectedShipmentForRack.clientName}</strong>
+                </p>
+              </div>
+
+              {/* Pallet + Box Selection */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mb-6">
+                <h4 className="text-lg font-bold text-purple-900 mb-4">
+                  📦 How Many to Assign?
+                </h4>
+                
+                {/* Available Info */}
+                <div className="bg-white rounded-lg p-4 mb-4 border-2 border-purple-300">
+                  <p className="text-sm text-gray-600 mb-2">Available for assignment:</p>
+                  <div className="flex items-center gap-6 text-lg">
+                    {selectedShipmentForRack.totalPallets > 0 && (
+                      <div>
+                        <span className="font-bold text-purple-700">{selectedShipmentForRack.totalPallets} Pallets</span>
+                        <span className="text-gray-500 text-sm ml-2">
+                          ({selectedShipmentForRack.boxesPerPallet} boxes each)
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-bold text-blue-700">{selectedShipmentForRack.looseBoxes} Loose Boxes</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pallet Input */}
+                {selectedShipmentForRack.totalPallets > 0 && (
+                  <div className="mb-4">
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      🎁 Pallets to Assign:
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setPalletQuantity(Math.max(0, palletQuantity - 1))}
+                        className="w-12 h-12 bg-red-500 text-white rounded-lg font-bold text-xl hover:bg-red-600"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        max={selectedShipmentForRack.totalPallets}
+                        value={palletQuantity}
+                        onChange={(e) => setPalletQuantity(Math.min(selectedShipmentForRack.totalPallets, Math.max(0, parseInt(e.target.value) || 0)))}
+                        className="flex-1 text-center text-2xl font-bold border-2 border-purple-300 rounded-lg px-4 py-3"
+                      />
+                      <button
+                        onClick={() => setPalletQuantity(Math.min(selectedShipmentForRack.totalPallets, palletQuantity + 1))}
+                        className="w-12 h-12 bg-green-500 text-white rounded-lg font-bold text-xl hover:bg-green-600"
+                      >
+                        +
+                      </button>
+                      <button
+                        onClick={() => setPalletQuantity(selectedShipmentForRack.totalPallets)}
+                        className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+                      >
+                        🎯 All
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      ⚡ Max: {selectedShipmentForRack.totalPallets} pallets | 
+                      Remaining: {selectedShipmentForRack.totalPallets - palletQuantity} pallets
+                    </p>
+                  </div>
+                )}
+
+                {/* Loose Box Input */}
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-semibold mb-2">
+                    📦 Loose Boxes to Assign:
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setLooseBoxQuantity(Math.max(0, looseBoxQuantity - 1))}
+                      className="w-12 h-12 bg-red-500 text-white rounded-lg font-bold text-xl hover:bg-red-600"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      max={selectedShipmentForRack.looseBoxes}
+                      value={looseBoxQuantity}
+                      onChange={(e) => setLooseBoxQuantity(Math.min(selectedShipmentForRack.looseBoxes, Math.max(0, parseInt(e.target.value) || 0)))}
+                      className="flex-1 text-center text-2xl font-bold border-2 border-blue-300 rounded-lg px-4 py-3"
+                    />
+                    <button
+                      onClick={() => setLooseBoxQuantity(Math.min(selectedShipmentForRack.looseBoxes, looseBoxQuantity + 1))}
+                      className="w-12 h-12 bg-green-500 text-white rounded-lg font-bold text-xl hover:bg-green-600"
+                    >
+                      +
+                    </button>
+                    <button
+                      onClick={() => setLooseBoxQuantity(selectedShipmentForRack.looseBoxes)}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+                    >
+                      🎯 All
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-2">
+                    ⚡ Max: {selectedShipmentForRack.looseBoxes} boxes | 
+                    Remaining: {selectedShipmentForRack.looseBoxes - looseBoxQuantity} boxes
+                  </p>
+                </div>
+
+                {/* Total Summary */}
+                <div className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-lg p-4 border-2 border-green-400">
+                  <p className="text-gray-700 font-semibold mb-2">Total to assign:</p>
+                  <div className="flex items-center gap-4 text-xl font-bold">
+                    {palletQuantity > 0 && (
+                      <span className="text-purple-700">
+                        {palletQuantity} Pallet{palletQuantity > 1 ? 's' : ''} 
+                        <span className="text-sm text-gray-600 ml-1">
+                          ({palletQuantity * (selectedShipmentForRack.boxesPerPallet || 0)} boxes)
+                        </span>
+                      </span>
+                    )}
+                    {looseBoxQuantity > 0 && (
+                      <span className="text-blue-700">+ {looseBoxQuantity} Box{looseBoxQuantity > 1 ? 'es' : ''}</span>
+                    )}
+                  </div>
+                  <p className="text-lg font-bold text-green-700 mt-2">
+                    = {(palletQuantity * (selectedShipmentForRack.boxesPerPallet || 0)) + looseBoxQuantity} Total Boxes
+                  </p>
+                </div>
+
+                {/* Photo Upload Section */}
+                <div className="bg-purple-50 rounded-xl p-6 border-2 border-purple-300">
+                  <h4 className="text-lg font-bold text-purple-900 mb-3 flex items-center gap-2">
+                    📸 Upload Photos (Optional - Max 10)
+                  </h4>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Take photos of pallets/boxes for reference
+                  </p>
+                  
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length + assignmentPhotos.length > 10) {
+                        alert('Maximum 10 photos allowed');
+                        return;
+                      }
+                      setAssignmentPhotos([...assignmentPhotos, ...files]);
+                    }}
+                    className="hidden"
+                    id="photo-upload"
+                  />
+                  
+                  <label
+                    htmlFor="photo-upload"
+                    className="block w-full px-6 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 cursor-pointer text-center transition-all"
+                  >
+                    📷 Take/Select Photos ({assignmentPhotos.length}/10)
+                  </label>
+
+                  {/* Photo Preview */}
+                  {assignmentPhotos.length > 0 && (
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      {assignmentPhotos.map((photo, idx) => (
+                        <div key={idx} className="relative group">
+                          <img
+                            src={URL.createObjectURL(photo)}
+                            alt={`Photo ${idx + 1}`}
+                            className="w-full h-24 object-cover rounded-lg border-2 border-purple-300"
+                          />
+                          <button
+                            onClick={() => setAssignmentPhotos(assignmentPhotos.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4">
+                <button
+                  onClick={() => {
+                    setShowAssignmentModal(false);
+                    setPalletQuantity(0);
+                    setLooseBoxQuantity(0);
+                  }}
+                  className="flex-1 px-6 py-4 bg-gray-500 text-white font-bold rounded-xl hover:bg-gray-600 transition-all text-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmAssignment}
+                  disabled={loading || (palletQuantity === 0 && looseBoxQuantity === 0)}
+                  className="flex-1 px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 transition-all text-lg shadow-lg"
+                >
+                  ✅ Confirm Assignment
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

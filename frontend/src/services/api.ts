@@ -3,17 +3,25 @@ const API_BASE_URL = '/api';
 
 // Helper to get auth token
 export const getAuthToken = (): string | null => {
-  return localStorage.getItem('authToken');
+  const storedToken = localStorage.getItem('authToken') || localStorage.getItem('token');
+
+  if (storedToken && !localStorage.getItem('authToken')) {
+    localStorage.setItem('authToken', storedToken);
+  }
+
+  return storedToken;
 };
 
 // Helper to set auth token
 export const setAuthToken = (token: string): void => {
   localStorage.setItem('authToken', token);
+  localStorage.setItem('token', token);
 };
 
 // Helper to clear auth token
 export const clearAuthToken = (): void => {
   localStorage.removeItem('authToken');
+  localStorage.removeItem('token');
   localStorage.removeItem('user');
 };
 
@@ -96,12 +104,13 @@ export const dashboardAPI = {
 
 // Shipments API
 export const shipmentsAPI = {
-  getAll: async (params?: { status?: string; search?: string; page?: number; limit?: number }) => {
+  getAll: async (params?: { status?: string; search?: string; page?: number; limit?: number; isWarehouseShipment?: boolean }) => {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.search) queryParams.append('search', params.search);
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.isWarehouseShipment !== undefined) queryParams.append('isWarehouseShipment', String(params.isWarehouseShipment));
     
     const query = queryParams.toString();
     return apiCall<any>(`/shipments${query ? `?${query}` : ''}`);

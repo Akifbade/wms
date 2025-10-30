@@ -13,6 +13,7 @@ interface Box {
   boxNumber: number;
   qrCode: string;
   status: string;
+  pieceQR?: string; // JSON string with pallet/loose metadata
   rack?: {
     code: string;
     location: string;
@@ -29,6 +30,7 @@ interface Shipment {
   qrCode: string;
   clientName: string;
   companyProfileId?: string;
+  companyProfile?: { id: string; name: string } | null;
   arrivalDate: string;
 }
 
@@ -36,12 +38,29 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [qrImages, setQrImages] = useState<Record<string, string>>({});
-  const [masterQrImage, setMasterQrImage] = useState<string | null>(null);
+  const [branding, setBranding] = useState<{
+    name?: string;
+    logoUrl?: string | null;
+    primaryColor?: string;
+    secondaryColor?: string;
+    accentColor?: string;
+    showCompanyName?: boolean;
+  } | null>(null);
+  // Derived print units: one per pallet, plus one per loose box
+  const [printUnits, setPrintUnits] = useState<Array<
+    | { type: 'PALLET'; key: string; palletNumber: number; pieces: number; qrValue: string }
+    | { type: 'LOOSE_BOX'; key: string; boxId: string; boxNumber: number; qrValue: string }
+  >>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && shipmentId) {
+      // Load branding (logo/colors)
+      fetch('/api/company/branding')
+        .then(r => r.json())
+        .then(d => setBranding(d?.branding || null))
+        .catch(() => {});
       loadShipmentAndBoxes();
     }
   }, [isOpen, shipmentId]);
@@ -70,19 +89,109 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
       });
       if (response.ok) {
         const data = await response.json();
-        
+
         if (!data.boxes || data.boxes.length === 0) {
           setError('No boxes found for this shipment');
           setLoading(false);
           return;
         }
-        
-        setBoxes(data.boxes);
-        
-        // Generate QR code images for individual boxes
+
+        // Ensure pieceQR exists as string and parse for grouping
+        const loaded: Box[] = data.boxes.map((b: any) => ({
+          id: b.id,
+          boxNumber: b.boxNumber,
+          qrCode: b.qrCode,
+          status: b.status,
+          pieceQR: b.pieceQR,
+          rack: b.rack,
+        }));
+        setBoxes(loaded);
+
+        // Build pallet and loose box units
+        const palletCounts = new Map<number, number>();
+        const loose: Box[] = [];
+        loaded.forEach((b) => {
+          let palletNumber = 0;
+          let isLoose = false;
+          try {
+            const meta = b.pieceQR ? JSON.parse(b.pieceQR) : undefined;
+            palletNumber = Number(meta?.palletNumber || 0);
+            isLoose = Boolean(meta?.isLoose) || palletNumber === 0;
+          } catch {
+            // fallback: infer from qrCode suffix `-PAL-x`
+            const m = /-PAL-(\d+)/.exec(b.qrCode);
+            palletNumber = m ? parseInt(m[1], 10) : 0;
+            isLoose = palletNumber === 0;
+          }
+          if (isLoose) {
+            loose.push(b);
+          } else {
+            palletCounts.set(palletNumber, (palletCounts.get(palletNumber) || 0) + 1);
+          }
+        });
+
+        // Create pallet units (one QR per pallet)
+        const totalPallets = shipment?.palletCount || palletCounts.size || 0;
+        const master = (shipment as any)?.qrCode || '';
+        const client = (shipment as any)?.clientName || '';
+        const arrDate = (shipment as any)?.arrivalDate ? new Date((shipment as any).arrivalDate) : null;
+        const ad = arrDate ? `${arrDate.getFullYear()}-${String(arrDate.getMonth()+1).padStart(2,'0')}-${String(arrDate.getDate()).padStart(2,'0')}` : '';
+        const buildPalletQR = (palletNumber: number, pieces: number) => {
+          // Compact summary segment appended to QR for pallet metadata
+          const meta = {
+            t: 'PAL', // type: pallet
+            pn: palletNumber,
+            pc: totalPallets || palletCounts.size,
+            pcs: pieces,
+            ref: shipmentRef,
+            c: client,
+            ad,
+          };
+          let encoded = '';
+          try {
+            encoded = typeof window !== 'undefined' && (window as any).btoa
+              ? (window as any).btoa(JSON.stringify(meta))
+              : btoa(JSON.stringify(meta));
+          } catch {
+            encoded = encodeURIComponent(JSON.stringify(meta));
+          }
+          return master
+            ? `${master}-PAL-${palletNumber}-OF-${totalPallets || palletCounts.size}|S:${encoded}`
+            : `PALLET-${shipmentId}-${palletNumber}|S:${encoded}`;
+        };
+        const palletsUnits = Array.from(palletCounts.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([palletNumber, pieces]) => {
+            const qrValue = buildPalletQR(palletNumber, pieces);
+            return {
+              type: 'PALLET' as const,
+              key: `PAL-${palletNumber}`,
+              palletNumber,
+              pieces,
+              qrValue,
+            };
+          });
+
+        // Loose boxes as individual units
+        const looseUnits = loose
+          .sort((a, b) => a.boxNumber - b.boxNumber)
+          .map((b) => ({
+            type: 'LOOSE_BOX' as const,
+            key: `BOX-${b.id}`,
+            boxId: b.id,
+            boxNumber: b.boxNumber,
+            qrValue: b.qrCode,
+          }));
+
+        const units = [...palletsUnits, ...looseUnits];
+        setPrintUnits(units);
+
+        // Pre-render QR images for all units
         const images: Record<string, string> = {};
-        for (const box of data.boxes) {
-          images[box.id] = await QRCode.toDataURL(box.qrCode, { width: 200 });
+        for (const u of units) {
+          const key = u.key;
+          const val = u.qrValue;
+          images[key] = await QRCode.toDataURL(val, { width: 220 });
         }
         setQrImages(images);
       }
@@ -93,30 +202,15 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
     }
   };
 
-  // Generate master QR image
-  useEffect(() => {
-    if (shipment?.qrCode) {
-      QRCode.toDataURL(shipment.qrCode, { width: 300 }).then(url => {
-        setMasterQrImage(url);
-      });
-    }
-  }, [shipment?.qrCode]);
+  // (master QR image no longer used in pallet-mode printing)
 
   const handlePrintAll = () => {
     window.print();
   };
 
-  const getStatusBadge = (status: string) => {
-    const badges: Record<string, string> = {
-      PENDING: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-      IN_STORAGE: 'bg-green-100 text-green-800 border-green-300',
-      RELEASED: 'bg-gray-100 text-gray-800 border-gray-300',
-    };
-    return badges[status] || badges.PENDING;
-  };
+  // status badge no longer displayed in pallet-mode printing
 
-  // Check if this is a single pallet shipment
-  const isSinglePallet = shipment?.palletCount === 1;
+  // single pallet shortcut no longer needed; we print per pallet always
 
   if (!isOpen) return null;
 
@@ -125,11 +219,16 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 flex justify-between items-center rounded-t-lg print:hidden">
-          <div>
-            <h2 className="text-2xl font-bold">
-              {isSinglePallet ? '🎯 Pallet Master QR Code' : '📦 Individual Box QR Codes'}
-            </h2>
-            <p className="text-indigo-100 text-sm mt-1">Shipment: {shipmentRef}</p>
+          <div className="flex items-center gap-3">
+            {branding?.logoUrl ? (
+              <img src={branding.logoUrl} alt={branding?.name || 'Brand'} className="h-8 w-auto rounded bg-white/10 p-1" />
+            ) : (
+              <span className="inline-flex items-center justify-center h-8 w-8 rounded bg-white/20 font-black">Q</span>
+            )}
+            <div>
+              <h2 className="text-2xl font-bold">QGO Cargo • QR Suite</h2>
+              <p className="text-indigo-100 text-sm mt-1">Shipment: {shipmentRef}{shipment?.companyProfile?.name ? ` • Profile: ${shipment.companyProfile.name}` : ''}</p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -154,70 +253,6 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
               <p className="text-gray-700 font-semibold text-lg">{error}</p>
               <p className="text-gray-500 text-sm mt-2">Boxes will be created when shipment is saved</p>
             </div>
-          ) : isSinglePallet && masterQrImage ? (
-            <>
-              {/* SINGLE PALLET VIEW - MASTER QR CODE */}
-              <div className="mb-6 flex justify-between items-center print:hidden">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    🪵 Master QR Code for Pallet
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Pallet: 1 | Boxes per Pallet: {shipment?.boxesPerPallet} | Total Boxes: {shipment?.originalBoxCount}
-                  </p>
-                </div>
-                <button
-                  onClick={handlePrintAll}
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                  </svg>
-                  Print QR Code
-                </button>
-              </div>
-
-              {/* Master QR Display */}
-              <div className="flex flex-col items-center justify-center gap-6 py-8 print:break-inside-avoid">
-                <div className="border-4 border-indigo-300 rounded-lg p-8 bg-white">
-                  <img 
-                    src={masterQrImage} 
-                    alt="Master Pallet QR"
-                    className="mx-auto"
-                  />
-                </div>
-
-                {/* Pallet Details */}
-                <div className="grid grid-cols-3 gap-4 w-full max-w-2xl text-center">
-                  <div className="border-2 border-blue-300 rounded-lg p-4 bg-blue-50">
-                    <p className="text-gray-600 text-sm font-medium">Pallets</p>
-                    <p className="text-3xl font-bold text-blue-600">1</p>
-                  </div>
-                  <div className="border-2 border-green-300 rounded-lg p-4 bg-green-50">
-                    <p className="text-gray-600 text-sm font-medium">Boxes per Pallet</p>
-                    <p className="text-3xl font-bold text-green-600">{shipment?.boxesPerPallet || '-'}</p>
-                  </div>
-                  <div className="border-2 border-purple-300 rounded-lg p-4 bg-purple-50">
-                    <p className="text-gray-600 text-sm font-medium">Total Boxes</p>
-                    <p className="text-3xl font-bold text-purple-600">{shipment?.originalBoxCount || '-'}</p>
-                  </div>
-                </div>
-
-                {/* QR Text */}
-                <div className="bg-gray-100 p-4 rounded-lg w-full max-w-2xl text-center">
-                  <p className="text-xs text-gray-600 mb-2">QR Code Value:</p>
-                  <p className="text-sm text-gray-800 font-mono break-all">{shipment?.qrCode}</p>
-                </div>
-
-                {/* Shipment Info */}
-                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg w-full max-w-2xl text-center">
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold">Client:</span> {shipment?.clientName}<br/>
-                    <span className="font-semibold">Arrived:</span> {new Date(shipment?.arrivalDate || '').toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            </>
           ) : boxes.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-gray-400 text-5xl mb-4">📦</div>
@@ -225,14 +260,14 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
             </div>
           ) : (
             <>
-              {/* MULTIPLE BOX VIEW - INDIVIDUAL QR CODES */}
+              {/* PALLET + LOOSE BOX VIEW - ONE QR PER PALLET, PLUS EACH LOOSE BOX */}
               <div className="mb-6 flex justify-between items-center print:hidden">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800">
-                    Total Boxes: {boxes.length}
+                    QRs to Print: {printUnits.length} (Pallets: {printUnits.filter(u => u.type === 'PALLET').length}, Loose Boxes: {printUnits.filter(u => u.type === 'LOOSE_BOX').length})
                   </h3>
                   <p className="text-sm text-gray-600">
-                    Each box has its own unique QR code for scanning
+                    One QR per pallet with details, plus one for each loose box
                   </p>
                 </div>
                 <button
@@ -246,41 +281,75 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
                 </button>
               </div>
 
-              {/* QR Codes Grid */}
+              {/* QR Codes Grid (Pallets + Loose Boxes) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {boxes.map(box => (
-                  <div 
-                    key={box.id} 
+                {printUnits.map(unit => (
+                  <div
+                    key={unit.key}
                     className="border-2 border-gray-200 rounded-lg p-4 text-center hover:border-indigo-400 transition print:border print:border-black print:break-inside-avoid"
                   >
-                    {/* Box Number */}
-                    <div className="bg-indigo-100 text-indigo-800 font-bold text-lg rounded-md py-2 mb-3">
-                      Box #{box.boxNumber}
-                    </div>
+                    {/* Header */}
+                    {unit.type === 'PALLET' ? (
+                      <div className="bg-blue-100 text-blue-800 font-bold text-lg rounded-md py-2 mb-3">
+                        Pallet #{unit.palletNumber}
+                      </div>
+                    ) : (
+                      <div className="bg-purple-100 text-purple-800 font-bold text-lg rounded-md py-2 mb-3">
+                        Loose Box #{unit.boxNumber}
+                      </div>
+                    )}
 
-                    {/* QR Code */}
-                    {qrImages[box.id] && (
-                      <img 
-                        src={qrImages[box.id]} 
-                        alt={`Box ${box.boxNumber} QR`}
+                    {/* QR Image */}
+                    {qrImages[unit.key] && (
+                      <img
+                        src={qrImages[unit.key]}
+                        alt={`${unit.type === 'PALLET' ? `Pallet ${unit.palletNumber}` : `Loose Box ${unit.boxNumber}`} QR`}
                         className="mx-auto mb-3"
                       />
                     )}
 
-                    {/* QR Code Text */}
-                    <p className="text-xs text-gray-600 font-mono break-all mb-2">
-                      {box.qrCode}
-                    </p>
-
-                    {/* Status */}
-                    <div className={`text-xs font-semibold px-2 py-1 rounded border inline-block ${getStatusBadge(box.status)}`}>
-                      {box.status}
+                    {/* Brand mark on label */}
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      {branding?.logoUrl ? (
+                        <img src={branding.logoUrl} alt={branding?.name || 'Brand'} className="h-5 w-auto" />
+                      ) : (
+                        <span className="text-xs font-black text-indigo-700">QGO</span>
+                      )}
+                      <span className="text-[10px] text-gray-600 font-semibold">{branding?.name || 'QGO Cargo'}</span>
                     </div>
 
-                    {/* Rack Info */}
-                    {box.rack && (
-                      <div className="mt-2 text-xs text-gray-600">
-                        📍 {box.rack.code} - {box.rack.location}
+                    {/* QR Value (compact with copy) */}
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <p className="text-xs text-gray-500 font-mono truncate max-w-[220px]" title={unit.qrValue}>
+                        {unit.qrValue.replace(/\|S:.+$/, '')}
+                      </p>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(unit.qrValue)}
+                        className="text-indigo-600 hover:text-indigo-800 text-xs underline"
+                        title="Copy full QR value"
+                      >Copy</button>
+                    </div>
+
+                    {/* Details */}
+                    {unit.type === 'PALLET' ? (
+                      <div className="text-xs text-gray-700 space-y-1">
+                        <div>Shipment: <span className="font-semibold">{shipmentRef}</span></div>
+                        {shipment?.companyProfile?.name && (
+                          <div>Profile: <span className="font-semibold">{shipment.companyProfile.name}</span></div>
+                        )}
+                        <div>Pieces on Pallet: <span className="font-semibold">{unit.pieces}</span></div>
+                        <div>Client: <span className="font-semibold">{shipment?.clientName || '—'}</span></div>
+                        <div>Arrived: <span className="font-semibold">{new Date(shipment?.arrivalDate || '').toLocaleDateString()}</span></div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-700 space-y-1">
+                        <div>Shipment: <span className="font-semibold">{shipmentRef}</span></div>
+                        <div>Type: <span className="font-semibold">Loose Box</span></div>
+                        {shipment?.companyProfile?.name && (
+                          <div>Profile: <span className="font-semibold">{shipment.companyProfile.name}</span></div>
+                        )}
+                        <div>Client: <span className="font-semibold">{shipment?.clientName || '—'}</span></div>
+                        <div>Arrived: <span className="font-semibold">{new Date(shipment?.arrivalDate || '').toLocaleDateString()}</span></div>
                       </div>
                     )}
                   </div>

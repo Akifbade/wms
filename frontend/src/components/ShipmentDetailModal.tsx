@@ -16,6 +16,7 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
   const [boxes, setBoxes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [rackDistribution, setRackDistribution] = useState<Record<string, any[]>>({});
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
 
   useEffect(() => {
     loadBoxes();
@@ -30,6 +31,32 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
       const data = await response.json();
       const boxList = data.boxes || [];
       setBoxes(boxList);
+
+      // Aggregate photos from boxes and extract pallet info
+      const photos: string[] = [];
+      for (const b of boxList) {
+        if (b.photos) {
+          try {
+            const parsed = JSON.parse(b.photos);
+            if (Array.isArray(parsed)) {
+              for (const url of parsed) {
+                if (typeof url === 'string' && url && !photos.includes(url)) photos.push(url);
+              }
+            }
+          } catch {}
+        }
+        
+        // Extract pallet number from pieceQR
+        if (b.pieceQR) {
+          try {
+            const pieceData = JSON.parse(b.pieceQR);
+            b.palletNumber = pieceData.palletNumber || null;
+          } catch {
+            b.palletNumber = null;
+          }
+        }
+      }
+      setPhotoUrls(photos);
 
       // Group boxes by rack
       const grouped: Record<string, any[]> = {};
@@ -134,21 +161,24 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
                 </span>
               </div>
               
-              {/* Box Grid */}
+              {/* Box Grid with Pallet Info */}
               <div className="grid grid-cols-8 gap-1 mt-2">
                 {boxList.map(box => (
                   <div
                     key={box.id}
-                    className={`aspect-square flex items-center justify-center text-xs font-bold rounded ${
+                    className={`aspect-square flex flex-col items-center justify-center text-xs font-bold rounded ${
                       box.status === 'IN_STORAGE' 
                         ? 'bg-green-500 text-white' 
                         : box.status === 'RELEASED'
                         ? 'bg-gray-400 text-white'
                         : 'bg-yellow-400 text-gray-800'
                     }`}
-                    title={`Box #${box.boxNumber} - ${box.status}`}
+                    title={`Box #${box.boxNumber}${box.palletNumber ? ` - Pallet ${box.palletNumber}` : ''} - ${box.status}`}
                   >
-                    {box.boxNumber}
+                    <span>{box.boxNumber}</span>
+                    {box.palletNumber && (
+                      <span className="text-[8px] opacity-80">P{box.palletNumber}</span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -156,6 +186,21 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
           );
         })}
       </div>
+
+      {/* Photo Gallery */}
+      {photoUrls.length > 0 && (
+        <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
+          <p className="text-sm font-semibold text-gray-700 mb-2">Photos ({photoUrls.length})</p>
+          <div className="grid grid-cols-4 gap-2">
+            {photoUrls.map((url, idx) => (
+              <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="group relative block aspect-square rounded-lg overflow-hidden border-2 border-blue-200 hover:border-blue-500 transition-all">
+                <img src={url} alt={`Photo ${idx+1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors"></div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="mt-4 pt-3 border-t border-blue-200">

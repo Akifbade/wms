@@ -59,7 +59,7 @@ router.get('/categories/list', async (req: AuthRequest, res: Response) => {
         logo: profile.logo,
         // Frontend still expects optional color/icon fields when rendering badges
         color: '#5B21B6',
-        icon: '🏢',
+        icon: '????',
         contractStatus: profile.contractStatus,
         contactPerson: profile.contactPerson,
         contactPhone: profile.contactPhone,
@@ -113,7 +113,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         },
         boxes: {
           where: { 
-            status: { in: ['IN_STORAGE', 'STORED'] }  // Only count stored boxes
+            status: { in: ['IN_STORAGE', 'STORED'] },  // Only count stored boxes
+            shipment: {
+              status: { notIn: ['RELEASED'] }  // Exclude released shipments
+            }
           },
           select: {
             id: true,
@@ -142,7 +145,14 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     // Calculate utilization based on pallet usage rather than raw boxes
     const racksWithStats = racks.map((rack: any) => {
       const palletUsage = calculatePalletUsage(rack.boxes || []);
-      const derivedStatus = palletUsage >= rack.capacityTotal ? 'FULL' : (rack.status || 'ACTIVE');
+      
+      // Determine status: FULL if at capacity, ACTIVE if has boxes, otherwise use stored status
+      let derivedStatus = 'ACTIVE';
+      if (palletUsage >= rack.capacityTotal) {
+        derivedStatus = 'FULL';
+      } else if (palletUsage === 0 && rack.status === 'INACTIVE') {
+        derivedStatus = 'INACTIVE';
+      }
 
       return {
         ...rack,
@@ -193,7 +203,10 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
         },
         boxes: {
           where: { 
-            status: { in: ['IN_STORAGE', 'STORED'] }  // Only show boxes currently in storage
+            status: { in: ['IN_STORAGE', 'STORED'] },  // Only show boxes currently in storage
+            shipment: {
+              status: { notIn: ['RELEASED'] }  // Exclude released shipments
+            }
           },
           include: {
             shipment: {
@@ -205,6 +218,14 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
                 status: true,
                 boxesPerPallet: true,
                 palletCount: true,
+                companyProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                    logo: true,
+                  }
+                },
+                clientName: true,
               },
             },
           },
@@ -449,3 +470,4 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
 });
 
 export default router;
+

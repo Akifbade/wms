@@ -124,14 +124,14 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-4 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-bold">🗺️ Warehouse Rack Map</h2>
+            <h2 className="text-xl font-bold">??????? Warehouse Rack Map</h2>
             <p className="text-sm text-purple-100 mt-1">Select a rack with available space</p>
           </div>
           <button
             onClick={onClose}
             className="text-white hover:text-gray-200 text-2xl font-bold"
           >
-            ×
+            ??
           </button>
         </div>
 
@@ -283,17 +283,17 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                       >
                         {rack.status === 'ACTIVE' 
                           ? utilization >= 100 
-                            ? '🔴 FULL' 
+                            ? '???? FULL' 
                             : utilization >= 90 
-                            ? '🟡 ALMOST FULL' 
-                            : '🟢 AVAILABLE'
+                            ? '???? ALMOST FULL' 
+                            : '???? AVAILABLE'
                           : rack.status}
                       </span>
                     </div>
 
                     {/* Location */}
                     <div className="text-xs text-gray-500 mb-3 truncate" title={rack.location}>
-                      📍 {rack.location}
+                      ???? {rack.location}
                     </div>
 
                     {/* Capacity */}
@@ -316,11 +316,11 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                     {/* Available Space */}
                     {isAvailable ? (
                       <div className="mt-2 text-xs font-medium text-green-600 text-center">
-                        ✓ {rack.capacityTotal - rack.capacityUsed} spaces
+                        ??? {rack.capacityTotal - rack.capacityUsed} spaces
                       </div>
                     ) : (
                       <div className="mt-2 text-xs font-medium text-red-600 text-center">
-                        ✗ No space
+                        ??? No space
                       </div>
                     )}
 
@@ -368,7 +368,7 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                   <QrCodeIcon className="h-7 w-7" />
                   Rack {selectedRackDetails.code}
                 </h3>
-                <p className="text-sm text-blue-100 mt-1">📍 {selectedRackDetails.location}</p>
+                <p className="text-sm text-blue-100 mt-1">???? {selectedRackDetails.location}</p>
               </div>
               <button
                 onClick={closeDetails}
@@ -399,8 +399,8 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                         }`}>
                           {selectedRackDetails.status === 'ACTIVE'
                             ? selectedRackDetails.capacityUsed >= selectedRackDetails.capacityTotal
-                              ? '🔴 FULL'
-                              : '🟢 AVAILABLE'
+                              ? '???? FULL'
+                              : '???? AVAILABLE'
                             : selectedRackDetails.status}
                         </span>
                       </p>
@@ -439,7 +439,7 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                 {/* Shipments List */}
                 <div className="flex-1 overflow-y-auto p-6">
                   <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    📦 Stored Shipments ({selectedRackDetails.boxes?.length || 0})
+                    ???? Stored Shipments ({selectedRackDetails.boxes?.length || 0})
                   </h4>
 
                   {selectedRackDetails.boxes && selectedRackDetails.boxes.length > 0 ? (
@@ -483,9 +483,9 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                           </div>
                           {box.shipment.shipper && (
                             <div className="text-xs text-gray-600 mt-2 space-y-1">
-                              <p>📤 <span className="font-medium">From:</span> {box.shipment.shipper}</p>
+                              <p>???? <span className="font-medium">From:</span> {box.shipment.shipper}</p>
                               {box.shipment.consignee && (
-                                <p>📥 <span className="font-medium">To:</span> {box.shipment.consignee}</p>
+                                <p>???? <span className="font-medium">To:</span> {box.shipment.consignee}</p>
                               )}
                             </div>
                           )}
@@ -494,7 +494,7 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                           {photoUrls.length > 0 && (
                             <div className="mt-3 pt-3 border-t border-gray-200">
                               <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
-                                📷 Photos ({photoUrls.length})
+                                ???? Photos ({photoUrls.length})
                               </p>
                               <div className="grid grid-cols-3 gap-2">
                                 {photoUrls.map((url: string, idx: number) => (
@@ -512,7 +512,7 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                                     />
                                     <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
                                       <span className="text-white text-xs font-bold opacity-0 group-hover:opacity-100">
-                                        🔍 View
+                                        ???? View
                                       </span>
                                     </div>
                                   </a>
@@ -526,7 +526,7 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                     </div>
                   ) : (
                     <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                      <div className="text-4xl mb-3">📭</div>
+                      <div className="text-4xl mb-3">????</div>
                       <p className="text-gray-500 font-medium">No shipments stored</p>
                       <p className="text-sm text-gray-400 mt-1">This rack is empty</p>
                     </div>
@@ -546,7 +546,7 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                       onClick={handleSelectThisRack}
                       className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-bold shadow-lg"
                     >
-                      ✓ Select This Rack
+                      ??? Select This Rack
                     </button>
                   )}
                 </div>
@@ -558,3 +558,4 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
     </div>
   );
 }
+

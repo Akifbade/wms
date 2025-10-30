@@ -69,7 +69,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
           contactPerson: profile.contactPerson,
           contactPhone: profile.contactPhone,
           color: '#5B21B6',
-          icon: '🏢',
+          icon: '????',
         }));
       setCategories(options);
     } catch (err) {
@@ -105,7 +105,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
           contactPerson: rack.companyProfile.contactPerson,
           contactPhone: rack.companyProfile.contactPhone,
           color: '#5B21B6',
-          icon: '🏢',
+          icon: '????',
         });
       } else if (rack.category) {
         setSelectedCategoryInfo(rack.category);
@@ -221,7 +221,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
 
       await racksAPI.update(rack.id, dataToSubmit);
       
-      setSuccess('Rack updated successfully! ✅');
+      setSuccess('Rack updated successfully! ???');
       setTimeout(() => {
         onSuccess();
         onClose();
@@ -242,13 +242,13 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-purple-600 text-white px-6 py-4 rounded-t-lg flex justify-between items-center">
-          <h2 className="text-xl font-bold">✏️ Edit Rack</h2>
+          <h2 className="text-xl font-bold">?????? Edit Rack</h2>
           <button
             onClick={onClose}
             className="text-white hover:text-gray-200 text-2xl font-bold"
             disabled={loading}
           >
-            ×
+            ??
           </button>
         </div>
 
@@ -349,7 +349,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
                   <option value="">Select Category / Company...</option>
                   {categories.map(cat => (
                     <option key={cat.id} value={cat.id}>
-                      🏢 {cat.name}
+                      ???? {cat.name}
                     </option>
                   ))}
                 </select>
@@ -378,7 +378,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
                     {(selectedCategoryInfo.contactPerson || selectedCategoryInfo.contactPhone) && (
                       <p className="text-blue-700 text-xs mt-1">
                         {selectedCategoryInfo.contactPerson && `Contact: ${selectedCategoryInfo.contactPerson}`}
-                        {selectedCategoryInfo.contactPerson && selectedCategoryInfo.contactPhone && ' · '}
+                        {selectedCategoryInfo.contactPerson && selectedCategoryInfo.contactPhone && ' ?? '}
                         {selectedCategoryInfo.contactPhone && `Phone: ${selectedCategoryInfo.contactPhone}`}
                       </p>
                     )}
@@ -429,7 +429,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
 
           {/* Dimensions */}
           <div className="border-b pb-4">
-            <h3 className="text-lg font-semibold mb-4 text-gray-700">📏 Dimensions (Size Information)</h3>
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">???? Dimensions (Size Information)</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -495,7 +495,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
               </div>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              💡 Optional: Enter rack physical dimensions for detailed tracking
+              ???? Optional: Enter rack physical dimensions for detailed tracking
             </p>
           </div>
 
@@ -513,7 +513,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
                   onClick={downloadQRCode}
                   className="px-4 py-2 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 font-medium text-sm"
                 >
-                  📥 Download QR Code
+                  ???? Download QR Code
                 </button>
               </div>
             </div>
@@ -542,3 +542,4 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
     </div>
   );
 }
+

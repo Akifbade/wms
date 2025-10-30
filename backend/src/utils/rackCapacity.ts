@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 interface BoxWithShipmentMeta {
   boxNumber: number | null;
+  pieceQR?: string | null;
   shipment?: {
     id: string;
     boxesPerPallet: number | null;
@@ -26,13 +27,33 @@ export function calculatePalletUsage(boxes: BoxWithShipmentMeta[]): number {
     }
 
     const shipmentId = box.shipment?.id ?? 'unknown';
-    const boxesPerPallet = box.shipment?.boxesPerPallet && box.shipment.boxesPerPallet > 0
-      ? box.shipment.boxesPerPallet
-      : 1;
+    // Prefer explicit palletNumber in pieceQR (JSON) when available
+    let explicitPallet: number | null = null;
+    if (box.pieceQR) {
+      try {
+        const meta = JSON.parse(box.pieceQR as string);
+        if (typeof meta?.palletNumber === 'number') {
+          explicitPallet = meta.palletNumber;
+        }
+        if (meta?.isLoose === true) {
+          // Loose boxes do not consume a pallet slot
+          continue;
+        }
+      } catch {
+        // fall back to computed method
+      }
+    }
 
-    const boxNumber = box.boxNumber ?? 1;
-    const palletIndex = Math.ceil(boxNumber / boxesPerPallet);
-    palletKeys.add(`${shipmentId}-${palletIndex}`);
+    if (explicitPallet !== null && explicitPallet > 0) {
+      palletKeys.add(`${shipmentId}-${explicitPallet}`);
+    } else {
+      const boxesPerPallet = box.shipment?.boxesPerPallet && box.shipment.boxesPerPallet > 0
+        ? box.shipment.boxesPerPallet
+        : 1;
+      const boxNumber = box.boxNumber ?? 1;
+      const palletIndex = Math.ceil(boxNumber / boxesPerPallet);
+      palletKeys.add(`${shipmentId}-${palletIndex}`);
+    }
   }
 
   return palletKeys.size;
@@ -57,6 +78,7 @@ export async function recomputeRackPalletUsage(
     },
     select: {
       boxNumber: true,
+      pieceQR: true,
       shipment: {
         select: {
           id: true,
@@ -68,3 +90,4 @@ export async function recomputeRackPalletUsage(
 
   return calculatePalletUsage(boxes);
 }
+
