@@ -31,9 +31,10 @@ name: Production Deployment
 # =============================================================================
 
 on:
-  push:
-    branches:
-      - stable/prisma-mysql-production
+  # Disabled auto-deploy on push - use manual deployment instead
+  # push:
+  #   branches:
+  #     - stable/prisma-mysql-production
   workflow_dispatch:
 
 env:
