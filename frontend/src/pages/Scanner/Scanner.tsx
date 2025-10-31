@@ -87,12 +87,30 @@ export const Scanner: React.FC = () => {
       const html5QrCode = new Html5Qrcode(qrCodeRegionId);
       scannerRef.current = html5QrCode;
 
+      // Request camera access first to get better error messages
+      console.log('📹 Requesting camera access...');
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
+        console.log('✅ Camera access granted:', stream.getVideoTracks());
+        // Stop the test stream
+        stream.getTracks().forEach(track => track.stop());
+      } catch (mediaErr: any) {
+        console.error('❌ getUserMedia failed:', mediaErr);
+        throw mediaErr; // Re-throw to handle in outer catch
+      }
+
+      console.log('🚀 Starting html5-qrcode scanner...');
       await html5QrCode.start(
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         onScanSuccess,
         () => {}  // onScanFailure
       );
+      
+      console.log('✅ Scanner started successfully');
     } catch (err: any) {
       console.error('❌ Camera error:', err);
       console.error('Error details:', {
