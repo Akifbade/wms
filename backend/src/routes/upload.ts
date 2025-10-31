@@ -8,7 +8,7 @@ const router = express.Router();
 // Configure multer storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/logos');
+    cb(null, 'uploads/company-logos');
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -43,7 +43,7 @@ router.post('/logo', authenticateToken, upload.single('logo'), (req, res) => {
       });
     }
     
-    const logoUrl = `/uploads/logos/${req.file.filename}`;
+    const logoUrl = `/uploads/company-logos/${req.file.filename}`;
     
     console.log('Logo uploaded successfully:', {
       filename: req.file.filename,
