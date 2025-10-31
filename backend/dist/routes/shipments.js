@@ -10,6 +10,7 @@ const zod_1 = require("zod");
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
+const rackCapacity_1 = require("../utils/rackCapacity");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 const parseOptionalInt = (value) => {
@@ -51,6 +52,25 @@ const photoUpload = (0, multer_1.default)({
         }
     }
 });
+// Upload endpoint for pallet and shipment imagery
+router.post('/upload/photo', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), photoUpload.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No photo uploaded' });
+        }
+        const photoUrl = `/uploads/shipments/${req.file.filename}`;
+        res.json({
+            success: true,
+            photoUrl,
+            filename: req.file.filename,
+            size: req.file.size,
+        });
+    }
+    catch (error) {
+        console.error('Shipment photo upload error:', error);
+        res.status(500).json({ error: 'Failed to upload shipment photo' });
+    }
+});
 // Validation schema
 const shipmentSchema = zod_1.z.object({
     name: zod_1.z.string().min(2),
@@ -64,11 +84,14 @@ const shipmentSchema = zod_1.z.object({
     companyProfileId: zod_1.z.string().optional(),
     palletCount: zod_1.z.number().int().positive().optional(),
     boxesPerPallet: zod_1.z.number().int().positive().optional(),
+    // Optional: variable pallets distribution and extra loose boxes
+    boxesDistribution: zod_1.z.array(zod_1.z.number().int().nonnegative()).optional(),
+    extraBoxes: zod_1.z.number().int().nonnegative().optional(),
     // NEW: Dimension & CBM fields for volume-based charging
     length: zod_1.z.number().positive().optional(), // in cm
     width: zod_1.z.number().positive().optional(), // in cm
     height: zod_1.z.number().positive().optional(), // in cm
-    cbm: zod_1.z.number().positive().optional(), // auto-calculated or provided (m³)
+    cbm: zod_1.z.number().positive().optional(), // auto-calculated or provided (m??)
     weight: zod_1.z.number().positive().optional(), // in kg
     // NEW: Enhanced warehouse fields
     category: zod_1.z.enum(['CUSTOMER_STORAGE', 'AIRPORT_CARGO', 'WAREHOUSE_STOCK']).optional(),
@@ -241,17 +264,37 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         const data = req.body;
         const companyId = req.user.companyId;
         const userId = req.user.id;
-        const palletCount = parseOptionalInt(data.palletCount);
-        const boxesPerPallet = parseOptionalInt(data.boxesPerPallet);
-        if (!palletCount || palletCount <= 0) {
-            return res.status(400).json({ error: 'Pallet count must be greater than zero' });
+        // Uniform mode inputs
+        let palletCount = parseOptionalInt(data.palletCount);
+        let boxesPerPallet = parseOptionalInt(data.boxesPerPallet);
+        // Variable mode inputs
+        const boxesDistribution = Array.isArray(data.boxesDistribution)
+            ? data.boxesDistribution.map(v => parseOptionalInt(v) ?? 0)
+            : [];
+        const extraBoxes = parseOptionalInt(data.extraBoxes) ?? 0;
+        // Determine mode and compute counts
+        let totalBoxCount = 0;
+        let originalBoxCount = 0;
+        if (boxesDistribution && boxesDistribution.length > 0) {
+            // Variable mode: palletCount becomes distribution length
+            palletCount = boxesDistribution.length;
+            const distributionSum = boxesDistribution.reduce((a, b) => a + Math.max(0, Math.trunc(b || 0)), 0);
+            const maxBPP = boxesDistribution.reduce((m, n) => Math.max(m, Math.max(0, Math.trunc(n || 0))), 0);
+            boxesPerPallet = Math.max(maxBPP, 0);
+            totalBoxCount = distributionSum + Math.max(0, Math.trunc(extraBoxes || 0));
+            originalBoxCount = totalBoxCount;
         }
-        if (!boxesPerPallet || boxesPerPallet <= 0) {
-            return res.status(400).json({ error: 'Boxes per pallet must be greater than zero' });
+        else {
+            if (!palletCount || palletCount <= 0) {
+                return res.status(400).json({ error: 'Pallet count must be greater than zero' });
+            }
+            if (!boxesPerPallet || boxesPerPallet <= 0) {
+                return res.status(400).json({ error: 'Boxes per pallet must be greater than zero' });
+            }
+            const computedBoxCount = palletCount * boxesPerPallet;
+            originalBoxCount = computedBoxCount;
+            totalBoxCount = computedBoxCount;
         }
-        const computedBoxCount = palletCount * boxesPerPallet;
-        const originalBoxCount = computedBoxCount;
-        const totalBoxCount = computedBoxCount;
         const currentBoxCount = parseOptionalInt(data.currentBoxCount) ?? totalBoxCount;
         if (!currentBoxCount || currentBoxCount <= 0) {
             return res.status(400).json({ error: 'Current box count must be greater than zero' });
@@ -283,6 +326,10 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                 parsedWarehouse.palletCount = palletCount;
                 parsedWarehouse.boxesPerPallet = boxesPerPallet;
                 parsedWarehouse.totalBoxes = totalBoxCount;
+                if (boxesDistribution && boxesDistribution.length > 0) {
+                    parsedWarehouse.boxesDistribution = boxesDistribution;
+                    parsedWarehouse.extraBoxes = Math.max(0, Math.trunc(extraBoxes || 0));
+                }
                 normalizedWarehouseData = JSON.stringify(parsedWarehouse);
             }
             catch (warehouseParseError) {
@@ -296,9 +343,12 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                 palletCount,
                 boxesPerPallet,
                 totalBoxes: totalBoxCount,
+                ...(boxesDistribution && boxesDistribution.length > 0
+                    ? { boxesDistribution, extraBoxes: Math.max(0, Math.trunc(extraBoxes || 0)) }
+                    : {}),
             });
         }
-        // 🚀 FETCH SHIPMENT SETTINGS
+        // ???? FETCH SHIPMENT SETTINGS
         let settings = await prisma.shipmentSettings.findUnique({
             where: { companyId }
         });
@@ -308,7 +358,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                 data: { companyId }
             });
         }
-        // ✅ VALIDATE REQUIRED FIELDS BASED ON SETTINGS
+        // ??? VALIDATE REQUIRED FIELDS BASED ON SETTINGS
         if (settings.requireClientEmail && !data.clientEmail) {
             return res.status(400).json({ error: 'Client email is required by company settings' });
         }
@@ -327,7 +377,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         const qrBase = `${qrPrefix}-${qrTimestamp}`;
         const qrMetaSegments = [`P${palletCount}`, `B${boxesPerPallet}`, `T${totalBoxCount}`];
         const masterQR = [qrBase, ...qrMetaSegments].join('-');
-        // 🚀 USE DEFAULT STORAGE TYPE FROM SETTINGS IF NOT PROVIDED
+        // ???? USE DEFAULT STORAGE TYPE FROM SETTINGS IF NOT PROVIDED
         const shipmentType = data.type || settings.defaultStorageType;
         const normalizedCustomerName = data.customerName || companyProfileName || data.clientName || null;
         const referenceId = data.referenceId || `SH-${qrTimestamp}`;
@@ -380,37 +430,149 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                 },
             },
         });
-        // ✅ CREATE INDIVIDUAL QR CODES FOR EACH BOX
+        // ??? CREATE INDIVIDUAL QR CODES FOR EACH BOX
+        const palletImagesMap = {};
+        const palletPhotosPayload = Array.isArray(data.palletPhotos) ? data.palletPhotos : [];
         const boxesToCreate = [];
-        for (let i = 1; i <= totalBoxCount; i++) {
-            const palletNumber = Math.ceil(i / boxesPerPallet);
-            boxesToCreate.push({
-                shipmentId: shipment.id,
-                boxNumber: i,
-                qrCode: `${masterQR}-BOX-${i}-OF-${totalBoxCount}-PAL-${palletNumber}`,
-                rackId: data.rackId || null, // Assign to rack if provided
-                status: data.rackId ? 'IN_STORAGE' : 'PENDING', // ✅ PENDING if no rack, IN_STORAGE if rack assigned
-                assignedAt: data.rackId ? new Date() : null,
-                companyId,
-                pieceQR: JSON.stringify({
-                    masterQRCode: masterQR,
+        if (boxesDistribution && boxesDistribution.length > 0) {
+            // Variable mode: build by pallet segments then loose boxes
+            let boxIdx = 0;
+            for (let p = 1; p <= palletCount; p++) {
+                const countForPallet = Math.max(0, Math.trunc(boxesDistribution[p - 1] || 0));
+                for (let j = 0; j < countForPallet; j++) {
+                    boxIdx += 1;
+                    boxesToCreate.push({
+                        shipmentId: shipment.id,
+                        boxNumber: boxIdx,
+                        qrCode: `${masterQR}-BOX-${boxIdx}-OF-${totalBoxCount}-PAL-${p}`,
+                        rackId: data.rackId || null,
+                        status: data.rackId ? 'IN_STORAGE' : 'PENDING',
+                        assignedAt: data.rackId ? new Date() : null,
+                        companyId,
+                        pieceQR: JSON.stringify({
+                            masterQRCode: masterQR,
+                            boxNumber: boxIdx,
+                            palletNumber: p,
+                            palletCount,
+                            boxesPerPallet: Math.max(0, Math.trunc(boxesDistribution[p - 1] || 0)),
+                            totalBoxes: totalBoxCount,
+                        }),
+                    });
+                }
+                const palletEntry = palletPhotosPayload[p - 1];
+                if (palletEntry) {
+                    const photoList = (Array.isArray(palletEntry) ? palletEntry : [palletEntry]);
+                    const filtered = photoList.filter((url) => typeof url === 'string' && url.trim() !== '');
+                    if (filtered.length > 0) {
+                        palletImagesMap[p] = palletImagesMap[p] || [];
+                        palletImagesMap[p].push(...filtered);
+                    }
+                }
+            }
+            // Loose boxes (no pallet)
+            for (let k = 0; k < Math.max(0, Math.trunc(extraBoxes || 0)); k++) {
+                const boxNumber = boxesToCreate.length + 1;
+                boxesToCreate.push({
+                    shipmentId: shipment.id,
+                    boxNumber,
+                    qrCode: `${masterQR}-BOX-${boxNumber}-OF-${totalBoxCount}-PAL-0`,
+                    rackId: data.rackId || null,
+                    status: data.rackId ? 'IN_STORAGE' : 'PENDING',
+                    assignedAt: data.rackId ? new Date() : null,
+                    companyId,
+                    pieceQR: JSON.stringify({
+                        masterQRCode: masterQR,
+                        boxNumber,
+                        palletNumber: 0,
+                        isLoose: true,
+                        palletCount,
+                        boxesPerPallet: 0,
+                        totalBoxes: totalBoxCount,
+                    }),
+                });
+            }
+        }
+        else {
+            // Uniform mode: original logic
+            for (let i = 1; i <= totalBoxCount; i++) {
+                const palletNumber = Math.ceil(i / boxesPerPallet);
+                boxesToCreate.push({
+                    shipmentId: shipment.id,
                     boxNumber: i,
-                    palletNumber,
-                    palletCount,
-                    boxesPerPallet,
-                    totalBoxes: totalBoxCount,
-                }),
-            });
+                    qrCode: `${masterQR}-BOX-${i}-OF-${totalBoxCount}-PAL-${palletNumber}`,
+                    rackId: data.rackId || null, // Assign to rack if provided
+                    status: data.rackId ? 'IN_STORAGE' : 'PENDING',
+                    assignedAt: data.rackId ? new Date() : null,
+                    companyId,
+                    pieceQR: JSON.stringify({
+                        masterQRCode: masterQR,
+                        boxNumber: i,
+                        palletNumber,
+                        palletCount,
+                        boxesPerPallet,
+                        totalBoxes: totalBoxCount,
+                    }),
+                });
+                const palletEntry = palletPhotosPayload[palletNumber - 1];
+                if (palletEntry) {
+                    const photoList = (Array.isArray(palletEntry) ? palletEntry : [palletEntry]);
+                    const filtered = photoList.filter((url) => typeof url === 'string' && url.trim() !== '');
+                    if (filtered.length > 0) {
+                        palletImagesMap[palletNumber] = palletImagesMap[palletNumber] || [];
+                        palletImagesMap[palletNumber].push(...filtered);
+                    }
+                }
+            }
         }
         await prisma.shipmentBox.createMany({
             data: boxesToCreate,
         });
-        // If rack assigned, update rack capacity
+        // Attach pallet-level photos to boxes (if provided)
+        let palletUpdates = [];
+        if (boxesDistribution && boxesDistribution.length > 0) {
+            // Compute ranges via prefix sums per pallet
+            let start = 1;
+            palletUpdates = Object.entries(palletImagesMap).map(([palletNumberStr, urls]) => {
+                const p = Number(palletNumberStr);
+                const countForPallet = Math.max(0, Math.trunc(boxesDistribution[p - 1] || 0));
+                const end = start + countForPallet - 1;
+                const update = prisma.shipmentBox.updateMany({
+                    where: {
+                        shipmentId: shipment.id,
+                        boxNumber: { gte: start, lte: end },
+                        companyId,
+                    },
+                    data: { photos: JSON.stringify(urls) },
+                });
+                start = end + 1;
+                return update;
+            });
+        }
+        else {
+            palletUpdates = Object.entries(palletImagesMap).map(([palletNumber, urls]) => prisma.shipmentBox.updateMany({
+                where: {
+                    shipmentId: shipment.id,
+                    boxNumber: {
+                        gte: (Number(palletNumber) - 1) * boxesPerPallet + 1,
+                        lte: Number(palletNumber) * boxesPerPallet,
+                    },
+                    companyId,
+                },
+                data: {
+                    photos: JSON.stringify(urls),
+                },
+            }));
+        }
+        if (palletUpdates.length > 0) {
+            await prisma.$transaction(palletUpdates);
+        }
+        // If rack assigned, recalculate capacity based on pallets
         if (data.rackId) {
+            const palletsUsed = await (0, rackCapacity_1.recomputeRackPalletUsage)(prisma, data.rackId, companyId);
             await prisma.rack.update({
                 where: { id: data.rackId },
                 data: {
-                    capacityUsed: { increment: totalBoxCount },
+                    capacityUsed: palletsUsed,
                     lastActivity: new Date(),
                 },
             });
@@ -431,7 +593,9 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                     userId: req.user.id,
                     companyId,
                     activityType: 'ASSIGN',
-                    itemDetails: `Shipment ${shipment.referenceId} - ${totalBoxCount} boxes (${palletCount} pallets x ${boxesPerPallet} boxes)`,
+                    itemDetails: boxesDistribution && boxesDistribution.length > 0
+                        ? `Shipment ${shipment.referenceId} - ${totalBoxCount} boxes (${palletCount} pallets; variable per pallet)`
+                        : `Shipment ${shipment.referenceId} - ${totalBoxCount} boxes (${palletCount} pallets x ${boxesPerPallet} boxes)`,
                     quantityAfter: totalBoxCount,
                 },
             });
@@ -601,55 +765,97 @@ router.post('/:id/assign-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 
 async (req, res) => {
     try {
         const { id } = req.params;
-        const { rackId, boxNumbers } = req.body; // boxNumbers = JSON string "[1,2,3]"
+        const { rackId, boxNumbers } = req.body; // boxNumbers can be array or JSON string
         const companyId = req.user.companyId;
         const uploadedFiles = req.files;
         if (!rackId || !boxNumbers) {
             return res.status(400).json({ error: 'Rack ID and box numbers required' });
         }
-        const parsedBoxNumbers = JSON.parse(boxNumbers);
-        if (parsedBoxNumbers.length === 0) {
+        const parsedBoxNumbers = Array.isArray(boxNumbers)
+            ? boxNumbers
+            : typeof boxNumbers === 'string'
+                ? JSON.parse(boxNumbers)
+                : [];
+        const normalizedBoxNumbers = parsedBoxNumbers
+            .map((value) => (typeof value === 'number' ? value : parseInt(value, 10)))
+            .filter((value) => Number.isInteger(value) && value > 0);
+        if (normalizedBoxNumbers.length === 0) {
             return res.status(400).json({ error: 'At least one box number required' });
         }
         // Prepare photo URLs
         const photoUrls = uploadedFiles?.map(file => `/uploads/shipments/${file.filename}`) || [];
-        // Update boxes with photos
+        const boxUpdateData = {
+            rackId,
+            status: 'IN_STORAGE',
+            assignedAt: new Date(),
+        };
+        if (photoUrls.length > 0) {
+            const existingSample = await prisma.shipmentBox.findFirst({
+                where: {
+                    shipmentId: id,
+                    boxNumber: {
+                        in: normalizedBoxNumbers,
+                    },
+                    companyId,
+                },
+                select: { photos: true },
+            });
+            let mergedPhotos = [];
+            if (existingSample?.photos) {
+                try {
+                    const parsed = JSON.parse(existingSample.photos);
+                    if (Array.isArray(parsed)) {
+                        mergedPhotos = parsed.filter((url) => typeof url === 'string');
+                    }
+                }
+                catch (parseError) {
+                    console.warn('Failed to parse existing shipment box photos', parseError);
+                }
+            }
+            photoUrls.forEach(url => {
+                if (!mergedPhotos.includes(url)) {
+                    mergedPhotos.push(url);
+                }
+            });
+            boxUpdateData.photos = JSON.stringify(mergedPhotos);
+        }
+        // Update boxes with photos (if provided)
         await prisma.shipmentBox.updateMany({
             where: {
                 shipmentId: id,
-                boxNumber: { in: parsedBoxNumbers },
+                boxNumber: { in: normalizedBoxNumbers },
                 companyId,
             },
-            data: {
-                rackId,
-                status: 'IN_STORAGE',
-                assignedAt: new Date(),
-            },
+            data: boxUpdateData,
         });
-        // Update rack capacity
+        const palletsUsed = await (0, rackCapacity_1.recomputeRackPalletUsage)(prisma, rackId, companyId);
+        // Update rack capacity based on pallet usage
         await prisma.rack.update({
             where: { id: rackId },
             data: {
-                capacityUsed: { increment: parsedBoxNumbers.length },
+                capacityUsed: palletsUsed,
                 lastActivity: new Date(),
             },
         });
-        // Check if all boxes are now assigned
+        // Check assignment progress and update shipment status accordingly
         const allBoxes = await prisma.shipmentBox.findMany({
             where: { shipmentId: id, companyId },
             select: { rackId: true },
         });
-        const allAssigned = allBoxes.every(box => box.rackId !== null);
-        // Update shipment status if all boxes are assigned
-        if (allAssigned) {
-            await prisma.shipment.update({
-                where: { id },
-                data: {
-                    status: 'IN_STORAGE',
-                    assignedAt: new Date(),
-                },
-            });
-        }
+        const totalBoxes = allBoxes.length;
+        const assignedCount = allBoxes.filter(box => box.rackId !== null).length;
+        const remainingUnassigned = totalBoxes - assignedCount;
+        // Compute new status: IN_STORAGE if all assigned, PARTIAL if some assigned, else PENDING
+        const newStatus = assignedCount === 0
+            ? 'PENDING'
+            : (remainingUnassigned === 0 ? 'IN_STORAGE' : 'PARTIAL');
+        await prisma.shipment.update({
+            where: { id },
+            data: {
+                status: newStatus,
+                assignedAt: assignedCount > 0 ? new Date() : null,
+            },
+        });
         // Log activity
         await prisma.rackActivity.create({
             data: {
@@ -657,13 +863,18 @@ async (req, res) => {
                 userId: req.user.id,
                 companyId,
                 activityType: 'ASSIGN',
-                itemDetails: `${parsedBoxNumbers.length} boxes from shipment ${id}${photoUrls.length > 0 ? ` (${photoUrls.length} photos)` : ''}`,
-                quantityAfter: parsedBoxNumbers.length,
+                itemDetails: `${normalizedBoxNumbers.length} boxes from shipment ${id}${photoUrls.length > 0 ? ` (${photoUrls.length} photos)` : ''}`,
+                quantityAfter: palletsUsed,
             },
         });
         res.json({
             success: true,
-            assigned: parsedBoxNumbers.length,
+            assigned: normalizedBoxNumbers.length,
+            assignedTotal: assignedCount,
+            totalBoxes,
+            remainingUnassigned,
+            shipmentStatus: newStatus,
+            palletsUsed,
             photosUploaded: photoUrls.length,
             photoUrls
         });
@@ -679,7 +890,7 @@ router.post('/:id/release-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER')
         const { id } = req.params;
         const { boxNumbers, releaseAll, collectorID, releasePhotos } = req.body; // boxNumbers = [1,2,3] or releaseAll = true
         const companyId = req.user.companyId;
-        // 🚀 FETCH SHIPMENT SETTINGS
+        // ???? FETCH SHIPMENT SETTINGS
         let settings = await prisma.shipmentSettings.findUnique({
             where: { companyId }
         });
@@ -688,7 +899,7 @@ router.post('/:id/release-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER')
                 data: { companyId }
             });
         }
-        // ✅ VALIDATE RELEASE REQUIREMENTS BASED ON SETTINGS
+        // ??? VALIDATE RELEASE REQUIREMENTS BASED ON SETTINGS
         if (settings.requireIDVerification && !collectorID) {
             return res.status(400).json({ error: 'Collector ID verification is required by company settings' });
         }
@@ -707,7 +918,7 @@ router.post('/:id/release-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER')
         if (!shipment) {
             return res.status(404).json({ error: 'Shipment not found' });
         }
-        // ✅ CHECK PARTIAL RELEASE SETTINGS
+        // ??? CHECK PARTIAL RELEASE SETTINGS
         if (!releaseAll && !settings.allowPartialRelease) {
             return res.status(400).json({ error: 'Partial release is not allowed by company settings' });
         }
@@ -742,12 +953,13 @@ router.post('/:id/release-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER')
                 rackId: null, // Remove from rack
             },
         });
-        // Update rack capacities
+        // Update rack capacities using pallet-based calculations
         for (const [rackId, count] of Object.entries(rackUpdates)) {
+            const palletsUsed = await (0, rackCapacity_1.recomputeRackPalletUsage)(prisma, rackId, companyId);
             await prisma.rack.update({
                 where: { id: rackId },
                 data: {
-                    capacityUsed: { decrement: count },
+                    capacityUsed: palletsUsed,
                     lastActivity: new Date(),
                 },
             });
@@ -759,7 +971,7 @@ router.post('/:id/release-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER')
                     companyId,
                     activityType: 'RELEASE',
                     itemDetails: `Released ${count} boxes from shipment ${shipment.referenceId}`,
-                    quantityAfter: count,
+                    quantityAfter: palletsUsed,
                 },
             });
         }
@@ -775,7 +987,7 @@ router.post('/:id/release-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER')
                 currentBoxCount: remainingBoxes.length,
             },
         });
-        // 🚀 CALCULATE CHARGES BASED ON SETTINGS
+        // ???? CALCULATE CHARGES BASED ON SETTINGS
         let totalCharges = 0;
         if (settings.generateReleaseInvoice) {
             const storageDays = Math.ceil((new Date().getTime() - new Date(shipment.arrivalDate).getTime()) / (1000 * 60 * 60 * 24));
@@ -790,12 +1002,12 @@ router.post('/:id/release-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER')
             totalCharges += boxesToRelease.length * settings.releasePerBoxFee;
             totalCharges += settings.releaseTransportFee;
         }
-        // 🚀 SEND NOTIFICATION IF ENABLED
+        // ???? SEND NOTIFICATION IF ENABLED
         let notificationSent = false;
         if (settings.notifyClientOnRelease && shipment.clientPhone) {
             // TODO: Integrate with notification service
             notificationSent = true;
-            console.log(`📱 Notification sent to ${shipment.clientPhone}: ${boxesToRelease.length} boxes released`);
+            console.log(`???? Notification sent to ${shipment.clientPhone}: ${boxesToRelease.length} boxes released`);
         }
         res.json({
             success: true,

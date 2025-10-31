@@ -9,15 +9,15 @@ async function main() {
   // Create a test company
   let company = await prisma.company.create({
     data: {
-      name: 'Test Company',
-      phone: '03001234567',
-      email: 'test@company.com',
-      address: 'Test Address',
+      name: 'Demo Warehouse Co.',
+      phone: '+965 1234 5678',
+      email: 'admin@demowarehouse.com',
+      address: 'Kuwait City, Kuwait',
       plan: 'PRO',
     },
   }).catch(async () => {
     // If exists, fetch it
-    const existing = await prisma.company.findFirst({ where: { name: 'Test Company' } });
+    const existing = await prisma.company.findFirst({ where: { name: 'Demo Warehouse Co.' } });
     return existing;
   });
 
@@ -26,15 +26,15 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('✅ Company created:', company.id);
+  console.log('✅ Company ready:', company.id);
 
   // Create a test user
-  const hashedPassword = await bcrypt.hash('password123', 10);
+  const hashedPassword = await bcrypt.hash('demo123', 10);
   const user = await prisma.user.upsert({
-    where: { email: 'admin@test.com' },
+    where: { email: 'admin@demo.com' },
     update: {},
     create: {
-      email: 'admin@test.com',
+      email: 'admin@demo.com',
       password: hashedPassword,
       name: 'Admin User',
       role: 'ADMIN',
@@ -44,7 +44,7 @@ async function main() {
   });
 
   console.log('✅ User created:', user.email);
-  console.log('Credentials: email: admin@test.com, password: password123');
+  console.log('Credentials: email: admin@demo.com, password: demo123');
 }
 
 main()

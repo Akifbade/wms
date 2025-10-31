@@ -361,6 +361,25 @@ jobs:
             echo "❌ Backend health check failed!"
             echo "📋 Backend logs:"
             docker logs wms-backend --tail 50
+            
+            echo ""
+            echo "🔄 AUTOMATIC ROLLBACK INITIATED..."
+            echo "================================================"
+            
+            # Stop failed backend
+            docker stop wms-backend
+            
+            # Restore from backup
+            docker cp "$BACKUP_DIR/backend/." wms-backend:/app/
+            docker cp "$BACKUP_DIR/frontend/." wms-frontend:/usr/share/nginx/html/
+            
+            # Restart containers
+            docker start wms-backend
+            docker exec wms-frontend nginx -s reload
+            
+            echo "✅ Rollback complete - Production restored from backup"
+            echo "📦 Backup used: $BACKUP_DIR"
+            
             exit 1
           fi
           
@@ -430,27 +449,58 @@ jobs:
           echo "   Press Ctrl + Shift + R or open in Incognito"
           echo "================================================"
 
-      - name: Rollback Instructions (On Failure)
+      - name: Emergency Rollback (On Failure)
         if: failure()
         env:
           VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
           VPS_USER: ${{ secrets.PROD_VPS_USER }}
         run: |
           echo "================================================"
-          echo "❌ DEPLOYMENT FAILED - ROLLBACK NEEDED"
+          echo "❌ DEPLOYMENT FAILED - EMERGENCY ROLLBACK"
           echo "================================================"
           
           ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
           cd "${{ env.PRODUCTION_PATH }}"
           
-          echo "📋 Container logs:"
-          docker logs wms-frontend --tail 30
+          echo "� Finding latest backup..."
+          LATEST_BACKUP=$(ls -td backups/production-* 2>/dev/null | head -1)
+          
+          if [ -z "$LATEST_BACKUP" ]; then
+            echo "❌ No backup found!"
+            exit 1
+          fi
+          
+          echo "📦 Using backup: $LATEST_BACKUP"
           
           echo ""
-          echo "🔙 To rollback manually:"
-          echo "1. SSH to server: ssh root@148.230.107.155"
-          echo "2. cd /root/NEW\ START"
-          echo "3. Find backup: ls -lht backups/frontend/"
-          echo "4. Restore: docker cp backups/frontend/backup-XXXXXX/. wms-frontend:/usr/share/nginx/html/"
-          echo "5. Restart: docker-compose restart frontend"
+          echo "🔄 Rolling back frontend..."
+          docker stop wms-frontend
+          docker cp "$LATEST_BACKUP/frontend/." wms-frontend:/usr/share/nginx/html/
+          docker start wms-frontend
+          echo "✅ Frontend rolled back"
+          
+          echo ""
+          echo "� Rolling back backend..."
+          docker stop wms-backend
+          docker cp "$LATEST_BACKUP/backend/." wms-backend:/app/
+          docker start wms-backend
+          sleep 20
+          echo "✅ Backend rolled back"
+          
+          echo ""
+          echo "🔄 Rolling back database (if needed)..."
+          if [ -f "$LATEST_BACKUP/database/warehouse_wms.sql" ]; then
+            echo "⚠️  Database rollback available but NOT auto-applied (data safety)"
+            echo "📋 Manual restore: docker exec -i wms-database mysql -u root -prootpassword123 warehouse_wms < $LATEST_BACKUP/database/warehouse_wms.sql"
+          fi
+          
+          echo ""
+          echo "✅ ROLLBACK COMPLETE"
+          echo "📊 Container Status:"
+          docker ps --filter "name=wms-" --format "table {{.Names}}\t{{.Status}}"
+          
+          echo ""
+          echo "🔍 Health Check:"
+          curl -f http://localhost:5000/api/health && echo "✅ Backend OK" || echo "❌ Backend still failing"
+          curl -f http://localhost:80 && echo "✅ Frontend OK" || echo "❌ Frontend still failing"
           EOF

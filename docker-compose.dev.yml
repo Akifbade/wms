@@ -12,7 +12,7 @@ services:
       MYSQL_USER: ${DB_USER:-wms_user}
       MYSQL_PASSWORD: ${DB_PASSWORD:-wmspassword}
     ports:
-      - "${DB_PORT:-3306}:3306"
+      - "3307:3306" # align with .env DB_PORT and keep dev isolated
     volumes:
       - mysql_data_dev:/var/lib/mysql
     networks:
@@ -35,13 +35,8 @@ services:
       DATABASE_URL: mysql://${DB_USER:-wms_user}:${DB_PASSWORD:-wmspassword}@database:3306/${DB_NAME:-warehouse_wms}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key}
       PORT: 5000
-      # 🔥 PARSE + MONGODB CONFIG
-      USE_PARSE: ${USE_PARSE:-true}
-      PARSE_SERVER_URL: http://parse:1337/parse
-      PARSE_APP_ID: ${PARSE_APP_ID:-WMS_WAREHOUSE_APP}
-      PARSE_MASTER_KEY: ${PARSE_MASTER_KEY:-your-master-key-change-in-production}
     ports:
-      - "${BACKEND_PORT:-5000}:5000"
+      - "5002:5000" # host 5002 avoids clashes; container still runs on 5000 like prod
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -49,10 +44,6 @@ services:
     depends_on:
       database:
         condition: service_healthy
-      mongodb:
-        condition: service_healthy
-      parse:
-        condition: service_started
     networks:
       - wms-network-dev
 
@@ -68,7 +59,7 @@ services:
       DOCKER_ENV: "true"
       VITE_HOST: "0.0.0.0"
     ports:
-      - "0.0.0.0:${FRONTEND_PORT:-3000}:3000"
+      - "3000:3000" # Always bind dev UI to localhost:3000 to avoid .env overrides
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -77,89 +68,7 @@ services:
     networks:
       - wms-network-dev
 
-  # MongoDB Service (for Parse Server)
-  mongodb:
-    image: mongo:6
-    container_name: wms-mongodb-dev
-    restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: adminpassword
-      MONGO_INITDB_DATABASE: warehouse_wms
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data_dev:/data/db
-    networks:
-      - wms-network-dev
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  # Parse Server
-  parse:
-    image: parseplatform/parse-server:latest
-    container_name: wms-parse-dev
-    restart: unless-stopped
-    environment:
-      PARSE_SERVER_DATABASE_URI: mongodb://admin:adminpassword@mongodb:27017/warehouse_wms?authSource=admin
-      PARSE_SERVER_APPLICATION_ID: WMS_WAREHOUSE_APP
-      PARSE_SERVER_MASTER_KEY: wms-master-key-change-in-production
-      PARSE_SERVER_URL: http://parse:1337/parse
-      PARSE_SERVER_PUBLIC_SERVER_URL: http://localhost:1337/parse
-      PARSE_SERVER_MOUNT_PATH: /parse
-      PARSE_SERVER_ALLOW_CLIENT_CLASS_CREATION: true
-      PARSE_SERVER_ENABLE_EXPERIMENTAL_DIRECT_ACCESS: true
-      PARSE_SERVER_MASTER_KEY_IPS: "0.0.0.0/0,::/0"
-      PORT: 1337
-    ports:
-      - "1337:1337"
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    networks:
-      - wms-network-dev
-
-  # Parse Dashboard
-  parse-dashboard:
-    image: parseplatform/parse-dashboard:latest
-    container_name: wms-parse-dashboard-dev
-    restart: unless-stopped
-    environment:
-      PARSE_DASHBOARD_CONFIG: |
-        {
-          "apps": [{
-            "serverURL": "http://parse:1337/parse",
-            "appId": "WMS_WAREHOUSE_APP",
-            "masterKey": "wms-master-key-change-in-production",
-            "appName": "WMS Warehouse"
-          }],
-          "users": [{"user": "admin", "pass": "admin123"}],
-          "useEncryptedPasswords": false,
-          "trustProxy": 1
-        }
-      PARSE_DASHBOARD_ALLOW_INSECURE_HTTP: 1
-    ports:
-      - "4040:4040"
-    depends_on:
-      - parse
-    networks:
-      - wms-network-dev
-
-  # Auto Git Commit Service
-  git-watcher:
-    image: alpine:latest
-    container_name: wms-git-watcher-dev
-    restart: unless-stopped
-    volumes:
-      - .:/workspace
-    working_dir: /workspace
-    command: sh -c "apk add --no-cache git inotify-tools && sh /workspace/scripts/git-auto-commit.sh"
-    networks:
-      - wms-network-dev
+  # (Parse, Mongo, and git-watcher removed for prod parity)
 
 networks:
   wms-network-dev:
@@ -167,6 +76,4 @@ networks:
 
 volumes:
   mysql_data_dev:
-    driver: local
-  mongo_data_dev:
     driver: local
