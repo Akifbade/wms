@@ -80,21 +80,43 @@ export const Scanner: React.FC = () => {
       );
     } catch (err: any) {
       console.error('❌ Camera error:', err);
+      console.error('Error details:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+        code: err.code
+      });
+      
       let errorMsg = '❌ Camera access denied.';
+      let solution = 'Try: Settings → Browser → Permissions → Camera → Allow';
       
       if (err.message?.includes('HTTPS') || err.message?.includes('localhost')) {
-        errorMsg = '🔒 Camera requires HTTPS or localhost. Please use: https://staging.qgocargo.cloud';
+        errorMsg = '🔒 Camera requires HTTPS';
+        solution = 'Use: https://qgocargo.cloud (Production) or https://staging.qgocargo.cloud';
       } else if (err.name === 'NotAllowedError') {
-        errorMsg = '❌ Camera permission denied. Please allow camera access in browser settings.';
+        errorMsg = '❌ Camera permission denied';
+        solution = 'Settings → Browser → Permissions → Camera → Allow for this site';
       } else if (err.name === 'NotFoundError') {
-        errorMsg = '❌ No camera found on device.';
-      } else if (err.name === 'NotReadableError') {
-        errorMsg = '❌ Camera is already in use by another application.';
+        errorMsg = '❌ No camera found';
+        solution = 'Check if your device has a camera and it\'s properly connected';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMsg = '❌ Camera is in use';
+        solution = 'Close other apps using camera (WhatsApp, Skype, etc.) and try again';
+      } else if (err.name === 'OverconstrainedError') {
+        errorMsg = '❌ Camera constraints not supported';
+        solution = 'Your camera doesn\'t support required settings. Try another device';
+      } else if (err.name === 'NotSupportedError' || err.name === 'TypeError') {
+        errorMsg = '❌ Camera not supported';
+        solution = 'Update your browser or use Chrome/Safari on mobile';
+      } else if (err.message?.includes('insecure context')) {
+        errorMsg = '🔒 Insecure connection';
+        solution = 'Must use HTTPS: https://qgocargo.cloud or https://staging.qgocargo.cloud';
       } else {
-        errorMsg = `❌ Camera error: ${err.message || 'Unknown error'}`;
+        errorMsg = `❌ Camera error: ${err.name || 'Unknown'}`;
+        solution = `Details: ${err.message || 'No details available'}. Try reloading page or using Chrome browser.`;
       }
       
-      setError(errorMsg);
+      setError(`${errorMsg}\n\n💡 ${solution}`);
       setScanning(false);
     }
   };
