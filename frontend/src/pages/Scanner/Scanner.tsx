@@ -62,11 +62,26 @@ export const Scanner: React.FC = () => {
       
       // Check if we have HTTPS or localhost
       const isSecureContext = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost';
-      console.log('🔒 Secure context:', isSecureContext, 'Protocol:', window.location.protocol);
+      const currentUrl = window.location.href;
+      
+      console.log('🔒 Camera Security Check:', {
+        isSecureContext,
+        protocol: window.location.protocol,
+        hostname: window.location.hostname,
+        url: currentUrl,
+        mediaDevices: !!navigator.mediaDevices,
+        getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+      });
+      
+      // FORCE HTTPS if not secure
+      if (!isSecureContext && window.location.protocol === 'http:') {
+        const httpsUrl = currentUrl.replace('http://', 'https://');
+        throw new Error(`🔒 Camera requires HTTPS. Redirecting to: ${httpsUrl}`);
+      }
       
       // Check if mediaDevices is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera API not available. Please use HTTPS or localhost.');
+        throw new Error('Camera API not available. Your browser or connection does not support camera access. Please use HTTPS (https://qgocargo.cloud) and a modern browser like Chrome.');
       }
       
       const html5QrCode = new Html5Qrcode(qrCodeRegionId);
@@ -84,39 +99,57 @@ export const Scanner: React.FC = () => {
         name: err.name,
         message: err.message,
         stack: err.stack,
-        code: err.code
+        code: err.code,
+        type: typeof err,
+        stringified: JSON.stringify(err, null, 2)
       });
       
-      let errorMsg = '❌ Camera access denied.';
-      let solution = 'Try: Settings → Browser → Permissions → Camera → Allow';
+      let errorMsg = '❌ Camera access failed';
+      let solution = 'Try reloading the page';
       
-      if (err.message?.includes('HTTPS') || err.message?.includes('localhost')) {
+      // Check for HTTPS requirement
+      if (err.message?.includes('HTTPS') || err.message?.includes('https://') || err.message?.includes('Redirecting')) {
         errorMsg = '🔒 Camera requires HTTPS';
-        solution = 'Use: https://qgocargo.cloud (Production) or https://staging.qgocargo.cloud';
-      } else if (err.name === 'NotAllowedError') {
+        solution = `Current URL: ${window.location.href}\n\n✅ Use HTTPS: https://qgocargo.cloud\n\nCamera access only works on secure connections (HTTPS).`;
+      } 
+      // Permission denied
+      else if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied') || err.message?.includes('permission')) {
         errorMsg = '❌ Camera permission denied';
-        solution = 'Settings → Browser → Permissions → Camera → Allow for this site';
-      } else if (err.name === 'NotFoundError') {
-        errorMsg = '❌ No camera found';
-        solution = 'Check if your device has a camera and it\'s properly connected';
-      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        errorMsg = '❌ Camera is in use';
-        solution = 'Close other apps using camera (WhatsApp, Skype, etc.) and try again';
-      } else if (err.name === 'OverconstrainedError') {
-        errorMsg = '❌ Camera constraints not supported';
-        solution = 'Your camera doesn\'t support required settings. Try another device';
-      } else if (err.name === 'NotSupportedError' || err.name === 'TypeError') {
-        errorMsg = '❌ Camera not supported';
-        solution = 'Update your browser or use Chrome/Safari on mobile';
-      } else if (err.message?.includes('insecure context')) {
+        solution = `Please allow camera access:\n\n📱 Mobile: Tap the lock/info icon in address bar → Permissions → Camera → Allow\n\n💻 Desktop: Settings → Privacy → Camera → Allow for this site\n\nThen refresh the page.`;
+      } 
+      // No camera found
+      else if (err.name === 'NotFoundError' || err.message?.includes('not found') || err.message?.includes('No camera')) {
+        errorMsg = '❌ No camera detected';
+        solution = 'Make sure your device has a working camera and it\'s not disabled in system settings.';
+      } 
+      // Camera in use
+      else if (err.name === 'NotReadableError' || err.name === 'TrackStartError' || err.message?.includes('in use') || err.message?.includes('being used')) {
+        errorMsg = '❌ Camera is busy';
+        solution = 'Close other apps using the camera (WhatsApp, Zoom, Skype, etc.) and try again.';
+      } 
+      // Constraints not supported
+      else if (err.name === 'OverconstrainedError' || err.message?.includes('constraint')) {
+        errorMsg = '❌ Camera settings not supported';
+        solution = 'Your camera doesn\'t support the required settings. Try using a different device or browser.';
+      } 
+      // Not supported/API not available
+      else if (err.name === 'NotSupportedError' || err.name === 'TypeError' || err.message?.includes('not available') || err.message?.includes('not supported')) {
+        errorMsg = '❌ Camera API not supported';
+        solution = `Your browser doesn't support camera access.\n\n✅ Recommended:\n- Chrome (Desktop/Mobile)\n- Safari (iPhone/iPad)\n- Edge (Desktop)\n\n🔒 Make sure you're using: https://qgocargo.cloud`;
+      } 
+      // Insecure context
+      else if (err.message?.includes('insecure context') || err.message?.includes('secure origin')) {
         errorMsg = '🔒 Insecure connection';
-        solution = 'Must use HTTPS: https://qgocargo.cloud or https://staging.qgocargo.cloud';
-      } else {
+        solution = `Camera requires HTTPS.\n\n✅ Use: https://qgocargo.cloud\n❌ Don't use: http://qgocargo.cloud`;
+      } 
+      // Generic/unknown error
+      else {
+        const errorDetails = err.message || err.name || 'Unknown error';
         errorMsg = `❌ Camera error: ${err.name || 'Unknown'}`;
-        solution = `Details: ${err.message || 'No details available'}. Try reloading page or using Chrome browser.`;
+        solution = `Error: ${errorDetails}\n\nTroubleshooting:\n1. Make sure you're using HTTPS: https://qgocargo.cloud\n2. Allow camera permissions when prompted\n3. Try Chrome browser on mobile\n4. Check if camera works in other apps\n5. Reload the page and try again`;
       }
       
-      setError(`${errorMsg}\n\n💡 ${solution}`);
+      setError(`${errorMsg}\n\n💡 Solution:\n${solution}`);
       setScanning(false);
     }
   };
@@ -550,12 +583,37 @@ export const Scanner: React.FC = () => {
 
             {!scanning && !scanResult && !loading && (
               <div className="p-12 text-center space-y-6">
+                {/* HTTPS Warning if not secure */}
+                {window.location.protocol === 'http:' && (
+                  <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <p className="text-red-900 font-bold text-lg">🔒 Camera Requires HTTPS</p>
+                    </div>
+                    <p className="text-red-700 mb-3">Camera access only works on secure connections.</p>
+                    <button
+                      onClick={() => {
+                        const httpsUrl = window.location.href.replace('http://', 'https://');
+                        window.location.href = httpsUrl;
+                      }}
+                      className="px-6 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      ✅ Switch to HTTPS Now
+                    </button>
+                  </div>
+                )}
+
                 <div className="mx-auto w-64 h-64 border-4 border-dashed border-primary-300 rounded-3xl flex items-center justify-center bg-gradient-to-br from-primary-50 to-blue-50">
                   <QrCodeIcon className="h-32 w-32 text-primary-400" />
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">Ready to Scan</h3>
                   <p className="text-gray-600 text-lg">جاهز للمسح</p>
+                  {window.location.protocol === 'https:' && (
+                    <p className="text-green-600 text-sm mt-2">✅ Secure Connection (HTTPS)</p>
+                  )}
                 </div>
                 <button
                   onClick={startScanning}
