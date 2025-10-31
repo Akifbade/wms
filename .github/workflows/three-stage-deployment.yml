@@ -148,9 +148,16 @@ jobs:
           echo "📦 Copying frontend build..."
           scp -i ~/.ssh/deploy_key -r frontend/dist/* ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/frontend/staging-dist/"
           
-          # Copy backend code
+          # Copy backend code (exclude node_modules and large files)
           echo "📦 Copying backend code..."
-          scp -i ~/.ssh/deploy_key -r backend/* ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/backend/staging-temp/"
+          rsync -avz --progress \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            --exclude 'node_modules' \
+            --exclude '.env' \
+            --exclude 'dist' \
+            --exclude '*.log' \
+            --exclude 'uploads' \
+            backend/ ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/backend/staging-temp/"
           
           # Deploy to staging containers
           ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
