@@ -204,7 +204,7 @@ jobs:
           sleep 30
           
           echo "🔍 Checking backend health..."
-          if docker exec wms-staging-backend curl -f http://localhost:5001/api/health > /dev/null 2>&1; then
+          if curl -f http://localhost:5001/api/health > /dev/null 2>&1; then
             echo "✅ Staging backend is healthy!"
           else
             echo "⚠️  Warning: Staging backend health check failed"
@@ -323,7 +323,7 @@ jobs:
           echo "================================================"
           
           echo "🔍 Checking staging backend health..."
-          if docker exec wms-staging-backend curl -f http://localhost:5001/api/health > /dev/null 2>&1; then
+          if curl -f http://localhost:5001/api/health > /dev/null 2>&1; then
             echo "✅ Staging backend is healthy"
           else
             echo "⚠️  Warning: Staging backend health check failed"
@@ -361,7 +361,7 @@ jobs:
           sleep 30
           
           echo "🔍 Checking backend health..."
-          if docker exec wms-backend curl -f http://localhost:5000/api/health > /dev/null 2>&1; then
+          if curl -f http://localhost:5000/api/health > /dev/null 2>&1; then
             echo "✅ Production backend is healthy!"
           else
             echo "❌ Backend health check failed!"
