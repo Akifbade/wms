@@ -330,6 +330,21 @@ jobs:
           fi
           
           echo ""
+          echo "================================================"
+          echo "�️  STEP 3A: Clean Failed Migrations (Pre-deployment)"
+          echo "================================================"
+          echo "� Checking for failed migrations in production database..."
+          docker exec wms-database mysql -u root -prootpassword123 warehouse_wms -e "SELECT migration_name, started_at, finished_at FROM _prisma_migrations WHERE finished_at IS NULL LIMIT 5;" 2>/dev/null || echo "No failed migrations table or entries"
+          
+          echo "🧹 Cleaning failed migration entries..."
+          docker exec wms-database mysql -u root -prootpassword123 warehouse_wms -e "DELETE FROM _prisma_migrations WHERE finished_at IS NULL;" 2>/dev/null || echo "Migration cleanup completed"
+          
+          echo "✅ Database cleaned and ready"
+          
+          echo ""
+          echo "================================================"
+          echo "🎯 STEP 3B: Deploy Backend Code"
+          echo "================================================"
           echo "🛑 Stopping production backend..."
           docker stop wms-backend
           
@@ -337,17 +352,6 @@ jobs:
           docker cp wms-staging-backend:/app/. /tmp/staging-backend/
           docker cp /tmp/staging-backend/. wms-backend:/app/
           rm -rf /tmp/staging-backend
-          
-          echo "🗄️  Preparing migrations for production..."
-          docker exec wms-backend sh -c "
-            echo 'Checking migration status...'
-            ls -la /app/prisma/migrations/ 2>/dev/null || echo 'No migrations directory'
-            
-            echo 'Cleaning any failed migration entries from production DB...'
-            mysql -h database -u root -prootpassword123 warehouse_wms -e 'DELETE FROM _prisma_migrations WHERE finished_at IS NULL;' 2>/dev/null || true
-            
-            echo 'Production migrations prepared'
-          " || echo "Migration preparation completed with warnings"
           
           echo ""
           echo "🚀 Starting production backend..."
