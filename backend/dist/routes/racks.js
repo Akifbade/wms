@@ -4,6 +4,7 @@ const express_1 = require("express");
 const client_1 = require("@prisma/client");
 const auth_1 = require("../middleware/auth");
 const zod_1 = require("zod");
+const rackCapacity_1 = require("../utils/rackCapacity");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 router.use(auth_1.authenticateToken);
@@ -13,10 +14,52 @@ const rackSchema = zod_1.z.object({
     location: zod_1.z.string().optional(),
     capacityTotal: zod_1.z.number().positive().optional(),
     categoryId: zod_1.z.string().optional(), // NEW: Category reference
+    companyProfileId: zod_1.z.string().optional(), // NEW: Company profile reference
     length: zod_1.z.number().positive().optional(),
     width: zod_1.z.number().positive().optional(),
     height: zod_1.z.number().positive().optional(),
     dimensionUnit: zod_1.z.enum(['CM', 'INCHES', 'METERS']).optional(),
+});
+// Get categories for rack assignment
+router.get('/categories/list', async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const profiles = await prisma.companyProfile.findMany({
+            where: {
+                companyId,
+                isActive: true,
+            },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                logo: true,
+                contractStatus: true,
+                contactPerson: true,
+                contactPhone: true,
+            },
+            orderBy: { name: 'asc' },
+        });
+        console.log('Loaded company profiles for racks dropdown', profiles.length, 'companyId:', companyId);
+        res.json({
+            categories: profiles.map(profile => ({
+                id: profile.id,
+                name: profile.name,
+                description: profile.description,
+                logo: profile.logo,
+                // Frontend still expects optional color/icon fields when rendering badges
+                color: '#5B21B6',
+                icon: '????',
+                contractStatus: profile.contractStatus,
+                contactPerson: profile.contactPerson,
+                contactPhone: profile.contactPhone,
+            })),
+        });
+    }
+    catch (error) {
+        console.error('Get rack company profiles error:', error);
+        res.status(500).json({ error: 'Failed to fetch company profiles' });
+    }
 });
 // Get all racks
 router.get('/', async (req, res) => {
@@ -43,6 +86,17 @@ router.get('/', async (req, res) => {
                         icon: true,
                     },
                 },
+                companyProfile: {
+                    select: {
+                        id: true,
+                        name: true,
+                        logo: true,
+                        description: true,
+                        contractStatus: true,
+                        contactPerson: true,
+                        contactPhone: true,
+                    },
+                },
                 boxes: {
                     where: {
                         status: { in: ['IN_STORAGE', 'STORED'] } // Only count stored boxes
@@ -51,6 +105,15 @@ router.get('/', async (req, res) => {
                         id: true,
                         shipmentId: true,
                         status: true,
+                        boxNumber: true,
+                        photos: true,
+                        shipment: {
+                            select: {
+                                id: true,
+                                boxesPerPallet: true,
+                                palletCount: true,
+                            },
+                        },
                     },
                 },
                 _count: {
@@ -61,16 +124,17 @@ router.get('/', async (req, res) => {
             },
             orderBy: { code: 'asc' },
         });
-        // Calculate utilization based on actual stored boxes
+        // Calculate utilization based on pallet usage rather than raw boxes
         const racksWithStats = racks.map((rack) => {
-            const actualCapacityUsed = rack.boxes?.filter((box) => box.status === 'IN_STORAGE' || box.status === 'STORED').length || 0;
+            const palletUsage = (0, rackCapacity_1.calculatePalletUsage)(rack.boxes || []);
+            const derivedStatus = palletUsage >= rack.capacityTotal ? 'FULL' : (rack.status || 'ACTIVE');
             return {
                 ...rack,
-                capacityUsed: actualCapacityUsed, // Override with actual count
+                capacityUsed: palletUsage,
                 utilization: rack.capacityTotal > 0
-                    ? Math.round((actualCapacityUsed / rack.capacityTotal) * 100)
+                    ? Math.round((palletUsage / rack.capacityTotal) * 100)
                     : 0,
-                status: actualCapacityUsed >= rack.capacityTotal ? 'FULL' : 'ACTIVE',
+                status: derivedStatus,
             };
         });
         res.json({ racks: racksWithStats });
@@ -98,6 +162,17 @@ router.get('/:id', async (req, res) => {
                         icon: true,
                     },
                 },
+                companyProfile: {
+                    select: {
+                        id: true,
+                        name: true,
+                        logo: true,
+                        description: true,
+                        contactPerson: true,
+                        contactPhone: true,
+                        contractStatus: true,
+                    },
+                },
                 boxes: {
                     where: {
                         status: { in: ['IN_STORAGE', 'STORED'] } // Only show boxes currently in storage
@@ -110,6 +185,8 @@ router.get('/:id', async (req, res) => {
                                 shipper: true,
                                 consignee: true,
                                 status: true,
+                                boxesPerPallet: true,
+                                palletCount: true,
                             },
                         },
                     },
@@ -131,15 +208,16 @@ router.get('/:id', async (req, res) => {
         if (!rack) {
             return res.status(404).json({ error: 'Rack not found' });
         }
-        // Calculate actual capacity used
-        const actualCapacityUsed = rack.boxes?.filter((box) => box.status === 'IN_STORAGE' || box.status === 'STORED').length || 0;
+        // Calculate actual capacity used in pallet slots
+        const palletUsage = (0, rackCapacity_1.calculatePalletUsage)(rack.boxes || []);
+        const derivedStatus = palletUsage >= rack.capacityTotal ? 'FULL' : (rack.status || 'ACTIVE');
         const rackWithStats = {
             ...rack,
-            capacityUsed: actualCapacityUsed,
+            capacityUsed: palletUsage,
             utilization: rack.capacityTotal > 0
-                ? Math.round((actualCapacityUsed / rack.capacityTotal) * 100)
+                ? Math.round((palletUsage / rack.capacityTotal) * 100)
                 : 0,
-            status: actualCapacityUsed >= rack.capacityTotal ? 'FULL' : 'ACTIVE',
+            status: derivedStatus,
         };
         res.json({ rack: rackWithStats });
     }
@@ -175,12 +253,25 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                 return res.status(404).json({ error: 'Category not found' });
             }
         }
+        // Validate companyProfileId if provided
+        if (data.companyProfileId) {
+            const companyProfile = await prisma.companyProfile.findFirst({
+                where: {
+                    id: data.companyProfileId,
+                    companyId,
+                },
+            });
+            if (!companyProfile) {
+                return res.status(404).json({ error: 'Company profile not found' });
+            }
+        }
         const rack = await prisma.rack.create({
             data: {
                 code: data.code,
                 rackType: data.rackType || 'STORAGE',
                 location: data.location,
                 categoryId: data.categoryId,
+                companyProfileId: data.companyProfileId,
                 length: data.length,
                 width: data.width,
                 height: data.height,
@@ -199,6 +290,13 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                         logo: true,
                         color: true,
                         icon: true,
+                    },
+                },
+                companyProfile: {
+                    select: {
+                        id: true,
+                        name: true,
+                        logo: true,
                     },
                 },
             },
@@ -236,6 +334,18 @@ router.put('/:id', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, r
                 return res.status(404).json({ error: 'Category not found' });
             }
         }
+        // Validate companyProfileId if provided
+        if (req.body.companyProfileId) {
+            const companyProfile = await prisma.companyProfile.findFirst({
+                where: {
+                    id: req.body.companyProfileId,
+                    companyId,
+                },
+            });
+            if (!companyProfile) {
+                return res.status(404).json({ error: 'Company profile not found' });
+            }
+        }
         const rack = await prisma.rack.update({
             where: { id },
             data: req.body,
@@ -247,6 +357,13 @@ router.put('/:id', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, r
                         logo: true,
                         color: true,
                         icon: true,
+                    },
+                },
+                companyProfile: {
+                    select: {
+                        id: true,
+                        name: true,
+                        logo: true,
                     },
                 },
             },
