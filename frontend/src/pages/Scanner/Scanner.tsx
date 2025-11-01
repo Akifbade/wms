@@ -93,28 +93,72 @@ export const Scanner: React.FC = () => {
 
       // Request camera access first to get better error messages
       console.log('📹 Requesting camera access...');
+      console.log('📱 Available constraints:', navigator.mediaDevices.getSupportedConstraints());
       
       try {
+        // Try simpler constraints first
+        console.log('🔍 Trying camera access with environment facing mode...');
         const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } 
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
         });
         console.log('✅ Camera access granted:', stream.getVideoTracks());
+        console.log('📹 Video track settings:', stream.getVideoTracks()[0].getSettings());
         // Stop the test stream
         stream.getTracks().forEach(track => track.stop());
       } catch (mediaErr: any) {
         console.error('❌ getUserMedia failed:', mediaErr);
-        throw mediaErr; // Re-throw to handle in outer catch
+        console.error('Error details:', {
+          name: mediaErr.name,
+          message: mediaErr.message,
+          constraint: mediaErr.constraint,
+          stack: mediaErr.stack
+        });
+        
+        // Try without facingMode constraint as fallback
+        if (mediaErr.name === 'OverconstrainedError' || mediaErr.constraint === 'facingMode') {
+          console.log('⚠️ facingMode not supported, trying without constraint...');
+          try {
+            const fallbackStream = await navigator.mediaDevices.getUserMedia({ 
+              video: true 
+            });
+            console.log('✅ Camera access granted (fallback mode)');
+            fallbackStream.getTracks().forEach(track => track.stop());
+          } catch (fallbackErr) {
+            console.error('❌ Fallback also failed:', fallbackErr);
+            throw mediaErr; // Throw original error
+          }
+        } else {
+          throw mediaErr; // Re-throw to handle in outer catch
+        }
       }
 
       console.log('🚀 Starting html5-qrcode scanner...');
-      await html5QrCode.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        onScanSuccess,
-        () => {}  // onScanFailure
-      );
       
-      console.log('✅ Scanner started successfully');
+      // Try with facingMode first, fallback to any camera if fails
+      try {
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess,
+          () => {}  // onScanFailure
+        );
+        console.log('✅ Scanner started successfully with environment camera');
+      } catch (startErr: any) {
+        console.warn('⚠️ Failed with facingMode, trying default camera:', startErr);
+        
+        // Fallback to default camera (any available)
+        await html5QrCode.start(
+          { facingMode: { ideal: 'environment' } }, // Make it optional
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess,
+          () => {}  // onScanFailure
+        );
+        console.log('✅ Scanner started successfully with default camera');
+      }
     } catch (err: any) {
       console.error('❌ Camera error:', err);
       console.error('Error details:', {
@@ -137,7 +181,18 @@ export const Scanner: React.FC = () => {
       // Permission denied
       else if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied') || err.message?.includes('permission')) {
         errorMsg = '❌ Camera permission denied';
-        solution = `Please allow camera access:\n\n📱 Mobile: Tap the lock/info icon in address bar → Permissions → Camera → Allow\n\n💻 Desktop: Settings → Privacy → Camera → Allow for this site\n\nThen refresh the page.`;
+        solution = `📱 MOBILE FIX (Android/iPhone):
+1. Tap the 🔒 lock icon in the address bar
+2. Tap "Permissions" or "Site settings"
+3. Find "Camera" → Change to "Allow"
+4. Refresh this page
+
+💻 DESKTOP FIX:
+Chrome: Click 🔒 → Site settings → Camera → Allow
+Safari: Safari menu → Preferences → Websites → Camera → Allow
+Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
+
+🔄 Then REFRESH the page!`;
       } 
       // No camera found
       else if (err.name === 'NotFoundError' || err.message?.includes('not found') || err.message?.includes('No camera')) {

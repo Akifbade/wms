@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.1",
+  "version": "v2.1.2",
   "buildDate": "Nov 01, 2025",
-  "buildTime": "17:52:28",
+  "buildTime": "17:55:19",
   "author": "akifbade46-del",
-  "commitMessage": "fix: add IN_WAREHOUSE status to release button condition + document all issues",
+  "commitMessage": "feat: auto-version system with Git Bash support",
   "environment": "development"
 }
