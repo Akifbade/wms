@@ -1,10 +1,10 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.1.14**
-- **Released**: Nov 01, 2025 at 23:10:07
+## Current Version: **v2.1.15**
+- **Released**: Nov 01, 2025 at 23:11:48
 - **Author**: akifbade46-del
 - **Status**: Development
-- **Change**: feat: add staging environment on/off control scripts
+- **Change**: fix: remove vendor chunk to prevent React undefined errors
 
 ---
 
