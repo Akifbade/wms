@@ -1,10 +1,10 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.1.6**
-- **Released**: Nov 01, 2025 at 22:05:19
+## Current Version: **v2.1.7**
+- **Released**: Nov 01, 2025 at 22:15:33
 - **Author**: akifbade46-del
 - **Status**: Development
-- **Change**: fix: scanner camera with multiple fallback configs for mobile compatibility
+- **Change**: fix: scanner qr-reader element DOM timing - wait for render before initializing camera
 
 ---
 

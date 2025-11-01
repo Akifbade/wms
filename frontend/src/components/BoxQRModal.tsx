@@ -348,48 +348,55 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
                       />
                     )}
 
-                    {/* Brand mark on label */}
-                    <div className="flex items-center justify-center gap-2 mb-2">
+                    {/* Brand mark on label - LOGO ONLY (smaller) */}
+                    <div className="flex items-center justify-center gap-2 mb-3">
                       {branding?.logoUrl ? (
-                        <img src={branding.logoUrl} alt={branding?.name || 'Brand'} className="h-5 w-auto" />
+                        <img 
+                          src={branding.logoUrl} 
+                          alt="Logo" 
+                          className="h-8 w-auto object-contain"
+                          onError={(e) => {
+                            console.error('❌ Logo failed to load:', branding.logoUrl);
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
                       ) : (
-                        <span className="text-xs font-black text-indigo-700">QGO</span>
+                        <span className="text-sm font-black text-indigo-700">QGO</span>
                       )}
-                      <span className="text-[10px] text-gray-600 font-semibold">{branding?.name || 'QGO Cargo'}</span>
                     </div>
 
-                    {/* QR Value (compact with copy) */}
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <p className="text-xs text-gray-500 font-mono truncate max-w-[220px]" title={unit.qrValue}>
+                    {/* QR Value (compact with copy) - BIGGER TEXT */}
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <p className="text-sm text-gray-600 font-mono truncate max-w-[220px]" title={unit.qrValue}>
                         {unit.qrValue.replace(/\|S:.+$/, '')}
                       </p>
                       <button
                         onClick={() => navigator.clipboard.writeText(unit.qrValue)}
-                        className="text-indigo-600 hover:text-indigo-800 text-xs underline"
+                        className="text-indigo-600 hover:text-indigo-800 text-sm underline print:hidden"
                         title="Copy full QR value"
                       >Copy</button>
                     </div>
 
-                    {/* Details */}
+                    {/* Details - BIGGER TEXT */}
                     {unit.type === 'PALLET' ? (
-                      <div className="text-xs text-gray-700 space-y-1">
-                        <div>Shipment: <span className="font-semibold">{shipmentRef}</span></div>
+                      <div className="text-sm text-gray-700 space-y-1.5">
+                        <div><span className="font-medium">Shipment:</span> <span className="font-bold">{shipmentRef}</span></div>
                         {shipment?.companyProfile?.name && (
-                          <div>Profile: <span className="font-semibold">{shipment.companyProfile.name}</span></div>
+                          <div><span className="font-medium">Profile:</span> <span className="font-bold">{shipment.companyProfile.name}</span></div>
                         )}
-                        <div>Pieces on Pallet: <span className="font-semibold">{unit.pieces}</span></div>
-                        <div>Client: <span className="font-semibold">{shipment?.clientName || '—'}</span></div>
-                        <div>Arrived: <span className="font-semibold">{new Date(shipment?.arrivalDate || '').toLocaleDateString()}</span></div>
+                        <div><span className="font-medium">Pieces on Pallet:</span> <span className="font-bold">{unit.pieces}</span></div>
+                        <div><span className="font-medium">Client:</span> <span className="font-bold">{shipment?.clientName || '—'}</span></div>
+                        <div><span className="font-medium">Arrived:</span> <span className="font-bold">{new Date(shipment?.arrivalDate || '').toLocaleDateString()}</span></div>
                       </div>
                     ) : (
-                      <div className="text-xs text-gray-700 space-y-1">
-                        <div>Shipment: <span className="font-semibold">{shipmentRef}</span></div>
-                        <div>Type: <span className="font-semibold">Loose Box</span></div>
+                      <div className="text-sm text-gray-700 space-y-1.5">
+                        <div><span className="font-medium">Shipment:</span> <span className="font-bold">{shipmentRef}</span></div>
+                        <div><span className="font-medium">Type:</span> <span className="font-bold">Loose Box</span></div>
                         {shipment?.companyProfile?.name && (
-                          <div>Profile: <span className="font-semibold">{shipment.companyProfile.name}</span></div>
+                          <div><span className="font-medium">Profile:</span> <span className="font-bold">{shipment.companyProfile.name}</span></div>
                         )}
-                        <div>Client: <span className="font-semibold">{shipment?.clientName || '—'}</span></div>
-                        <div>Arrived: <span className="font-semibold">{new Date(shipment?.arrivalDate || '').toLocaleDateString()}</span></div>
+                        <div><span className="font-medium">Client:</span> <span className="font-bold">{shipment?.clientName || '—'}</span></div>
+                        <div><span className="font-medium">Arrived:</span> <span className="font-bold">{new Date(shipment?.arrivalDate || '').toLocaleDateString()}</span></div>
                       </div>
                     )}
                   </div>
