@@ -138,26 +138,63 @@ export const Scanner: React.FC = () => {
 
       console.log('🚀 Starting html5-qrcode scanner...');
       
-      // Try with facingMode first, fallback to any camera if fails
-      try {
-        await html5QrCode.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          onScanSuccess,
-          () => {}  // onScanFailure
-        );
-        console.log('✅ Scanner started successfully with environment camera');
-      } catch (startErr: any) {
-        console.warn('⚠️ Failed with facingMode, trying default camera:', startErr);
-        
-        // Fallback to default camera (any available)
-        await html5QrCode.start(
-          { facingMode: { ideal: 'environment' } }, // Make it optional
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          onScanSuccess,
-          () => {}  // onScanFailure
-        );
-        console.log('✅ Scanner started successfully with default camera');
+      // Try multiple camera configurations with proper fallback
+      const cameraConfigs = [
+        // Config 1: Back camera (environment)
+        { 
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        // Config 2: Back camera (ideal, not required)
+        { 
+          facingMode: { ideal: 'environment' }
+        },
+        // Config 3: Any camera (no constraints)
+        { 
+          facingMode: 'user' 
+        },
+        // Config 4: Most basic (any camera)
+        'environment' as any
+      ];
+      
+      let scannerStarted = false;
+      let lastError: any = null;
+      
+      for (let i = 0; i < cameraConfigs.length; i++) {
+        try {
+          console.log(`🔄 Trying camera config ${i + 1}/${cameraConfigs.length}:`, cameraConfigs[i]);
+          
+          await html5QrCode.start(
+            cameraConfigs[i],
+            { 
+              fps: 10, 
+              qrbox: { width: 250, height: 250 },
+              aspectRatio: 1.0
+            },
+            onScanSuccess,
+            () => {}  // onScanFailure
+          );
+          
+          console.log(`✅ Scanner started successfully with config ${i + 1}`);
+          scannerStarted = true;
+          break;
+        } catch (configErr: any) {
+          console.warn(`⚠️ Config ${i + 1} failed:`, configErr.message);
+          lastError = configErr;
+          
+          // Try to stop scanner if partially started
+          try {
+            await html5QrCode.stop();
+          } catch (e) {
+            // Ignore stop errors
+          }
+        }
+      }
+      
+      if (!scannerStarted) {
+        console.error('❌ All camera configs failed');
+        throw lastError || new Error('Failed to start scanner with any camera configuration');
       }
     } catch (err: any) {
       console.error('❌ Camera error:', err);
