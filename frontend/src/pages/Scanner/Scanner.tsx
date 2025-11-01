@@ -90,24 +90,36 @@ export const Scanner: React.FC = () => {
       // Set scanning true to render the div
       setScanning(true);
       
-      // Wait for DOM to update and div to be rendered - INCREASED wait time
-      console.log('⏳ Waiting for DOM to render qr-reader element...');
-      await new Promise(resolve => setTimeout(resolve, 300)); // Increased from 100ms to 300ms
+      // FORCE React to update DOM immediately - CRITICAL for mobile
+      await new Promise(resolve => {
+        // Use requestAnimationFrame to ensure React has flushed updates
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            resolve(undefined);
+          });
+        });
+      });
       
-      // Check if qr-reader element exists (with retry)
+      // Wait for DOM to update and div to be rendered - INCREASED wait time for mobile
+      console.log('⏳ Waiting for DOM to render qr-reader element...');
+      await new Promise(resolve => setTimeout(resolve, 500)); // Increased from 300ms to 500ms for mobile
+      
+      // Check if qr-reader element exists (with retry) - MORE RETRIES for slow mobile
       let qrReaderElement = document.getElementById(qrCodeRegionId);
       let retries = 0;
-      while (!qrReaderElement && retries < 5) {
-        console.log(`⏳ Retry ${retries + 1}/5: Waiting for qr-reader element...`);
-        await new Promise(resolve => setTimeout(resolve, 200));
+      while (!qrReaderElement && retries < 10) { // Increased from 5 to 10 retries
+        console.log(`⏳ Retry ${retries + 1}/10: Waiting for qr-reader element...`);
+        await new Promise(resolve => setTimeout(resolve, 300)); // Increased from 200ms to 300ms
         qrReaderElement = document.getElementById(qrCodeRegionId);
         retries++;
       }
       
       if (!qrReaderElement) {
-        console.error('❌ QR reader element not found in DOM after 5 retries');
+        console.error('❌ QR reader element not found in DOM after 10 retries');
         console.error('DOM body:', document.body.innerHTML.substring(0, 500));
-        throw new Error('Scanner container not ready after 5 retries. Please refresh and try again.');
+        console.error('📱 Mobile debugging - Current scanning state:', scanning);
+        console.error('📱 Retry duration: 500ms initial + (10 × 300ms) = 3.5 seconds total');
+        throw new Error('📱 Scanner container not ready after 10 retries (3.5 seconds). Please close this page completely and reopen, then try again. If issue persists, clear browser cache.');
       }
       
       console.log('✅ QR reader element found:', qrReaderElement);
@@ -284,7 +296,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       else {
         const errorDetails = err.message || err.name || 'Unknown error';
         errorMsg = `❌ Camera error: ${err.name || 'Unknown'}`;
-        solution = `Error: ${errorDetails}\n\nTroubleshooting:\n1. Make sure you're using HTTPS: https://qgocargo.cloud\n2. Allow camera permissions when prompted\n3. Try Chrome browser on mobile\n4. Check if camera works in other apps\n5. Reload the page and try again`;
+        solution = `Error: ${errorDetails}\n\n💡 Troubleshooting:\n1. ✅ Make sure you're using HTTPS: https://qgocargo.cloud\n2. 📷 Allow camera permissions when browser asks\n3. 🌐 Try Chrome browser (best for camera)\n4. 📱 Check if camera works in other apps (like WhatsApp)\n5. 🔄 Reload the page and try again\n6. 🔒 Check browser settings: Site Settings → Camera → Allow\n7. 📞 If still not working, contact support with error: ${err.name || 'Unknown'}`;
       }
       
       setError(`${errorMsg}\n\n💡 Solution:\n${solution}`);
