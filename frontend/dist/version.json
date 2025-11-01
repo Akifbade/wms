@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.5",
+  "version": "v2.1.6",
   "buildDate": "Nov 01, 2025",
-  "buildTime": "21:46:10",
+  "buildTime": "22:05:19",
   "author": "akifbade46-del",
-  "commitMessage": "docs: add mobile camera test guide in Urdu/Hindi",
+  "commitMessage": "fix: scanner camera with multiple fallback configs for mobile compatibility",
   "environment": "development"
 }

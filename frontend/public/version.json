@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.6",
+  "version": "v2.1.7",
   "buildDate": "Nov 01, 2025",
-  "buildTime": "22:05:19",
+  "buildTime": "22:15:33",
   "author": "akifbade46-del",
-  "commitMessage": "fix: scanner camera with multiple fallback configs for mobile compatibility",
+  "commitMessage": "fix: scanner qr-reader element DOM timing - wait for render before initializing camera",
   "environment": "development"
 }
