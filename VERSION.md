@@ -1,10 +1,10 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.1.8**
-- **Released**: Nov 01, 2025 at 22:32:09
+## Current Version: **v2.1.9**
+- **Released**: Nov 01, 2025 at 22:34:46
 - **Author**: akifbade46-del
 - **Status**: Development
-- **Change**: fix: QR label improvements - smaller logo only, bigger text, 404 error handling
+- **Change**: fix: scanner DOM retry logic, rack company profile display with debugging
 
 ---
 

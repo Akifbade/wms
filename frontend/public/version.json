@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.8",
+  "version": "v2.1.9",
   "buildDate": "Nov 01, 2025",
-  "buildTime": "22:32:09",
+  "buildTime": "22:34:46",
   "author": "akifbade46-del",
-  "commitMessage": "fix: QR label improvements - smaller logo only, bigger text, 404 error handling",
+  "commitMessage": "fix: scanner DOM retry logic, rack company profile display with debugging",
   "environment": "development"
 }
