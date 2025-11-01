@@ -50,7 +50,6 @@ services:
         condition: service_healthy
     networks:
       - staging-network
-      - wms-network
     command: sh -c "npx prisma generate && npx prisma db push --accept-data-loss && npx ts-node src/index.ts"
 
   # Staging Frontend
@@ -69,14 +68,11 @@ services:
       - staging-backend
     networks:
       - staging-network
-      - wms-network
 
 networks:
   staging-network:
     name: staging-network
     driver: bridge
-  wms-network:
-    external: true
 
 volumes:
   staging_mysql_data:
