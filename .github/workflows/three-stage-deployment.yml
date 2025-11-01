@@ -170,8 +170,15 @@ jobs:
             StrictHostKeyChecking no
             IdentitiesOnly yes
           SSHCONFIG
-          # Quick sanity check (non-fatal)
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes root@148.230.107.155 "echo 'SSH OK'" || true
+          # Quick sanity check with verbose output
+          echo "🔍 Testing SSH connection..."
+          ssh -vvv -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -o ConnectTimeout=5 root@148.230.107.155 "echo 'SSH OK'" 2>&1 | head -30 || {
+            echo "❌ SSH connection failed. Check:"
+            echo "   1. Is the private key valid? (Should be ed25519 or RSA)"
+            echo "   2. Is the key in GitHub secrets correct?"
+            echo "   3. Does the public key exist in /root/.ssh/authorized_keys on VPS?"
+            exit 1
+          }
 
       - name: "Deploy Full Stack to Staging (Rocky Linux) - WITH SAFETY & ROLLBACK"
         timeout-minutes: 45
@@ -182,7 +189,7 @@ jobs:
           
           # Copy built frontend files
           echo "📦 Copying frontend build..."
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -r frontend/dist/* root@148.230.107.155:"${{ env.PRODUCTION_PATH }}/frontend/staging-dist/"
+          scp -vvv -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -r frontend/dist/* root@148.230.107.155:"${{ env.PRODUCTION_PATH }}/frontend/staging-dist/" 2>&1 | grep -E "debug|error|denied" || true
           
           # Copy backend code (exclude node_modules and large files)
           echo "📦 Copying backend code..."
