@@ -136,7 +136,10 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.STAGING_VPS_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          # Write key safely and normalize line endings (fixes 'error in libcrypto')
+          printf "%s" "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          # Remove any Windows CR characters that break OpenSSH
+          tr -d '\r' < ~/.ssh/deploy_key > ~/.ssh/deploy_key.tmp && mv ~/.ssh/deploy_key.tmp ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           # VPS_HOST: 148.230.107.155 (Staging)
           ssh-keyscan -H 148.230.107.155 >> ~/.ssh/known_hosts 2>/dev/null || true
@@ -148,7 +151,10 @@ jobs:
             ServerAliveCountMax 10
             TCPKeepAlive yes
             StrictHostKeyChecking no
+            IdentitiesOnly yes
           SSHCONFIG
+          # Quick sanity check (non-fatal)
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes root@148.230.107.155 "echo 'SSH OK'" || true
 
       - name: "Deploy Full Stack to Staging (Rocky Linux) - WITH SAFETY & ROLLBACK"
         timeout-minutes: 45
@@ -159,12 +165,12 @@ jobs:
           
           # Copy built frontend files
           echo "📦 Copying frontend build..."
-          scp -i ~/.ssh/deploy_key -r frontend/dist/* root@148.230.107.155:"${{ env.PRODUCTION_PATH }}/frontend/staging-dist/"
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -r frontend/dist/* root@148.230.107.155:"${{ env.PRODUCTION_PATH }}/frontend/staging-dist/"
           
           # Copy backend code (exclude node_modules and large files)
           echo "📦 Copying backend code..."
           rsync -avz --progress \
-            -e "ssh -i ~/.ssh/deploy_key" \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes" \
             --exclude 'node_modules' \
             --exclude '.env' \
             --exclude 'dist' \
@@ -356,10 +362,14 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.PROD_VPS_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          # Write key safely and normalize line endings (fixes 'error in libcrypto')
+          printf "%s" "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          tr -d '\r' < ~/.ssh/deploy_key > ~/.ssh/deploy_key.tmp && mv ~/.ssh/deploy_key.tmp ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           # VPS_HOST: 148.230.107.155 (Production)
           ssh-keyscan -H 148.230.107.155 >> ~/.ssh/known_hosts 2>/dev/null || true
+          # Quick sanity check (non-fatal)
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes root@148.230.107.155 "echo 'SSH OK'" || true
 
       - name: Promote Staging to Production (Full Stack)
         run: |
