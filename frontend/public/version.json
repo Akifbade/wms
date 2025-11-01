@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.12",
+  "version": "v2.1.13",
   "buildDate": "Nov 01, 2025",
-  "buildTime": "22:49:16",
+  "buildTime": "23:04:57",
   "author": "akifbade46-del",
-  "commitMessage": "fix: React useState error - add dedupe config for React modules",
+  "commitMessage": "feat: add company logos to rack QR labels when printing",
   "environment": "development"
 }
