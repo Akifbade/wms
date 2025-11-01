@@ -11,7 +11,7 @@ const router = Router();
 // Configure multer for damage photo uploads
 const damagePhotoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = 'public/uploads/damages';
+    const uploadDir = 'uploads/damages';
     // Create directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });

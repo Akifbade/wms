@@ -14,10 +14,10 @@ import {
   DocumentTextIcon,
   BanknotesIcon,
   ArrowRightOnRectangleIcon,
-  ShieldCheckIcon,
   ChartBarIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
+import { VersionBadgeHeader } from '../VersionBadgeHeader';
 
 // Role-based navigation configuration
 const navigationConfig = {
@@ -52,10 +52,6 @@ const navigationConfig = {
     { name: 'My Tasks', href: '/my-tasks', icon: ArchiveBoxIcon },
   ]
 };
-
-const adminNavigation = [
-  { name: 'Role Management', href: '/admin/roles', icon: ShieldCheckIcon },
-];
 
 export const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -148,42 +144,6 @@ export const Layout: React.FC = () => {
               </Link>
             );
           })}
-
-          {/* Admin Navigation */}
-          {currentUser?.role === 'ADMIN' && (
-            <>
-              <div className="pt-4 pb-2">
-                <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Admin
-                </p>
-              </div>
-              {adminNavigation.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
-                const isAITesting = item.href === '/admin/ai-testing';
-                
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={`
-                      flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors
-                      ${active
-                        ? isAITesting 
-                          ? 'bg-purple-50 text-purple-700 border-l-4 border-purple-600'
-                          : 'bg-red-50 text-red-700 border-l-4 border-red-600'
-                        : 'text-gray-700 hover:bg-gray-100'
-                      }
-                    `}
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <Icon className={`mr-3 h-5 w-5 ${active ? (isAITesting ? 'text-purple-600' : 'text-red-600') : 'text-gray-400'}`} />
-                    {item.name}
-                  </Link>
-                );
-              })}
-            </>
-          )}
         </nav>
 
         {/* User Profile & Logout */}
@@ -233,6 +193,8 @@ export const Layout: React.FC = () => {
             </button>
 
             <div className="flex-1 flex items-center justify-end space-x-4">
+              {/* Version badge - shows current deployed version */}
+              <VersionBadgeHeader />
               {/* Search */}
               <div className="hidden md:block">
                 <input

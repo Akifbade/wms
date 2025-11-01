@@ -154,27 +154,71 @@ router.patch("/:jobId", authenticateToken as any, async (req: AuthRequest, res) 
 
 /**
  * DELETE /api/moving-jobs/:jobId
- * Delete a moving job
+ * Delete a moving job (soft delete - preserves history and material records)
  */
 router.delete("/:jobId", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { jobId } = req.params;
     const { companyId } = req.user!;
+    const userId = req.user!.id;
 
-    // Verify job belongs to the company
+    // Verify job belongs to the company and get all relations
     const existingJob = await prisma.movingJob.findFirst({
       where: { id: jobId, companyId },
+      include: {
+        assignments: true,
+        materialIssues: true,
+        materialReturns: true,
+        costSnapshots: true,
+        approvals: true,
+        files: true
+      }
     });
 
     if (!existingJob) {
       return res.status(404).json({ error: "Job not found" });
     }
 
-    await prisma.movingJob.delete({
+    // Check if any materials are still pending/active
+    const activeMaterials = existingJob.materialIssues.filter((m: any) => 
+      m.status !== 'RETURNED' && m.status !== 'CANCELLED'
+    );
+
+    if (activeMaterials.length > 0) {
+      return res.status(400).json({ 
+        error: `Cannot delete job: ${activeMaterials.length} active material issue(s) still pending. Return or cancel them first.`,
+        activeMaterialsCount: activeMaterials.length
+      });
+    }
+
+    // Soft delete: mark deletedAt timestamp instead of hard delete
+    // This preserves all material history and audit trails
+    const deletedJob = await prisma.movingJob.update({
       where: { id: jobId },
+      data: { 
+        deletedAt: new Date(),
+        status: 'CANCELLED' // Mark status as cancelled for clarity
+      },
+      include: {
+        materialIssues: true,
+        materialReturns: true,
+        costSnapshots: true
+      }
     });
 
-    res.json({ message: "Job deleted successfully" });
+    console.log(`Job ${jobId} soft deleted by user ${userId} - all material history preserved`);
+
+    res.json({ 
+      message: "Job deleted successfully (archived with full history preserved)",
+      job: {
+        id: deletedJob.id,
+        jobCode: deletedJob.jobCode,
+        status: deletedJob.status,
+        deletedAt: deletedJob.deletedAt,
+        materialIssuesCount: deletedJob.materialIssues.length,
+        materialReturnsCount: deletedJob.materialReturns.length
+      }
+    });
   } catch (error) {
     console.error("Error deleting job:", error);
     res.status(500).json({ error: "Failed to delete job." });

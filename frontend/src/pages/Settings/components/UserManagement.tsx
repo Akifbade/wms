@@ -18,12 +18,13 @@ interface User {
   name: string;
   email: string;
   phone: string;
-  role: 'ADMIN' | 'MANAGER' | 'WORKER';
+  role: 'ADMIN' | 'MANAGER' | 'DRIVER' | 'WORKER' | 'SCANNER' | 'PACKER' | 'LABOR';
   status: 'ACTIVE' | 'INACTIVE';
   skills: string[];
   joinedAt: string;
   lastActive: string;
   avatar?: string;
+  isDummy?: boolean;
 }
 
 const mockUsers: User[] = [
@@ -76,7 +77,11 @@ const mockUsers: User[] = [
 const roleColors = {
   ADMIN: 'bg-red-100 text-red-800',
   MANAGER: 'bg-blue-100 text-blue-800',
-  WORKER: 'bg-green-100 text-green-800'
+  DRIVER: 'bg-purple-100 text-purple-800',
+  WORKER: 'bg-green-100 text-green-800',
+  SCANNER: 'bg-yellow-100 text-yellow-800',
+  PACKER: 'bg-gray-100 text-gray-800',
+  LABOR: 'bg-gray-100 text-gray-800'
 };
 
 const statusColors = {
@@ -246,7 +251,11 @@ export const UserManagement: React.FC = () => {
               <option value="ALL">All Roles</option>
               <option value="ADMIN">Admin</option>
               <option value="MANAGER">Manager</option>
+              <option value="DRIVER">Driver</option>
               <option value="WORKER">Worker</option>
+              <option value="SCANNER">Scanner</option>
+              <option value="PACKER">Packer</option>
+              <option value="LABOR">Labor</option>
             </select>
           </div>
           
@@ -371,53 +380,119 @@ export const UserManagement: React.FC = () => {
 
       {/* Role Permissions Overview */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Role Permissions</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Role Permissions Guide</h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Admin Permissions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Admin */}
           <div className="border border-red-200 rounded-lg p-4 bg-red-50">
             <div className="flex items-center mb-3">
               <ShieldCheckIcon className="h-5 w-5 text-red-600 mr-2" />
-              <h4 className="font-medium text-red-900">Administrator</h4>
+              <h4 className="font-medium text-red-900">Admin</h4>
             </div>
-            <ul className="text-sm text-red-700 space-y-1">
-              <li>• Full system access</li>
-              <li>• User management</li>
-              <li>• Company settings</li>
-              <li>• Financial reports</li>
-              <li>• System configuration</li>
+            <ul className="text-xs text-red-700 space-y-1">
+              <li>✅ Full system access</li>
+              <li>✅ Manage users</li>
+              <li>✅ View all jobs</li>
+              <li>✅ Financial reports</li>
+              <li>✅ Settings</li>
             </ul>
           </div>
 
-          {/* Manager Permissions */}
+          {/* Manager */}
           <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
             <div className="flex items-center mb-3">
               <UserGroupIcon className="h-5 w-5 text-blue-600 mr-2" />
               <h4 className="font-medium text-blue-900">Manager</h4>
             </div>
-            <ul className="text-sm text-blue-700 space-y-1">
-              <li>• Job scheduling</li>
-              <li>• Team management</li>
-              <li>• Inventory oversight</li>
-              <li>• Performance reports</li>
-              <li>• Expense approval</li>
+            <ul className="text-xs text-blue-700 space-y-1">
+              <li>✅ Manage jobs</li>
+              <li>✅ View reports</li>
+              <li>✅ Manage teams</li>
+              <li>✅ Scan shipments</li>
+              <li>❌ System settings</li>
             </ul>
           </div>
 
-          {/* Worker Permissions */}
+          {/* Driver */}
+          <div className="border border-purple-200 rounded-lg p-4 bg-purple-50">
+            <div className="flex items-center mb-3">
+              <span className="text-purple-600 mr-2">🚗</span>
+              <h4 className="font-medium text-purple-900">Driver</h4>
+            </div>
+            <ul className="text-xs text-purple-700 space-y-1">
+              <li>✅ View assigned jobs</li>
+              <li>✅ Update job status</li>
+              <li>✅ Mobile app access</li>
+              <li>❌ View all jobs</li>
+              <li>❌ Manage system</li>
+            </ul>
+          </div>
+
+          {/* Worker */}
           <div className="border border-green-200 rounded-lg p-4 bg-green-50">
             <div className="flex items-center mb-3">
               <CheckBadgeIcon className="h-5 w-5 text-green-600 mr-2" />
               <h4 className="font-medium text-green-900">Worker</h4>
             </div>
-            <ul className="text-sm text-green-700 space-y-1">
-              <li>• QR scanning operations</li>
-              <li>• Job execution</li>
-              <li>• Inventory updates</li>
-              <li>• Photo uploads</li>
-              <li>• Basic reporting</li>
+            <ul className="text-xs text-green-700 space-y-1">
+              <li>✅ Scan shipments</li>
+              <li>✅ View dashboard</li>
+              <li>✅ Manage shipments</li>
+              <li>❌ Manage jobs</li>
+              <li>❌ View reports</li>
             </ul>
           </div>
+
+          {/* Scanner */}
+          <div className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
+            <div className="flex items-center mb-3">
+              <span className="text-yellow-600 mr-2">📱</span>
+              <h4 className="font-medium text-yellow-900">Scanner</h4>
+            </div>
+            <ul className="text-xs text-yellow-700 space-y-1">
+              <li>✅ Scan shipments ONLY</li>
+              <li>✅ View pending items</li>
+              <li>❌ Dashboard access</li>
+              <li>❌ Manage anything</li>
+              <li>❌ Reports</li>
+            </ul>
+          </div>
+
+          {/* Packer */}
+          <div className="border border-gray-300 rounded-lg p-4 bg-gray-100">
+            <div className="flex items-center mb-3">
+              <span className="text-gray-600 mr-2">📦</span>
+              <h4 className="font-medium text-gray-900">Packer</h4>
+            </div>
+            <ul className="text-xs text-gray-700 space-y-1">
+              <li>🔒 Dummy user only</li>
+              <li>✅ Job staff assignment</li>
+              <li>❌ Cannot login</li>
+              <li>❌ No system access</li>
+              <li>Used for tracking</li>
+            </ul>
+          </div>
+
+          {/* Labor */}
+          <div className="border border-gray-300 rounded-lg p-4 bg-gray-100">
+            <div className="flex items-center mb-3">
+              <span className="text-gray-600 mr-2">🔧</span>
+              <h4 className="font-medium text-gray-900">Labor</h4>
+            </div>
+            <ul className="text-xs text-gray-700 space-y-1">
+              <li>🔒 Dummy user only</li>
+              <li>✅ Job staff assignment</li>
+              <li>❌ Cannot login</li>
+              <li>❌ No system access</li>
+              <li>Used for tracking</li>
+            </ul>
+          </div>
+        </div>
+        
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            💡 <strong>Tip:</strong> PACKER and LABOR roles are "dummy users" - they can be assigned to Moving Job staff for tracking purposes but cannot login to the system.
+          </p>
         </div>
       </div>
 
@@ -524,10 +599,17 @@ export const UserManagement: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   >
                     <option value="">Select a role</option>
-                    <option value="ADMIN">Admin - Full system access</option>
-                    <option value="MANAGER">Manager - Team & operations management</option>
-                    <option value="WORKER">Worker - Daily operations</option>
+                    <option value="ADMIN">🛡️ Admin - Full system access</option>
+                    <option value="MANAGER">👔 Manager - Manage jobs & teams</option>
+                    <option value="DRIVER">🚗 Driver - View assigned jobs only</option>
+                    <option value="WORKER">👷 Worker - General warehouse work</option>
+                    <option value="SCANNER">📱 Scanner - QR scanning only</option>
+                    <option value="PACKER">📦 Packer - Staff assignment only</option>
+                    <option value="LABOR">🔧 Labor - Staff assignment only</option>
                   </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    PACKER/LABOR are dummy users for job staff assignment only
+                  </p>
                 </div>
               </div>
 

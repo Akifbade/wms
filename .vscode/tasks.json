@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "🚀 Auto Commit & Push",
+      "type": "shell",
+      "command": ".\\quick-commit.ps1",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "👀 Start Auto-Commit Watcher",
+      "type": "shell",
+      "command": ".\\auto-commit-watcher.ps1",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "🏗️ Build Frontend",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "🚢 Deploy to Local Container",
+      "type": "shell",
+      "command": "docker cp frontend/dist/. wms-frontend:/usr/share/nginx/html/ ; docker exec wms-frontend nginx -s reload",
+      "problemMatcher": [],
+      "dependsOn": ["🏗️ Build Frontend"]
+    }
+  ]
+}

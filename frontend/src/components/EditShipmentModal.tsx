@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { racksAPI, shipmentsAPI } from '../services/api';
 import RackMapModal from './RackMapModal';
+import { parseNumberInput, getSafeNumber } from '../utils/inputHelpers';
 
 interface EditShipmentModalProps {
   isOpen: boolean;
@@ -38,10 +39,10 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
     clientPhone: '',
     clientEmail: '',
     description: '',
-    totalBoxCount: 0,
-    currentBoxCount: 0,
+    totalBoxCount: '',
+    currentBoxCount: '',
     rackId: '',
-    estimatedValue: 0,
+    estimatedValue: '',
     notes: '',
     status: '',
   });
@@ -59,10 +60,10 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         clientPhone: shipment.clientPhone || '',
         clientEmail: shipment.clientEmail || '',
         description: shipment.description || '',
-        totalBoxCount: shipment.totalBoxCount || 0,
-        currentBoxCount: shipment.currentBoxCount || 0,
+        totalBoxCount: shipment.totalBoxCount || '',
+        currentBoxCount: shipment.currentBoxCount || '',
         rackId: shipment.rackId || '',
-        estimatedValue: shipment.estimatedValue || 0,
+        estimatedValue: shipment.estimatedValue || '',
         notes: shipment.notes || '',
         status: shipment.status || 'IN_STORAGE',
       });
@@ -125,7 +126,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name.includes('Count') || name === 'estimatedValue' ? Number(value) : value
+      [name]: (name.includes('Count') || name === 'estimatedValue') ? parseNumberInput(value, true) : value
     }));
   };
 
@@ -136,22 +137,38 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
     setSuccess('');
 
     try {
+      // Convert to numbers using getSafeNumber
+      const totalBoxCount = getSafeNumber(formData.totalBoxCount);
+      const currentBoxCount = getSafeNumber(formData.currentBoxCount);
+      const estimatedValue = getSafeNumber(formData.estimatedValue);
+
       // Validation
       if (!formData.clientName || !formData.clientPhone) {
         throw new Error('Client name and phone are required');
       }
-      if (formData.totalBoxCount <= 0) {
+      if (totalBoxCount <= 0) {
         throw new Error('Total box count must be greater than 0');
       }
-      if (formData.currentBoxCount > formData.totalBoxCount) {
+      if (currentBoxCount > totalBoxCount) {
         throw new Error('Current box count cannot exceed total box count');
       }
       if (!formData.rackId) {
         throw new Error('Please select a rack');
       }
 
-      // Remove totalBoxCount from the data being sent (schema only has currentBoxCount)
-      const { totalBoxCount, ...updateData } = formData;
+      // Prepare update data with converted numbers
+      const updateData = {
+        clientName: formData.clientName,
+        clientPhone: formData.clientPhone,
+        clientEmail: formData.clientEmail,
+        description: formData.description,
+        currentBoxCount,
+        rackId: formData.rackId,
+        estimatedValue,
+        notes: formData.notes,
+        status: formData.status,
+      };
+
       await shipmentsAPI.update(shipment.id, updateData);
 
       // Save custom field values
@@ -174,7 +191,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         }
       }
       
-      alert(`✅ SUCCESS!\n\nShipment ${shipment.referenceId} has been updated successfully!\n\n📦 Current Boxes: ${formData.currentBoxCount}\n📍 Rack: ${formData.rackId}`);
+      alert(`✅ SUCCESS!\n\nShipment ${shipment.referenceId} has been updated successfully!\n\n📦 Current Boxes: ${currentBoxCount}\n📍 Rack: ${formData.rackId}`);
       
       onSuccess();
       onClose();
@@ -451,6 +468,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                       >
                         <option value="">-- Select --</option>
                         {(() => {
+                          if (!field.fieldOptions) return [];
                           try {
                             // Try to parse as JSON array
                             const options = JSON.parse(field.fieldOptions);
@@ -459,9 +477,9 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                             )) : [];
                           } catch {
                             // Fallback: split by comma if not valid JSON
-                            return field.fieldOptions.split(',').map((option: string) => (
+                            return typeof field.fieldOptions === 'string' ? field.fieldOptions.split(',').map((option: string) => (
                               <option key={option.trim()} value={option.trim()}>{option.trim()}</option>
-                            ));
+                            )) : [];
                           }
                         })()}
                       </select>

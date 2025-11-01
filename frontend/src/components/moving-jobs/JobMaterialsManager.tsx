@@ -254,7 +254,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
         <div className="flex gap-4">
           <div className="text-right">
             <p className="text-sm text-gray-500">Total Cost</p>
-            <p className="text-xl font-bold">₹{getTotalIssued().toFixed(2)}</p>
+            <p className="text-xl font-bold">{getTotalIssued().toFixed(2)} KWD</p>
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-500">Pending Returns</p>
@@ -408,8 +408,8 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">{issue.quantity} {issue.material.unit}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">₹{issue.unitCost.toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap font-bold">₹{issue.totalCost.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{issue.unitCost.toFixed(2)} KWD</td>
+                    <td className="px-6 py-4 whitespace-nowrap font-bold">{issue.totalCost.toFixed(2)} KWD</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {issue.rack ? `${issue.rack.code} - ${issue.rack.location}` : 'N/A'}
                     </td>

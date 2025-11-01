@@ -10,6 +10,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// ENUMS
+// ============================================
+
+enum Role {
+  ADMIN    // Full access to everything
+  MANAGER  // Manage jobs, view reports, manage users
+  DRIVER   // View assigned jobs, update job status, mobile app access
+  WORKER   // General warehouse worker
+  SCANNER  // Only scan shipments, view pending shipments
+  PACKER   // Dummy user for job staff assignment only
+  LABOR    // Dummy user for job staff assignment only
+}
+
+// ============================================
+// MODELS
+// ============================================
+
 // Multi-Tenant Companies
 model Company {
   id         String  @id @default(cuid())
@@ -31,6 +49,12 @@ model Company {
   showCompanyName Boolean @default(true)
   logoSize        String? @default("medium") // small, medium, large
 
+  // NEW: Contract & Contact Info
+  contactPerson      String?
+  contactPhone       String?
+  contractStatus     String? @default("ACTIVE") // ACTIVE, INACTIVE, EXPIRED
+  contractDocument   String? // File path to contract PDF/DOC
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -40,6 +64,8 @@ model Company {
   shipments         Shipment[]
   movingJobs        MovingJob[]
   expenses          Expense[]
+  categories        Category[] // NEW: One-to-many with categories
+  companyProfiles   CompanyProfile[] // NEW: Customer/vendor company profiles (DIOR, JAZEERA, etc)
   invoiceSettings   InvoiceSettings?
   customFields      CustomField[]
   billingSettings   BillingSettings?
@@ -73,6 +99,7 @@ model Company {
   purchaseOrders       PurchaseOrder[]
   purchaseOrderItems   PurchaseOrderItem[]
   materialPriceHistory MaterialPriceHistory[]
+  rackAuditLogs        RackAuditLog[]
 
   @@map("companies")
 }
@@ -84,9 +111,11 @@ model User {
   password  String
   name      String
   phone     String?
-  role      String   @default("WORKER") // ADMIN, MANAGER, WORKER
+  role      Role     @default(WORKER) // Enum: ADMIN, MANAGER, DRIVER, WORKER, SCANNER, PACKER, LABOR
   skills    String? // JSON string of skills array
   isActive  Boolean  @default(true)
+  isDummy   Boolean  @default(false) // True for PACKER/LABOR (staff-only users)
+  permissions String? @db.Text // JSON string for granular permissions override
   companyId String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -101,7 +130,7 @@ model User {
 
   // Relations
   company                 Company            @relation(fields: [companyId], references: [id])
-  activities              RackActivity[]
+  rackActivities          RackActivity[]
   jobAssignments          JobAssignment[]
   movingJobsLead          MovingJob[]        @relation("MovingJobTeamLead")
   stockBatchesReceived    StockBatch[]       @relation("StockBatchReceivedBy")
@@ -126,16 +155,95 @@ model User {
   shipmentsAssigned Shipment[] @relation("ShipmentAssignedBy")
   shipmentsReleased Shipment[] @relation("ShipmentReleasedBy")
 
+  // NEW: Activity Tracking
+  activities UserActivity[]
+  
+  // NEW: File Upload Tracking
+  uploadedFiles JobFile[]     @relation("JobFileUploads")
+
   @@map("users")
+}
+
+// User Activity Tracking (NEW - Hidden Admin Feature)
+model UserActivity {
+  id         Int      @id @default(autoincrement())
+  userId     String   @db.VarChar(191)
+  action     String   @db.VarChar(100)
+  entityType String   @db.VarChar(50)
+  entityId   String?  @db.VarChar(191)
+  details    String?  @db.Text
+  ipAddress  String?  @db.VarChar(45)
+  userAgent  String?  @db.Text
+  timestamp  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([timestamp])
+  @@map("user_activities")
+}
+
+// NEW: Rack Category System (Company-specific categories with branding)
+model Category {
+  id          String    @id @default(cuid())
+  name        String    // DIOR, COMPANY_MATERIAL, JAZEERA, etc.
+  description String?   @db.Text
+  logo        String?   // Logo/icon file path
+  color       String?   // Hex color code (e.g., #FF5733)
+  icon        String?   // Icon name or emoji
+  companyId   String
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  racks       Rack[]    // One-to-many: A category has many racks
+
+  @@unique([name, companyId]) // Category name unique per company
+  @@map("categories")
+}
+
+// Company Profiles (DIOR, JAZEERA, etc - Customer/Vendor companies)
+model CompanyProfile {
+  id               String   @id @default(cuid())
+  name             String   // e.g., "DIOR", "JAZEERA", "COMPANY_MATERIAL"
+  description      String?
+  logo             String?  // File path to logo
+  contactPerson    String?  // Contact person name
+  contactPhone     String?  // Contact phone number
+  contractStatus   String   @default("ACTIVE") // ACTIVE, INACTIVE, EXPIRED, PENDING
+  isActive         Boolean  @default(true)
+  companyId        String   // Parent company
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  racks            Rack[]   // One-to-many: Profile can have many racks assigned
+  shipments        Shipment[] // One-to-many: Shipments from/to this company profile
+
+  @@unique([name, companyId]) // Company profile name unique per company
+  @@map("company_profiles")
 }
 
 // Central Rack System (Core Integration Point)
 model Rack {
-  id            String    @id @default(cuid())
-  code          String // A1, A2, B1, etc.
-  qrCode        String    @unique
-  rackType      String    @default("STORAGE") // STORAGE, MATERIALS, EQUIPMENT
-  location      String?
+  id               String    @id @default(cuid())
+  code             String // A1, A2, B1, etc.
+  qrCode           String    @unique
+  rackType         String    @default("STORAGE") // STORAGE, MATERIALS, EQUIPMENT
+  categoryId       String?   // FK to Category (instead of string category)
+  companyProfileId String?   // NEW: FK to CompanyProfile (DIOR, JAZEERA, etc)
+  location         String?
+  
+  // Size/Dimensions
+  length        Float?    // Length in meters/feet
+  width         Float?    // Width in meters/feet
+  height        Float?    // Height in meters/feet
+  dimensionUnit String    @default("METERS") // METERS, FEET
+  
   capacityTotal Float     @default(100)
   capacityUsed  Float     @default(0)
   minCapacity   Int       @default(2) // Minimum capacity requirement
@@ -144,19 +252,23 @@ model Rack {
   companyId     String
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime? // Soft delete: null = active, has timestamp = deleted
 
   // Relations
-  company        Company          @relation(fields: [companyId], references: [id])
-  boxes          ShipmentBox[] // Individual boxes assigned
-  activities     RackActivity[]
-  inventory      RackInventory[]
-  materialLevels RackStockLevel[] @relation("RackMaterialLevels")
+  company           Company           @relation(fields: [companyId], references: [id])
+  category          Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull) // FK to Category
+  companyProfile    CompanyProfile?   @relation(fields: [companyProfileId], references: [id], onDelete: SetNull) // NEW: FK to CompanyProfile
+  boxes             ShipmentBox[] // Individual boxes assigned
+  activities        RackActivity[]
+  inventory         RackInventory[]
+  materialLevels    RackStockLevel[] @relation("RackMaterialLevels")
   MaterialReturn MaterialReturn[]
   jobMaterials   MaterialIssue[]  @relation("JobMaterialRack") // Materials assigned to jobs
   transfersFrom  MaterialTransfer[] @relation("TransferFromRack") // NEW: Transfers from this rack
   transfersTo    MaterialTransfer[] @relation("TransferToRack")   // NEW: Transfers to this rack
 
   @@unique([code, companyId])
+  @@index([deletedAt]) // Index for filtering active racks
   @@map("racks")
 }
 
@@ -200,6 +312,26 @@ model RackActivity {
   @@map("rack_activities")
 }
 
+// Rack Audit Trail - Full deletion and modification history
+model RackAuditLog {
+  id          String   @id @default(cuid())
+  rackId      String
+  action      String // DELETE, CREATE, UPDATE, MODIFY_STATUS
+  status      String // SUCCESS, FAILED
+  message     String?
+  details     String? // JSON string with old/new values, box details, etc
+  performedBy String?
+  createdAt   DateTime @default(now())
+  companyId   String
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([rackId])
+  @@index([createdAt])
+  @@index([companyId])
+  @@map("rack_audit_logs")
+}
+
 // Shipment Management
 model Shipment {
   id               String    @id @default(cuid())
@@ -229,6 +361,7 @@ model Shipment {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime? // Soft delete: null = active, has timestamp = deleted
 
   // Warehouse Integration Fields (Non-breaking additions)
   isWarehouseShipment Boolean @default(false) // Flag for warehouse vs regular shipments
@@ -237,21 +370,32 @@ model Shipment {
   consignee           String? // Receiver information for warehouse
 
   // NEW: Enhanced Warehouse Fields
-  category      String  @default("CUSTOMER_STORAGE") // CUSTOMER_STORAGE, AIRPORT_CARGO, WAREHOUSE_STOCK
-  awbNumber     String? // Air Waybill number for airport shipments
-  flightNumber  String? // Flight number for airport tracking
-  origin        String? // Origin airport/location
-  destination   String? // Destination airport/location
-  customerName  String? // Normalized customer name for grouping (e.g., "Dior", "Boodai Trading")
+  category           String    @default("CUSTOMER_STORAGE") // CUSTOMER_STORAGE, AIRPORT_CARGO, WAREHOUSE_STOCK
+  companyProfileId   String?   // NEW: FK to CompanyProfile (DIOR, JAZEERA, etc)
+  awbNumber          String?   // Air Waybill number for airport shipments
+  flightNumber       String?   // Flight number for airport tracking
+  origin             String?   // Origin airport/location
+  destination        String?   // Destination airport/location
+  customerName       String?   // Normalized customer name for grouping (e.g., "Dior", "Boodai Trading")
+  palletCount       Int?      // Number of pallets recorded at intake
+  boxesPerPallet    Int?      // Boxes contained per pallet
+  
+  // NEW: Dimension & CBM fields for volume-based charging
+  length            Float?    // Length in centimeters
+  width             Float?    // Width in centimeters
+  height            Float?    // Height in centimeters
+  cbm               Float?    // Cubic meters (m³) - auto-calculated: (L×W×H)/1000000
+  weight            Float?    // Weight in kilograms
 
   // Relations
-  company     Company          @relation(fields: [companyId], references: [id])
-  boxes       ShipmentBox[] // Individual boxes with QR codes - USE THIS for rack assignment
-  withdrawals Withdrawal[]
-  invoices    Invoice[]
-  charges     ShipmentCharges?
-  items       ShipmentItem[] // NEW: Detailed item tracking
-  materialUsages MaterialUsage[] // NEW: Materials used for this shipment
+  company            Company           @relation(fields: [companyId], references: [id])
+  companyProfile     CompanyProfile?   @relation(fields: [companyProfileId], references: [id], onDelete: SetNull) // NEW: FK to CompanyProfile
+  boxes              ShipmentBox[]     // Individual boxes with QR codes - USE THIS for rack assignment
+  withdrawals        Withdrawal[]
+  invoices           Invoice[]
+  charges            ShipmentCharges?
+  items              ShipmentItem[]    // NEW: Detailed item tracking
+  materialUsages     MaterialUsage[]   // NEW: Materials used for this shipment
 
   // User Relations for Tracking
   createdBy  User? @relation("ShipmentCreatedBy", fields: [createdById], references: [id])
@@ -261,6 +405,7 @@ model Shipment {
   @@index([category])
   @@index([customerName])
   @@index([awbNumber])
+  @@index([deletedAt]) // Index for filtering active shipments
   @@map("shipments")
 }
 
@@ -281,6 +426,9 @@ model ShipmentBox {
   // Warehouse Integration Fields (Non-breaking additions)  
   pieceWeight Float? // Weight of this specific piece/box
   pieceQR     String? // Alternative QR format for warehouse pieces
+  
+  // Photo attachments - JSON array of photo URLs uploaded during rack assignment
+  photos      String? // JSON array: ["uploads/shipments/photo1.jpg", "uploads/shipments/photo2.jpg"]
 
   // Relations with proper cascading
   shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
@@ -910,6 +1058,7 @@ model MovingJob {
   notes          String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  deletedAt      DateTime? // Soft delete: null = active, has timestamp = deleted
   companyId      String
 
   company         Company            @relation(fields: [companyId], references: [id])
@@ -919,8 +1068,33 @@ model MovingJob {
   materialReturns MaterialReturn[]
   costSnapshots   JobCostSnapshot[]
   approvals       MaterialApproval[]
+  files           JobFile[]          // NEW: Job documents and files
 
+  @@index([deletedAt]) // Index for filtering active jobs
   @@map("moving_jobs")
+}
+
+// Job Files & Documents (NEW)
+model JobFile {
+  id           Int      @id @default(autoincrement())
+  jobId        String
+  fileName     String   @db.VarChar(255)
+  originalName String   @db.VarChar(255)
+  filePath     String   @db.VarChar(500)
+  fileSize     Int
+  mimeType     String   @db.VarChar(100)
+  folderName   String?  @db.VarChar(100)
+  uploadedBy   String   @db.VarChar(191)
+  uploadedAt   DateTime @default(now())
+  description  String?  @db.Text
+
+  job          MovingJob @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  user         User      @relation("JobFileUploads", fields: [uploadedBy], references: [id], onDelete: Restrict)
+
+  @@index([jobId])
+  @@index([uploadedBy])
+  @@index([folderName])
+  @@map("job_files")
 }
 
 model JobAssignment {
@@ -1082,7 +1256,7 @@ model MaterialIssue {
   notes        String?
   companyId    String
 
-  job        MovingJob        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job        MovingJob        @relation(fields: [jobId], references: [id], onDelete: Restrict) // ← CHANGED: Restrict instead of Cascade - preserves history
   material   PackingMaterial  @relation(fields: [materialId], references: [id])
   stockBatch StockBatch?      @relation(fields: [stockBatchId], references: [id])
   rack       Rack?            @relation("JobMaterialRack", fields: [rackId], references: [id])
@@ -1110,7 +1284,7 @@ model MaterialReturn {
   notes           String?
   companyId       String
 
-  job        MovingJob         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job        MovingJob         @relation(fields: [jobId], references: [id], onDelete: Restrict) // ← CHANGED: Restrict instead of Cascade - preserves history
   material   PackingMaterial   @relation(fields: [materialId], references: [id])
   issue      MaterialIssue?    @relation(fields: [issueId], references: [id])
   rack       Rack?             @relation(fields: [rackId], references: [id])

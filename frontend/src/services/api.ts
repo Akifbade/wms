@@ -3,17 +3,25 @@ const API_BASE_URL = '/api';
 
 // Helper to get auth token
 export const getAuthToken = (): string | null => {
-  return localStorage.getItem('authToken');
+  const storedToken = localStorage.getItem('authToken') || localStorage.getItem('token');
+
+  if (storedToken && !localStorage.getItem('authToken')) {
+    localStorage.setItem('authToken', storedToken);
+  }
+
+  return storedToken;
 };
 
 // Helper to set auth token
 export const setAuthToken = (token: string): void => {
   localStorage.setItem('authToken', token);
+  localStorage.setItem('token', token);
 };
 
 // Helper to clear auth token
 export const clearAuthToken = (): void => {
   localStorage.removeItem('authToken');
+  localStorage.removeItem('token');
   localStorage.removeItem('user');
 };
 
@@ -96,12 +104,13 @@ export const dashboardAPI = {
 
 // Shipments API
 export const shipmentsAPI = {
-  getAll: async (params?: { status?: string; search?: string; page?: number; limit?: number }) => {
+  getAll: async (params?: { status?: string; search?: string; page?: number; limit?: number; isWarehouseShipment?: boolean }) => {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.search) queryParams.append('search', params.search);
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.isWarehouseShipment !== undefined) queryParams.append('isWarehouseShipment', String(params.isWarehouseShipment));
     
     const query = queryParams.toString();
     return apiCall<any>(`/shipments${query ? `?${query}` : ''}`);
@@ -147,6 +156,10 @@ export const racksAPI = {
     return apiCall<{ rack: any }>(`/racks/${id}`);
   },
 
+  getCategories: async () => {
+    return apiCall<{ categories: any[] }>('/racks/categories/list');
+  },
+
   create: async (data: any) => {
     return apiCall<{ rack: any }>('/racks', {
       method: 'POST',
@@ -163,6 +176,114 @@ export const racksAPI = {
 
   delete: async (id: string) => {
     return apiCall<{ message: string }>(`/racks/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// NEW: Categories API
+export const categoriesAPI = {
+  listByCompany: async (companyId: string) => {
+    const response = await apiCall<{ categories: any[] }>(`/categories/${companyId}`);
+    return response.categories;
+  },
+
+  getDetail: async (categoryId: string) => {
+    const response = await apiCall<{ category: any }>(`/categories/detail/${categoryId}`);
+    return response.category;
+  },
+
+  create: async (data: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/categories/`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: data,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  update: async (categoryId: string, data: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
+      method: 'PUT',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: data,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  delete: async (categoryId: string) => {
+    return apiCall<{ message: string }>(`/categories/${categoryId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Company Profiles API (DIOR, JAZEERA, etc)
+export const companiesAPI = {
+  listProfiles: async () => {
+    return apiCall<any[]>(`/company-profiles/`);
+  },
+
+  getProfile: async (profileId: string) => {
+    return apiCall<any>(`/company-profiles/${profileId}`);
+  },
+
+  createProfile: async (data: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/company-profiles/`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: data,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  updateProfile: async (profileId: string, data: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/company-profiles/${profileId}`, {
+      method: 'PUT',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: data,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  deleteProfile: async (profileId: string) => {
+    return apiCall<{ message: string }>(`/company-profiles/${profileId}`, {
       method: 'DELETE',
     });
   },
@@ -518,6 +639,8 @@ export default {
   dashboard: dashboardAPI,
   shipments: shipmentsAPI,
   racks: racksAPI,
+  categories: categoriesAPI,
+  companies: companiesAPI,
   jobs: jobsAPI,
   billing: billingAPI,
   withdrawals: withdrawalsAPI,

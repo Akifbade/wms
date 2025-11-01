@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { racksAPI } from '../services/api';
+import { racksAPI, companiesAPI } from '../services/api';
 import QRCode from 'qrcode';
+
+interface Category {
+  id: string;
+  name: string;
+  logo?: string;
+  color?: string;
+  icon?: string;
+  description?: string;
+  contractStatus?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+}
 
 interface CreateRackModalProps {
   isOpen: boolean;
@@ -10,16 +22,59 @@ interface CreateRackModalProps {
 
 export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRackModalProps) {
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [formData, setFormData] = useState({
     code: '',
     location: '',
     rackType: 'STORAGE',
+    categoryId: '',
+    companyProfileId: '',
     capacityTotal: 100,
     status: 'ACTIVE',
+    length: '',
+    width: '',
+    height: '',
+    dimensionUnit: 'METERS',
   });
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedCategoryInfo, setSelectedCategoryInfo] = useState<Category | null>(null);
+
+  const resolveLogoUrl = (logo?: string | null) => {
+    if (!logo) return '';
+    if (logo.startsWith('http')) return logo;
+    return logo.startsWith('/') ? logo : `/uploads/${logo}`;
+  };
+
+  // Load categories when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadCategories();
+    }
+  }, [isOpen]);
+
+  const loadCategories = async () => {
+    try {
+      const profiles = await companiesAPI.listProfiles();
+      const options: Category[] = (profiles || [])
+        .filter((profile: any) => profile.isActive !== false)
+        .map((profile: any) => ({
+          id: profile.id,
+          name: profile.name,
+          description: profile.description,
+          logo: profile.logo,
+          contractStatus: profile.contractStatus,
+          contactPerson: profile.contactPerson,
+          contactPhone: profile.contactPhone,
+          color: '#5B21B6',
+          icon: '????',
+        }));
+      setCategories(options);
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -28,21 +83,42 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
         code: '',
         location: '',
         rackType: 'STORAGE',
+        categoryId: '',
+        companyProfileId: '',
         capacityTotal: 100,
         status: 'ACTIVE',
+        length: '',
+        width: '',
+        height: '',
+        dimensionUnit: 'METERS',
       });
       setQrCodeUrl('');
       setError('');
       setSuccess('');
+      setSelectedCategoryInfo(null);
     }
   }, [isOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'capacityTotal' ? Number(value) : value
-    }));
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        [name]: name === 'capacityTotal' ? Number(value) : value,
+      } as typeof prev;
+
+      if (name === 'categoryId') {
+        next.companyProfileId = value;
+      }
+
+      return next;
+    });
+
+    // If category changed, update the selected category info
+    if (name === 'categoryId') {
+      const selected = categories.find(c => c.id === value);
+      setSelectedCategoryInfo(selected || null);
+    }
   };
 
   const generateQRCode = async (code: string) => {
@@ -103,15 +179,31 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
       // Generate unique QR code for the rack
       const qrCode = `RACK-${formData.code}-${Date.now()}`;
       
+      const selectedCompanyProfileId = formData.companyProfileId || formData.categoryId || '';
+
+      const {
+        categoryId: _unusedCategoryId,
+        companyProfileId: _unusedCompanyProfileId,
+        length,
+        width,
+        height,
+        ...rest
+      } = formData;
+
       const dataToSubmit = {
-        ...formData,
+        ...rest,
         qrCode,
         capacityUsed: 0,
+        length: length ? parseFloat(length) : undefined,
+        width: width ? parseFloat(width) : undefined,
+        height: height ? parseFloat(height) : undefined,
+        categoryId: undefined,
+        companyProfileId: selectedCompanyProfileId ? selectedCompanyProfileId : undefined,
       };
 
       await racksAPI.create(dataToSubmit);
       
-      setSuccess('Rack created successfully! ✅');
+      setSuccess('Rack created successfully! ???');
       
       // Generate final QR code for download
       await generateQRCode(formData.code);
@@ -134,13 +226,13 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-purple-600 text-white px-6 py-4 rounded-t-lg flex justify-between items-center">
-          <h2 className="text-xl font-bold">🏪 Create New Rack</h2>
+          <h2 className="text-xl font-bold">???? Create New Rack</h2>
           <button
             onClick={onClose}
             className="text-white hover:text-gray-200 text-2xl font-bold"
             disabled={loading}
           >
-            ×
+            ??
           </button>
         </div>
 
@@ -214,6 +306,59 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category / Company
+                </label>
+                <select
+                  name="categoryId"
+                  value={formData.categoryId}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="">Select Category / Company...</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      ???? {cat.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedCategoryInfo && (
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                    <div className="flex items-center gap-2">
+                      {selectedCategoryInfo.logo && (
+                        <img
+                          src={resolveLogoUrl(selectedCategoryInfo.logo)}
+                          alt={`${selectedCategoryInfo.name} logo`}
+                          className="h-10 w-10 rounded-md object-contain bg-white border border-blue-200"
+                        />
+                      )}
+                      <div>
+                        <p className="font-medium text-blue-900">{selectedCategoryInfo.name}</p>
+                        {selectedCategoryInfo.contractStatus && (
+                          <p className="text-blue-600 text-xs uppercase font-semibold">
+                            {selectedCategoryInfo.contractStatus}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {selectedCategoryInfo.description && (
+                      <p className="text-blue-700 text-xs mt-1">{selectedCategoryInfo.description}</p>
+                    )}
+                    {(selectedCategoryInfo.contactPerson || selectedCategoryInfo.contactPhone) && (
+                      <p className="text-blue-700 text-xs mt-1">
+                        {selectedCategoryInfo.contactPerson && `Contact: ${selectedCategoryInfo.contactPerson}`}
+                        {selectedCategoryInfo.contactPerson && selectedCategoryInfo.contactPhone && ' ?? '}
+                        {selectedCategoryInfo.contactPhone && `Phone: ${selectedCategoryInfo.contactPhone}`}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Select which company/category this rack belongs to
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Total Capacity <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -250,6 +395,78 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
             </div>
           </div>
 
+          {/* Dimensions */}
+          <div className="border-b pb-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">???? Dimensions (Size Information)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Length
+                </label>
+                <input
+                  type="number"
+                  name="length"
+                  value={formData.length}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="0.0"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Width
+                </label>
+                <input
+                  type="number"
+                  name="width"
+                  value={formData.width}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="0.0"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Height
+                </label>
+                <input
+                  type="number"
+                  name="height"
+                  value={formData.height}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="0.0"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit
+                </label>
+                <select
+                  name="dimensionUnit"
+                  value={formData.dimensionUnit}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="METERS">Meters</option>
+                  <option value="FEET">Feet</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              ???? Optional: Enter rack physical dimensions for detailed tracking
+            </p>
+          </div>
+
           {/* QR Code Preview */}
           {qrCodeUrl && (
             <div className="border-b pb-4">
@@ -265,7 +482,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
                     onClick={downloadQRCode}
                     className="px-4 py-2 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 font-medium text-sm"
                   >
-                    📥 Download QR Code
+                    ???? Download QR Code
                   </button>
                 )}
               </div>
@@ -295,3 +512,4 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
     </div>
   );
 }
+

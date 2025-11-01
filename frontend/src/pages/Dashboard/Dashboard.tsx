@@ -308,11 +308,11 @@ export const Dashboard: React.FC = () => {
                     </div>
                     <div>
                       <div className="font-medium text-gray-900">{client.name}</div>
-                      <div className="text-xs text-gray-500">{client.totalInvoices} invoices</div>
+                      <div className="text-xs text-gray-500">{client.shipments || 0} shipments</div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-gray-900">{client.totalAmount.toFixed(2)} KWD</div>
+                    <div className="font-semibold text-gray-900">{(client.revenue || 0).toFixed(2)} KWD</div>
                   </div>
                 </div>
               ))

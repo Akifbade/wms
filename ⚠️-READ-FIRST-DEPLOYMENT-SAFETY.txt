@@ -1,0 +1,26 @@
+⚠️ ⚠️ ⚠️ READ THIS FIRST ⚠️ ⚠️ ⚠️
+
+DEPLOYMENT SAFETY CRITICAL
+==========================
+
+TWO SERVERS - DO NOT CONFUSE:
+
+🟢 STAGING (SAFE FOR TESTING):
+   IP: 148.230.107.155
+   Purpose: Test new features
+   Risk: LOW
+   
+🔴 PRODUCTION (LIVE CUSTOMERS):
+   Domain: https://qgocargo.cloud
+   Purpose: REAL USERS SEE CHANGES
+   Risk: CRITICAL ⚠️
+
+BEFORE EVERY DEPLOYMENT:
+1. Confirm which server
+2. Get user approval
+3. Create backup
+4. Deploy
+
+IF CONFUSED - STOP AND ASK USER
+
+Read: DEPLOYMENT-SAFETY-PROTOCOL.md

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
+import { VersionBadge } from './components/VersionBadge';
 import { Layout } from './components/Layout/Layout';
 import { Dashboard } from './pages/Dashboard/Dashboard';
 import { Shipments } from './pages/Shipments/Shipments';
@@ -14,7 +15,6 @@ import { InvoiceDetail } from './pages/Invoices/InvoiceDetail';
 import { Expenses } from './pages/Expenses/Expenses';
 import { TemplateSettingsPage } from './pages/Settings/TemplateSettings';
 import UserProfile from './pages/Profile/UserProfile';
-import RoleManagement from './pages/Admin/RoleManagement';
 import MovingJobsManager from './components/moving-jobs/MovingJobsManager';
 import MaterialsManager from './components/moving-jobs/MaterialsManager';
 import JobReportsDashboard from './components/moving-jobs/JobReportsDashboard';
@@ -23,6 +23,7 @@ import ApprovalManager from './components/moving-jobs/ApprovalManager';
 import { MaterialsManagement } from './pages/Materials';
 import MaterialReports from './pages/Materials/MaterialReports';
 import { DamageReport } from './components/reports/DamageReport';
+import { DebugLogin } from './pages/DebugLogin';
 
 import { getAuthToken } from './services/api';
 import { PermissionProvider } from './contexts/PermissionContext';
@@ -76,6 +77,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
+          <Route path="/debug-login" element={<DebugLogin />} />
 
 
 
@@ -169,11 +171,6 @@ function App() {
                 <TemplateSettingsPage />
               </ProtectedRoute>
             } />
-            <Route path="admin/roles" element={
-              <ProtectedRoute allowedRoles={['ADMIN']}>
-                <RoleManagement />
-              </ProtectedRoute>
-            } />
 
 
 
@@ -203,6 +200,7 @@ function App() {
         {/* Catch all - redirect based on role */}
           <Route path="*" element={<Navigate to="/scanner" replace />} />
         </Routes>
+        <VersionBadge />
       </Router>
     </PermissionProvider>
   );

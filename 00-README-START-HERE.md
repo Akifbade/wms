@@ -2,9 +2,40 @@
 
 ---
 
-## 📚 QUICK NAVIGATION - IMPORTANT GUIDES
+## � **CHAT CRASH HO GAYA? ONE CODE SE FIX!**
 
-### � Getting Started (READ THESE FIRST!)
+### **New AI chat me bas type karo:**
+
+```
+CONTINUE WMS
+```
+
+**AI automatically sab samajh jayega!** ✅  
+**Details:** [CHAT-CRASH-FIX.md](./CHAT-CRASH-FIX.md)
+
+---
+
+## �📚 QUICK NAVIGATION - IMPORTANT GUIDES
+
+### 🤖 Getting Started (READ THESE FIRST!)
+
+🤖 **FOR AI DEVELOPMENT:** **[HOW-TO-WORK-WITH-AI.md](./HOW-TO-WORK-WITH-AI.md)** + **[AI-CONTEXT.md](./AI-CONTEXT.md)**
+   - 🎯 Share with AI in every new chat: `CONTINUE WMS`
+   - 🛡️ Prevents AI from breaking code
+   - ✅ Auto-backup system explained
+   - 📋 Template for AI conversations
+
+💾 **AI MEMORY SYSTEM:** **[AI-MEMORY-SYSTEM.md](./AI-MEMORY-SYSTEM.md)**
+   - 🧠 Auto-saves conversation every 5 mins
+   - 🔄 Never lose context again
+   - ⚡ One code to continue: `CONTINUE WMS`
+
+⚠️ **CRITICAL:** **[DOCKER-SAFETY-GUIDE.md](./DOCKER-SAFETY-GUIDE.md)** - READ THIS BEFORE ANY DEVELOPMENT!
+   - 🛡️ How Docker containers work (TEMPORARY!)
+   - 🚨 Emergency recovery steps
+   - ✅ Safe development workflow
+   - 📦 Auto-backup system
+
 1. **[DEPLOYMENT-GUIDE.md](./DEPLOYMENT-GUIDE.md)** 
    - 📦 Dusre PC/VPS par kaise deploy kare
    - ⏱️ 5 minutes (Docker) ya 10 minutes (Local)

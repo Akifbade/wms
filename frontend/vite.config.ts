@@ -24,8 +24,15 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        // Disable manual chunks to prevent React dependency issues
+        // All code will be bundled together ensuring proper load order
         manualChunks: undefined,
       },
     },
+    // Increase chunk size warning limit since we're bundling more together
+    chunkSizeWarningLimit: 2000,
+  },
+  resolve: {
+    dedupe: ['react', 'react-dom', 'react-router-dom'],
   },
 });

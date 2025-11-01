@@ -162,6 +162,28 @@ export const Shipments: React.FC = () => {
     }
   };
 
+  // Determine intake type based on pallet metadata
+  const getIntakeType = (shipment: any) => {
+    const palletCount = Number(shipment?.palletCount) || 0;
+    const boxesPerPallet = Number(shipment?.boxesPerPallet) || 0;
+    // Heuristic: any pallet structure => Pallet; otherwise Box
+    if (palletCount > 1) return 'PALLET';
+    if (palletCount === 1 && boxesPerPallet > 1) return 'PALLET';
+    return 'BOX';
+  };
+
+  // Compute days stored from arrivalDate (fallback to createdAt)
+  const getDaysStored = (shipment: any) => {
+    const src = shipment?.arrivalDate || shipment?.receivedDate || shipment?.createdAt;
+    if (!src) return 0;
+    const start = new Date(src);
+    if (Number.isNaN(start.getTime())) return 0;
+    const now = new Date();
+    const ms = now.getTime() - start.getTime();
+    const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
+    return Math.max(0, days);
+  };
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center h-96">
@@ -385,15 +407,13 @@ export const Shipments: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      {shipment.isWarehouseShipment ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
-                          <BuildingStorefrontIcon className="h-3 w-3" />
-                          Warehouse
+                      {getIntakeType(shipment) === 'PALLET' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                          🪵 Pallet
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          <HomeIcon className="h-3 w-3" />
-                          Regular
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                          📦 Box
                         </span>
                       )}
                     </div>
@@ -403,7 +423,7 @@ export const Shipments: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <span className="font-semibold">
-                      {shipment.receivedDate ? Math.ceil((new Date().getTime() - new Date(shipment.receivedDate).getTime()) / (1000 * 3600 * 24)) : 0} days
+                      {getDaysStored(shipment)} days
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -419,29 +439,29 @@ export const Shipments: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
+                      {/* QR Code button - show for ALL shipments */}
                       <button 
                         onClick={() => {
                           setSelectedShipment(shipment);
                           setQrModalOpen(true);
                         }}
-                        className="text-indigo-600 hover:text-indigo-900"
-                        title="View QR Codes"
+                        className="text-indigo-600 hover:text-indigo-900 transition-colors"
+                        title="View/Print QR Codes"
                       >
                         <QrCodeIcon className="h-5 w-5" />
                       </button>
-                      {/* Release button - check multiple status values and always show for debugging */}
-                      {((shipment.status === 'IN_STORAGE' || 
-                         shipment.status === 'PARTIAL' || 
-                         shipment.status === 'ACTIVE' ||
-                         shipment.status === 'IN STORAGE') && 
-                        shipment.currentBoxCount > 0) && (
+                      
+                      {/* Release button - only for stored shipments with boxes */}
+                      {(shipment.status === 'IN_STORAGE' || 
+                        shipment.status === 'IN_WAREHOUSE' || 
+                        shipment.status === 'PARTIAL' || 
+                        shipment.status === 'STORED' ||
+                        shipment.status === 'ACTIVE') && 
+                        shipment.currentBoxCount > 0 && (
                         <button 
-                          onClick={() => {
-                            console.log('🔍 Release button clicked:', { status: shipment.status, boxes: shipment.currentBoxCount });
-                            handleReleaseClick(shipment);
-                          }}
+                          onClick={() => handleReleaseClick(shipment)}
                           className="text-green-600 hover:text-green-900"
-                          title={`Generate Invoice & Release (Status: ${shipment.status})`}
+                          title="Generate Invoice & Release"
                         >
                           <ArrowRightOnRectangleIcon className="h-5 w-5" />
                         </button>

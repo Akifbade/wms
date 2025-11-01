@@ -70,7 +70,6 @@ router.post('/intake', async (req, res) => {
                 notes,
                 qrCode: `WH_${barcode}`,
                 status: 'ACTIVE',
-                rackId,
                 companyId,
                 createdById: req.user.id,
                 // Warehouse-specific fields
@@ -144,14 +143,14 @@ router.get('/shipments', async (req, res) => {
         const shipments = await prisma.shipment.findMany({
             where: whereClause,
             include: {
-                rack: { select: { code: true, qrCode: true } },
                 boxes: {
                     select: {
                         id: true,
                         boxNumber: true,
                         qrCode: true,
                         status: true,
-                        pieceQR: true
+                        pieceQR: true,
+                        rack: { select: { code: true, qrCode: true } }
                     }
                 },
                 invoices: {
@@ -180,7 +179,7 @@ router.post('/release/:shipmentId', async (req, res) => {
         // Get shipment with related data
         const shipment = await prisma.shipment.findFirst({
             where: { id: shipmentId, companyId, isWarehouseShipment: true },
-            include: { boxes: true, rack: true }
+            include: { boxes: { include: { rack: true } } }
         });
         if (!shipment) {
             return res.status(404).json({ error: 'Warehouse shipment not found' });
@@ -207,7 +206,7 @@ router.post('/release/:shipmentId', async (req, res) => {
             inDate: shipment.createdAt,
             outDate: new Date(),
             pieces: shipment.originalBoxCount,
-            rack: shipment.rack?.code || 'N/A'
+            rack: shipment.boxes[0]?.rack?.code || 'N/A'
         });
         const invoice = await prisma.invoice.create({
             data: {
@@ -273,16 +272,6 @@ router.post('/release/:shipmentId', async (req, res) => {
                 releasedAt: new Date()
             }
         });
-        // Update rack capacity
-        if (shipment.rackId) {
-            await prisma.rack.update({
-                where: { id: shipment.rackId },
-                data: {
-                    capacityUsed: { decrement: shipment.originalBoxCount },
-                    lastActivity: new Date()
-                }
-            });
-        }
         res.json({
             invoice: {
                 ...invoice,
@@ -315,8 +304,10 @@ router.post('/qr-scan', async (req, res) => {
                     isWarehouseShipment: true
                 },
                 include: {
-                    boxes: { where: { boxNumber: pieceData.pieceNumber } },
-                    rack: { select: { code: true, qrCode: true } }
+                    boxes: {
+                        where: { boxNumber: pieceData.pieceNumber },
+                        include: { rack: { select: { code: true, qrCode: true } } }
+                    }
                 }
             });
             if (shipment) {
@@ -372,8 +363,7 @@ router.post('/qr-scan', async (req, res) => {
                     isWarehouseShipment: true
                 },
                 include: {
-                    boxes: true,
-                    rack: { select: { code: true, qrCode: true } }
+                    boxes: { include: { rack: { select: { code: true, qrCode: true } } } }
                 }
             });
             if (shipment) {

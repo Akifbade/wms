@@ -1,7 +1,10 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import { APP_VERSION, getVersionInfo, logVersionInfo } from './config/version';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -23,17 +26,19 @@ import templateRoutes from './routes/templates';
 import uploadRoutes from './routes/upload';
 import permissionsRoutes from './routes/permissions';
 import movingJobsRoutes from './routes/moving-jobs';
-import jobsRoutes from './routes/jobs';
 import materialsRoutes from './routes/materials';
 import reportsRoutes from './routes/reports';
 import pluginsRoutes from './routes/plugins';
+import jobFilesRoutes from './routes/job-files'; // NEW: Job file uploads
 // NEW: Enhanced warehouse routes
 import shipmentItemsRoutes from './routes/shipment-items';
 import customerMaterialsRoutes from './routes/customer-materials';
 import workerDashboardRoutes from './routes/worker-dashboard';
+import categoriesRoutes from './routes/categories'; // NEW: Category management
+import companiesRoutes from './routes/companies'; // NEW: Company profiles management
 
-// Load environment variables FIRST
-dotenv.config();
+// Load environment variables FIRST (but allow env vars to override .env)
+dotenv.config({ override: false });
 
 // Initialize Express app
 const app = express();
@@ -57,15 +62,64 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files for uploads
-app.use('/uploads', express.static('public/uploads'));
+// Smart static handler for company logos (fallback between legacy/new filenames)
+app.get('/uploads/company-logos/:name', (req, res, next) => {
+  try {
+    const filename = req.params.name;
+    const baseDir = path.join(process.cwd(), 'uploads', 'company-logos');
+    const tryPaths: string[] = [];
 
-// Basic health check route
+    // 1) Requested filename as-is
+    tryPaths.push(path.join(baseDir, filename));
+
+    // 2) If request is company-logo-XXXX, also try company-XXXX
+    if (filename.startsWith('company-logo-')) {
+      const alt = 'company-' + filename.substring('company-logo-'.length);
+      tryPaths.push(path.join(baseDir, alt));
+    }
+
+    // 3) If request is company-XXXX, also try company-logo-XXXX
+    if (filename.startsWith('company-') && !filename.startsWith('company-logo-')) {
+      const alt = 'company-logo-' + filename.substring('company-'.length);
+      tryPaths.push(path.join(baseDir, alt));
+    }
+
+    for (const p of tryPaths) {
+      if (fs.existsSync(p)) {
+        return res.sendFile(p);
+      }
+    }
+  } catch (e) {
+    console.error('Logo static fallback error:', e);
+  }
+  // Hand off to generic static handler
+  return next();
+});
+
+// Serve generic static files for uploads (after logo-specific fallback)
+app.use('/uploads', express.static('uploads'));
+
+// Health check route with version info
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     message: 'Warehouse Management API is running',
+    version: APP_VERSION,
+    versionInfo: getVersionInfo(),
     timestamp: new Date().toISOString()
+  });
+});
+
+// Version info endpoint
+app.get('/api/version', (req, res) => {
+  const info = getVersionInfo();
+  res.json({
+    version: APP_VERSION,
+    environment: info.environment,
+    stage: info.stage,
+    buildDate: info.buildDate,
+    commitHash: info.commitHash,
+    timestamp: info.timestamp
   });
 });
 
@@ -93,6 +147,9 @@ app.use('/api/moving-jobs', movingJobsRoutes);
 app.use('/api/materials', materialsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/plugins', pluginsRoutes);
+app.use('/api/job-files', jobFilesRoutes); // NEW: Job file management
+app.use('/api/categories', categoriesRoutes); // NEW: Category management
+app.use('/api/company-profiles', companiesRoutes); // NEW: Company profiles (DIOR, JAZEERA, etc)
 // NEW: Enhanced warehouse routes
 app.use('/api', shipmentItemsRoutes); // Handles /api/shipments/:id/items
 app.use('/api', customerMaterialsRoutes); // Handles /api/customers/*
@@ -114,6 +171,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Start server
 const server = app.listen(PORT, () => {
+  logVersionInfo();
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV}`);
   console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}`);

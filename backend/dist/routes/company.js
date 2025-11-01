@@ -33,9 +33,10 @@ router.get('/branding', async (req, res) => {
                 }
             });
         }
-        // For local development, use backend URL, for production use HTTPS
-        const isDev = process.env.NODE_ENV === 'development';
-        const baseUrl = isDev ? 'http://localhost:5000' : `https://${req.get('host')}`;
+        // Use HTTP protocol (not HTTPS) since we don't have SSL yet
+        const protocol = req.protocol || 'http';
+        const host = req.get('host');
+        const baseUrl = `${protocol}://${host}`;
         res.json({
             branding: {
                 name: company.name,
@@ -94,9 +95,10 @@ router.get('/', async (req, res) => {
         if (!company) {
             return res.status(404).json({ error: 'Company not found' });
         }
-        // Force HTTPS in production, HTTP in development
-        const isDev = process.env.NODE_ENV === 'development';
-        const baseUrl = isDev ? `http://${req.get('host')}` : `https://${req.get('host')}`;
+        // Use HTTP protocol (not HTTPS) since we don't have SSL yet
+        const protocol = req.protocol || 'http';
+        const host = req.get('host');
+        const baseUrl = `${protocol}://${host}`;
         res.json({
             company: {
                 ...company,
@@ -167,9 +169,10 @@ router.put('/', async (req, res) => {
                 updatedAt: true,
             },
         });
-        // Force HTTPS in production, HTTP in development
-        const isDev = process.env.NODE_ENV === 'development';
-        const baseUrl = isDev ? `http://${req.get('host')}` : `https://${req.get('host')}`;
+        // Use HTTP protocol (not HTTPS) since we don't have SSL yet
+        const protocol = req.protocol || 'http';
+        const host = req.get('host');
+        const baseUrl = `${protocol}://${host}`;
         res.json({
             company: {
                 ...company,

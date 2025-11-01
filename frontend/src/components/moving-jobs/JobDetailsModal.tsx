@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import JobMaterialsManager from './JobMaterialsManager';
+import StaffAssignmentDialog from '../StaffAssignmentDialog';
 
 interface JobDetailsModalProps {
   isOpen: boolean;
@@ -10,7 +11,8 @@ interface JobDetailsModalProps {
 }
 
 const JobDetailsModal: React.FC<JobDetailsModalProps> = ({ isOpen, onClose, job, onUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'details' | 'materials'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'materials' | 'staff'>('details');
+  const [showStaffDialog, setShowStaffDialog] = useState(false);
 
   if (!isOpen || !job) return null;
 
@@ -50,6 +52,16 @@ const JobDetailsModal: React.FC<JobDetailsModalProps> = ({ isOpen, onClose, job,
               }`}
             >
               Materials
+            </button>
+            <button
+              onClick={() => setActiveTab('staff')}
+              className={`py-3 px-4 font-medium border-b-2 transition-colors ${
+                activeTab === 'staff'
+                  ? 'border-green-600 text-green-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Staff Assignment
             </button>
           </div>
         </div>
@@ -147,7 +159,40 @@ const JobDetailsModal: React.FC<JobDetailsModalProps> = ({ isOpen, onClose, job,
               onUpdate={onUpdate}
             />
           )}
+
+          {activeTab === 'staff' && (
+            <div>
+              <div className="mb-4">
+                <h3 className="text-xl font-bold mb-2">Staff Assignment</h3>
+                <p className="text-gray-600">Assign packers, carpenters, drivers, and external labor to this job.</p>
+              </div>
+              <button
+                onClick={() => setShowStaffDialog(true)}
+                className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-medium"
+              >
+                + Assign Staff to Job
+              </button>
+              
+              {/* Show existing assignments here in future */}
+              <div className="mt-6 text-gray-500 text-center py-8 border-2 border-dashed rounded-lg">
+                Staff assignments will be displayed here
+              </div>
+            </div>
+          )}
         </div>
+        
+        {/* Staff Assignment Dialog */}
+        {showStaffDialog && (
+          <StaffAssignmentDialog
+            open={showStaffDialog}
+            onClose={() => setShowStaffDialog(false)}
+            jobId={job.id}
+            onSuccess={() => {
+              setShowStaffDialog(false);
+              if (onUpdate) onUpdate();
+            }}
+          />
+        )}
       </div>
     </div>
   );

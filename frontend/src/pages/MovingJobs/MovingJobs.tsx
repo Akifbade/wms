@@ -16,6 +16,7 @@ import EditMovingJobModal from '../../components/EditMovingJobModal';
 import JobDetailsModal from '../../components/moving-jobs/JobDetailsModal';
 import JobMaterialReport from '../../components/moving-jobs/JobMaterialReport';
 import MaterialReturnModal from '../../components/MaterialReturnModal';
+import JobFileManager from '../../components/moving-jobs/JobFileManager';
 
 export const MovingJobs: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
@@ -26,6 +27,7 @@ export const MovingJobs: React.FC = () => {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [fileManagerOpen, setFileManagerOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<any>(null);
 
   useEffect(() => {
@@ -36,7 +38,15 @@ export const MovingJobs: React.FC = () => {
     try {
       setLoading(true);
       const params: any = {};
-      if (filterStatus !== 'all') params.status = filterStatus.toUpperCase().replace(' ', '_');
+      if (filterStatus !== 'all') {
+        // Map filter names to actual DB status values
+        const statusMap: Record<string, string> = {
+          'scheduled': 'SCHEDULED,PLANNED',  // Include both
+          'inprogress': 'IN_PROGRESS,DISPATCHED',  // Include both  
+          'completed': 'COMPLETED,CLOSED'  // Include both
+        };
+        params.status = statusMap[filterStatus] || filterStatus.toUpperCase();
+      }
       
       const data = await jobsAPI.getAll(params);
       setJobs(data.jobs || []);
@@ -89,7 +99,7 @@ export const MovingJobs: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Total Jobs</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">24</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{jobs.length}</p>
             </div>
             <TruckIcon className="h-10 w-10 text-primary-500" />
           </div>
@@ -98,7 +108,9 @@ export const MovingJobs: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">In Progress</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">3</p>
+              <p className="text-3xl font-bold text-green-600 mt-2">
+                {jobs.filter((j: any) => j.status === 'IN_PROGRESS').length}
+              </p>
             </div>
           </div>
         </div>
@@ -106,15 +118,19 @@ export const MovingJobs: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Scheduled</p>
-              <p className="text-3xl font-bold text-blue-600 mt-2">8</p>
+              <p className="text-3xl font-bold text-blue-600 mt-2">
+                {jobs.filter((j: any) => j.status === 'SCHEDULED' || j.status === 'PLANNED').length}
+              </p>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Revenue</p>
-              <p className="text-xl font-bold text-gray-900 mt-2">12,500 KWD</p>
+              <p className="text-sm font-medium text-gray-500">Completed</p>
+              <p className="text-xl font-bold text-gray-900 mt-2">
+                {jobs.filter((j: any) => j.status === 'COMPLETED').length}
+              </p>
             </div>
           </div>
         </div>
@@ -165,66 +181,106 @@ export const MovingJobs: React.FC = () => {
           <p className="mt-4 text-gray-600">Loading jobs...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {jobs.map((job: any) => (
-            <div key={job.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <h3 className="text-lg font-bold text-gray-900">{job.jobTitle || job.title || 'Untitled Job'}</h3>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(job.status)}`}>
-                      {job.status}
-                    </span>
+            <div key={job.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all">
+              {/* Header with Status Badge */}
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-t-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold">{job.jobTitle || job.title || 'Untitled Job'}</h3>
+                    <p className="text-blue-100 text-sm">{job.jobCode || 'No Code'}</p>
                   </div>
-                  <p className="text-gray-600 mt-1">{job.clientName}</p>
+                  <span className={`px-3 py-1 text-xs font-bold rounded-full ${getStatusColor(job.status)}`}>
+                    {job.status}
+                  </span>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center text-sm text-gray-600">
-                  <TruckIcon className="h-5 w-5 mr-2 text-gray-400" />
-                  <span className="font-medium">{job.jobCode || 'No Code'}</span>
+              {/* Job Details */}
+              <div className="p-6 space-y-4">
+                {/* Client Info */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center text-sm mb-2">
+                    <UserGroupIcon className="h-5 w-5 mr-2 text-blue-600" />
+                    <span className="font-bold text-gray-700">Client Details</span>
+                  </div>
+                  <div className="ml-7 space-y-1">
+                    <p className="text-sm font-medium text-gray-900">{job.clientName}</p>
+                    <p className="text-sm text-gray-600">{job.clientPhone}</p>
+                    {job.clientEmail && <p className="text-sm text-gray-600">{job.clientEmail}</p>}
+                  </div>
                 </div>
 
-                <div className="flex items-center text-sm text-gray-600">
-                  <MapPinIcon className="h-5 w-5 mr-2 text-gray-400" />
-                  <div className="flex-1">
-                    <div className="flex items-center">
-                      <span className="font-medium">From:</span>
-                      <span className="ml-2">{job.jobAddress || job.fromAddress || 'Not specified'}</span>
+                {/* Location Info */}
+                <div className="space-y-2">
+                  <div className="flex items-start text-sm">
+                    <MapPinIcon className="h-5 w-5 mr-2 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-700">From:</p>
+                      <p className="text-gray-600 text-xs mt-1">{job.jobAddress || job.fromAddress || 'Not specified'}</p>
                     </div>
-                    {(job.dropoffAddress || job.toAddress) && (
-                      <div className="flex items-center mt-1">
-                        <span className="font-medium">To:</span>
-                        <span className="ml-2">{job.dropoffAddress || job.toAddress}</span>
+                  </div>
+                  {(job.dropoffAddress || job.toAddress) && (
+                    <div className="flex items-start text-sm ml-7">
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-700">To:</p>
+                        <p className="text-gray-600 text-xs mt-1">{job.dropoffAddress || job.toAddress}</p>
                       </div>
-                    )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Date & Type */}
+                <div className="flex items-center justify-between text-sm bg-blue-50 rounded-lg p-3">
+                  <div className="flex items-center">
+                    <CalendarIcon className="h-5 w-5 mr-2 text-blue-600" />
+                    <span className="font-medium text-gray-900">
+                      {job.jobDate ? new Date(job.jobDate).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      }) : 'No Date'}
+                    </span>
                   </div>
+                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                    {job.jobType || 'LOCAL'}
+                  </span>
                 </div>
 
-                <div className="flex items-center text-sm text-gray-600">
-                  <CalendarIcon className="h-5 w-5 mr-2 text-gray-400" />
-                  <span>{job.jobDate ? new Date(job.jobDate).toLocaleDateString() : (job.scheduledDate ? new Date(job.scheduledDate).toLocaleDateString() : 'Invalid Date')}</span>
-                </div>
-
-                <div className="flex items-center text-sm text-gray-600">
-                  <UserGroupIcon className="h-5 w-5 mr-2 text-gray-400" />
-                  <div className="flex items-center space-x-1">
-                    {job.assignments?.map((assignment: any) => (
-                      <span key={assignment.id} className="px-2 py-1 bg-gray-100 rounded-full text-xs">
-                        {assignment.user.name}
-                      </span>
-                    ))}
+                {/* Team Members */}
+                {job.assignments && job.assignments.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-2">ASSIGNED TEAM</p>
+                    <div className="flex flex-wrap gap-2">
+                      {job.assignments.map((assignment: any) => (
+                        <span key={assignment.id} className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                          👤 {assignment.user.name}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Estimated Cost</span>
-                  <span className="text-lg font-bold text-gray-900">{job.totalCost || 0} KWD</span>
-                </div>
+                {/* Materials Issued */}
+                {job.materialIssues && job.materialIssues.length > 0 && (
+                  <div className="bg-orange-50 rounded-lg p-3">
+                    <p className="text-xs font-medium text-orange-700 mb-1">
+                      📦 Materials: {job.materialIssues.length} items issued
+                    </p>
+                  </div>
+                )}
 
-                {/* Action Buttons */}
-                <div className="pt-3 border-t border-gray-200 grid grid-cols-2 gap-2">
+                {/* Notes Preview */}
+                {job.notes && (
+                  <div className="text-xs text-gray-600 bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
+                    <span className="font-medium">Note:</span> {job.notes.substring(0, 50)}{job.notes.length > 50 ? '...' : ''}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="px-6 pb-6 grid grid-cols-2 gap-2">
                   <button
                     onClick={() => {
                       setSelectedJob(job);
@@ -255,6 +311,15 @@ export const MovingJobs: React.FC = () => {
                     <DocumentTextIcon className="h-4 w-4" />
                     Report
                   </button>
+                  <button
+                    onClick={() => {
+                      setSelectedJob(job);
+                      setFileManagerOpen(true);
+                    }}
+                    className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 font-medium text-sm flex items-center justify-center gap-2"
+                  >
+                    📁 Files
+                  </button>
                   {job.status !== 'COMPLETED' && (
                     <button
                       onClick={() => {
@@ -284,7 +349,6 @@ export const MovingJobs: React.FC = () => {
                     Delete
                   </button>
                 </div>
-              </div>
             </div>
           ))}
         </div>
@@ -335,6 +399,13 @@ export const MovingJobs: React.FC = () => {
             throw error; // Re-throw so MaterialReturnModal can handle it
           }
         }}
+      />
+
+      {/* File Manager Modal */}
+      <JobFileManager
+        isOpen={fileManagerOpen}
+        onClose={() => setFileManagerOpen(false)}
+        job={selectedJob}
       />
     </div>
   );

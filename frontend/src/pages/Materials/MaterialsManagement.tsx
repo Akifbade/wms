@@ -537,27 +537,27 @@ const MaterialsManagement = () => {
                   <input
                     type="number"
                     required
-                    min="0"
-                    value={materialForm.minStockLevel}
+                    value={materialForm.minStockLevel === 0 ? '' : materialForm.minStockLevel}
                     onChange={(e) => setMaterialForm({ 
                       ...materialForm, 
-                      minStockLevel: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 
+                      minStockLevel: e.target.value === '' ? 0 : parseInt(e.target.value)
                     })}
                     className="w-full border rounded-lg px-3 py-2"
+                    placeholder="Enter minimum stock"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Unit Cost (₹)</label>
+                  <label className="block text-sm font-medium mb-1">Unit Cost (KWD)</label>
                   <input
                     type="number"
                     step="0.01"
-                    min="0"
-                    value={materialForm.unitCost}
+                    value={materialForm.unitCost === 0 ? '' : materialForm.unitCost}
                     onChange={(e) => setMaterialForm({ 
                       ...materialForm, 
-                      unitCost: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 
+                      unitCost: e.target.value === '' ? 0 : parseFloat(e.target.value)
                     })}
                     className="w-full border rounded-lg px-3 py-2"
+                    placeholder="Enter unit cost"
                   />
                 </div>
                 <div className="col-span-2">
@@ -698,7 +698,7 @@ const MaterialsManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Unit Cost (₹)</label>
+                  <label className="block text-sm font-medium mb-1">Unit Cost (KWD)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -753,7 +753,7 @@ const MaterialsManagement = () => {
                           {batch.quantityRemaining}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">₹{batch.unitCost.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">{batch.unitCost.toFixed(2)} KWD</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {new Date(batch.purchaseDate).toLocaleDateString()}
                       </td>
