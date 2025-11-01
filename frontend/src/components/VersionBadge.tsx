@@ -1,5 +1,5 @@
 import React from 'react';
-import { APP_VERSION, VERSION_INFO } from '../../config/version';
+import { APP_VERSION, VERSION_INFO } from '../config/version';
 
 /**
  * Version Badge Component
