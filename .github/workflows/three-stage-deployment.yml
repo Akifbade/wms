@@ -270,18 +270,6 @@ jobs:
             HEALTH_FAILED=true
           fi
           
-          # Try HTTPS check if cert exists
-          echo "🔍 Checking staging HTTPS (if cert exists)..."
-          if [ -f "/etc/letsencrypt/live/staging.qgocargo.cloud/fullchain.pem" ]; then
-            if curl -f https://staging.qgocargo.cloud 2>&1 | grep -q "SSL certificate"; then
-              echo "⚠️  SSL warning (expected for self-test)"
-            else
-              echo "✅ HTTPS certificate present and nginx accepting connections"
-            fi
-          else
-            echo "ℹ️  Staging cert not yet issued - HTTP available only"
-          fi
-          
           if [ "$HEALTH_FAILED" = true ]; then
             echo "❌ Health checks failed - triggering rollback"
             exit 1
