@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.15",
+  "version": "v2.1.17",
   "buildDate": "Nov 01, 2025",
-  "buildTime": "23:11:48",
+  "buildTime": "23:44:42",
   "author": "akifbade46-del",
-  "commitMessage": "fix: remove vendor chunk to prevent React undefined errors",
+  "commitMessage": "feat: professional QR label design with QGO branding for A4 stickers",
   "environment": "development"
 }
