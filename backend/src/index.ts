@@ -1,4 +1,6 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
@@ -59,7 +61,41 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files for uploads
+// Smart static handler for company logos (fallback between legacy/new filenames)
+app.get('/uploads/company-logos/:name', (req, res, next) => {
+  try {
+    const filename = req.params.name;
+    const baseDir = path.join(process.cwd(), 'uploads', 'company-logos');
+    const tryPaths: string[] = [];
+
+    // 1) Requested filename as-is
+    tryPaths.push(path.join(baseDir, filename));
+
+    // 2) If request is company-logo-XXXX, also try company-XXXX
+    if (filename.startsWith('company-logo-')) {
+      const alt = 'company-' + filename.substring('company-logo-'.length);
+      tryPaths.push(path.join(baseDir, alt));
+    }
+
+    // 3) If request is company-XXXX, also try company-logo-XXXX
+    if (filename.startsWith('company-') && !filename.startsWith('company-logo-')) {
+      const alt = 'company-logo-' + filename.substring('company-'.length);
+      tryPaths.push(path.join(baseDir, alt));
+    }
+
+    for (const p of tryPaths) {
+      if (fs.existsSync(p)) {
+        return res.sendFile(p);
+      }
+    }
+  } catch (e) {
+    console.error('Logo static fallback error:', e);
+  }
+  // Hand off to generic static handler
+  return next();
+});
+
+// Serve generic static files for uploads (after logo-specific fallback)
 app.use('/uploads', express.static('uploads'));
 
 // Basic health check route
