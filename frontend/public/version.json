@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.3",
+  "version": "v2.1.4",
   "buildDate": "Nov 01, 2025",
-  "buildTime": "18:31:16",
+  "buildTime": "18:34:34",
   "author": "akifbade46-del",
-  "commitMessage": "feat: auto-version system complete with commit message display in info button",
+  "commitMessage": "fix: improve camera diagnostics with detailed error messages and fallback mode",
   "environment": "development"
 }
