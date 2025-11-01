@@ -134,12 +134,12 @@ jobs:
       - name: Setup SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.STAGING_VPS_SSH_KEY }}
-          VPS_HOST: ${{ secrets.STAGING_VPS_HOST }}
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+          # VPS_HOST: 148.230.107.155 (Staging)
+          ssh-keyscan -H 148.230.107.155 >> ~/.ssh/known_hosts 2>/dev/null || true
           
           # Configure SSH to not timeout
           cat >> ~/.ssh/config << 'SSHCONFIG'
@@ -152,9 +152,6 @@ jobs:
 
       - name: "Deploy Full Stack to Staging (Rocky Linux) - WITH SAFETY & ROLLBACK"
         timeout-minutes: 45
-        env:
-          VPS_HOST: ${{ secrets.STAGING_VPS_HOST }}
-          VPS_USER: ${{ secrets.STAGING_VPS_USER }}
         run: |
           echo "================================================"
           echo "🧪 DEPLOYING FULL STACK TO STAGING (WITH SAFETY)"
@@ -162,7 +159,7 @@ jobs:
           
           # Copy built frontend files
           echo "📦 Copying frontend build..."
-          scp -i ~/.ssh/deploy_key -r frontend/dist/* ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/frontend/staging-dist/"
+          scp -i ~/.ssh/deploy_key -r frontend/dist/* root@148.230.107.155:"${{ env.PRODUCTION_PATH }}/frontend/staging-dist/"
           
           # Copy backend code (exclude node_modules and large files)
           echo "📦 Copying backend code..."
@@ -173,10 +170,10 @@ jobs:
             --exclude 'dist' \
             --exclude '*.log' \
             --exclude 'uploads' \
-            backend/ ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/backend/staging-temp/"
+            backend/ root@148.230.107.155:"${{ env.PRODUCTION_PATH }}/backend/staging-temp/"
           
           # Deploy to staging containers with safety checks
-          ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
+          ssh -i ~/.ssh/deploy_key root@148.230.107.155 << 'EOF'
           set -e
           cd "${{ env.PRODUCTION_PATH }}"
           
@@ -357,23 +354,20 @@ jobs:
       - name: Setup SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.PROD_VPS_SSH_KEY }}
-          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+          # VPS_HOST: 148.230.107.155 (Production)
+          ssh-keyscan -H 148.230.107.155 >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Promote Staging to Production (Full Stack)
-        env:
-          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
-          VPS_USER: ${{ secrets.PROD_VPS_USER }}
         run: |
           echo "================================================"
           echo "🚀 PROMOTING STAGING TO PRODUCTION"
           echo "================================================"
           
-          ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
+          ssh -i ~/.ssh/deploy_key root@148.230.107.155 << 'EOF'
           set -e
           cd "${{ env.PRODUCTION_PATH }}"
           
@@ -498,14 +492,12 @@ jobs:
           EOF
 
       - name: Verify Production
-        env:
-          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
         run: |
           echo "🔍 External health check..."
           sleep 5
           
           # Test direct IP
-          if curl -f -s http://$VPS_HOST > /dev/null; then
+          if curl -f -s http://148.230.107.155 > /dev/null; then
             echo "✅ Direct IP accessible"
           else
             echo "❌ Direct IP failed"
@@ -532,12 +524,12 @@ jobs:
           echo "🕐 Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo ""
           echo "🖥️  Server: Rocky Linux 9.x"
-          echo "📍 IP: ${{ secrets.PROD_VPS_HOST }}"
+          echo "📍 IP: 148.230.107.155"
           echo ""
           echo "🌐 Access URLs:"
           echo "   Production: http://qgocargo.cloud"
-          echo "   Direct IP: http://${{ secrets.PROD_VPS_HOST }}"
-          echo "   Portainer: https://${{ secrets.PROD_VPS_HOST }}:9443"
+          echo "   Direct IP: http://148.230.107.155"
+          echo "   Portainer: https://148.230.107.155:9443"
           echo ""
           echo "📊 Status: ${{ job.status }}"
           echo "================================================"
@@ -548,9 +540,6 @@ jobs:
 
       - name: Emergency Rollback (On Failure)
         if: failure()
-        env:
-          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
-          VPS_USER: ${{ secrets.PROD_VPS_USER }}
         run: |
           echo "================================================"
           echo "❌ DEPLOYMENT FAILED - EMERGENCY ROLLBACK"
