@@ -1,10 +1,10 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.1.9**
-- **Released**: Nov 01, 2025 at 22:34:46
+## Current Version: **v2.1.11**
+- **Released**: Nov 01, 2025 at 22:42:01
 - **Author**: akifbade46-del
 - **Status**: Development
-- **Change**: fix: scanner DOM retry logic, rack company profile display with debugging
+- **Change**: perf: code splitting optimization - 67% faster initial load
 
 ---
 
