@@ -14,7 +14,6 @@ import { InvoiceDetail } from './pages/Invoices/InvoiceDetail';
 import { Expenses } from './pages/Expenses/Expenses';
 import { TemplateSettingsPage } from './pages/Settings/TemplateSettings';
 import UserProfile from './pages/Profile/UserProfile';
-import RoleManagement from './pages/Admin/RoleManagement';
 import MovingJobsManager from './components/moving-jobs/MovingJobsManager';
 import MaterialsManager from './components/moving-jobs/MaterialsManager';
 import JobReportsDashboard from './components/moving-jobs/JobReportsDashboard';
@@ -169,11 +168,6 @@ function App() {
             <Route path="settings/templates" element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <TemplateSettingsPage />
-              </ProtectedRoute>
-            } />
-            <Route path="admin/roles" element={
-              <ProtectedRoute allowedRoles={['ADMIN']}>
-                <RoleManagement />
               </ProtectedRoute>
             } />
 
