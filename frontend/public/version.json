@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.11",
+  "version": "v2.1.12",
   "buildDate": "Nov 01, 2025",
-  "buildTime": "22:42:01",
+  "buildTime": "22:49:16",
   "author": "akifbade46-del",
-  "commitMessage": "perf: code splitting optimization - 67% faster initial load",
+  "commitMessage": "fix: React useState error - add dedupe config for React modules",
   "environment": "development"
 }

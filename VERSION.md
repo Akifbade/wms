@@ -1,10 +1,10 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.1.11**
-- **Released**: Nov 01, 2025 at 22:42:01
+## Current Version: **v2.1.12**
+- **Released**: Nov 01, 2025 at 22:49:16
 - **Author**: akifbade46-del
 - **Status**: Development
-- **Change**: perf: code splitting optimization - 67% faster initial load
+- **Change**: fix: React useState error - add dedupe config for React modules
 
 ---
 

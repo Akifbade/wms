@@ -198,20 +198,42 @@ export const Racks: React.FC = () => {
     }, 100);
   };
 
-  const handlePrintAllQR = () => {
+  const handlePrintAllQR = async () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
+
+    // Load company branding for logo
+    let companyLogo = '';
+    try {
+      const response = await fetch('/api/company/branding');
+      const data = await response.json();
+      if (data?.branding?.logoUrl) {
+        companyLogo = data.branding.logoUrl;
+      }
+    } catch (err) {
+      console.warn('Could not load branding:', err);
+    }
 
     const qrGridHtml = racks.map(rack => {
       const canvas = bulkQrCanvasRefs.current[rack.id];
       if (!canvas) return '';
       const qrDataUrl = canvas.toDataURL();
+      
+      // Determine which logo to use: company profile logo or default company logo
+      let logoToUse = companyLogo;
+      if (rack.companyProfile?.logo) {
+        const logoPath = rack.companyProfile.logo;
+        logoToUse = logoPath.startsWith('http') ? logoPath : (logoPath.startsWith('/') ? logoPath : `/uploads/${logoPath}`);
+      }
+      
       return `
         <div class="qr-item">
+          ${logoToUse ? `<img src="${logoToUse}" class="company-logo" alt="Logo" onerror="this.style.display='none'" />` : ''}
           <h3>${rack.code}</h3>
           <p class="location">${rack.location || 'Warehouse'}</p>
-          <img src="${qrDataUrl}" alt="QR Code" />
+          <img src="${qrDataUrl}" alt="QR Code" class="qr-code" />
           <p class="code">RACK_${rack.code}</p>
+          ${rack.companyProfile?.name ? `<p class="company-name">${rack.companyProfile.name}</p>` : ''}
         </div>
       `;
     }).join('');
@@ -238,16 +260,24 @@ export const Racks: React.FC = () => {
               padding: 15px;
               page-break-inside: avoid;
             }
+            .company-logo {
+              height: 40px;
+              width: auto;
+              max-width: 120px;
+              margin: 0 auto 10px;
+              object-fit: contain;
+            }
             h3 {
               margin: 0 0 5px 0;
               font-size: 24px;
+              font-weight: bold;
             }
             .location {
               margin: 5px 0;
               font-size: 14px;
               color: #666;
             }
-            img {
+            .qr-code {
               width: 100%;
               max-width: 200px;
               margin: 10px 0;
@@ -256,6 +286,12 @@ export const Racks: React.FC = () => {
               font-size: 16px;
               font-weight: bold;
               font-family: 'Courier New', monospace;
+              margin: 5px 0;
+            }
+            .company-name {
+              font-size: 12px;
+              color: #5B21B6;
+              font-weight: 600;
               margin: 5px 0 0 0;
             }
             @media print {
