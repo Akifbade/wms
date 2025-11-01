@@ -4,6 +4,7 @@ import path from 'path';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import { APP_VERSION, getVersionInfo, logVersionInfo } from './config/version';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -98,12 +99,27 @@ app.get('/uploads/company-logos/:name', (req, res, next) => {
 // Serve generic static files for uploads (after logo-specific fallback)
 app.use('/uploads', express.static('uploads'));
 
-// Basic health check route
+// Health check route with version info
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     message: 'Warehouse Management API is running',
+    version: APP_VERSION,
+    versionInfo: getVersionInfo(),
     timestamp: new Date().toISOString()
+  });
+});
+
+// Version info endpoint
+app.get('/api/version', (req, res) => {
+  const info = getVersionInfo();
+  res.json({
+    version: APP_VERSION,
+    environment: info.environment,
+    stage: info.stage,
+    buildDate: info.buildDate,
+    commitHash: info.commitHash,
+    timestamp: info.timestamp
   });
 });
 
@@ -155,6 +171,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Start server
 const server = app.listen(PORT, () => {
+  logVersionInfo();
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV}`);
   console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}`);
