@@ -453,6 +453,7 @@ export const Shipments: React.FC = () => {
                       
                       {/* Release button - only for stored shipments with boxes */}
                       {(shipment.status === 'IN_STORAGE' || 
+                        shipment.status === 'IN_WAREHOUSE' || 
                         shipment.status === 'PARTIAL' || 
                         shipment.status === 'STORED' ||
                         shipment.status === 'ACTIVE') && 
