@@ -17,6 +17,7 @@ import {
   ChartBarIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
+import { VersionBadgeHeader } from '../VersionBadgeHeader';
 
 // Role-based navigation configuration
 const navigationConfig = {
@@ -192,23 +193,8 @@ export const Layout: React.FC = () => {
             </button>
 
             <div className="flex-1 flex items-center justify-end space-x-4">
-              {/* Environment/version badge to confirm live code */}
-              <div
-                className="hidden md:flex items-center gap-2 px-2 py-1 rounded-lg border border-gray-200 bg-gray-50 text-xs text-gray-600"
-                title={`Environment: ${((import.meta as any)?.env?.MODE) || 'dev'}`}
-              >
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-                  {(((import.meta as any)?.env?.MODE) || 'dev').toUpperCase()}
-                </span>
-                <span className="text-gray-400">•</span>
-                {/* App version from env with fallback to date stamp */}
-                <span>
-                  v{((import.meta as any)?.env?.VITE_APP_VERSION) || `dev-${new Date().toISOString().slice(0,10)}`}
-                </span>
-                <span className="text-gray-400">•</span>
-                <span>{new Date().toLocaleString()}</span>
-              </div>
+              {/* Version badge - shows current deployed version */}
+              <VersionBadgeHeader />
               {/* Search */}
               <div className="hidden md:block">
                 <input
