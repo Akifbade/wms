@@ -251,6 +251,7 @@ model Rack {
   companyId     String
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime? // Soft delete: null = active, has timestamp = deleted
 
   // Relations
   company           Company           @relation(fields: [companyId], references: [id])
@@ -266,6 +267,7 @@ model Rack {
   transfersTo    MaterialTransfer[] @relation("TransferToRack")   // NEW: Transfers to this rack
 
   @@unique([code, companyId])
+  @@index([deletedAt]) // Index for filtering active racks
   @@map("racks")
 }
 
@@ -338,6 +340,7 @@ model Shipment {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime? // Soft delete: null = active, has timestamp = deleted
 
   // Warehouse Integration Fields (Non-breaking additions)
   isWarehouseShipment Boolean @default(false) // Flag for warehouse vs regular shipments
@@ -381,6 +384,7 @@ model Shipment {
   @@index([category])
   @@index([customerName])
   @@index([awbNumber])
+  @@index([deletedAt]) // Index for filtering active shipments
   @@map("shipments")
 }
 
@@ -1033,6 +1037,7 @@ model MovingJob {
   notes          String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  deletedAt      DateTime? // Soft delete: null = active, has timestamp = deleted
   companyId      String
 
   company         Company            @relation(fields: [companyId], references: [id])
@@ -1044,6 +1049,7 @@ model MovingJob {
   approvals       MaterialApproval[]
   files           JobFile[]          // NEW: Job documents and files
 
+  @@index([deletedAt]) // Index for filtering active jobs
   @@map("moving_jobs")
 }
 

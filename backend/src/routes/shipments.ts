@@ -1137,7 +1137,7 @@ router.post('/:id/release-boxes', authorizeRoles('ADMIN', 'MANAGER'), async (req
   }
 });
 
-// Delete shipment
+// Delete shipment (STRICT: prevent deletion if materials allocated to racks)
 router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -1145,15 +1145,32 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
 
     const existing = await prisma.shipment.findFirst({
       where: { id, companyId },
+      include: {
+        boxes: {
+          where: { rackId: { not: null } }, // Check if any box is in a rack
+        },
+      },
     });
 
     if (!existing) {
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
-    await prisma.shipment.delete({ where: { id } });
+    // STRICT DELETE: Prevent deletion if materials are allocated to racks
+    if (existing.boxes.length > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete shipment: Materials are currently allocated to racks',
+        detail: `${existing.boxes.length} box(es) in racks. Remove from racks first.`,
+      });
+    }
 
-    res.json({ message: 'Shipment deleted successfully' });
+    // Soft delete: mark with deletedAt timestamp instead of hard delete
+    await prisma.shipment.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    res.json({ message: 'Shipment deleted successfully (archived)' });
   } catch (error) {
     console.error('Delete shipment error:', error);
     res.status(500).json({ error: 'Internal server error' });
