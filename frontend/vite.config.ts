@@ -56,4 +56,7 @@ export default defineConfig({
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
   },
+  resolve: {
+    dedupe: ['react', 'react-dom', 'react-router-dom'],
+  },
 });
