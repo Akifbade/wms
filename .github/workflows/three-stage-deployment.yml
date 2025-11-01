@@ -133,18 +133,28 @@ jobs:
 
       - name: Setup SSH
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.PROD_VPS_SSH_KEY }}
-          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.STAGING_VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.STAGING_VPS_HOST }}
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          # Configure SSH to not timeout
+          cat >> ~/.ssh/config << 'SSHCONFIG'
+          Host *
+            ServerAliveInterval 60
+            ServerAliveCountMax 10
+            TCPKeepAlive yes
+            StrictHostKeyChecking no
+          SSHCONFIG
 
-      - name: Deploy Full Stack to Staging (Rocky Linux) - WITH SAFETY & ROLLBACK
+      - name: "Deploy Full Stack to Staging (Rocky Linux) - WITH SAFETY & ROLLBACK"
+        timeout-minutes: 45
         env:
-          VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
-          VPS_USER: ${{ secrets.PROD_VPS_USER }}
+          VPS_HOST: ${{ secrets.STAGING_VPS_HOST }}
+          VPS_USER: ${{ secrets.STAGING_VPS_USER }}
         run: |
           echo "================================================"
           echo "🧪 DEPLOYING FULL STACK TO STAGING (WITH SAFETY)"
@@ -229,7 +239,7 @@ jobs:
           rm -rf backend/staging-temp
           
           echo "📦 Installing dependencies..."
-          docker exec wms-staging-backend sh -c "cd /app && npm install --legacy-peer-deps"
+          docker exec wms-staging-backend sh -c "cd /app && npm ci --legacy-peer-deps --prefer-offline --no-audit 2>&1 | tail -20"
           
           echo "🔧 Generating Prisma client..."
           docker exec wms-staging-backend npx prisma generate
