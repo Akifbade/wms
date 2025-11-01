@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.18",
-  "buildDate": "Nov 01, 2025",
-  "buildTime": "23:50:01",
+  "version": "v2.1.19",
+  "buildDate": "Nov 02, 2025",
+  "buildTime": "00:12:47",
   "author": "akifbade46-del",
-  "commitMessage": "feat: professional QR label design with QGO branding for A4 stickers",
+  "commitMessage": "fix: mobile camera DOM rendering - force React flush + increase retries to 10 (3.5s)",
   "environment": "development"
 }

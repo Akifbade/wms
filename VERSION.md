@@ -1,10 +1,10 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.1.18**
-- **Released**: Nov 01, 2025 at 23:50:01
+## Current Version: **v2.1.19**
+- **Released**: Nov 02, 2025 at 00:12:47
 - **Author**: akifbade46-del
 - **Status**: Development
-- **Change**: feat: professional QR label design with QGO branding for A4 stickers
+- **Change**: fix: mobile camera DOM rendering - force React flush + increase retries to 10 (3.5s)
 
 ---
 

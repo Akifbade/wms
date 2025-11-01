@@ -234,25 +234,36 @@ export const Scanner: React.FC = () => {
       }
     } catch (err: any) {
       console.error('❌ Camera error:', err);
+      console.error('📱 MOBILE DEBUG - Error type:', typeof err);
+      console.error('📱 MOBILE DEBUG - Error constructor:', err?.constructor?.name);
+      console.error('📱 MOBILE DEBUG - Error toString:', err?.toString());
       console.error('Error details:', {
         name: err.name,
         message: err.message,
         stack: err.stack,
         code: err.code,
         type: typeof err,
+        constructor: err?.constructor?.name,
+        keys: Object.keys(err || {}),
         stringified: JSON.stringify(err, null, 2)
       });
+      
+      // Extract error info from various sources
+      const errorName = err?.name || err?.constructor?.name || typeof err;
+      const errorMessage = err?.message || err?.toString() || 'Unknown error';
+      
+      console.error('📱 EXTRACTED - Name:', errorName, 'Message:', errorMessage);
       
       let errorMsg = '❌ Camera access failed';
       let solution = 'Try reloading the page';
       
       // Check for HTTPS requirement
-      if (err.message?.includes('HTTPS') || err.message?.includes('https://') || err.message?.includes('Redirecting')) {
+      if (errorMessage?.includes('HTTPS') || errorMessage?.includes('https://') || errorMessage?.includes('Redirecting')) {
         errorMsg = '🔒 Camera requires HTTPS';
         solution = `Current URL: ${window.location.href}\n\n✅ Use HTTPS: https://qgocargo.cloud\n\nCamera access only works on secure connections (HTTPS).`;
       } 
       // Permission denied
-      else if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied') || err.message?.includes('permission')) {
+      else if (errorName === 'NotAllowedError' || errorMessage?.includes('Permission denied') || errorMessage?.includes('permission') || errorMessage?.includes('not allowed')) {
         errorMsg = '❌ Camera permission denied';
         solution = `📱 MOBILE FIX (Android/iPhone):
 1. Tap the 🔒 lock icon in the address bar
@@ -268,35 +279,44 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 🔄 Then REFRESH the page!`;
       } 
       // No camera found
-      else if (err.name === 'NotFoundError' || err.message?.includes('not found') || err.message?.includes('No camera')) {
+      else if (errorName === 'NotFoundError' || errorMessage?.includes('not found') || errorMessage?.includes('No camera')) {
         errorMsg = '❌ No camera detected';
         solution = 'Make sure your device has a working camera and it\'s not disabled in system settings.';
       } 
       // Camera in use
-      else if (err.name === 'NotReadableError' || err.name === 'TrackStartError' || err.message?.includes('in use') || err.message?.includes('being used')) {
+      else if (errorName === 'NotReadableError' || errorName === 'TrackStartError' || errorMessage?.includes('in use') || errorMessage?.includes('being used')) {
         errorMsg = '❌ Camera is busy';
         solution = 'Close other apps using the camera (WhatsApp, Zoom, Skype, etc.) and try again.';
       } 
       // Constraints not supported
-      else if (err.name === 'OverconstrainedError' || err.message?.includes('constraint')) {
+      else if (errorName === 'OverconstrainedError' || errorMessage?.includes('constraint')) {
         errorMsg = '❌ Camera settings not supported';
         solution = 'Your camera doesn\'t support the required settings. Try using a different device or browser.';
       } 
       // Not supported/API not available
-      else if (err.name === 'NotSupportedError' || err.name === 'TypeError' || err.message?.includes('not available') || err.message?.includes('not supported')) {
+      else if (errorName === 'NotSupportedError' || errorName === 'TypeError' || errorMessage?.includes('not available') || errorMessage?.includes('not supported')) {
         errorMsg = '❌ Camera API not supported';
         solution = `Your browser doesn't support camera access.\n\n✅ Recommended:\n- Chrome (Desktop/Mobile)\n- Safari (iPhone/iPad)\n- Edge (Desktop)\n\n🔒 Make sure you're using: https://qgocargo.cloud`;
       } 
       // Insecure context
-      else if (err.message?.includes('insecure context') || err.message?.includes('secure origin')) {
+      else if (errorMessage?.includes('insecure context') || errorMessage?.includes('secure origin')) {
         errorMsg = '🔒 Insecure connection';
         solution = `Camera requires HTTPS.\n\n✅ Use: https://qgocargo.cloud\n❌ Don't use: http://qgocargo.cloud`;
-      } 
+      }
+      // Html5Qrcode specific errors
+      else if (errorMessage?.includes('QR code parse error') || errorMessage?.includes('NotFoundException')) {
+        errorMsg = '❌ Camera started but QR code not detected';
+        solution = 'Camera is working! Position a QR code in front of the camera to scan.';
+      }
+      // DOM/Element errors
+      else if (errorMessage?.includes('not ready') || errorMessage?.includes('not found') || errorMessage?.includes('element')) {
+        errorMsg = '❌ Scanner initialization failed';
+        solution = '📱 Try this:\n1. Close this tab completely\n2. Clear browser cache (Settings → Privacy → Clear cache)\n3. Reopen https://qgocargo.cloud/scanner\n4. Try again';
+      }
       // Generic/unknown error
       else {
-        const errorDetails = err.message || err.name || 'Unknown error';
-        errorMsg = `❌ Camera error: ${err.name || 'Unknown'}`;
-        solution = `Error: ${errorDetails}\n\n💡 Troubleshooting:\n1. ✅ Make sure you're using HTTPS: https://qgocargo.cloud\n2. 📷 Allow camera permissions when browser asks\n3. 🌐 Try Chrome browser (best for camera)\n4. 📱 Check if camera works in other apps (like WhatsApp)\n5. 🔄 Reload the page and try again\n6. 🔒 Check browser settings: Site Settings → Camera → Allow\n7. 📞 If still not working, contact support with error: ${err.name || 'Unknown'}`;
+        errorMsg = `❌ Camera error: ${errorName}`;
+        solution = `Error: ${errorMessage}\n\n💡 Troubleshooting:\n1. ✅ Make sure you're using HTTPS: https://qgocargo.cloud\n2. 📷 Allow camera permissions when browser asks\n3. 🌐 Try Chrome browser (best for camera)\n4. 📱 Check if camera works in other apps (like WhatsApp)\n5. 🔄 Reload the page and try again\n6. 🔒 Check browser settings: Site Settings → Camera → Allow\n7. 📞 If still not working, contact support with error: ${errorName}`;
       }
       
       setError(`${errorMsg}\n\n💡 Solution:\n${solution}`);
