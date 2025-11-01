@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.2",
+  "version": "v2.1.3",
   "buildDate": "Nov 01, 2025",
-  "buildTime": "17:55:19",
+  "buildTime": "18:31:16",
   "author": "akifbade46-del",
-  "commitMessage": "feat: auto-version system with Git Bash support",
+  "commitMessage": "feat: auto-version system complete with commit message display in info button",
   "environment": "development"
 }

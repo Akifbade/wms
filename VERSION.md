@@ -1,10 +1,10 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.1.2**
-- **Released**: Nov 01, 2025 at 17:55:19
+## Current Version: **v2.1.3**
+- **Released**: Nov 01, 2025 at 18:31:16
 - **Author**: akifbade46-del
 - **Status**: Development
-- **Change**: feat: auto-version system with Git Bash support
+- **Change**: feat: auto-version system complete with commit message display in info button
 
 ---
 

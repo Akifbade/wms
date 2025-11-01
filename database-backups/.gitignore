@@ -1,7 +1,0 @@
-# Database backups are stored here
-# Automated daily backups at 2 AM
-# Manual backups: Run backup-database.bat (Windows) or backup-database.sh (Linux)
-# Restore: Run restore-database.bat <filename> or restore-database.sh <filename>
-
-*.sql
-*.sql.gz
