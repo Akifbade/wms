@@ -1,13 +1,20 @@
-# 🚀 QUICK REFERENCE CARD
+# 🚀 QUICK REFERENCE CARD - NOVEMBER 2025
 
-## Your Production System - October 15, 2025
+## Your Complete System - Production + Staging
 
 ---
 
 ## 🌐 Access URLs
 
-**Frontend:** https://72.60.215.188  
-**Backend API:** https://72.60.215.188/api  
+### 🔴 PRODUCTION (Live)
+**Frontend:** http://148.230.107.155  
+**Backend API:** http://148.230.107.155:5000  
+**Health Check:** http://148.230.107.155:5000/api/health
+
+### 🟢 STAGING (Testing)
+**Frontend:** http://148.230.107.155:8080  
+**Backend API:** http://148.230.107.155:5001  
+**Health Check:** http://148.230.107.155:5001/api/health  
 **API Health:** https://72.60.215.188/api/health  
 
 ---
