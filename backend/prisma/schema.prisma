@@ -1256,7 +1256,7 @@ model MaterialIssue {
   notes        String?
   companyId    String
 
-  job        MovingJob        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job        MovingJob        @relation(fields: [jobId], references: [id], onDelete: Restrict) // ← CHANGED: Restrict instead of Cascade - preserves history
   material   PackingMaterial  @relation(fields: [materialId], references: [id])
   stockBatch StockBatch?      @relation(fields: [stockBatchId], references: [id])
   rack       Rack?            @relation("JobMaterialRack", fields: [rackId], references: [id])
@@ -1284,7 +1284,7 @@ model MaterialReturn {
   notes           String?
   companyId       String
 
-  job        MovingJob         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job        MovingJob         @relation(fields: [jobId], references: [id], onDelete: Restrict) // ← CHANGED: Restrict instead of Cascade - preserves history
   material   PackingMaterial   @relation(fields: [materialId], references: [id])
   issue      MaterialIssue?    @relation(fields: [issueId], references: [id])
   rack       Rack?             @relation(fields: [rackId], references: [id])
