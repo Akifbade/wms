@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.13",
+  "version": "v2.1.14",
   "buildDate": "Nov 01, 2025",
-  "buildTime": "23:04:57",
+  "buildTime": "23:10:07",
   "author": "akifbade46-del",
-  "commitMessage": "feat: add company logos to rack QR labels when printing",
+  "commitMessage": "feat: add staging environment on/off control scripts",
   "environment": "development"
 }
