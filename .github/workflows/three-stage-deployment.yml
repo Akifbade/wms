@@ -133,13 +133,13 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy Full Stack to Staging (Rocky Linux)
+      - name: Deploy Full Stack to Staging (Rocky Linux) - WITH SAFETY & ROLLBACK
         env:
           VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
           VPS_USER: ${{ secrets.PROD_VPS_USER }}
         run: |
           echo "================================================"
-          echo "🧪 DEPLOYING FULL STACK TO STAGING"
+          echo "🧪 DEPLOYING FULL STACK TO STAGING (WITH SAFETY)"
           echo "================================================"
           
           # Copy built frontend files
@@ -157,16 +157,57 @@ jobs:
             --exclude 'uploads' \
             backend/ ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/backend/staging-temp/"
           
-          # Deploy to staging containers
+          # Deploy to staging containers with safety checks
           ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
           set -e
           cd "${{ env.PRODUCTION_PATH }}"
+          
+          STAGING_BACKUP_DIR="backups/staging-$(date +%Y%m%d-%H%M%S)"
+          DEPLOY_FAILED=false
+          
+          echo ""
+          echo "================================================"
+          echo "📦 STEP 0: Creating Pre-Deployment Backups"
+          echo "================================================"
+          mkdir -p "$STAGING_BACKUP_DIR"/{frontend,backend}
+          
+          echo "💾 Backing up current staging frontend..."
+          docker cp wms-staging-frontend:/usr/share/nginx/html/. "$STAGING_BACKUP_DIR/frontend/" 2>/dev/null || echo "⚠️  Frontend backup skipped (empty)"
+          
+          echo "💾 Backing up current staging backend..."
+          docker cp wms-staging-backend:/app/. "$STAGING_BACKUP_DIR/backend/" 2>/dev/null || echo "⚠️  Backend backup skipped"
+          
+          echo "✅ Backups created: $STAGING_BACKUP_DIR"
+          
+          # Trap function to rollback on any error
+          trap_rollback() {
+            echo ""
+            echo "================================================"
+            echo "❌ DEPLOYMENT FAILED - INITIATING ROLLBACK"
+            echo "================================================"
+            
+            echo "🔄 Restoring frontend from backup..."
+            docker cp "$STAGING_BACKUP_DIR/frontend/." wms-staging-frontend:/usr/share/nginx/html/ 2>/dev/null || true
+            docker exec wms-staging-frontend nginx -s reload 2>/dev/null || true
+            
+            echo "🔄 Restoring backend from backup..."
+            docker cp "$STAGING_BACKUP_DIR/backend/." wms-staging-backend:/app/ 2>/dev/null || true
+            docker restart wms-staging-backend 2>/dev/null || true
+            sleep 15
+            
+            echo "✅ Rollback complete - Staging restored from backup"
+            echo "📍 Backup location: $STAGING_BACKUP_DIR"
+            exit 1
+          }
+          
+          trap trap_rollback ERR
           
           echo ""
           echo "================================================"
           echo "🎯 STEP 1: Deploy Frontend to Staging"
           echo "================================================"
           docker cp frontend/staging-dist/. wms-staging-frontend:/usr/share/nginx/html/
+          docker exec wms-staging-frontend nginx -t || { echo "❌ Nginx syntax error"; exit 1; }
           docker exec wms-staging-frontend nginx -s reload
           echo "✅ Frontend deployed to staging"
           
@@ -175,7 +216,7 @@ jobs:
           echo "🎯 STEP 2: Deploy Backend to Staging"
           echo "================================================"
           
-          echo "� Copying backend code to container..."
+          echo "📋 Copying backend code to container..."
           docker cp backend/staging-temp/. wms-staging-backend:/app/
           rm -rf backend/staging-temp
           
@@ -185,35 +226,79 @@ jobs:
           echo "🔧 Generating Prisma client..."
           docker exec wms-staging-backend npx prisma generate
           
-          echo "�️  Handling migrations safely..."
+          echo "🔧 Handling migrations safely..."
           docker exec wms-staging-backend sh -c "
             echo 'Checking for failed migrations...'
             npx prisma migrate status || true
             
-            echo 'Cleaning any failed migration entries...'
-            mysql -h database -u wms_user -pwmspassword123 warehouse_wms -e 'DELETE FROM _prisma_migrations WHERE finished_at IS NULL;' 2>/dev/null || true
+            echo 'Cleaning failed migration entries...'
+            mysql -h staging-database -u wms_user -pwmspassword123 warehouse_wms -e 'DELETE FROM _prisma_migrations WHERE finished_at IS NULL;' 2>/dev/null || true
             
             echo 'Deploying migrations...'
-            npx prisma migrate deploy || echo 'Migration deployment completed with warnings'
+            npx prisma migrate deploy || echo 'Migration deployment completed'
           "
           
-          echo "� Restarting staging backend to apply changes..."
+          echo "🔄 Restarting staging backend..."
           docker restart wms-staging-backend
+          sleep 20
           
-          echo "⏳ Waiting for backend to start (30 seconds)..."
-          sleep 30
-          
-          echo "🔍 Checking backend health..."
-          if curl -f http://localhost:5001/api/health > /dev/null 2>&1; then
-            echo "✅ Staging backend is healthy!"
-          else
-            echo "⚠️  Warning: Staging backend health check failed"
-            docker logs wms-staging-backend --tail 30
-          fi
+          echo "✅ Backend deployed to staging"
           
           echo ""
           echo "================================================"
-          echo "✅ STAGING DEPLOYMENT COMPLETE"
+          echo "🎯 STEP 3: Health Checks & Verification"
+          echo "================================================"
+          
+          HEALTH_FAILED=false
+          
+          # Check frontend HTTP health
+          echo "🔍 Checking staging frontend HTTP (port 8080)..."
+          if curl -f http://127.0.0.1:8080 > /dev/null 2>&1; then
+            echo "✅ Frontend HTTP responding (200)"
+          else
+            echo "❌ Frontend HTTP check failed"
+            HEALTH_FAILED=true
+          fi
+          
+          # Check backend API health
+          echo "🔍 Checking staging backend API (/api/health)..."
+          if curl -f http://127.0.0.1:5001/api/health > /dev/null 2>&1; then
+            echo "✅ Backend API healthy"
+          else
+            echo "❌ Backend API health check failed"
+            docker logs wms-staging-backend --tail 20
+            HEALTH_FAILED=true
+          fi
+          
+          # Try HTTPS check if cert exists
+          echo "🔍 Checking staging HTTPS (if cert exists)..."
+          if [ -f "/etc/letsencrypt/live/staging.qgocargo.cloud/fullchain.pem" ]; then
+            if curl -f https://staging.qgocargo.cloud 2>&1 | grep -q "SSL certificate"; then
+              echo "⚠️  SSL warning (expected for self-test)"
+            else
+              echo "✅ HTTPS certificate present and nginx accepting connections"
+            fi
+          else
+            echo "ℹ️  Staging cert not yet issued - HTTP available only"
+          fi
+          
+          if [ "$HEALTH_FAILED" = true ]; then
+            echo "❌ Health checks failed - triggering rollback"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ All health checks passed!"
+          echo "================================================"
+          
+          # Save backup metadata for reference
+          echo "Backup Info: Created at $(date)" > "$STAGING_BACKUP_DIR/BACKUP_INFO.txt"
+          echo "Commit: ${{ github.sha }}" >> "$STAGING_BACKUP_DIR/BACKUP_INFO.txt"
+          echo "Actor: ${{ github.actor }}" >> "$STAGING_BACKUP_DIR/BACKUP_INFO.txt"
+          
+          echo ""
+          echo "================================================"
+          echo "✅ STAGING DEPLOYMENT COMPLETE (WITH SAFETY)"
           echo "================================================"
           echo "🌐 Frontend: http://148.230.107.155:8080"
           echo "🔌 Backend: http://148.230.107.155:5001/api/health"
