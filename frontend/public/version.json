@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.4",
+  "version": "v2.1.5",
   "buildDate": "Nov 01, 2025",
-  "buildTime": "18:34:34",
+  "buildTime": "21:46:10",
   "author": "akifbade46-del",
-  "commitMessage": "fix: improve camera diagnostics with detailed error messages and fallback mode",
+  "commitMessage": "docs: add mobile camera test guide in Urdu/Hindi",
   "environment": "development"
 }
