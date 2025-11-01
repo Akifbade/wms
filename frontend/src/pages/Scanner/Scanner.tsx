@@ -127,110 +127,66 @@ export const Scanner: React.FC = () => {
       const html5QrCode = new Html5Qrcode(qrCodeRegionId);
       scannerRef.current = html5QrCode;
 
-      // Request camera access first to get better error messages
-      console.log('📹 Requesting camera access...');
+      // 📹 CRITICAL: Test camera access BEFORE starting html5-qrcode
+      // This matches camera-test.html behavior which works perfectly
+      console.log('📹 Step 1: Testing direct camera access (like camera-test.html)...');
       console.log('📱 Available constraints:', navigator.mediaDevices.getSupportedConstraints());
       
-      try {
-        // Try simpler constraints first
-        console.log('🔍 Trying camera access with environment facing mode...');
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          } 
-        });
-        console.log('✅ Camera access granted:', stream.getVideoTracks());
-        console.log('📹 Video track settings:', stream.getVideoTracks()[0].getSettings());
-        // Stop the test stream
-        stream.getTracks().forEach(track => track.stop());
-      } catch (mediaErr: any) {
-        console.error('❌ getUserMedia failed:', mediaErr);
-        console.error('Error details:', {
-          name: mediaErr.name,
-          message: mediaErr.message,
-          constraint: mediaErr.constraint,
-          stack: mediaErr.stack
-        });
-        
-        // Try without facingMode constraint as fallback
-        if (mediaErr.name === 'OverconstrainedError' || mediaErr.constraint === 'facingMode') {
-          console.log('⚠️ facingMode not supported, trying without constraint...');
-          try {
-            const fallbackStream = await navigator.mediaDevices.getUserMedia({ 
-              video: true 
-            });
-            console.log('✅ Camera access granted (fallback mode)');
-            fallbackStream.getTracks().forEach(track => track.stop());
-          } catch (fallbackErr) {
-            console.error('❌ Fallback also failed:', fallbackErr);
-            throw mediaErr; // Throw original error
-          }
-        } else {
-          throw mediaErr; // Re-throw to handle in outer catch
-        }
-      }
-
-      console.log('🚀 Starting html5-qrcode scanner...');
+      let cameraWorks = false;
+      let workingConstraints: any = null;
       
-      // Try multiple camera configurations with proper fallback
-      const cameraConfigs = [
-        // Config 1: Back camera (environment)
-        { 
-          facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        },
-        // Config 2: Back camera (ideal, not required)
-        { 
-          facingMode: { ideal: 'environment' }
-        },
-        // Config 3: Any camera (no constraints)
-        { 
-          facingMode: 'user' 
-        },
-        // Config 4: Most basic (any camera)
-        'environment' as any
+      // Test configs in order of preference
+      const testConfigs = [
+        { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } },
+        { video: { facingMode: 'environment' } },
+        { video: true }
       ];
       
-      let scannerStarted = false;
-      let lastError: any = null;
-      
-      for (let i = 0; i < cameraConfigs.length; i++) {
+      for (let i = 0; i < testConfigs.length; i++) {
         try {
-          console.log(`🔄 Trying camera config ${i + 1}/${cameraConfigs.length}:`, cameraConfigs[i]);
+          console.log(`🔍 Testing camera config ${i + 1}/${testConfigs.length}:`, testConfigs[i]);
+          const testStream = await navigator.mediaDevices.getUserMedia(testConfigs[i]);
+          console.log('✅ Camera test SUCCESS with config', i + 1);
+          console.log('📹 Video track settings:', testStream.getVideoTracks()[0]?.getSettings());
           
-          await html5QrCode.start(
-            cameraConfigs[i],
-            { 
-              fps: 10, 
-              qrbox: { width: 250, height: 250 },
-              aspectRatio: 1.0
-            },
-            onScanSuccess,
-            () => {}  // onScanFailure
-          );
+          // Stop test stream immediately
+          testStream.getTracks().forEach(track => track.stop());
           
-          console.log(`✅ Scanner started successfully with config ${i + 1}`);
-          scannerStarted = true;
+          cameraWorks = true;
+          workingConstraints = testConfigs[i];
           break;
-        } catch (configErr: any) {
-          console.warn(`⚠️ Config ${i + 1} failed:`, configErr.message);
-          lastError = configErr;
-          
-          // Try to stop scanner if partially started
-          try {
-            await html5QrCode.stop();
-          } catch (e) {
-            // Ignore stop errors
-          }
+        } catch (testErr: any) {
+          console.warn(`⚠️ Config ${i + 1} failed:`, testErr.name, testErr.message);
         }
       }
       
-      if (!scannerStarted) {
-        console.error('❌ All camera configs failed');
-        throw lastError || new Error('Failed to start scanner with any camera configuration');
+      if (!cameraWorks) {
+        console.error('❌ Direct camera access failed - camera-test.html would also fail');
+        throw new Error('Camera test failed - please check camera permissions and try camera-test.html first');
+      }
+      
+      console.log('✅ Camera test passed! Now starting html5-qrcode with working constraints...');
+
+      console.log('🚀 Step 2: Starting html5-qrcode with PROVEN working constraints...');
+      
+      // Use the constraints that we KNOW work from camera test
+      try {
+        await html5QrCode.start(
+          workingConstraints.video,
+          { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0
+          },
+          onScanSuccess,
+          () => {}  // onScanFailure - ignore, not an error
+        );
+        
+        console.log('✅ html5-qrcode scanner started successfully!');
+      } catch (html5Err: any) {
+        console.error('❌ html5-qrcode.start() failed even though camera test passed!');
+        console.error('This is an html5-qrcode library issue:', html5Err);
+        throw html5Err;
       }
     } catch (err: any) {
       console.error('❌ Camera error:', err);
