@@ -99,6 +99,7 @@ model Company {
   purchaseOrders       PurchaseOrder[]
   purchaseOrderItems   PurchaseOrderItem[]
   materialPriceHistory MaterialPriceHistory[]
+  rackAuditLogs        RackAuditLog[]
 
   @@map("companies")
 }
@@ -309,6 +310,26 @@ model RackActivity {
   user User @relation(fields: [userId], references: [id])
 
   @@map("rack_activities")
+}
+
+// Rack Audit Trail - Full deletion and modification history
+model RackAuditLog {
+  id          String   @id @default(cuid())
+  rackId      String
+  action      String // DELETE, CREATE, UPDATE, MODIFY_STATUS
+  status      String // SUCCESS, FAILED
+  message     String?
+  details     String? // JSON string with old/new values, box details, etc
+  performedBy String?
+  createdAt   DateTime @default(now())
+  companyId   String
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([rackId])
+  @@index([createdAt])
+  @@index([companyId])
+  @@map("rack_audit_logs")
 }
 
 // Shipment Management

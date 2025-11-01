@@ -435,11 +435,12 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
   }
 });
 
-// Delete rack
+// Delete rack - with strict delete protection and audit logging
 router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const companyId = req.user!.companyId;
+    const userId = req.user!.id;
 
     const existing = await prisma.rack.findFirst({
       where: { id, companyId },
@@ -451,21 +452,170 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
     });
 
     if (!existing) {
+      // Log failed deletion attempt
+      await prisma.rackAuditLog.create({
+        data: {
+          rackId: id,
+          action: 'DELETE',
+          status: 'FAILED',
+          message: 'Rack not found',
+          performedBy: userId,
+          companyId,
+        },
+      });
       return res.status(404).json({ error: 'Rack not found' });
     }
 
+    // Check if boxes are allocated to this rack
     if (existing.boxes.length > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete rack with boxes in storage' 
+      // Log failed deletion due to allocated materials
+      const boxDetails = existing.boxes.map(box => ({
+        id: box.id,
+        shipmentId: box.shipmentId,
+        status: box.status,
+      }));
+
+      await prisma.rackAuditLog.create({
+        data: {
+          rackId: id,
+          action: 'DELETE',
+          status: 'FAILED',
+          message: `Cannot delete: ${existing.boxes.length} box(es) allocated to this rack`,
+          details: JSON.stringify({
+            reason: 'MATERIALS_ALLOCATED',
+            boxCount: existing.boxes.length,
+            boxes: boxDetails,
+          }),
+          performedBy: userId,
+          companyId,
+        },
+      });
+
+      return res.status(400).json({
+        error: `Cannot delete rack: ${existing.boxes.length} box(es) with materials are currently allocated`,
+        details: {
+          reason: 'MATERIALS_ALLOCATED',
+          boxCount: existing.boxes.length,
+          boxes: boxDetails,
+        },
       });
     }
 
-    await prisma.rack.delete({ where: { id } });
+    // Perform soft delete
+    const deletedRack = await prisma.rack.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        companyProfile: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
 
-    res.json({ message: 'Rack deleted successfully' });
+    // Log successful deletion
+    await prisma.rackAuditLog.create({
+      data: {
+        rackId: id,
+        action: 'DELETE',
+        status: 'SUCCESS',
+        message: `Rack "${existing.code}" successfully deleted (soft delete)`,
+        details: JSON.stringify({
+          rackCode: existing.code,
+          rackType: existing.rackType,
+          location: existing.location,
+          deletedAt: deletedRack.deletedAt,
+        }),
+        performedBy: userId,
+        companyId,
+      },
+    });
+
+    res.json({
+      message: 'Rack deleted successfully',
+      rack: deletedRack,
+    });
   } catch (error) {
     console.error('Delete rack error:', error);
+
+    // Log error
+    try {
+      await prisma.rackAuditLog.create({
+        data: {
+          rackId: req.params.id,
+          action: 'DELETE',
+          status: 'FAILED',
+          message: `Error during deletion: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          performedBy: req.user!.id,
+          companyId: req.user!.companyId,
+        },
+      });
+    } catch (logError) {
+      console.error('Failed to log deletion error:', logError);
+    }
+
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get audit trail for a specific rack
+router.get('/:id/audit', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+    const { limit = 50, offset = 0 } = req.query;
+
+    // Verify rack exists
+    const rack = await prisma.rack.findFirst({
+      where: { id, companyId },
+      select: { id: true, code: true, companyId: true },
+    });
+
+    if (!rack) {
+      return res.status(404).json({ error: 'Rack not found' });
+    }
+
+    // Get audit logs
+    const auditLogs = await prisma.rackAuditLog.findMany({
+      where: { rackId: id, companyId },
+      orderBy: { createdAt: 'desc' },
+      take: parseInt(limit as string) || 50,
+      skip: parseInt(offset as string) || 0,
+    });
+
+    // Get total count
+    const totalCount = await prisma.rackAuditLog.count({
+      where: { rackId: id, companyId },
+    });
+
+    // Enrich logs with user information if available
+    const enrichedLogs = auditLogs.map(log => ({
+      ...log,
+      details: log.details ? JSON.parse(log.details) : null,
+    }));
+
+    res.json({
+      rackId: id,
+      rackCode: rack.code,
+      totalLogs: totalCount,
+      logs: enrichedLogs,
+      pagination: {
+        limit: parseInt(limit as string) || 50,
+        offset: parseInt(offset as string) || 0,
+        total: totalCount,
+      },
+    });
+  } catch (error) {
+    console.error('Get rack audit trail error:', error);
+    res.status(500).json({ error: 'Failed to fetch audit trail' });
   }
 });
 
