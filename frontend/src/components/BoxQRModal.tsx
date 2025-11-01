@@ -59,8 +59,15 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
       // Load branding (logo/colors)
       fetch('/api/company/branding')
         .then(r => r.json())
-        .then(d => setBranding(d?.branding || null))
-        .catch(() => {});
+        .then(d => {
+          const brandingData = d?.branding || null;
+          console.log('✅ BoxQRModal: Loaded branding:', brandingData);
+          console.log('   - logoUrl:', brandingData?.logoUrl);
+          setBranding(brandingData);
+        })
+        .catch((err) => {
+          console.error('❌ BoxQRModal: Failed to load branding:', err);
+        });
       loadShipmentAndBoxes();
     }
   }, [isOpen, shipmentId]);
@@ -204,8 +211,41 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
 
   // (master QR image no longer used in pallet-mode printing)
 
-  const handlePrintAll = () => {
-    window.print();
+  const handlePrintAll = async () => {
+    // Preload all images to ensure they're ready for print
+    const imgPromises: Promise<void>[] = [];
+    
+    // Preload logo image if it exists
+    if (branding?.logoUrl) {
+      imgPromises.push(
+        new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => resolve(); // Don't fail if image fails to load
+          img.src = branding.logoUrl;
+        })
+      );
+    }
+    
+    // Preload all QR images
+    Object.values(qrImages).forEach(qrSrc => {
+      imgPromises.push(
+        new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => resolve(); // Don't fail if image fails to load
+          img.src = qrSrc;
+        })
+      );
+    });
+    
+    // Wait for all images to load before printing
+    await Promise.all(imgPromises);
+    
+    // Small delay to ensure rendering
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   // status badge no longer displayed in pallet-mode printing
@@ -386,13 +426,18 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
             visibility: hidden;
           }
           .fixed, .fixed * {
-            visibility: visible;
+            visibility: visible !important;
           }
           .fixed {
             position: absolute;
             left: 0;
             top: 0;
             width: 100%;
+          }
+          .fixed img {
+            visibility: visible !important;
+            max-width: 100%;
+            height: auto;
           }
           .print\\:hidden {
             display: none !important;

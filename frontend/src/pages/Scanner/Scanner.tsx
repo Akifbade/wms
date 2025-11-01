@@ -61,11 +61,15 @@ export const Scanner: React.FC = () => {
       setScanning(true);
       
       // Check if we have HTTPS or localhost
-      const isSecureContext = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const isHttps = window.location.protocol === 'https:';
+      const isSecureContext = window.isSecureContext || isHttps || isLocalhost;
       const currentUrl = window.location.href;
       
       console.log('🔒 Camera Security Check:', {
         isSecureContext,
+        isLocalhost,
+        isHttps,
         protocol: window.location.protocol,
         hostname: window.location.hostname,
         url: currentUrl,
@@ -73,8 +77,8 @@ export const Scanner: React.FC = () => {
         getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
       });
       
-      // FORCE HTTPS if not secure
-      if (!isSecureContext && window.location.protocol === 'http:') {
+      // FORCE HTTPS if not secure (and not localhost)
+      if (!isSecureContext && window.location.protocol === 'http:' && !isLocalhost) {
         const httpsUrl = currentUrl.replace('http://', 'https://');
         throw new Error(`🔒 Camera requires HTTPS. Redirecting to: ${httpsUrl}`);
       }
