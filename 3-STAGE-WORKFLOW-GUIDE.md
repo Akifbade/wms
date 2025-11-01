@@ -217,9 +217,11 @@ docker exec wms-backend npx prisma migrate status
 ### Ports:
 | Service | Staging | Production |
 |---------|---------|------------|
-| Frontend | 8080 | 80 |
+| Frontend | 8080 | 80/443 |
 | Backend | 5001 | 5000 |
-| Database | 3308 | 3306 |
+| Database | 3308 (ext) | 3307 (ext) |
+
+**Note**: External ports show MySQL internal port 3306 mapped to external ports (3308 staging, 3307 production)
 
 ### Useful Commands:
 ```bash
