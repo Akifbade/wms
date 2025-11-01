@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
+import { VersionBadge } from './components/VersionBadge';
 import { Layout } from './components/Layout/Layout';
 import { Dashboard } from './pages/Dashboard/Dashboard';
 import { Shipments } from './pages/Shipments/Shipments';
@@ -199,6 +200,7 @@ function App() {
         {/* Catch all - redirect based on role */}
           <Route path="*" element={<Navigate to="/scanner" replace />} />
         </Routes>
+        <VersionBadge />
       </Router>
     </PermissionProvider>
   );
