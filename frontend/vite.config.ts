@@ -27,16 +27,12 @@ export default defineConfig({
         // Manual chunks for better caching and faster loads
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            // React core
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+            // React core - MUST be first to avoid undefined errors
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') || id.includes('scheduler')) {
               return 'react-vendor';
             }
-            // UI libraries
-            if (id.includes('@heroicons')) {
-              return 'ui-vendor';
-            }
-            // Charts
-            if (id.includes('recharts') || id.includes('victory')) {
+            // Charts (these depend on React)
+            if (id.includes('recharts') || id.includes('victory') || id.includes('d3-')) {
               return 'chart-vendor';
             }
             // PDF/Canvas
@@ -47,8 +43,12 @@ export default defineConfig({
             if (id.includes('qrcode') || id.includes('html5-qrcode')) {
               return 'qr-vendor';
             }
-            // Everything else from node_modules
-            return 'vendor';
+            // UI libraries (these depend on React)
+            if (id.includes('@heroicons')) {
+              return 'ui-vendor';
+            }
+            // Everything else from node_modules - NO RETURN here to avoid vendor chunk
+            // This prevents mixing React-dependent and independent libraries
           }
         },
       },
