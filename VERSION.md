@@ -1,10 +1,10 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.1.19**
-- **Released**: Nov 02, 2025 at 00:12:47
+## Current Version: **v2.1.20**
+- **Released**: Nov 02, 2025 at 00:15:37
 - **Author**: akifbade46-del
 - **Status**: Development
-- **Change**: fix: mobile camera DOM rendering - force React flush + increase retries to 10 (3.5s)
+- **Change**: fix: improved camera error detection with detailed mobile debugging logs
 
 ---
 
