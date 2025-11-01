@@ -58,7 +58,6 @@ export const Scanner: React.FC = () => {
   const startScanning = async () => {
     try {
       setError('');
-      setScanning(true);
       
       // Check if we have HTTPS or localhost
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -87,6 +86,21 @@ export const Scanner: React.FC = () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera API not available. Your browser or connection does not support camera access. Please use HTTPS (https://qgocargo.cloud) and a modern browser like Chrome.');
       }
+      
+      // Set scanning true to render the div
+      setScanning(true);
+      
+      // Wait for DOM to update and div to be rendered
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Check if qr-reader element exists
+      const qrReaderElement = document.getElementById(qrCodeRegionId);
+      if (!qrReaderElement) {
+        console.error('❌ QR reader element not found in DOM');
+        throw new Error('Scanner container not ready. Please try again.');
+      }
+      
+      console.log('✅ QR reader element found:', qrReaderElement);
       
       const html5QrCode = new Html5Qrcode(qrCodeRegionId);
       scannerRef.current = html5QrCode;

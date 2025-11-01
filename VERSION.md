@@ -1,10 +1,10 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.1.5**
-- **Released**: Nov 01, 2025 at 21:46:10
+## Current Version: **v2.1.6**
+- **Released**: Nov 01, 2025 at 22:05:19
 - **Author**: akifbade46-del
 - **Status**: Development
-- **Change**: docs: add mobile camera test guide in Urdu/Hindi
+- **Change**: fix: scanner camera with multiple fallback configs for mobile compatibility
 
 ---
 
