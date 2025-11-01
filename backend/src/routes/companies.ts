@@ -8,6 +8,28 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 const router = Router();
 const prisma = new PrismaClient();
 
+const parseBoolean = (value: any, fallback: boolean): boolean => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') {
+      return true;
+    }
+    if (normalized === 'false') {
+      return false;
+    }
+  }
+
+  if (typeof value === 'number') {
+    return value === 1;
+  }
+
+  return fallback;
+};
+
 // Configure multer for company logo uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -40,7 +62,16 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       orderBy: { name: 'asc' }
     });
 
-    res.json(profiles);
+    const protocol = req.protocol || 'http';
+    const host = req.get('host');
+    const baseUrl = host ? `${protocol}://${host}` : null;
+
+    const payload = profiles.map((profile) => ({
+      ...profile,
+      logoUrl: profile.logo && baseUrl ? `${baseUrl}${profile.logo}` : null,
+    }));
+
+    res.json(payload);
   } catch (error: any) {
     console.error('Error fetching company profiles:', error);
     res.status(500).json({ error: 'Failed to fetch company profiles' });
@@ -68,7 +99,14 @@ router.get('/:profileId', authenticateToken, async (req: AuthRequest, res: Respo
       return res.status(404).json({ error: 'Company profile not found' });
     }
 
-    res.json(profile);
+    const protocol = req.protocol || 'http';
+    const host = req.get('host');
+    const baseUrl = host ? `${protocol}://${host}` : null;
+
+    res.json({
+      ...profile,
+      logoUrl: profile.logo && baseUrl ? `${baseUrl}${profile.logo}` : null,
+    });
   } catch (error: any) {
     console.error('Error fetching company profile:', error);
     res.status(500).json({ error: 'Failed to fetch company profile' });
@@ -99,6 +137,8 @@ router.post('/', authenticateToken, upload.single('logo'), async (req: AuthReque
 
     const logoPath = req.file ? `/uploads/company-logos/${req.file.filename}` : null;
 
+    const activeFlag = parseBoolean(isActive, true);
+
     const profile = await prisma.companyProfile.create({
       data: {
         name: name.trim(),
@@ -107,12 +147,19 @@ router.post('/', authenticateToken, upload.single('logo'), async (req: AuthReque
         contactPhone: contactPhone?.trim() || '',
         logo: logoPath,
         contractStatus: contractStatus || 'ACTIVE',
-        isActive: isActive !== false,
+        isActive: activeFlag,
         companyId
       }
     });
 
-    res.status(201).json(profile);
+    const protocol = req.protocol || 'http';
+    const host = req.get('host');
+    const baseUrl = host ? `${protocol}://${host}` : null;
+
+    res.status(201).json({
+      ...profile,
+      logoUrl: profile.logo && baseUrl ? `${baseUrl}${profile.logo}` : null,
+    });
   } catch (error: any) {
     console.error('Error creating company profile:', error);
     res.status(500).json({ error: 'Failed to create company profile' });
@@ -178,11 +225,18 @@ router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: 
         contactPhone: contactPhone?.trim(),
         logo: logoPath,
         contractStatus: contractStatus || profile.contractStatus,
-        isActive: isActive !== undefined ? isActive : profile.isActive
+        isActive: isActive !== undefined ? parseBoolean(isActive, profile.isActive) : profile.isActive
       }
     });
 
-    res.json(updated);
+    const protocol = req.protocol || 'http';
+    const host = req.get('host');
+    const baseUrl = host ? `${protocol}://${host}` : null;
+
+    res.json({
+      ...updated,
+      logoUrl: updated.logo && baseUrl ? `${baseUrl}${updated.logo}` : null,
+    });
   } catch (error: any) {
     console.error('Error updating company profile:', error);
     res.status(500).json({ error: 'Failed to update company profile' });
