@@ -18,6 +18,7 @@ interface CompanyProfile {
   name: string;
   description?: string;
   logo?: string;
+  logoUrl?: string;
   contactPerson?: string;
   contactPhone?: string;
   contractStatus?: string;
@@ -104,7 +105,7 @@ export const CompanyProfiles: React.FC = () => {
       contractStatus: profile.contractStatus || 'ACTIVE',
       isActive: profile.isActive
     });
-    setLogoPreview(profile.logo || null);
+    setLogoPreview(profile.logoUrl || profile.logo || null);
     setLogoFile(null);
     setEditingId(profile.id);
     setShowForm(true);
@@ -247,13 +248,13 @@ export const CompanyProfiles: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Logo Upload */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">Company Logo</label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Profile Logo</label>
               <div className="flex items-center space-x-6">
                 <div className="relative">
                   {logoPreview ? (
                     <img
                       src={logoPreview}
-                      alt="Logo"
+                      alt="Profile Logo"
                       className="w-24 h-24 rounded-lg object-cover border-2 border-gray-200"
                     />
                   ) : (
@@ -417,6 +418,7 @@ export const CompanyProfiles: React.FC = () => {
           {profiles.map((profile) => {
             const statusConfig = CONTRACT_STATUSES.find((s) => s.value === profile.contractStatus);
             const statusColor = statusConfig?.color || 'gray';
+            const logoSrc = profile.logoUrl || profile.logo;
 
             return (
               <div
@@ -426,9 +428,9 @@ export const CompanyProfiles: React.FC = () => {
                 {/* Logo & Name */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-start space-x-3 flex-1">
-                    {profile.logo ? (
+                    {logoSrc ? (
                       <img
-                        src={profile.logo}
+                        src={logoSrc}
                         alt={profile.name}
                         className="w-12 h-12 rounded-lg object-cover"
                       />
