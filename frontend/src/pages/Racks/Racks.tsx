@@ -164,9 +164,14 @@ export const Racks: React.FC = () => {
     setLoadingDetails(true);
     try {
       const response = await racksAPI.getById(rack.id);
+      console.log('✅ Rack details loaded:', response.rack);
+      console.log('   - companyProfile:', response.rack?.companyProfile);
+      console.log('   - companyProfile.name:', response.rack?.companyProfile?.name);
+      console.log('   - companyProfile.logo:', response.rack?.companyProfile?.logo);
       setRackDetails(response.rack);
     } catch (err) {
-      console.error('Failed to load rack details:', err);
+      console.error('❌ Failed to load rack details:', err);
+      console.log('⚠️ Falling back to basic rack data:', rack);
       setRackDetails(rack);
     } finally {
       setLoadingDetails(false);
@@ -682,16 +687,20 @@ export const Racks: React.FC = () => {
                 {/* Rack Information */}
                 <div className="px-6 pt-4 pb-2 bg-white border-b">
                   <div className="grid grid-cols-2 gap-6">
-                    {rackDetails?.companyProfile && (
+                    {rackDetails?.companyProfile && rackDetails.companyProfile.name && (
                       <div className="flex items-center gap-3 bg-purple-50 border border-purple-200 rounded-lg p-4">
                         {rackDetails.companyProfile.logo && (
                           <img
                             src={resolveLogoUrl(rackDetails.companyProfile.logo)}
                             alt={`${rackDetails.companyProfile.name} logo`}
                             className="h-16 w-16 rounded-lg object-contain bg-white border border-purple-200"
+                            onError={(e) => {
+                              console.warn('Logo failed to load:', rackDetails.companyProfile.logo);
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
                           />
                         )}
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="text-xs text-purple-600 font-semibold uppercase mb-1">Company / Profile</p>
                           <p
                             className="text-lg font-bold text-purple-900 truncate cursor-pointer underline-offset-2 hover:underline"

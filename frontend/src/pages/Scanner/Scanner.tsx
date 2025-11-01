@@ -90,14 +90,24 @@ export const Scanner: React.FC = () => {
       // Set scanning true to render the div
       setScanning(true);
       
-      // Wait for DOM to update and div to be rendered
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for DOM to update and div to be rendered - INCREASED wait time
+      console.log('⏳ Waiting for DOM to render qr-reader element...');
+      await new Promise(resolve => setTimeout(resolve, 300)); // Increased from 100ms to 300ms
       
-      // Check if qr-reader element exists
-      const qrReaderElement = document.getElementById(qrCodeRegionId);
+      // Check if qr-reader element exists (with retry)
+      let qrReaderElement = document.getElementById(qrCodeRegionId);
+      let retries = 0;
+      while (!qrReaderElement && retries < 5) {
+        console.log(`⏳ Retry ${retries + 1}/5: Waiting for qr-reader element...`);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        qrReaderElement = document.getElementById(qrCodeRegionId);
+        retries++;
+      }
+      
       if (!qrReaderElement) {
-        console.error('❌ QR reader element not found in DOM');
-        throw new Error('Scanner container not ready. Please try again.');
+        console.error('❌ QR reader element not found in DOM after 5 retries');
+        console.error('DOM body:', document.body.innerHTML.substring(0, 500));
+        throw new Error('Scanner container not ready after 5 retries. Please refresh and try again.');
       }
       
       console.log('✅ QR reader element found:', qrReaderElement);
