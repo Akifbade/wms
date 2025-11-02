@@ -184,6 +184,43 @@ export const Shipments: React.FC = () => {
     return Math.max(0, days);
   };
 
+  // 🎯 NEW SAFE HELPER FUNCTIONS (UI only - no logic changes)
+  const getFormattedDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'N/A';
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  const getPalletInfo = (shipment: any) => {
+    if (shipment.palletCount > 0 && shipment.boxesPerPallet > 0) {
+      return `${shipment.palletCount} × ${shipment.boxesPerPallet}`;
+    }
+    return `${shipment.totalBoxCount || 0} boxes`;
+  };
+
+  const getStorageBadge = (days: number) => {
+    if (days < 30) return { badge: `${days}d`, color: 'green', icon: '🟢', text: 'text-green-700', bg: 'bg-green-100' };
+    if (days < 60) return { badge: `${days}d`, color: 'yellow', icon: '🟡', text: 'text-yellow-700', bg: 'bg-yellow-100' };
+    return { badge: `${days}d`, color: 'red', icon: '🔴', text: 'text-red-700', bg: 'bg-red-100' };
+  };
+
+  // Calculate long-stay counts (safe - only for display)
+  const longStayCounts = {
+    warning: shipments.filter(s => {
+      const days = getDaysStored(s);
+      return days >= 30 && days < 60;
+    }).length,
+    urgent: shipments.filter(s => {
+      const days = getDaysStored(s);
+      return days >= 60;
+    }).length
+  };
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center h-96">
@@ -257,6 +294,22 @@ export const Shipments: React.FC = () => {
             <BuildingStorefrontIcon className="h-4 w-4" />
             Warehouse Shipments ({warehouseCounts.warehouse})
           </button>
+          {longStayCounts.warning > 0 && (
+            <button
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-yellow-100 text-yellow-700 border border-yellow-300 flex items-center gap-2"
+              title="Shipments stored 30-60 days"
+            >
+              🟡 Warning: {longStayCounts.warning}
+            </button>
+          )}
+          {longStayCounts.urgent > 0 && (
+            <button
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-100 text-red-700 border border-red-300 flex items-center gap-2 animate-pulse"
+              title="Shipments stored over 60 days"
+            >
+              🔴 Urgent: {longStayCounts.urgent}
+            </button>
+          )}
         </div>
       </div>
 
@@ -395,15 +448,18 @@ export const Shipments: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{shipment.clientName}</div>
-                    <div className="text-xs text-gray-500">{new Date(shipment.receivedDate).toLocaleDateString()}</div>
+                    <div className="text-xs text-gray-500">{getFormattedDate(shipment.receivedDate)}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {shipment.clientPhone}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                      📦 {shipment.currentBoxCount} / {shipment.originalBoxCount} pieces
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                        📦 {shipment.currentBoxCount} / {shipment.originalBoxCount} pieces
+                      </span>
+                      <span className="text-xs text-gray-500">{getPalletInfo(shipment)}</span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
@@ -422,9 +478,15 @@ export const Shipments: React.FC = () => {
                     <span className="text-sm font-medium text-primary-600">{shipment.rackLocations || 'N/A'}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <span className="font-semibold">
-                      {getDaysStored(shipment)} days
-                    </span>
+                    {(() => {
+                      const days = getDaysStored(shipment);
+                      const storageBadge = getStorageBadge(days);
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
+                          {storageBadge.icon} {storageBadge.badge}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {(() => {
