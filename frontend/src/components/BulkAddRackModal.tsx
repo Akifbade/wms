@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { XMarkIcon, SparklesIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
-import { racksAPI } from '../services/api';
+import { racksAPI, companiesAPI } from '../services/api';
+
+interface Category {
+  id: string;
+  name: string;
+  logo?: string;
+  color?: string;
+  icon?: string;
+  description?: string;
+  contractStatus?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+}
 
 interface BulkAddRackModalProps {
   isOpen: boolean;
@@ -12,6 +24,8 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategoryInfo, setSelectedCategoryInfo] = useState<Category | null>(null);
   
   const [formData, setFormData] = useState({
     zone: '',
@@ -19,6 +33,8 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
     startNumber: 1,
     endNumber: 10,
     location: '',
+    categoryId: '',
+    companyProfileId: '',
     capacityMode: 'FLEXIBLE' as 'FIXED' | 'FLEXIBLE' | 'UNLIMITED',
     // Fixed capacity
     capacityTotal: 100,
@@ -31,16 +47,64 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
     rackType: 'STORAGE' as 'STORAGE' | 'MATERIALS' | 'EQUIPMENT'
   });
 
+  const resolveLogoUrl = (logo?: string | null) => {
+    if (!logo) return '';
+    if (logo.startsWith('http')) return logo;
+    return logo.startsWith('/') ? logo : `/uploads/${logo}`;
+  };
+
+  // Load categories when modal opens
   useEffect(() => {
     if (isOpen) {
+      loadCategories();
       setError('');
       setSuccess('');
+      setSelectedCategoryInfo(null);
     }
   }, [isOpen]);
 
+  const loadCategories = async () => {
+    try {
+      const profiles = await companiesAPI.listProfiles();
+      const options: Category[] = (profiles || [])
+        .filter((profile: any) => profile.isActive !== false)
+        .map((profile: any) => ({
+          id: profile.id,
+          name: profile.name,
+          description: profile.description,
+          logo: profile.logo,
+          contractStatus: profile.contractStatus,
+          contactPerson: profile.contactPerson,
+          contactPhone: profile.contactPhone,
+          color: '#5B21B6',
+          icon: '🏢',
+        }));
+      setCategories(options);
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        [name]: name === 'capacityTotal' ? Number(value) : value,
+      };
+
+      if (name === 'categoryId') {
+        next.companyProfileId = value;
+      }
+
+      return next;
+    });
+
+    // If category changed, update the selected category info
+    if (name === 'categoryId') {
+      const selected = categories.find(c => c.id === value);
+      setSelectedCategoryInfo(selected || null);
+    }
   };
 
   const getPreviewRacks = () => {
@@ -86,6 +150,8 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
         const rackCode = `${formData.prefix}${i}`;
         const location = formData.location.replace('{n}', i.toString());
         
+        const selectedCompanyProfileId = formData.companyProfileId || formData.categoryId || '';
+        
         const rackData: any = {
           code: rackCode,
           zone: formData.zone,
@@ -94,6 +160,11 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
           capacityMode: formData.capacityMode,
           status: 'ACTIVE'
         };
+
+        // Add company profile if selected
+        if (selectedCompanyProfileId) {
+          rackData.companyProfileId = selectedCompanyProfileId;
+        }
 
         // Set capacity based on mode
         if (formData.capacityMode === 'FIXED') {
@@ -176,22 +247,67 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
             <h3 className="text-lg font-semibold mb-4 text-blue-800 flex items-center gap-2">
               🏢 Zone Configuration
             </h3>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Zone Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="zone"
-                value={formData.zone}
-                onChange={handleChange}
-                placeholder="e.g., 1A, 1B, 1C (Zone 1 sub-sections)"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                💡 Tip: Use format like <strong>1A, 1B, 1C</strong> for sub-zones, or <strong>Zone 1, Zone 2</strong> for main zones
-              </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Zone Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="zone"
+                  value={formData.zone}
+                  onChange={handleChange}
+                  placeholder="e.g., 1A, 1B, 1C (Zone 1 sub-sections)"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  💡 Tip: Use format like <strong>1A, 1B, 1C</strong> for sub-zones, or <strong>Zone 1, Zone 2</strong> for main zones
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category / Company
+                </label>
+                <select
+                  name="categoryId"
+                  value={formData.categoryId}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select Category / Company...</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      🏢 {cat.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedCategoryInfo && (
+                  <div className="mt-2 p-3 bg-white border border-blue-200 rounded-lg text-sm">
+                    <div className="flex items-center gap-2">
+                      {selectedCategoryInfo.logo && (
+                        <img
+                          src={resolveLogoUrl(selectedCategoryInfo.logo)}
+                          alt={`${selectedCategoryInfo.name} logo`}
+                          className="h-10 w-10 rounded-md object-contain bg-white border border-blue-200"
+                        />
+                      )}
+                      <div>
+                        <p className="font-medium text-blue-900">{selectedCategoryInfo.name}</p>
+                        {selectedCategoryInfo.contractStatus && (
+                          <p className="text-blue-600 text-xs uppercase font-semibold">
+                            {selectedCategoryInfo.contractStatus}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {selectedCategoryInfo.description && (
+                      <p className="text-blue-700 text-xs mt-1">{selectedCategoryInfo.description}</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
