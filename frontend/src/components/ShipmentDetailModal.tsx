@@ -421,6 +421,128 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
                 </div>
               </div>
 
+              {/* 🆕 NEW: Company Profile */}
+              {(shipment as any).companyProfile && (
+                <div className="border border-indigo-200 bg-indigo-50 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-800 mb-3 flex items-center">
+                    <span className="text-xl mr-2">🏢</span> Company Profile
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-600">Company Name</p>
+                      <p className="font-semibold text-gray-800">{(shipment as any).companyProfile.name}</p>
+                    </div>
+                    {(shipment as any).companyProfile.contractStatus && (
+                      <div>
+                        <p className="text-gray-600">Contract Status</p>
+                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                          (shipment as any).companyProfile.contractStatus === 'ACTIVE' ? 'bg-green-200 text-green-800' :
+                          (shipment as any).companyProfile.contractStatus === 'EXPIRED' ? 'bg-red-200 text-red-800' :
+                          'bg-yellow-200 text-yellow-800'
+                        }`}>
+                          {(shipment as any).companyProfile.contractStatus}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 🆕 NEW: Storage Type & Special Instructions */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-bold text-gray-800 mb-3 flex items-center">
+                  <span className="text-xl mr-2">📦</span> Storage Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-600">Storage Type</p>
+                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                      (shipment as any).storageType === 'STANDARD' ? 'bg-blue-100 text-blue-800' :
+                      (shipment as any).storageType === 'FRAGILE' ? 'bg-yellow-100 text-yellow-800' :
+                      (shipment as any).storageType === 'HAZMAT' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {(shipment as any).storageType === 'STANDARD' ? '🟦 Standard' :
+                       (shipment as any).storageType === 'FRAGILE' ? '🟨 Fragile' :
+                       (shipment as any).storageType === 'HAZMAT' ? '🟥 Hazmat' :
+                       (shipment as any).storageType || 'Standard'}
+                    </span>
+                  </div>
+                  {((shipment as any).palletCount > 0 || (shipment as any).boxesPerPallet > 0) && (
+                    <div>
+                      <p className="text-gray-600">Pallet Breakdown</p>
+                      <p className="font-semibold text-gray-800">
+                        {(shipment as any).palletCount || 0} pallets × {(shipment as any).boxesPerPallet || 0} boxes/pallet
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {(shipment as any).specialInstructions && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-gray-600 text-xs mb-1">Special Instructions</p>
+                    <p className="text-gray-800 text-sm bg-yellow-50 border border-yellow-200 rounded p-2">
+                      ⚠️ {(shipment as any).specialInstructions}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* 🆕 NEW: Warehouse Shipment Info (International) */}
+              {(shipment as any).isWarehouseShipment && (
+                <div className="border border-purple-200 bg-purple-50 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-800 mb-3 flex items-center">
+                    <span className="text-xl mr-2">🌍</span> International Shipment Details
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    {/* Shipper Info */}
+                    <div className="border-r border-purple-200 pr-4">
+                      <p className="text-purple-700 font-semibold mb-2">📤 Shipper</p>
+                      {(shipment as any).shipper && (
+                        <div className="mb-2">
+                          <p className="text-gray-600 text-xs">Name</p>
+                          <p className="font-semibold text-gray-800">{(shipment as any).shipper}</p>
+                        </div>
+                      )}
+                      {(shipment as any).shipperAddress && (
+                        <div className="mb-2">
+                          <p className="text-gray-600 text-xs">Address</p>
+                          <p className="text-gray-800 text-xs">{(shipment as any).shipperAddress}</p>
+                        </div>
+                      )}
+                      {(shipment as any).shipperPhone && (
+                        <div>
+                          <p className="text-gray-600 text-xs">Phone</p>
+                          <p className="text-gray-800">{(shipment as any).shipperPhone}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Consignee Info */}
+                    <div className="pl-4">
+                      <p className="text-purple-700 font-semibold mb-2">📥 Consignee</p>
+                      {(shipment as any).consignee && (
+                        <div className="mb-2">
+                          <p className="text-gray-600 text-xs">Name</p>
+                          <p className="font-semibold text-gray-800">{(shipment as any).consignee}</p>
+                        </div>
+                      )}
+                      {(shipment as any).consigneeAddress && (
+                        <div className="mb-2">
+                          <p className="text-gray-600 text-xs">Address</p>
+                          <p className="text-gray-800 text-xs">{(shipment as any).consigneeAddress}</p>
+                        </div>
+                      )}
+                      {(shipment as any).consigneePhone && (
+                        <div>
+                          <p className="text-gray-600 text-xs">Phone</p>
+                          <p className="text-gray-800">{(shipment as any).consigneePhone}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Rack Information - Legacy (kept for backward compatibility) */}
               {shipment.rack && (
                 <div className="border border-green-200 bg-green-50 rounded-lg p-4">

@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.58",
+  "version": "v2.1.60",
   "buildDate": "Nov 02, 2025",
-  "buildTime": "18:01:55",
-  "commit": "f72fcf741",
+  "buildTime": "18:14:49",
+  "commit": "0ae2b6942",
   "author": "akifbade46-del",
   "environment": "development"
 }
