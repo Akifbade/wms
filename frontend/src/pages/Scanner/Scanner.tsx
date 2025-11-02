@@ -424,8 +424,22 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       };
     }
     
+    // Calculate pallets and loose boxes from remaining boxes
+    const boxesPerPallet = 20; // Standard pallet = 20 boxes
+    const totalPallets = Math.floor(unassignedBoxes / boxesPerPallet);
+    const looseBoxes = unassignedBoxes % boxesPerPallet;
+    
     setRemainingBoxes(unassignedBoxes);
-    return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode };
+    return { 
+      type: 'shipment', 
+      data: { 
+        ...shipment, 
+        remainingBoxes: unassignedBoxes,
+        availablePallets: totalPallets,
+        availableLooseBoxes: looseBoxes 
+      }, 
+      rawCode 
+    };
   };
 
   const processScanCode = async (code: string): Promise<ScanResult> => {
@@ -543,7 +557,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
     const totalBoxes = ((palletQuantity || 0) * 20) + (looseBoxQuantity || 0);
     
     if (totalBoxes <= 0) {
-      setError('Please enter how many pallets or boxes to assign');
+      setError('Please select pallets or boxes to assign');
       return;
     }
 
@@ -554,49 +568,70 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
     
     try {
       setLoading(true);
+      const token = localStorage.getItem('authToken');
       
-      // Get all unassigned boxes
-      const boxResponse = await fetch(`/api/shipments/${pendingShipment.id}/boxes`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      console.log('🎯 Scanner Assignment:', {
+        pallets: palletQuantity,
+        looseBoxes: looseBoxQuantity,
+        totalBoxes,
+        rack: scanResult.data.code,
+        shipment: pendingShipment.referenceId,
+        photos: assignmentPhotos.length
       });
-      const boxData = await boxResponse.json();
-      const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId);
+
+      // Upload photos first if any (Same as Pending+Racks)
+      let photoUrls: string[] = [];
+      if (assignmentPhotos.length > 0) {
+        for (const photo of assignmentPhotos) {
+          const formData = new FormData();
+          formData.append('photo', photo);
+          
+          const uploadRes = await fetch('/api/shipments/upload/photo', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+          });
+          
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            photoUrls.push(uploadData.photoUrl);
+          }
+        }
+        console.log('📸 Uploaded photos:', photoUrls);
+      }
       
-      // Take first N boxes based on total quantity
-      const boxNumbers = unassignedBoxes.slice(0, totalBoxes).map((b: any) => b.boxNumber);
-      
-      // Assign boxes to rack
-      await fetch(`/api/shipments/${pendingShipment.id}/assign-boxes`, {
+      // Use same API endpoint as Pending+Racks workflow
+      const response = await fetch(`/api/shipments/${pendingShipment.id}/assign-rack`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           rackId: scanResult.data.id,
-          boxNumbers
+          quantity: totalBoxes,
+          pallets: palletQuantity,
+          looseBoxes: looseBoxQuantity,
+          photos: photoUrls
         })
       });
       
-      // Update shipment status if all boxes assigned
-      if (totalBoxes === remainingBoxes) {
-        await fetch(`/api/shipments/${pendingShipment.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-          },
-          body: JSON.stringify({ status: 'IN_STORAGE' })
-        });
+      if (response.ok) {
+        playSuccessSound();
+        alert(`✅ Assignment Complete!\n\n🎁 ${palletQuantity || 0} Pallet${palletQuantity > 1 ? 's' : ''} (${(palletQuantity || 0) * 20} boxes)\n📦 ${looseBoxQuantity || 0} Loose Box${looseBoxQuantity > 1 ? 'es' : ''}\n\n= ${totalBoxes} Total Boxes assigned to ${scanResult.data.code}!${photoUrls.length > 0 ? `\n� ${photoUrls.length} photo${photoUrls.length > 1 ? 's' : ''} uploaded` : ''}`);
+        setPendingShipment(null);
+        setScanResult(null);
+        setPalletQuantity(0);
+        setLooseBoxQuantity(0);
+        setAssignmentPhotos([]);
+        setRemainingBoxes(0);
+      } else {
+        const error = await response.json();
+        playErrorSound();
+        setError(error.message || 'Failed to assign boxes to rack');
       }
-      
-      alert(`✅ Assignment Complete!\n\n📦 ${palletQuantity || 0} Pallets (${(palletQuantity || 0) * 20} boxes)\n📦 ${looseBoxQuantity || 0} Loose Boxes\n\n= ${totalBoxes} Total Boxes assigned to ${scanResult.data.code}!\n\n📊 Rack capacity updated. Check Racks page for current status.`);
-      setPendingShipment(null);
-      setScanResult(null);
-      setPalletQuantity(0);
-      setLooseBoxQuantity(0);
-      setRemainingBoxes(0);
     } catch (err: any) {
+      playErrorSound();
       setError(err.message || 'Failed to assign');
     } finally {
       setLoading(false);
@@ -1012,94 +1047,165 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                           
                           <div className="bg-white p-3 rounded border mb-3">
                             <p className="text-sm text-gray-600 mb-2">Available for assignment:</p>
-                            <div className="flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-2">
-                                <span className="text-2xl">📦</span>
-                                <div>
-                                  <p className="font-bold text-lg">{pendingShipment.palletCount || 0} Pallets</p>
-                                  <p className="text-xs text-gray-500">({(pendingShipment.palletCount || 0) * 20} boxes each)</p>
+                            <div className="flex items-center justify-center gap-6">
+                              {pendingShipment.availablePallets > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-3xl">🎁</span>
+                                  <div>
+                                    <p className="font-bold text-xl text-blue-600">{pendingShipment.availablePallets} Pallets</p>
+                                    <p className="text-xs text-gray-500">(20 boxes each)</p>
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-2xl">📦</span>
-                                <div>
-                                  <p className="font-bold text-lg">{remainingBoxes - ((pendingShipment.palletCount || 0) * 20)} Loose Boxes</p>
+                              )}
+                              {pendingShipment.availableLooseBoxes > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-3xl">📦</span>
+                                  <div>
+                                    <p className="font-bold text-xl text-orange-600">{pendingShipment.availableLooseBoxes} Loose Boxes</p>
+                                  </div>
                                 </div>
-                              </div>
+                              )}
                             </div>
                           </div>
 
-                          {/* Pallets to Assign */}
-                          <div className="mb-3">
-                            <label className="block text-sm font-semibold mb-2">📦 Pallets to Assign:</label>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setPalletQuantity(Math.max(0, (palletQuantity || 0) - 1))}
-                                className="w-10 h-10 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600"
-                              >
-                                −
-                              </button>
-                              <input
-                                type="number"
-                                min="0"
-                                max={pendingShipment.palletCount || 0}
-                                value={palletQuantity || 0}
-                                onChange={(e) => setPalletQuantity(Math.min(pendingShipment.palletCount || 0, parseInt(e.target.value) || 0))}
-                                className="flex-1 px-4 py-2 text-center text-lg font-bold border-2 border-gray-300 rounded-lg"
-                              />
-                              <button
-                                onClick={() => setPalletQuantity(Math.min((pendingShipment.palletCount || 0), (palletQuantity || 0) + 1))}
-                                className="w-10 h-10 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600"
-                              >
-                                +
-                              </button>
-                              <button
-                                onClick={() => setPalletQuantity(pendingShipment.palletCount || 0)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
-                              >
-                                📦 All
-                              </button>
+                          {/* Pallets to Assign - Only show if pallets available */}
+                          {pendingShipment.availablePallets > 0 && (
+                            <div className="mb-3">
+                              <label className="block text-sm font-semibold mb-2">🎁 Pallets to Assign:</label>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setPalletQuantity(Math.max(0, (palletQuantity || 0) - 1))}
+                                  className="w-10 h-10 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600"
+                                >
+                                  −
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={pendingShipment.availablePallets}
+                                  value={palletQuantity || 0}
+                                  onChange={(e) => setPalletQuantity(Math.min(pendingShipment.availablePallets, parseInt(e.target.value) || 0))}
+                                  className="flex-1 px-4 py-2 text-center text-lg font-bold border-2 border-gray-300 rounded-lg"
+                                />
+                                <button
+                                  onClick={() => setPalletQuantity(Math.min(pendingShipment.availablePallets, (palletQuantity || 0) + 1))}
+                                  className="w-10 h-10 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600"
+                                >
+                                  +
+                                </button>
+                                <button
+                                  onClick={() => setPalletQuantity(pendingShipment.availablePallets)}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+                                >
+                                  🎁 All
+                                </button>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">⚠️ Max: {pendingShipment.availablePallets} pallets | Remaining: {pendingShipment.availablePallets - (palletQuantity || 0)} pallets</p>
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">⚠️ Max: {pendingShipment.palletCount || 0} pallets | Remaining: {(pendingShipment.palletCount || 0) - (palletQuantity || 0)} pallets</p>
-                          </div>
+                          )}
 
-                          {/* Loose Boxes to Assign */}
-                          <div className="mb-3">
-                            <label className="block text-sm font-semibold mb-2">📦 Loose Boxes to Assign:</label>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setLooseBoxQuantity(Math.max(0, (looseBoxQuantity || 0) - 1))}
-                                className="w-10 h-10 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600"
-                              >
-                                −
-                              </button>
-                              <input
-                                type="number"
-                                min="0"
-                                max={remainingBoxes - ((pendingShipment.palletCount || 0) * 20)}
-                                value={looseBoxQuantity || 0}
-                                onChange={(e) => setLooseBoxQuantity(Math.min(remainingBoxes - ((pendingShipment.palletCount || 0) * 20), parseInt(e.target.value) || 0))}
-                                className="flex-1 px-4 py-2 text-center text-lg font-bold border-2 border-gray-300 rounded-lg"
-                              />
-                              <button
-                                onClick={() => setLooseBoxQuantity(Math.min(remainingBoxes - ((pendingShipment.palletCount || 0) * 20), (looseBoxQuantity || 0) + 1))}
-                                className="w-10 h-10 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600"
-                              >
-                                +
-                              </button>
+                          {/* Loose Boxes to Assign - Only show if loose boxes available */}
+                          {pendingShipment.availableLooseBoxes > 0 && (
+                            <div className="mb-3">
+                              <label className="block text-sm font-semibold mb-2">📦 Loose Boxes to Assign:</label>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setLooseBoxQuantity(Math.max(0, (looseBoxQuantity || 0) - 1))}
+                                  className="w-10 h-10 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600"
+                                >
+                                  −
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={pendingShipment.availableLooseBoxes}
+                                  value={looseBoxQuantity || 0}
+                                  onChange={(e) => setLooseBoxQuantity(Math.min(pendingShipment.availableLooseBoxes, parseInt(e.target.value) || 0))}
+                                  className="flex-1 px-4 py-2 text-center text-lg font-bold border-2 border-gray-300 rounded-lg"
+                                />
+                                <button
+                                  onClick={() => setLooseBoxQuantity(Math.min(pendingShipment.availableLooseBoxes, (looseBoxQuantity || 0) + 1))}
+                                  className="w-10 h-10 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600"
+                                >
+                                  +
+                                </button>
+                                <button
+                                  onClick={() => setLooseBoxQuantity(pendingShipment.availableLooseBoxes)}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+                                >
+                                  📦 All
+                                </button>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">⚠️ Max: {pendingShipment.availableLooseBoxes} boxes | Remaining: {pendingShipment.availableLooseBoxes - (looseBoxQuantity || 0)} boxes</p>
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">⚠️ Max: {remainingBoxes - ((pendingShipment.palletCount || 0) * 20)} boxes | Remaining: {remainingBoxes - ((pendingShipment.palletCount || 0) * 20) - (looseBoxQuantity || 0)} boxes</p>
-                          </div>
+                          )}
 
                           {/* Total Summary */}
-                          <div className="bg-green-50 border border-green-300 p-3 rounded-lg">
+                          <div className="bg-green-50 border border-green-300 p-3 rounded-lg mb-3">
                             <p className="font-semibold text-green-900 mb-1">Total to assign:</p>
-                            <p className="text-lg font-bold text-green-900">
-                              {palletQuantity || 0} Pallets ({((palletQuantity || 0) * 20)} boxes)
-                            </p>
-                            <p className="text-sm font-semibold text-green-800">
+                            {palletQuantity > 0 && (
+                              <p className="text-lg font-bold text-green-900">
+                                {palletQuantity} Pallet{palletQuantity > 1 ? 's' : ''} ({palletQuantity * 20} boxes)
+                              </p>
+                            )}
+                            {looseBoxQuantity > 0 && (
+                              <p className="text-lg font-bold text-green-900">
+                                + {looseBoxQuantity} Loose Box{looseBoxQuantity > 1 ? 'es' : ''}
+                              </p>
+                            )}
+                            <p className="text-xl font-bold text-green-800 mt-2">
                               = {((palletQuantity || 0) * 20) + (looseBoxQuantity || 0)} Total Boxes
                             </p>
+                          </div>
+
+                          {/* Photo Upload Section (Same as Pending+Racks) */}
+                          <div className="mb-3">
+                            <label className="block text-sm font-semibold mb-2">
+                              📸 Upload Photos (Optional - Max 10)
+                            </label>
+                            <p className="text-xs text-gray-600 mb-2">Take photos of pallets/boxes for reference</p>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              multiple
+                              className="hidden"
+                              id="scanner-photo-upload"
+                              onChange={(e) => {
+                                const files = Array.from(e.target.files || []);
+                                if (files.length + assignmentPhotos.length > 10) {
+                                  alert('Maximum 10 photos allowed');
+                                  return;
+                                }
+                                setAssignmentPhotos([...assignmentPhotos, ...files]);
+                              }}
+                            />
+                            <label
+                              htmlFor="scanner-photo-upload"
+                              className="w-full block py-3 bg-purple-600 text-white text-center rounded-lg font-bold cursor-pointer hover:bg-purple-700"
+                            >
+                              📷 Take/Select Photos ({assignmentPhotos.length}/10)
+                            </label>
+                            
+                            {assignmentPhotos.length > 0 && (
+                              <div className="grid grid-cols-5 gap-2 mt-2">
+                                {assignmentPhotos.map((photo, idx) => (
+                                  <div key={idx} className="relative">
+                                    <img
+                                      src={URL.createObjectURL(photo)}
+                                      alt={`Preview ${idx + 1}`}
+                                      className="w-full h-16 object-cover rounded border"
+                                    />
+                                    <button
+                                      onClick={() => setAssignmentPhotos(assignmentPhotos.filter((_, i) => i !== idx))}
+                                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs font-bold"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
 
