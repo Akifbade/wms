@@ -1,8 +1,8 @@
 {
   "version": "v2.1.21",
   "buildDate": "Nov 02, 2025",
-  "buildTime": "06:29:08",
+  "buildTime": "14:18:58",
   "author": "akifbade46-del",
-  "commitMessage": "feat: complete scanner rebuild - 2-step QR workflow with single scan per step, success messages, and assignment modal (v2.1.21)",
+  "commitMessage": " fix: decode pallet QR metadata and match shipments robustly",
   "environment": "development"
 }
