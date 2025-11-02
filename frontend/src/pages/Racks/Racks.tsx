@@ -30,8 +30,14 @@ const ShipmentBoxCard: React.FC<{
   shipment: any;
   boxCount: number;
   photos: string[];
-}> = ({ shipment, boxCount, photos }) => {
+  assignedDate?: Date;
+}> = ({ shipment, boxCount, photos, assignedDate }) => {
   const [showPhotos, setShowPhotos] = useState(false);
+
+  // Calculate days in rack
+  const daysInRack = assignedDate 
+    ? Math.floor((new Date().getTime() - new Date(assignedDate).getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
 
   return (
     <div className="bg-gradient-to-r from-white to-blue-50 border-2 border-blue-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-md transition-all">
@@ -51,11 +57,23 @@ const ShipmentBoxCard: React.FC<{
             </span>
           </div>
           <p className="text-xs text-gray-700 font-semibold">
-            📦 {shipment?.companyProfile?.name || shipment?.clientName || 'Unknown Company'}
+            🏢 {shipment?.companyProfile?.name || shipment?.clientName || 'Unknown Company'}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
-            Boxes: <span className="font-semibold text-gray-700">{boxCount}</span>
-          </p>
+          {shipment?.clientPhone && (
+            <p className="text-xs text-gray-600 mt-1">
+              📞 {shipment.clientPhone}
+            </p>
+          )}
+          <div className="flex items-center gap-3 mt-2 text-xs">
+            <span className="text-gray-600">
+              📦 <span className="font-semibold text-gray-700">{boxCount}</span> boxes
+            </span>
+            {daysInRack > 0 && (
+              <span className={`font-semibold ${daysInRack > 30 ? 'text-orange-600' : 'text-green-600'}`}>
+                📅 {daysInRack} day{daysInRack !== 1 ? 's' : ''} in rack
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1359,14 +1377,20 @@ export const Racks: React.FC = () => {
                                     const firstBox = shipmentBoxes[0];
                                     const shipment = firstBox.shipment;
 
-                                    // Collect all photos from all boxes in this shipment
+                                    // Collect UNIQUE photos from all boxes in this shipment (avoid duplicates)
                                     const allPhotos: string[] = [];
+                                    const photoSet = new Set<string>();
                                     shipmentBoxes.forEach((box: any) => {
                                       if (box.photos) {
                                         try {
                                           const parsed = JSON.parse(box.photos);
                                           if (Array.isArray(parsed)) {
-                                            allPhotos.push(...parsed);
+                                            parsed.forEach((url: string) => {
+                                              if (!photoSet.has(url)) {
+                                                photoSet.add(url);
+                                                allPhotos.push(url);
+                                              }
+                                            });
                                           }
                                         } catch (error) {
                                           console.warn('Failed to parse box photos', error);
@@ -1380,6 +1404,7 @@ export const Racks: React.FC = () => {
                                         shipment={shipment}
                                         boxCount={shipmentBoxes.length}
                                         photos={allPhotos}
+                                        assignedDate={firstBox.assignedAt}
                                       />
                                     );
                                   });
