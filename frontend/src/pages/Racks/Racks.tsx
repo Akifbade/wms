@@ -35,7 +35,7 @@ const ShipmentBoxCard: React.FC<{
   const [showPhotos, setShowPhotos] = useState(false);
 
   // Calculate days in rack
-  const daysInRack = assignedDate 
+  const daysInRack = assignedDate
     ? Math.floor((new Date().getTime() - new Date(assignedDate).getTime()) / (1000 * 60 * 60 * 24))
     : 0;
 
