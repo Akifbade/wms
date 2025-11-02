@@ -611,22 +611,33 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       // Upload photos first if any (Same as Pending+Racks)
       let photoUrls: string[] = [];
       if (assignmentPhotos.length > 0) {
+        console.log(`📸 Starting upload of ${assignmentPhotos.length} photo(s)...`);
         for (const photo of assignmentPhotos) {
           const formData = new FormData();
           formData.append('photo', photo);
 
-          const uploadRes = await fetch('/api/shipments/upload/photo', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-          });
+          try {
+            const uploadRes = await fetch('/api/shipments/upload/photo', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}` },
+              body: formData
+            });
 
-          if (uploadRes.ok) {
-            const uploadData = await uploadRes.json();
-            photoUrls.push(uploadData.photoUrl);
+            if (uploadRes.ok) {
+              const uploadData = await uploadRes.json();
+              photoUrls.push(uploadData.photoUrl);
+              console.log(`✅ Photo uploaded: ${uploadData.photoUrl}`);
+            } else {
+              const errorText = await uploadRes.text();
+              console.error(`❌ Photo upload failed (${uploadRes.status}):`, errorText);
+              alert(`⚠️ Photo upload failed: ${uploadRes.status} ${errorText.substring(0, 100)}`);
+            }
+          } catch (error) {
+            console.error('❌ Photo upload error:', error);
+            alert(`⚠️ Photo upload error: ${error}`);
           }
         }
-        console.log('📸 Uploaded photos:', photoUrls);
+        console.log(`📸 Successfully uploaded ${photoUrls.length}/${assignmentPhotos.length} photos`);
       }
 
       // Use same API endpoint as Pending+Racks workflow

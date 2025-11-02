@@ -3,7 +3,7 @@
  * Auto-updated by GitHub Actions
  */
 
-export const APP_VERSION = 'v2.1.57';
+export const APP_VERSION = 'v2.1.105';
 
 export const getVersionInfo = () => {
   return {
