@@ -3,13 +3,13 @@
  * DO NOT EDIT MANUALLY - This file is auto-generated
  */
 
-export const APP_VERSION = 'v2.1.0';
+export const APP_VERSION = 'v2.1.20';
 
 export const VERSION_INFO = {
-  version: 'v2.1.0',
+  version: 'v2.1.20',
   environment: process.env.REACT_APP_ENV || 'development',
   buildDate: new Date().toISOString(),
-  commitHash: process.env.REACT_APP_COMMIT_HASH || 'local-dev',
+  commitHash: process.env.REACT_APP_COMMIT_HASH || 'caf311a65',
   stage: 'staging', // local, staging, or production
 };
 

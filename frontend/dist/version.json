@@ -1,8 +1,8 @@
 {
   "version": "v2.1.20",
   "buildDate": "Nov 02, 2025",
-  "buildTime": "00:15:37",
+  "buildTime": "14:15:00",
   "author": "akifbade46-del",
-  "commitMessage": "fix: improved camera error detection with detailed mobile debugging logs",
+  "commitMessage": "fix: corrected scanner to stable v2.1.20 - working camera implementation",
   "environment": "development"
 }

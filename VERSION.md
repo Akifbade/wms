@@ -1,10 +1,10 @@
 # 📦 WMS Version History
 
 ## Current Version: **v2.1.21**
-- **Released**: Nov 02, 2025 at 06:29:08
+- **Released**: Nov 02, 2025 at 14:18:58
 - **Author**: akifbade46-del
 - **Status**: Development
-- **Change**: feat: complete scanner rebuild - 2-step QR workflow with single scan per step, success messages, and assignment modal (v2.1.21)
+- **Change**:  fix: decode pallet QR metadata and match shipments robustly
 
 ---
 
