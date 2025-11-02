@@ -87,7 +87,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const { status, section, search } = req.query;
     const companyId = req.user!.companyId;
 
-    const where: any = { 
+    const where: any = {
       companyId,
       deletedAt: null  // Only return non-deleted racks
     };
@@ -125,7 +125,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
           },
         },
         boxes: {
-          where: { 
+          where: {
             status: { in: ['IN_STORAGE', 'STORED'] },  // Only count stored boxes
             shipment: {
               status: { notIn: ['RELEASED'] }  // Exclude released shipments
@@ -158,7 +158,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     // Calculate utilization based on pallet usage rather than raw boxes
     const racksWithStats = racks.map((rack: any) => {
       const palletUsage = calculatePalletUsage(rack.boxes || []);
-      
+
       // Determine status: FULL if at capacity, ACTIVE if has boxes, otherwise use stored status
       let derivedStatus = 'ACTIVE';
       if (palletUsage >= rack.capacityTotal) {
@@ -170,8 +170,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       return {
         ...rack,
         capacityUsed: palletUsage,
-        utilization: rack.capacityTotal > 0 
-          ? Math.round((palletUsage / rack.capacityTotal) * 100) 
+        utilization: rack.capacityTotal > 0
+          ? Math.round((palletUsage / rack.capacityTotal) * 100)
           : 0,
         status: derivedStatus,
       };
@@ -191,8 +191,8 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     const companyId = req.user!.companyId;
 
     const rack = await prisma.rack.findFirst({
-      where: { 
-        id, 
+      where: {
+        id,
         companyId,
         deletedAt: null  // Only return non-deleted racks
       },
@@ -219,7 +219,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
           },
         },
         boxes: {
-          where: { 
+          where: {
             status: { in: ['IN_STORAGE', 'STORED'] },  // Only show boxes currently in storage
             shipment: {
               status: { notIn: ['RELEASED'] }  // Exclude released shipments
@@ -274,8 +274,8 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     const rackWithStats = {
       ...rack,
       capacityUsed: palletUsage,
-      utilization: rack.capacityTotal > 0 
-        ? Math.round((palletUsage / rack.capacityTotal) * 100) 
+      utilization: rack.capacityTotal > 0
+        ? Math.round((palletUsage / rack.capacityTotal) * 100)
         : 0,
       status: derivedStatus,
     };

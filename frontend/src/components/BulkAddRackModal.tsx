@@ -491,8 +491,8 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
                                     type="button"
                                     onClick={() => setFormData(prev => ({ ...prev, capacityMode: 'FIXED' }))}
                                     className={`px-4 py-3 rounded-lg font-medium transition-all ${formData.capacityMode === 'FIXED'
-                                            ? 'bg-blue-600 text-white shadow-lg'
-                                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                        ? 'bg-blue-600 text-white shadow-lg'
+                                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                                         }`}
                                 >
                                     📊 Fixed
@@ -501,8 +501,8 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
                                     type="button"
                                     onClick={() => setFormData(prev => ({ ...prev, capacityMode: 'FLEXIBLE' }))}
                                     className={`px-4 py-3 rounded-lg font-medium transition-all ${formData.capacityMode === 'FLEXIBLE'
-                                            ? 'bg-green-600 text-white shadow-lg'
-                                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                        ? 'bg-green-600 text-white shadow-lg'
+                                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                                         }`}
                                 >
                                     🔄 Flexible
@@ -511,8 +511,8 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
                                     type="button"
                                     onClick={() => setFormData(prev => ({ ...prev, capacityMode: 'UNLIMITED' }))}
                                     className={`px-4 py-3 rounded-lg font-medium transition-all ${formData.capacityMode === 'UNLIMITED'
-                                            ? 'bg-purple-600 text-white shadow-lg'
-                                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                        ? 'bg-purple-600 text-white shadow-lg'
+                                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                                         }`}
                                 >
                                     ∞ Unlimited
