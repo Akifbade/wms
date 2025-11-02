@@ -470,11 +470,6 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
 
     const existing = await prisma.rack.findFirst({
       where: { id, companyId },
-      include: {
-        boxes: {
-          where: { status: 'IN_STORAGE' },
-        },
-      },
     });
 
     if (!existing) {
@@ -492,12 +487,28 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
       return res.status(404).json({ error: 'Rack not found' });
     }
 
-    // Check if boxes are allocated to this rack
-    if (existing.boxes.length > 0) {
+    // Check if ACTIVE boxes (IN_STORAGE) are allocated to this rack
+    // Exclude RELEASED boxes - they no longer occupy the rack
+    const activeBoxes = await prisma.shipmentBox.findMany({
+      where: {
+        rackId: id,
+        status: 'IN_STORAGE', // Only check boxes currently in storage
+      },
+      select: {
+        id: true,
+        shipmentId: true,
+        boxNumber: true,
+        status: true,
+      },
+    });
+
+    // Check if active boxes are allocated to this rack
+    if (activeBoxes.length > 0) {
       // Log failed deletion due to allocated materials
-      const boxDetails = existing.boxes.map(box => ({
+      const boxDetails = activeBoxes.map(box => ({
         id: box.id,
         shipmentId: box.shipmentId,
+        boxNumber: box.boxNumber,
         status: box.status,
       }));
 
@@ -506,10 +517,10 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
           rackId: id,
           action: 'DELETE',
           status: 'FAILED',
-          message: `Cannot delete: ${existing.boxes.length} box(es) allocated to this rack`,
+          message: `Cannot delete: ${activeBoxes.length} box(es) currently in storage on this rack`,
           details: JSON.stringify({
-            reason: 'MATERIALS_ALLOCATED',
-            boxCount: existing.boxes.length,
+            reason: 'MATERIALS_IN_STORAGE',
+            boxCount: activeBoxes.length,
             boxes: boxDetails,
           }),
           performedBy: userId,
@@ -518,11 +529,12 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
       });
 
       return res.status(400).json({
-        error: `Cannot delete rack: ${existing.boxes.length} box(es) with materials are currently allocated`,
+        error: `Cannot delete rack: ${activeBoxes.length} box(es) with materials are currently IN STORAGE`,
         details: {
-          reason: 'MATERIALS_ALLOCATED',
-          boxCount: existing.boxes.length,
+          reason: 'MATERIALS_IN_STORAGE',
+          boxCount: activeBoxes.length,
           boxes: boxDetails,
+          message: 'Only boxes with status IN_STORAGE block deletion. Released boxes do not prevent deletion.',
         },
       });
     }
