@@ -442,28 +442,11 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   }, [boxesDistribution, extraBoxes, variablePerPallet, intakeMode, formData.palletCount, formData.boxesPerPallet]);
 
   const generateQRPreview = () => {
-    const timestamp = Math.floor(Date.now() / 1000);
-    let qrValue = '';
-
-    if (intakeMode === 'pallet') {
-      if (variablePerPallet) {
-        const palletCount = Math.max(getSafeNumber(formData.palletCount, 1), 1);
-        const dist = boxesDistribution.slice(0, palletCount);
-        const totalBoxes = dist.reduce((a, b) => a + (Number.isFinite(b) ? Math.max(0, Math.trunc(b)) : 0), 0) + Math.max(0, Math.trunc(extraBoxes));
-        const maxBPP = dist.reduce((m, n) => Math.max(m, Math.max(0, Math.trunc(n || 0))), 0);
-        qrValue = `QR-SH-${timestamp}-P${palletCount}B${maxBPP}T${totalBoxes}`;
-      } else {
-        const palletCount = getSafeNumber(formData.palletCount, 1);
-        const boxesPerPallet = getSafeNumber(formData.boxesPerPallet, 1);
-        const totalBoxes = palletCount * boxesPerPallet;
-        // Simple format: just timestamp for easy scanning
-        qrValue = `SH-${timestamp}`;
-      }
-    } else {
-      // Box mode - simple format
-      const totalBoxes = getSafeNumber(formData.pieces, 1);
-      qrValue = `SH-${timestamp}`;
-    }
+    // Simple QR format: Only shipment number (backend generates unique shipment ID)
+    // QR must be simple and reusable for scanning - no metadata in QR itself
+    const timestamp = Date.now();
+    const shipmentNumber = `${timestamp}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const qrValue = `SHIPMENT_${shipmentNumber}`;
 
     setQRCodeValue(qrValue);
     setShowQRPreview(true);
@@ -1569,38 +1552,11 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                       </p>
                     </div>
                     <div className="w-full border-t pt-4 mt-4">
-                      {intakeMode === 'pallet' ? (
-                        <>
-                          <h4 className="font-semibold text-gray-700 mb-2">Pallet Details:</h4>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div className="bg-blue-50 p-2 rounded">
-                              <p className="text-gray-600">Pallets</p>
-                              <p className="text-lg font-bold text-blue-600">{formData.palletCount}</p>
-                            </div>
-                            <div className="bg-green-50 p-2 rounded">
-                              <p className="text-gray-600">Boxes/Pallet</p>
-                              <p className="text-lg font-bold text-green-600">{formData.boxesPerPallet}</p>
-                            </div>
-                            <div className="bg-purple-50 p-2 rounded col-span-2">
-                              <p className="text-gray-600">Total Boxes</p>
-                              <p className="text-lg font-bold text-purple-600">{formData.pieces}</p>
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <h4 className="font-semibold text-gray-700 mb-2">Box Details:</h4>
-                          <div className="grid grid-cols-1 gap-2 text-sm">
-                            <div className="bg-green-50 p-3 rounded">
-                              <p className="text-gray-600">Total Boxes</p>
-                              <p className="text-2xl font-bold text-green-600">{formData.pieces}</p>
-                            </div>
-                            <p className="text-xs text-gray-500 text-center mt-2">
-                              This shipment contains individual boxes (no pallets)
-                            </p>
-                          </div>
-                        </>
-                      )}
+                      <h4 className="font-semibold text-gray-700 mb-3">Shipment Information:</h4>
+                      <div className="bg-blue-50 p-3 rounded">
+                        <p className="text-gray-600 text-sm mb-1">Use this QR code to scan and identify the shipment</p>
+                        <p className="text-xs text-gray-500">QR codes are permanent and never change</p>
+                      </div>
                     </div>
                   </div>
                   <button
@@ -2133,9 +2089,9 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 type="button"
                 onClick={generateQRPreview}
                 className="px-6 py-3 border-2 border-purple-500 text-purple-600 rounded-lg hover:bg-purple-50 font-medium transition-colors flex items-center gap-2"
-                disabled={loading || (intakeMode === 'pallet' && (!formData.palletCount || !formData.boxesPerPallet)) || (intakeMode === 'box' && !formData.pieces)}
+                disabled={loading}
               >
-                {intakeMode === 'pallet' ? 'View Pallet QR' : 'View Box QR'}
+                View Shipment QR
               </button>
               <button
                 type="button"
