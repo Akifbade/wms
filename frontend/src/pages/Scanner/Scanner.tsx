@@ -898,33 +898,33 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   }, [activeTab]);
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-2 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-6 max-w-7xl mx-auto">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">📱 Warehouse Scanner</h1>
-        <p className="text-gray-600 text-lg">مسح المستودع | مسح أو بحث يدوي</p>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">📱 Warehouse Scanner</h1>
+        <p className="text-gray-600 text-sm sm:text-base md:text-lg">مسح المستودع | مسح أو بحث يدوي</p>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-2 bg-white rounded-xl p-2 shadow-md border-2 border-gray-200">
+      {/* Tab Navigation - MOBILE OPTIMIZED */}
+      <div className="flex gap-1 sm:gap-2 bg-white rounded-lg sm:rounded-xl p-1 sm:p-2 shadow-md border-2 border-gray-200">
         <button
           onClick={() => setActiveTab('scanner')}
-          className={`flex-1 py-4 px-6 rounded-lg font-bold text-lg transition-all ${activeTab === 'scanner'
+          className={`flex-1 py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 rounded-md sm:rounded-lg font-bold text-xs sm:text-sm md:text-lg transition-all ${activeTab === 'scanner'
               ? 'bg-primary-600 text-white shadow-lg'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
         >
-          📸 QR Scanner<br />
-          <span className="text-sm font-normal">مسح QR | الكاميرا</span>
+          <span className="block">📸 Scanner</span>
+          <span className="hidden sm:block text-xs font-normal mt-0.5">مسح QR</span>
         </button>
         <button
           onClick={() => setActiveTab('list')}
-          className={`flex-1 py-4 px-6 rounded-lg font-bold text-lg transition-all ${activeTab === 'list'
+          className={`flex-1 py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 rounded-md sm:rounded-lg font-bold text-xs sm:text-sm md:text-lg transition-all ${activeTab === 'list'
               ? 'bg-primary-600 text-white shadow-lg'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
         >
-          📋 Pending List + Racks<br />
-          <span className="text-sm font-normal">قائمة الانتظار | خريطة الرفوف</span>
+          <span className="block">📋 Pending List</span>
+          <span className="hidden sm:block text-xs font-normal mt-0.5">قائمة الانتظار</span>
         </button>
       </div>
 
@@ -943,15 +943,15 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
             <div className="bg-white rounded-2xl shadow-xl border-2 border-gray-200 overflow-hidden">
 
               {scanning && (
-                <div className="p-6 space-y-4">
-                  <div className="text-center mb-4">
-                    <h3 className="text-xl font-bold text-primary-600 mb-2">📸 Scanning...</h3>
-                    <p className="text-gray-600">ضع رمز الاستجابة السريعة في الإطار</p>
+                <div className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                  <div className="text-center mb-3 sm:mb-4">
+                    <h3 className="text-base sm:text-lg md:text-xl font-bold text-primary-600 mb-1 sm:mb-2">📸 Scanning...</h3>
+                    <p className="text-gray-600 text-xs sm:text-sm md:text-base">ضع رمز الاستجابة السريعة في الإطار</p>
                   </div>
                   <div id={qrCodeRegionId} className="mx-auto"></div>
                   <button
                     onClick={stopScanning}
-                    className="w-full py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"
+                    className="w-full py-2.5 sm:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm sm:text-base"
                   >
                     Stop Camera / إيقاف الكاميرا
                   </button>
@@ -959,45 +959,45 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
               )}
 
               {!scanning && !scanResult && !loading && (
-                <div className="p-12 text-center space-y-6">
+                <div className="p-4 sm:p-8 md:p-12 text-center space-y-4 sm:space-y-6">
                   {/* HTTPS Warning if not secure */}
                   {window.location.protocol === 'http:' && (
-                    <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+                    <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border-2 border-red-300 rounded-lg">
                       <div className="flex items-center justify-center gap-2 mb-2">
-                        <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
-                        <p className="text-red-900 font-bold text-lg">🔒 Camera Requires HTTPS</p>
+                        <p className="text-red-900 font-bold text-sm sm:text-base md:text-lg">🔒 Camera Requires HTTPS</p>
                       </div>
-                      <p className="text-red-700 mb-3">Camera access only works on secure connections.</p>
+                      <p className="text-red-700 mb-3 text-xs sm:text-sm">Camera access only works on secure connections.</p>
                       <button
                         onClick={() => {
                           const httpsUrl = window.location.href.replace('http://', 'https://');
                           window.location.href = httpsUrl;
                         }}
-                        className="px-6 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors"
+                        className="px-4 sm:px-6 py-2 sm:py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors text-sm sm:text-base"
                       >
                         ✅ Switch to HTTPS Now
                       </button>
                     </div>
                   )}
 
-                  <div className="mx-auto w-64 h-64 border-4 border-dashed border-primary-300 rounded-3xl flex items-center justify-center bg-gradient-to-br from-primary-50 to-blue-50">
-                    <QrCodeIcon className="h-32 w-32 text-primary-400" />
+                  <div className="mx-auto w-40 h-40 sm:w-52 sm:h-52 md:w-64 md:h-64 border-4 border-dashed border-primary-300 rounded-2xl sm:rounded-3xl flex items-center justify-center bg-gradient-to-br from-primary-50 to-blue-50">
+                    <QrCodeIcon className="h-20 w-20 sm:h-24 sm:w-24 md:h-32 md:w-32 text-primary-400" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Ready to Scan</h3>
-                    <p className="text-gray-600 text-lg">جاهز للمسح</p>
+                    <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">Ready to Scan</h3>
+                    <p className="text-gray-600 text-sm sm:text-base md:text-lg">جاهز للمسح</p>
                     {window.location.protocol === 'https:' && (
-                      <p className="text-green-600 text-sm mt-2">✅ Secure Connection (HTTPS)</p>
+                      <p className="text-green-600 text-xs sm:text-sm mt-1 sm:mt-2">✅ Secure Connection (HTTPS)</p>
                     )}
                   </div>
                   <button
                     onClick={startScanning}
-                    className="inline-flex items-center gap-3 px-10 py-5 bg-primary-600 text-white text-xl font-bold rounded-xl hover:bg-primary-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                    className="inline-flex items-center gap-2 sm:gap-3 px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 bg-primary-600 text-white text-base sm:text-lg md:text-xl font-bold rounded-lg sm:rounded-xl hover:bg-primary-700 transition-all shadow-lg hover:shadow-xl"
                   >
-                    <CameraIcon className="h-7 w-7" />
-                    Start Camera
+                    <CameraIcon className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
+                    <span>Start Camera</span>
                   </button>
                 </div>
               )}
@@ -1010,13 +1010,13 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
               )}
 
               {scanResult && !loading && (
-                <div className="p-8 space-y-6">
+                <div className="p-3 sm:p-5 md:p-8 space-y-4 sm:space-y-5 md:space-y-6">
                   <div className="text-center">
-                    <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                      <CheckCircleIcon className="h-12 w-12 text-green-600" />
+                    <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-green-100 rounded-full flex items-center justify-center mb-3 sm:mb-4">
+                      <CheckCircleIcon className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-green-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-green-900 mb-1">Scan Successful! ✅</h3>
-                    <p className="text-gray-600 font-mono text-lg">{scanResult.rawCode}</p>
+                    <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-green-900 mb-1">Scan Successful! ✅</h3>
+                    <p className="text-gray-600 font-mono text-xs sm:text-sm md:text-base break-all px-2">{scanResult.rawCode}</p>
                   </div>
 
                   {scanResult.type === 'rack' && (
@@ -1095,14 +1095,14 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               </div>
                             </div>
 
-                            {/* Pallets to Assign - Only show if pallets available */}
+                            {/* Pallets to Assign - Only show if pallets available - MOBILE OPTIMIZED */}
                             {pendingShipment.availablePallets > 0 && (
                               <div className="mb-3">
-                                <label className="block text-sm font-semibold mb-2">🎁 Pallets to Assign:</label>
-                                <div className="flex items-center gap-2">
+                                <label className="block text-xs sm:text-sm font-semibold mb-2">🎁 Pallets to Assign:</label>
+                                <div className="flex items-center gap-1.5 sm:gap-2">
                                   <button
                                     onClick={() => setPalletQuantity(Math.max(0, (palletQuantity || 0) - 1))}
-                                    className="w-10 h-10 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600"
+                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600 text-sm sm:text-base"
                                   >
                                     −
                                   </button>
@@ -1112,33 +1112,33 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                     max={pendingShipment.availablePallets}
                                     value={palletQuantity || 0}
                                     onChange={(e) => setPalletQuantity(Math.min(pendingShipment.availablePallets, parseInt(e.target.value) || 0))}
-                                    className="flex-1 px-4 py-2 text-center text-lg font-bold border-2 border-gray-300 rounded-lg"
+                                    className="flex-1 px-2 sm:px-4 py-1.5 sm:py-2 text-center text-base sm:text-lg font-bold border-2 border-gray-300 rounded-lg"
                                   />
                                   <button
                                     onClick={() => setPalletQuantity(Math.min(pendingShipment.availablePallets, (palletQuantity || 0) + 1))}
-                                    className="w-10 h-10 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600"
+                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 text-sm sm:text-base"
                                   >
                                     +
                                   </button>
                                   <button
                                     onClick={() => setPalletQuantity(pendingShipment.availablePallets)}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+                                    className="px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 text-xs sm:text-sm"
                                   >
                                     🎁 All
                                   </button>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">⚠️ Max: {pendingShipment.availablePallets} pallets | Remaining: {pendingShipment.availablePallets - (palletQuantity || 0)} pallets</p>
+                                <p className="text-xs text-gray-500 mt-1">⚠️ Max: {pendingShipment.availablePallets} | Remaining: {pendingShipment.availablePallets - (palletQuantity || 0)}</p>
                               </div>
                             )}
 
-                            {/* Loose Boxes to Assign - Only show if loose boxes available */}
+                            {/* Loose Boxes to Assign - Only show if loose boxes available - MOBILE OPTIMIZED */}
                             {pendingShipment.availableLooseBoxes > 0 && (
                               <div className="mb-3">
-                                <label className="block text-sm font-semibold mb-2">📦 Loose Boxes to Assign:</label>
-                                <div className="flex items-center gap-2">
+                                <label className="block text-xs sm:text-sm font-semibold mb-2">📦 Loose Boxes to Assign:</label>
+                                <div className="flex items-center gap-1.5 sm:gap-2">
                                   <button
                                     onClick={() => setLooseBoxQuantity(Math.max(0, (looseBoxQuantity || 0) - 1))}
-                                    className="w-10 h-10 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600"
+                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600 text-sm sm:text-base"
                                   >
                                     −
                                   </button>
@@ -1148,22 +1148,22 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                     max={pendingShipment.availableLooseBoxes}
                                     value={looseBoxQuantity || 0}
                                     onChange={(e) => setLooseBoxQuantity(Math.min(pendingShipment.availableLooseBoxes, parseInt(e.target.value) || 0))}
-                                    className="flex-1 px-4 py-2 text-center text-lg font-bold border-2 border-gray-300 rounded-lg"
+                                    className="flex-1 px-2 sm:px-4 py-1.5 sm:py-2 text-center text-base sm:text-lg font-bold border-2 border-gray-300 rounded-lg"
                                   />
                                   <button
                                     onClick={() => setLooseBoxQuantity(Math.min(pendingShipment.availableLooseBoxes, (looseBoxQuantity || 0) + 1))}
-                                    className="w-10 h-10 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600"
+                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 text-sm sm:text-base"
                                   >
                                     +
                                   </button>
                                   <button
                                     onClick={() => setLooseBoxQuantity(pendingShipment.availableLooseBoxes)}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+                                    className="px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 text-xs sm:text-sm"
                                   >
                                     📦 All
                                   </button>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">⚠️ Max: {pendingShipment.availableLooseBoxes} boxes | Remaining: {pendingShipment.availableLooseBoxes - (looseBoxQuantity || 0)} boxes</p>
+                                <p className="text-xs text-gray-500 mt-1">⚠️ Max: {pendingShipment.availableLooseBoxes} | Remaining: {pendingShipment.availableLooseBoxes - (looseBoxQuantity || 0)}</p>
                               </div>
                             )}
 
@@ -1236,13 +1236,13 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                             </div>
                           </div>
 
-                          <div className="flex gap-3">
+                          <div className="flex gap-2 sm:gap-3">
                             <button
                               onClick={assignShipmentToRack}
                               disabled={loading || ((palletQuantity || 0) === 0 && (looseBoxQuantity || 0) === 0)}
-                              className="flex-1 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-bold text-lg"
+                              className="flex-1 py-2.5 sm:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-bold text-sm sm:text-base md:text-lg"
                             >
-                              ✅ Confirm Assignment
+                              ✅ Confirm
                             </button>
                             <button
                               onClick={() => {
@@ -1251,7 +1251,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                 setLooseBoxQuantity(0);
                                 setRemainingBoxes(0);
                               }}
-                              className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-bold"
+                              className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-bold text-sm sm:text-base"
                             >
                               Cancel
                             </button>
@@ -1336,7 +1336,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               setScanResult(null);
                               startScanning();
                             }}
-                            className="w-full py-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-bold text-lg"
+                            className="w-full py-2.5 sm:py-3 md:py-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-bold text-sm sm:text-base md:text-lg"
                           >
                             Scan Next Shipment
                           </button>
@@ -1357,9 +1357,9 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               setScanResult(null);
                               startScanning();
                             }}
-                            className="w-full py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-lg shadow-lg"
+                            className="w-full py-3 sm:py-3.5 md:py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-sm sm:text-base md:text-lg shadow-lg"
                           >
-                            ✅ Ready - Scan Rack Now ({scanResult.data.remainingBoxes} boxes to assign)
+                            ✅ Scan Rack Now ({scanResult.data.remainingBoxes} boxes)
                           </button>
                         </div>
                       ) : (
@@ -1379,10 +1379,10 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                     </div>
                   )}
 
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex gap-2 sm:gap-3 pt-3 sm:pt-4">
                     <button
                       onClick={handleReset}
-                      className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold"
+                      className="flex-1 py-2.5 sm:py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold text-sm sm:text-base"
                     >
                       Clear
                     </button>
@@ -1391,10 +1391,10 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                         setScanResult(null);
                         startScanning();
                       }}
-                      className="flex-1 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold flex items-center justify-center gap-2"
+                      className="flex-1 py-2.5 sm:py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base"
                     >
-                      <ArrowPathIcon className="h-5 w-5" />
-                      Scan Again
+                      <ArrowPathIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span>Scan Again</span>
                     </button>
                   </div>
                 </div>
@@ -1698,58 +1698,58 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
       {/* PALLET + BOX ASSIGNMENT MODAL */}
       {showAssignmentModal && selectedShipmentForRack && selectedRackForAssignment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-5">
-              <div className="flex items-center gap-3 mb-2">
-                <CheckCircleIcon className="h-8 w-8" />
-                <h2 className="text-2xl font-bold">Scan Successful! ✅</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+            {/* Header - MOBILE OPTIMIZED */}
+            <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 sm:px-6 py-3 sm:py-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                <CheckCircleIcon className="h-6 w-6 sm:h-8 sm:w-8" />
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold">Scan Successful! ✅</h2>
               </div>
-              <p className="text-lg font-semibold">{selectedRackForAssignment.code}</p>
+              <p className="text-sm sm:text-base md:text-lg font-semibold">{selectedRackForAssignment.code}</p>
             </div>
 
-            {/* Rack Information */}
-            <div className="p-6 bg-blue-50 border-b-2 border-blue-200">
-              <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center gap-2">
+            {/* Rack Information - MOBILE OPTIMIZED */}
+            <div className="p-3 sm:p-4 md:p-6 bg-blue-50 border-b-2 border-blue-200">
+              <h3 className="text-base sm:text-lg md:text-xl font-bold text-blue-900 mb-3 sm:mb-4 flex items-center gap-2">
                 📦 Rack Information
               </h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
                 <div>
-                  <span className="text-gray-600">Code:</span>
-                  <p className="text-xl font-bold text-gray-900">{selectedRackForAssignment.code}</p>
+                  <span className="text-gray-600 text-xs sm:text-sm">Code:</span>
+                  <p className="text-sm sm:text-base md:text-xl font-bold text-gray-900">{selectedRackForAssignment.code}</p>
                 </div>
                 <div>
-                  <span className="text-gray-600">Location:</span>
-                  <p className="text-xl font-bold text-gray-900">{selectedRackForAssignment.location || 'Section B, Row 2'}</p>
+                  <span className="text-gray-600 text-xs sm:text-sm">Location:</span>
+                  <p className="text-sm sm:text-base md:text-xl font-bold text-gray-900 truncate">{selectedRackForAssignment.location || 'Section B, Row 2'}</p>
                 </div>
                 <div>
-                  <span className="text-gray-600">Section:</span>
-                  <p className="text-xl font-bold text-gray-900">{selectedRackForAssignment.section || '-'}</p>
+                  <span className="text-gray-600 text-xs sm:text-sm">Section:</span>
+                  <p className="text-sm sm:text-base md:text-xl font-bold text-gray-900">{selectedRackForAssignment.section || '-'}</p>
                 </div>
                 <div>
-                  <span className="text-gray-600">Capacity:</span>
-                  <p className="text-xl font-bold text-gray-900">
+                  <span className="text-gray-600 text-xs sm:text-sm">Capacity:</span>
+                  <p className="text-sm sm:text-base md:text-xl font-bold text-gray-900">
                     {selectedRackForAssignment.capacityUsed || 0} / {selectedRackForAssignment.capacityTotal || 100}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Assignment Section */}
-            <div className="p-6">
-              <div className="mb-6">
-                <h3 className="text-lg font-bold text-purple-900 mb-2 flex items-center gap-2">
+            {/* Assignment Section - MOBILE OPTIMIZED */}
+            <div className="p-3 sm:p-4 md:p-6">
+              <div className="mb-4 sm:mb-6">
+                <h3 className="text-sm sm:text-base md:text-lg font-bold text-purple-900 mb-2 flex items-center gap-2">
                   📦 Assign "{selectedShipmentForRack.referenceId}" to this rack?
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-gray-600 text-xs sm:text-sm md:text-base">
                   Client: <strong>{selectedShipmentForRack.clientName}</strong>
                 </p>
               </div>
 
-              {/* Pallet + Box Selection */}
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mb-6">
-                <h4 className="text-lg font-bold text-purple-900 mb-4">
+              {/* Pallet + Box Selection - MOBILE OPTIMIZED */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
+                <h4 className="text-sm sm:text-base md:text-lg font-bold text-purple-900 mb-3 sm:mb-4">
                   📦 How Many to Assign?
                 </h4>
 
@@ -1771,16 +1771,16 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                   </div>
                 </div>
 
-                {/* Pallet Input */}
+                {/* Pallet Input - MOBILE OPTIMIZED */}
                 {selectedShipmentForRack.totalPallets > 0 && (
-                  <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-2">
+                  <div className="mb-3 sm:mb-4">
+                    <label className="block text-gray-700 font-semibold mb-2 text-xs sm:text-sm md:text-base">
                       🎁 Pallets to Assign:
                     </label>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
                       <button
                         onClick={() => setPalletQuantity(Math.max(0, palletQuantity - 1))}
-                        className="w-12 h-12 bg-red-500 text-white rounded-lg font-bold text-xl hover:bg-red-600"
+                        className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-red-500 text-white rounded-lg font-bold text-base sm:text-lg md:text-xl hover:bg-red-600"
                       >
                         −
                       </button>
@@ -1790,37 +1790,37 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                         max={selectedShipmentForRack.totalPallets}
                         value={palletQuantity}
                         onChange={(e) => setPalletQuantity(Math.min(selectedShipmentForRack.totalPallets, Math.max(0, parseInt(e.target.value) || 0)))}
-                        className="flex-1 text-center text-2xl font-bold border-2 border-purple-300 rounded-lg px-4 py-3"
+                        className="flex-1 text-center text-lg sm:text-xl md:text-2xl font-bold border-2 border-purple-300 rounded-lg px-2 sm:px-3 md:px-4 py-2 sm:py-2.5 md:py-3"
                       />
                       <button
                         onClick={() => setPalletQuantity(Math.min(selectedShipmentForRack.totalPallets, palletQuantity + 1))}
-                        className="w-12 h-12 bg-green-500 text-white rounded-lg font-bold text-xl hover:bg-green-600"
+                        className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-green-500 text-white rounded-lg font-bold text-base sm:text-lg md:text-xl hover:bg-green-600"
                       >
                         +
                       </button>
                       <button
                         onClick={() => setPalletQuantity(selectedShipmentForRack.totalPallets)}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+                        className="px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 text-xs sm:text-sm md:text-base"
                       >
                         🎯 All
                       </button>
                     </div>
-                    <p className="text-sm text-gray-500 mt-2">
-                      ⚡ Max: {selectedShipmentForRack.totalPallets} pallets |
-                      Remaining: {selectedShipmentForRack.totalPallets - palletQuantity} pallets
+                    <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                      ⚡ Max: {selectedShipmentForRack.totalPallets} |
+                      Remaining: {selectedShipmentForRack.totalPallets - palletQuantity}
                     </p>
                   </div>
                 )}
 
-                {/* Loose Box Input */}
-                <div className="mb-4">
-                  <label className="block text-gray-700 font-semibold mb-2">
+                {/* Loose Box Input - MOBILE OPTIMIZED */}
+                <div className="mb-3 sm:mb-4">
+                  <label className="block text-gray-700 font-semibold mb-2 text-xs sm:text-sm md:text-base">
                     📦 Loose Boxes to Assign:
                   </label>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
                     <button
                       onClick={() => setLooseBoxQuantity(Math.max(0, looseBoxQuantity - 1))}
-                      className="w-12 h-12 bg-red-500 text-white rounded-lg font-bold text-xl hover:bg-red-600"
+                      className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-red-500 text-white rounded-lg font-bold text-base sm:text-lg md:text-xl hover:bg-red-600"
                     >
                       −
                     </button>
@@ -1830,24 +1830,24 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       max={selectedShipmentForRack.looseBoxes}
                       value={looseBoxQuantity}
                       onChange={(e) => setLooseBoxQuantity(Math.min(selectedShipmentForRack.looseBoxes, Math.max(0, parseInt(e.target.value) || 0)))}
-                      className="flex-1 text-center text-2xl font-bold border-2 border-blue-300 rounded-lg px-4 py-3"
+                      className="flex-1 text-center text-lg sm:text-xl md:text-2xl font-bold border-2 border-blue-300 rounded-lg px-2 sm:px-3 md:px-4 py-2 sm:py-2.5 md:py-3"
                     />
                     <button
                       onClick={() => setLooseBoxQuantity(Math.min(selectedShipmentForRack.looseBoxes, looseBoxQuantity + 1))}
-                      className="w-12 h-12 bg-green-500 text-white rounded-lg font-bold text-xl hover:bg-green-600"
+                      className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-green-500 text-white rounded-lg font-bold text-base sm:text-lg md:text-xl hover:bg-green-600"
                     >
                       +
                     </button>
                     <button
                       onClick={() => setLooseBoxQuantity(selectedShipmentForRack.looseBoxes)}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+                      className="px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 text-xs sm:text-sm md:text-base"
                     >
                       🎯 All
                     </button>
                   </div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    ⚡ Max: {selectedShipmentForRack.looseBoxes} boxes |
-                    Remaining: {selectedShipmentForRack.looseBoxes - looseBoxQuantity} boxes
+                  <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                    ⚡ Max: {selectedShipmentForRack.looseBoxes} |
+                    Remaining: {selectedShipmentForRack.looseBoxes - looseBoxQuantity}
                   </p>
                 </div>
 
@@ -1928,24 +1928,24 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-4">
+              {/* Action Buttons - MOBILE OPTIMIZED */}
+              <div className="flex gap-2 sm:gap-3 md:gap-4">
                 <button
                   onClick={() => {
                     setShowAssignmentModal(false);
                     setPalletQuantity(0);
                     setLooseBoxQuantity(0);
                   }}
-                  className="flex-1 px-6 py-4 bg-gray-500 text-white font-bold rounded-xl hover:bg-gray-600 transition-all text-lg"
+                  className="flex-1 px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 bg-gray-500 text-white font-bold rounded-lg sm:rounded-xl hover:bg-gray-600 transition-all text-sm sm:text-base md:text-lg"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirmAssignment}
                   disabled={loading || (palletQuantity === 0 && looseBoxQuantity === 0)}
-                  className="flex-1 px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 transition-all text-lg shadow-lg"
+                  className="flex-1 px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-lg sm:rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 transition-all text-sm sm:text-base md:text-lg shadow-lg"
                 >
-                  ✅ Confirm Assignment
+                  ✅ Confirm
                 </button>
               </div>
             </div>
