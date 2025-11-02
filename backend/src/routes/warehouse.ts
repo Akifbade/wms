@@ -403,8 +403,33 @@ router.post('/qr-scan', async (req: AuthRequest, res: Response) => {
       }
     }
     
-    // Check if it's a shipment master QR
-    if (qrCode.startsWith('WH_')) {
+    // Check if it's a shipment master QR (new format: SHIPMENT_XXX)
+    if (qrCode.startsWith('SHIPMENT_')) {
+      const shipmentId = qrCode.replace('SHIPMENT_', '');
+      const shipment = await prisma.shipment.findFirst({
+        where: { 
+          qrCode: qrCode,
+          companyId
+        },
+        include: {
+          boxes: { include: { rack: { select: { code: true, qrCode: true } } } },
+          companyProfile: { select: { id: true, name: true } }
+        }
+      });
+      
+      if (shipment) {
+        result = {
+          type: 'shipment',
+          data: {
+            ...shipment,
+            warehouseData: shipment.warehouseData ? parseWarehouseData(shipment.warehouseData) : {}
+          }
+        };
+      }
+    }
+    
+    // Check if it's an old warehouse shipment format (WH_)
+    if (!result.data && qrCode.startsWith('WH_')) {
       const barcode = qrCode.replace('WH_', '');
       const shipment = await prisma.shipment.findFirst({
         where: { 

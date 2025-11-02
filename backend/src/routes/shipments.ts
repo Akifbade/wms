@@ -417,12 +417,11 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
       return res.status(400).json({ error: 'Rack assignment is required by company settings' });
     }
 
-    // Generate master QR code for shipment using settings prefix
-    const qrPrefix = settings.autoGenerateQR ? settings.qrCodePrefix : 'QR-SH';
-    const qrTimestamp = Date.now();
-    const qrBase = `${qrPrefix}-${qrTimestamp}`;
-  const qrMetaSegments = [`P${palletCount}`, `B${boxesPerPallet}`, `T${totalBoxCount}`];
-  const masterQR = [qrBase, ...qrMetaSegments].join('-');
+    // Generate master QR code for shipment - SIMPLE FORMAT: SHIPMENT_ID only
+    // Format: SHIPMENT_{shipmentNumber} - QR must NEVER change once assigned
+    // No metadata in QR (metadata stored in database only)
+    const shipmentNumber = `${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const masterQR = `SHIPMENT_${shipmentNumber}`;
 
     // ???? USE DEFAULT STORAGE TYPE FROM SETTINGS IF NOT PROVIDED
     const shipmentType = data.type || settings.defaultStorageType;
@@ -495,7 +494,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
           boxesToCreate.push({
             shipmentId: shipment.id,
             boxNumber: boxIdx,
-            qrCode: `${masterQR}-BOX-${boxIdx}-OF-${totalBoxCount}-PAL-${p}`,
+            qrCode: `${masterQR}-BOX${String(boxIdx).padStart(3, '0')}`,
             rackId: data.rackId || null,
             status: data.rackId ? 'IN_STORAGE' : 'PENDING',
             assignedAt: data.rackId ? new Date() : null,
@@ -526,7 +525,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
         boxesToCreate.push({
           shipmentId: shipment.id,
           boxNumber,
-          qrCode: `${masterQR}-BOX-${boxNumber}-OF-${totalBoxCount}-PAL-0`,
+          qrCode: `${masterQR}-BOX${String(boxNumber).padStart(3, '0')}`,
           rackId: data.rackId || null,
           status: data.rackId ? 'IN_STORAGE' : 'PENDING',
           assignedAt: data.rackId ? new Date() : null,
@@ -549,7 +548,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
         boxesToCreate.push({
           shipmentId: shipment.id,
           boxNumber: i,
-          qrCode: `${masterQR}-BOX-${i}-OF-${totalBoxCount}-PAL-${palletNumber}`,
+          qrCode: `${masterQR}-BOX${String(i).padStart(3, '0')}`,
           rackId: data.rackId || null, // Assign to rack if provided
           status: data.rackId ? 'IN_STORAGE' : 'PENDING',
           assignedAt: data.rackId ? new Date() : null,

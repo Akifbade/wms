@@ -328,7 +328,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
         height: data.height,
         dimensionUnit: data.dimensionUnit,
         companyId,
-        qrCode: `QR-${data.code}`,
+        qrCode: `RACK_${data.code.replace(/-/g, '_')}`,
         capacityTotal: data.capacityTotal || 100,
         capacityUsed: 0,
         status: 'ACTIVE',

@@ -26,10 +26,10 @@ export async function createShipmentWithBoxes(data: {
   consignee?: string;
 }) {
   return prisma.$transaction(async (tx) => {
-    // 1. Generate master QR code
+    // 1. Generate master QR code - SIMPLE FORMAT: SHIPMENT_XXX only (QR must NEVER change)
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(7).toUpperCase();
-    const masterQR = `SHP-${timestamp}-${random}`;
+    const random = Math.random().toString(36).substr(2, 9).toUpperCase();
+    const masterQR = `SHIPMENT_${timestamp}-${random}`;
 
     // 2. Create shipment
     const shipment = await tx.shipment.create({
