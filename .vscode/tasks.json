@@ -41,6 +41,83 @@
       "command": "docker cp frontend/dist/. wms-frontend:/usr/share/nginx/html/ ; docker exec wms-frontend nginx -s reload",
       "problemMatcher": [],
       "dependsOn": ["🏗️ Build Frontend"]
+    },
+    {
+      "label": "✅ WORKFLOW STEP 1: Build & Test Locally",
+      "type": "shell",
+      "command": "Write-Host '🧪 Building frontend locally...' -ForegroundColor Cyan; cd frontend; npm run build; if (`$LASTEXITCODE -ne 0) { Write-Host '❌ Build failed! Fix errors before continuing.' -ForegroundColor Red; exit 1 } else { Write-Host '✅ Local build successful!' -ForegroundColor Green }",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "📝 WORKFLOW STEP 2: Commit Changes Locally",
+      "type": "shell",
+      "command": ".\\quick-commit.ps1",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "dependsOn": ["✅ WORKFLOW STEP 1: Build & Test Locally"]
+    },
+    {
+      "label": "🚀 WORKFLOW STEP 3: Push to GitHub (Auto Triggers Staging)",
+      "type": "shell",
+      "command": "Write-Host '📤 Pushing to GitHub...' -ForegroundColor Cyan; git push origin stable/prisma-mysql-production; Write-Host '✅ Pushed! GitHub Actions will deploy to staging automatically.' -ForegroundColor Green; Write-Host '🔗 Watch progress: https://github.com/Akifbade/wms/actions' -ForegroundColor Yellow",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "🧪 WORKFLOW STEP 4: Test on Staging (148.230.107.155:8080)",
+      "type": "shell",
+      "command": "Write-Host '✅ Testing staging deployment...' -ForegroundColor Cyan; `$response = Invoke-WebRequest -Uri 'http://148.230.107.155:8080/api/health' -ErrorAction SilentlyContinue; if (`$response.StatusCode -eq 200) { Write-Host '🟢 STAGING HEALTHY - Ready for testing!' -ForegroundColor Green; Write-Host '🌐 Open browser: http://148.230.107.155:8080' -ForegroundColor Cyan; Start-Process 'http://148.230.107.155:8080' } else { Write-Host '🔴 Staging not ready yet. GitHub Actions might still be deploying. Wait 2-5 minutes.' -ForegroundColor Yellow }",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "🟢 WORKFLOW STEP 5: Approve Production Deployment",
+      "type": "shell",
+      "command": "Write-Host '✅ Staging is good!' -ForegroundColor Green; Write-Host '' -ForegroundColor Green; Write-Host '📋 TO DEPLOY TO PRODUCTION:' -ForegroundColor Cyan; Write-Host '1. Go to: https://github.com/Akifbade/wms/actions' -ForegroundColor Yellow; Write-Host '2. Click: Three-Stage Deployment workflow' -ForegroundColor Yellow; Write-Host '3. Click: Run workflow' -ForegroundColor Yellow; Write-Host '4. Select environment: production' -ForegroundColor Yellow; Write-Host '5. Click: Run workflow' -ForegroundColor Yellow; Write-Host '6. GitHub will ask for approval - click Approve' -ForegroundColor Yellow; Write-Host '' -ForegroundColor Cyan; Write-Host '✅ Then production will update automatically!' -ForegroundColor Green; Start-Process 'https://github.com/Akifbade/wms/actions'",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "⚡ QUICK WORKFLOW: Local → Staging → Production",
+      "type": "shell",
+      "command": "Write-Host '═══════════════════════════════════════════════════════════════' -ForegroundColor Cyan; Write-Host '⚡ COMPLETE WORKFLOW (DO IN THIS ORDER)' -ForegroundColor Green; Write-Host '═══════════════════════════════════════════════════════════════' -ForegroundColor Cyan; Write-Host ''; Write-Host 'Step 1: Make code changes locally' -ForegroundColor Yellow; Write-Host 'Step 2: Run Task → WORKFLOW STEP 1: Build & Test Locally' -ForegroundColor Cyan; Write-Host 'Step 3: Run Task → WORKFLOW STEP 2: Commit Changes Locally' -ForegroundColor Cyan; Write-Host 'Step 4: Run Task → WORKFLOW STEP 3: Push to GitHub' -ForegroundColor Cyan; Write-Host 'Step 5: Wait 3-5 minutes for GitHub Actions' -ForegroundColor Magenta; Write-Host 'Step 6: Run Task → WORKFLOW STEP 4: Test on Staging' -ForegroundColor Cyan; Write-Host 'Step 7: Test features on http://148.230.107.155:8080' -ForegroundColor Yellow; Write-Host 'Step 8: If staging OK, Run Task → WORKFLOW STEP 5: Approve Production' -ForegroundColor Green; Write-Host ''; Write-Host '═══════════════════════════════════════════════════════════════' -ForegroundColor Cyan; Write-Host '✅ That is it! No manual VPS work needed.' -ForegroundColor Green",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "🔒 SAFETY: Verify Staging Before Production",
+      "type": "shell",
+      "command": "Write-Host '🔍 Checking staging health...' -ForegroundColor Cyan; `$response = Invoke-WebRequest -Uri 'http://148.230.107.155:8080/api/health' -ErrorAction SilentlyContinue; if (`$response.StatusCode -eq 200) { `$data = `$response.Content | ConvertFrom-Json; Write-Host '✅ STAGING HEALTHY' -ForegroundColor Green; Write-Host ('Version: ' + `$data.version) -ForegroundColor Green; Write-Host ('Environment: ' + `$data.environment) -ForegroundColor Green; Write-Host '🟢 SAFE TO PROMOTE TO PRODUCTION' -ForegroundColor Green } else { Write-Host '❌ STAGING HEALTH CHECK FAILED' -ForegroundColor Red; Write-Host 'DO NOT promote to production!' -ForegroundColor Red }",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "🔒 SAFETY: Verify Production Health",
+      "type": "shell",
+      "command": "Write-Host '🔍 Checking production health...' -ForegroundColor Cyan; `$response = Invoke-WebRequest -Uri 'https://148.230.107.155/api/health' -SkipCertificateCheck -ErrorAction SilentlyContinue; if (`$response.StatusCode -eq 200) { `$data = `$response.Content | ConvertFrom-Json; Write-Host '✅ PRODUCTION HEALTHY' -ForegroundColor Green; Write-Host ('Version: ' + `$data.version) -ForegroundColor Green; Write-Host ('Environment: ' + `$data.environment) -ForegroundColor Green } else { Write-Host '⚠️ Production health check failed' -ForegroundColor Yellow }",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
     }
   ]
 }

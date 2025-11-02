@@ -1,3 +1,31 @@
 {
-    "git.ignoreLimitWarning": true
+    "git.ignoreLimitWarning": true,
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "icon": "terminal-powershell"
+        }
+    },
+    "files.autoSave": "onFocusChange",
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/node_modules/**": true,
+        "**/.next/**": true,
+        "**/dist/**": false
+    },
+    "typescript.strict": true,
+    "typescript.checkJs": true,
+    "[typescript]": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit"
+        }
+    },
+    "[typescriptreact]": {
+        "editor.formatOnSave": true
+    },
+    "git.decorations.enabled": true,
+    "git.detectSubmodules": false,
+    "todo-tree.general.tags": ["TODO", "FIXME", "BUG", "HACK"]
 }
