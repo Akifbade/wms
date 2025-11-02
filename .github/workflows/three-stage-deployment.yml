@@ -357,6 +357,30 @@ jobs:
           
           echo ""
           echo "================================================"
+          echo "     STEP 6: Cleanup Old Backups & Docker Cache"
+          echo "================================================"
+          
+          # Keep only last 2 backups (delete older ones)
+          echo "     Cleaning old backups (keeping last 2)..."
+          cd backups
+          ls -t | grep -E '^(staging|production)-' | tail -n +3 | xargs -r rm -rf
+          BACKUP_SIZE=$(du -sh . | cut -f1)
+          echo "->   Backups cleaned. Current total: $BACKUP_SIZE"
+          cd "$PROD_PATH"
+          
+          # Clean Docker build cache (keep last 24 hours)
+          echo "     Cleaning Docker build cache..."
+          DOCKER_FREED=$(docker system prune -af --filter 'until=24h' 2>&1 | grep 'Total reclaimed' || echo '0B')
+          echo "->   Docker cache: $DOCKER_FREED"
+          
+          # Show disk space
+          echo "     Checking disk space..."
+          df -h | grep '/dev/sda4'
+          
+          echo "================================================"
+          
+          echo ""
+          echo "================================================"
           echo "->   STAGING DEPLOYMENT COMPLETE (WITH SAFETY)"
           echo "================================================"
           echo "     Frontend: http://148.230.107.155:8080"
@@ -555,6 +579,30 @@ jobs:
             
             exit 1
           fi
+          
+          echo ""
+          echo "================================================"
+          echo "     STEP 7: Cleanup Old Backups & Docker Cache"
+          echo "================================================"
+          
+          # Keep only last 2 backups (delete older ones)
+          echo "     Cleaning old backups (keeping last 2)..."
+          cd backups
+          ls -t | grep -E '^(staging|production)-' | tail -n +3 | xargs -r rm -rf
+          BACKUP_SIZE=$(du -sh . | cut -f1)
+          echo "->   Backups cleaned. Current total: $BACKUP_SIZE"
+          cd "$PROD_PATH"
+          
+          # Clean Docker build cache (keep last 24 hours)
+          echo "     Cleaning Docker build cache..."
+          DOCKER_FREED=$(docker system prune -af --filter 'until=24h' 2>&1 | grep 'Total reclaimed' || echo '0B')
+          echo "->   Docker cache: $DOCKER_FREED"
+          
+          # Show disk space
+          echo "     Checking disk space..."
+          df -h | grep '/dev/sda4'
+          
+          echo "================================================"
           
           echo ""
           echo "================================================"
