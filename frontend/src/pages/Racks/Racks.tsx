@@ -637,6 +637,12 @@ export const Racks: React.FC = () => {
             const zoneIcon = zoneRacks[0]?.zoneIcon || (zoneName === 'Unassigned' ? '📦' : '🏢');
             const zoneDescription = zoneRacks[0]?.zoneDescription || '';
 
+            // Get company logo from racks in this zone (if all racks belong to same company)
+            const companyLogos = [...new Set(zoneRacks.map((r: any) => r.companyProfile?.logo).filter(Boolean))];
+            const companyNames = [...new Set(zoneRacks.map((r: any) => r.companyProfile?.name).filter(Boolean))];
+            const singleCompanyLogo = companyLogos.length === 1 ? String(companyLogos[0]) : null;
+            const singleCompanyName = companyNames.length === 1 ? String(companyNames[0]) : null;
+
             // Calculate pallet and box totals
             const totalPallets = zoneRacks.reduce((sum: number, r: any) => sum + (r.currentPallets || 0), 0);
             const totalBoxes = zoneRacks.reduce((sum: number, r: any) => sum + (r.currentBoxes || 0), 0);
@@ -656,12 +662,29 @@ export const Racks: React.FC = () => {
                       {zoneIcon}
                     </div>
 
+                    {/* Company Logo (if all racks in zone belong to same company) */}
+                    {singleCompanyLogo && (
+                      <div className="flex-shrink-0">
+                        <img
+                          src={resolveLogoUrl(singleCompanyLogo)}
+                          alt={singleCompanyName || 'Company'}
+                          className="w-20 h-20 object-contain rounded-lg border-2 border-gray-300 bg-white p-2 shadow-md"
+                          title={singleCompanyName || 'Company Logo'}
+                        />
+                      </div>
+                    )}
+
                     {/* Zone Info */}
                     <div className="text-left flex-1">
                       <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                         {zoneName === 'Unassigned' ? '📦 Unassigned Racks' : `Zone ${zoneName}`}
                         {totalRacks === 0 && (
                           <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded">Empty</span>
+                        )}
+                        {singleCompanyName && (
+                          <span className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                            {singleCompanyName}
+                          </span>
                         )}
                       </h3>
 
@@ -792,7 +815,7 @@ export const Racks: React.FC = () => {
                           });
                         }
                         const shipmentCount = uniqueShipments.size;
-                        const available = Math.max(totalCapacity - rack.capacityUsed, 0);
+                        // const available = Math.max(totalCapacity - rack.capacityUsed, 0);
 
                         return (
                           <div
