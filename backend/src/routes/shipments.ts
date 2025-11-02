@@ -1277,7 +1277,10 @@ router.post('/:shipmentId/assign-rack',
         quantity,
         pallets,
         looseBoxes,
-        photos: photos?.length || 0
+        photos: photos?.length || 0,
+        photosReceived: photos,
+        photosType: typeof photos,
+        photosIsArray: Array.isArray(photos)
       });
 
       // Validation
@@ -1348,6 +1351,12 @@ router.post('/:shipmentId/assign-rack',
 
       // Assign boxes to rack with photos
       const photosJson = photos && photos.length > 0 ? JSON.stringify(photos) : null;
+      console.log('📸 Photos processing:', {
+        photosReceived: photos,
+        photosLength: photos?.length,
+        photosJson,
+        willSavePhotos: photosJson !== null
+      });
 
       const updatedBoxes = await prisma.$transaction(
         boxesToAssign.map((box: any, index: number) => {
