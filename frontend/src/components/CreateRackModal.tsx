@@ -119,6 +119,15 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
         next.companyProfileId = value;
       }
 
+      // Auto-generate location from zone and rack code
+      if (name === 'zone' || name === 'code') {
+        const zone = name === 'zone' ? value : prev.zone;
+        const code = name === 'code' ? value : prev.code;
+        if (zone && code) {
+          next.location = `Zone ${zone}, Rack ${code}`;
+        }
+      }
+
       return next;
     });
 
@@ -258,72 +267,67 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
             </div>
           )}
 
-          {/* Basic Information */}
-          <div className="border-b pb-4">
-            <h3 className="text-lg font-semibold mb-4 text-gray-700">Basic Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Zone Configuration - SAME AS BULK ADD */}
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <h3 className="text-lg font-semibold mb-4 text-blue-800">🏢 Zone Configuration</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Zone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="zone"
+                    value={formData.zone}
+                    onChange={handleChange}
+                    placeholder="e.g., 1, 2, A, B..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    💡 Physical zone where this rack is located
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Zone Icon
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowIconPicker(true)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center gap-3"
+                  >
+                    <span className="text-3xl">{formData.zoneIcon}</span>
+                    <span className="text-gray-600">Click to change</span>
+                  </button>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rack Code <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Zone Description
                 </label>
-                <input
-                  type="text"
-                  name="code"
-                  value={formData.code}
-                  onChange={handleCodeChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent uppercase"
-                  placeholder="A1, B2, C3..."
-                  required
+                <textarea
+                  name="zoneDescription"
+                  value={formData.zoneDescription}
+                  onChange={(e) => setFormData(prev => ({ ...prev, zoneDescription: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={2}
+                  placeholder="Describe this zone's purpose or location..."
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Use format like A1, A2, B1, etc.
-                </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Warehouse Location <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="location"
-                  value={formData.location}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Zone A, Floor 1, Section 2, Row 3..."
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Physical location in warehouse (e.g., "Zone A, Floor 2")
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rack Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="rackType"
-                  value={formData.rackType}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  required
-                >
-                  <option value="STORAGE">Storage</option>
-                  <option value="MATERIALS">Materials</option>
-                  <option value="EQUIPMENT">Equipment</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Company Profile (Owner)
                 </label>
                 <select
                   name="categoryId"
                   value={formData.categoryId}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Select Company Profile...</option>
                   {categories.map(cat => (
@@ -333,7 +337,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
                   ))}
                 </select>
                 {selectedCategoryInfo && (
-                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                  <div className="mt-2 p-3 bg-white border border-blue-200 rounded-lg text-sm">
                     <div className="flex items-center gap-2">
                       {selectedCategoryInfo.logo && (
                         <img
@@ -354,18 +358,66 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
                     {selectedCategoryInfo.description && (
                       <p className="text-blue-700 text-xs mt-1">{selectedCategoryInfo.description}</p>
                     )}
-                    {(selectedCategoryInfo.contactPerson || selectedCategoryInfo.contactPhone) && (
-                      <p className="text-blue-700 text-xs mt-1">
-                        {selectedCategoryInfo.contactPerson && `Contact: ${selectedCategoryInfo.contactPerson}`}
-                        {selectedCategoryInfo.contactPerson && selectedCategoryInfo.contactPhone && ' ?? '}
-                        {selectedCategoryInfo.contactPhone && `Phone: ${selectedCategoryInfo.contactPhone}`}
-                      </p>
-                    )}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* Rack Code & Basic Settings */}
+          <div className="border-b pb-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">📦 Rack Code & Settings</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Rack Code <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="code"
+                  value={formData.code}
+                  onChange={handleCodeChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent uppercase"
+                  placeholder="e.g., 1A, 2B, 3C..."
+                  required
+                />
                 <p className="text-xs text-gray-500 mt-1">
-                  Which company/client owns the items stored in this rack?
+                  Unique rack identifier (e.g., 1A, 2B, 3C)
                 </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Location (Auto-generated)
+                </label>
+                <input
+                  type="text"
+                  name="location"
+                  value={formData.location}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
+                  placeholder="Will auto-generate from Zone + Rack Code"
+                  readOnly
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Auto-created from zone and rack code
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Rack Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="rackType"
+                  value={formData.rackType}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                >
+                  <option value="STORAGE">Storage</option>
+                  <option value="MATERIALS">Materials</option>
+                  <option value="EQUIPMENT">Equipment</option>
+                </select>
               </div>
 
               <div>
