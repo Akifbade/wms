@@ -19,6 +19,7 @@ import WHMShipmentModal from '../../components/WHMShipmentModal';
 import EditShipmentModal from '../../components/EditShipmentModal';
 import ShipmentDetailModal from '../../components/ShipmentDetailModal';
 import BoxQRModal from '../../components/BoxQRModal';
+import ShipmentsPrintReport from '../../components/ShipmentsPrintReport';
 
 export const Shipments: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -259,13 +260,24 @@ export const Shipments: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">📦 Warehouse Shipments</h1>
           <p className="text-gray-600 mt-1">Complete warehouse management with intake, tracking, and release</p>
         </div>
-        <button 
-          onClick={() => setCreateModalOpen(true)}
-          className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md"
-        >
-          <PlusIcon className="h-5 w-5 mr-2" />
-          📦 New Shipment Intake
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Print Report Buttons */}
+          <ShipmentsPrintReport 
+            shipments={filteredShipments}
+            searchTerm={searchTerm}
+            activeTab={activeTab}
+            warehouseFilter={warehouseFilter}
+          />
+          
+          {/* New Shipment Button */}
+          <button 
+            onClick={() => setCreateModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            📦 New Shipment Intake
+          </button>
+        </div>
       </div>
 
       {error && (
