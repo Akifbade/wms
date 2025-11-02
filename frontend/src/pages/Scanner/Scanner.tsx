@@ -46,6 +46,10 @@ export const Scanner: React.FC = () => {
   const [palletQuantity, setPalletQuantity] = useState<number>(0);
   const [looseBoxQuantity, setLooseBoxQuantity] = useState<number>(0);
   const [assignmentPhotos, setAssignmentPhotos] = useState<File[]>([]);
+  
+  // ✅ Duplicate prevention: Track last scanned code and timestamp
+  const lastScanRef = useRef<{ code: string; timestamp: number } | null>(null);
+  const SCAN_COOLDOWN_MS = 3000; // 3 seconds cooldown between same QR scans
 
   useEffect(() => {
     return () => {
@@ -133,7 +137,6 @@ export const Scanner: React.FC = () => {
       console.log('📱 Available constraints:', navigator.mediaDevices.getSupportedConstraints());
       
       let cameraWorks = false;
-      let workingConstraints: any = null;
       
       // Test configs in order of preference
       const testConfigs = [
@@ -153,7 +156,6 @@ export const Scanner: React.FC = () => {
           testStream.getTracks().forEach(track => track.stop());
           
           cameraWorks = true;
-          workingConstraints = testConfigs[i];
           break;
         } catch (testErr: any) {
           console.warn(`⚠️ Config ${i + 1} failed:`, testErr.name, testErr.message);
@@ -167,12 +169,16 @@ export const Scanner: React.FC = () => {
       
       console.log('✅ Camera test passed! Now starting html5-qrcode with working constraints...');
 
-      console.log('🚀 Step 2: Starting html5-qrcode with PROVEN working constraints...');
+      console.log('🚀 Step 2: Starting html5-qrcode with correct camera config...');
       
-      // Use the constraints that we KNOW work from camera test
+      // ✅ FIX: html5-qrcode.start() expects ONLY facingMode string OR deviceId string
+      // NOT the full constraints object with width/height
+      // Use the facingMode string directly
+      const cameraConfig = { facingMode: 'environment' };
+      
       try {
         await html5QrCode.start(
-          workingConstraints.video,
+          cameraConfig,
           { 
             fps: 10, 
             qrbox: { width: 250, height: 250 },
@@ -293,6 +299,21 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   };
 
   const onScanSuccess = async (decodedText: string) => {
+    // ✅ DUPLICATE PREVENTION: Check if same code was scanned recently
+    const now = Date.now();
+    if (lastScanRef.current) {
+      const { code: lastCode, timestamp: lastTime } = lastScanRef.current;
+      const timeSinceLastScan = now - lastTime;
+      
+      if (lastCode === decodedText && timeSinceLastScan < SCAN_COOLDOWN_MS) {
+        console.log(`🚫 Duplicate scan ignored: ${decodedText} (scanned ${Math.round(timeSinceLastScan/1000)}s ago)`);
+        return; // Ignore duplicate scan
+      }
+    }
+    
+    // Update last scan tracking
+    lastScanRef.current = { code: decodedText, timestamp: now };
+    
     await stopScanning();
     
     setLoading(true);
@@ -308,21 +329,50 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   };
 
   const processScanCode = async (code: string): Promise<ScanResult> => {
-    if (code.toUpperCase().includes('RACK') || code.match(/^R-[A-Z]-\d+$/i)) {
+    const upperCode = code.toUpperCase();
+    
+    // ✅ PRIORITY 1: Check for RACK_XXX format (simplified)
+    if (upperCode.startsWith('RACK_')) {
       const response = await racksAPI.getAll({ search: code });
-      const rack = response.racks?.find((r: any) => r.code.toUpperCase() === code.toUpperCase());
+      const rack = response.racks?.find((r: any) => r.code.toUpperCase() === upperCode);
       if (rack) return { type: 'rack', data: rack, rawCode: code };
     }
     
-    // Check if it's a box QR code (QR-SH-timestamp-BOX-1)
-    if (code.includes('-BOX-')) {
-      const masterQR = code.split('-BOX-')[0]; // Get QR-SH-timestamp part
-      const response = await shipmentsAPI.getAll({ search: masterQR });
+    // ✅ PRIORITY 2: Check for old R-X-XXX format (backwards compatibility)
+    if (upperCode.match(/^R-[A-Z]-\d+$/i)) {
+      const response = await racksAPI.getAll({ search: code });
+      const rack = response.racks?.find((r: any) => r.code.toUpperCase() === upperCode);
+      if (rack) return { type: 'rack', data: rack, rawCode: code };
+    }
+    
+    // ✅ PRIORITY 3: Check for PALLET_SHIPMENTID_NUMBER format (simplified pallet QR)
+    // Example: PALLET_cmhhm6gq1000132e5vadvqil_1
+    if (upperCode.startsWith('PALLET_')) {
+      const parts = code.split('_');
+      if (parts.length === 3) {
+        const shipmentId = parts[1];
+        // Search by shipment ID
+        const response = await shipmentsAPI.getAll({ search: shipmentId });
+        const shipment = response.shipments?.find((s: any) => s.id === shipmentId);
+        if (shipment) {
+          const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+          });
+          const boxData = await boxResponse.json();
+          const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
+          setRemainingBoxes(unassignedBoxes);
+          return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode: code };
+        }
+      }
+    }
+    
+    // ✅ PRIORITY 4: Check for SHIPMENT_XXX format (simplified shipment master QR)
+    if (upperCode.startsWith('SHIPMENT_')) {
+      const response = await shipmentsAPI.getAll({ search: code });
       const shipment = response.shipments?.find((s: any) => 
-        s.qrCode && masterQR.includes(s.qrCode)
+        s.qrCode?.toUpperCase() === upperCode || s.referenceId?.toUpperCase() === upperCode
       );
       if (shipment) {
-        // Fetch box information to get remaining unassigned boxes
         const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
         });
@@ -333,12 +383,32 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       }
     }
     
+    // ✅ PRIORITY 5: Check if it's a box QR code (format: SHIPMENT_XXX-BOX001)
+    if (code.includes('-BOX')) {
+      // Extract master QR (everything before -BOX)
+      // Example: SHIPMENT_1730547890123-abcd123-BOX001 → SHIPMENT_1730547890123-abcd123
+      const masterQR = code.split('-BOX')[0];
+      const response = await shipmentsAPI.getAll({ search: masterQR });
+      const shipment = response.shipments?.find((s: any) => 
+        s.qrCode?.toUpperCase() === masterQR.toUpperCase()
+      );
+      if (shipment) {
+        const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+        });
+        const boxData = await boxResponse.json();
+        const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
+        setRemainingBoxes(unassignedBoxes);
+        return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode: code };
+      }
+    }
+    
+    // ✅ FALLBACK: Try general search by reference ID
     const response = await shipmentsAPI.getAll({ search: code });
     const shipment = response.shipments?.find((s: any) => 
-      s.referenceId.toUpperCase() === code.toUpperCase()
+      s.referenceId?.toUpperCase() === upperCode
     );
     if (shipment) {
-      // Fetch remaining boxes for regular shipment scan too
       const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
       });

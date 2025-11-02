@@ -4,9 +4,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const client_1 = require("@prisma/client");
+const version_1 = require("./config/version");
 // Import routes
 const auth_1 = __importDefault(require("./routes/auth"));
 const shipments_1 = __importDefault(require("./routes/shipments"));
@@ -58,14 +61,58 @@ app.use((req, res, next) => {
     res.setHeader('Surrogate-Control', 'no-store');
     next();
 });
-// Serve static files for uploads
+// Smart static handler for company logos (fallback between legacy/new filenames)
+app.get('/uploads/company-logos/:name', (req, res, next) => {
+    try {
+        const filename = req.params.name;
+        const baseDir = path_1.default.join(process.cwd(), 'uploads', 'company-logos');
+        const tryPaths = [];
+        // 1) Requested filename as-is
+        tryPaths.push(path_1.default.join(baseDir, filename));
+        // 2) If request is company-logo-XXXX, also try company-XXXX
+        if (filename.startsWith('company-logo-')) {
+            const alt = 'company-' + filename.substring('company-logo-'.length);
+            tryPaths.push(path_1.default.join(baseDir, alt));
+        }
+        // 3) If request is company-XXXX, also try company-logo-XXXX
+        if (filename.startsWith('company-') && !filename.startsWith('company-logo-')) {
+            const alt = 'company-logo-' + filename.substring('company-'.length);
+            tryPaths.push(path_1.default.join(baseDir, alt));
+        }
+        for (const p of tryPaths) {
+            if (fs_1.default.existsSync(p)) {
+                return res.sendFile(p);
+            }
+        }
+    }
+    catch (e) {
+        console.error('Logo static fallback error:', e);
+    }
+    // Hand off to generic static handler
+    return next();
+});
+// Serve generic static files for uploads (after logo-specific fallback)
 app.use('/uploads', express_1.default.static('uploads'));
-// Basic health check route
+// Health check route with version info
 app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
         message: 'Warehouse Management API is running',
+        version: version_1.APP_VERSION,
+        versionInfo: (0, version_1.getVersionInfo)(),
         timestamp: new Date().toISOString()
+    });
+});
+// Version info endpoint
+app.get('/api/version', (req, res) => {
+    const info = (0, version_1.getVersionInfo)();
+    res.json({
+        version: version_1.APP_VERSION,
+        environment: info.environment,
+        stage: info.stage,
+        buildDate: info.buildDate,
+        commitHash: info.commitHash,
+        timestamp: info.timestamp
     });
 });
 // API Routes
@@ -113,6 +160,7 @@ app.use((err, req, res, next) => {
 });
 // Start server
 const server = app.listen(PORT, () => {
+    (0, version_1.logVersionInfo)();
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV}`);
     console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}`);

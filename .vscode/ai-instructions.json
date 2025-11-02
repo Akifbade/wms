@@ -70,9 +70,34 @@
   "AVAILABLE_VSCODE_TASKS": {
     "localhost_test": "🧪 LOCALHOST TEST: Check All APIs",
     "localhost_rebuild": "🔄 LOCALHOST REBUILD: Fresh Docker Build",
+    "localhost_auto_reload": "🔄 AUTO-RELOAD: Watch Localhost Changes (background)",
+    "localhost_quick_rebuild": "⚡ QUICK: Rebuild Localhost After Changes (Ctrl+Shift+B)",
     "staging_verify": "🔒 SAFETY: Verify Staging Before Production",
     "production_verify": "🔒 SAFETY: Verify Production Health",
     "workflow_guide": "⚡ QUICK WORKFLOW: Local → Staging → Production"
+  },
+  
+  "DEVELOPMENT_MODE": {
+    "hot_reload_script": "watch-localhost.ps1",
+    "purpose": "Auto-rebuild localhost when source files change - TEST BEFORE COMMIT",
+    "usage": {
+      "automatic": "Run task: 🔄 AUTO-RELOAD: Watch Localhost Changes",
+      "quick_rebuild": "Press Ctrl+Shift+B for fast rebuild",
+      "manual": "Run .\\watch-localhost.ps1 in PowerShell",
+      "stop": "Press Ctrl+C in watch terminal"
+    },
+    "watched_files": {
+      "backend": "backend/src/**/*.{ts,js} → Auto-restarts backend container",
+      "frontend": "frontend/src/**/*.{tsx,ts,jsx,js,css} → Auto-rebuilds + hot-reloads"
+    },
+    "workflow": [
+      "1. Start watch script (task or manual)",
+      "2. Make changes to code",
+      "3. Watch script auto-detects and rebuilds",
+      "4. Test on http://localhost immediately",
+      "5. ONLY commit when verified working",
+      "6. NEVER push multiple commits"
+    ]
   },
   
   "SAFETY_MECHANISMS": {
