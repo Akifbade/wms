@@ -51,62 +51,83 @@ export const Scanner: React.FC = () => {
   const lastScanRef = useRef<{ code: string; timestamp: number } | null>(null);
   const SCAN_COOLDOWN_MS = 3000; // 3 seconds cooldown between same QR scans
 
-  // 🔊 Sound alerts
+  // 🔊 Sound alerts - Create shared audio context
+  const audioContextRef = useRef<AudioContext | null>(null);
+  
+  const getAudioContext = () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    return audioContextRef.current;
+  };
+
   const playSuccessSound = () => {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.value = 800; // High pitch for success
-    oscillator.type = 'sine';
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.3);
+    try {
+      const audioContext = getAudioContext();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 800; // High pitch for success
+      oscillator.type = 'sine';
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (err) {
+      console.log('Sound playback failed:', err);
+    }
   };
 
   const playErrorSound = () => {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    
-    // Play 3 loud error beeps
-    for (let i = 0; i < 3; i++) {
-      setTimeout(() => {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = 200; // Low pitch for error
-        oscillator.type = 'square';
-        gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.4);
-      }, i * 500); // 500ms between beeps
+    try {
+      const audioContext = getAudioContext();
+      
+      // Play 3 loud error beeps
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.value = 200; // Low pitch for error
+          oscillator.type = 'square';
+          gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.4);
+        }, i * 500); // 500ms between beeps
+      }
+    } catch (err) {
+      console.log('Error sound playback failed:', err);
     }
   };
 
   const playWarningSound = () => {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.value = 400; // Medium pitch for warning
-    oscillator.type = 'triangle';
-    gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.8);
+    try {
+      const audioContext = getAudioContext();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 400; // Medium pitch for warning
+      oscillator.type = 'triangle';
+      gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.8);
+    } catch (err) {
+      console.log('Warning sound playback failed:', err);
+    }
   };
 
   useEffect(() => {
@@ -120,6 +141,14 @@ export const Scanner: React.FC = () => {
   const startScanning = async () => {
     try {
       setError('');
+      
+      // Initialize audio context on user interaction (required by browsers)
+      try {
+        getAudioContext();
+        console.log('🔊 Audio context initialized');
+      } catch (err) {
+        console.log('⚠️ Audio context initialization failed:', err);
+      }
       
       // Check if we have HTTPS or localhost
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
