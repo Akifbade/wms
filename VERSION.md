@@ -1,8 +1,8 @@
 ```markdown
 # 📦 WMS Version History
-## Current Version: **v2.1.87**
+## Current Version: **v2.1.88**
 ## Current Version: **v2.1.38**
-- **Released**: Nov 02, 2025 at 22:34:48
+- **Released**: Nov 02, 2025 at 22:37:41
 - **Author**: akifbade46-del
 - **Status**: Development  
 - **Change**: fix: critical - fix missing qrTimestamp variable in shipments.ts
