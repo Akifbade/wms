@@ -2,7 +2,18 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "🚀 Auto Commit & Push",
+      "label": "� LOCALHOST: Rebuild & Start All Containers",
+      "type": "shell",
+      "command": "Write-Host '🔄 Rebuilding all containers with latest code...' -ForegroundColor Cyan; docker-compose down; docker-compose up -d --build; Write-Host '✅ Waiting for containers to start...' -ForegroundColor Green; Start-Sleep -Seconds 10; docker ps; Write-Host ''; Write-Host '✅ Localhost is ready!' -ForegroundColor Green; Write-Host 'Frontend: http://localhost:80' -ForegroundColor Yellow; Write-Host 'Backend: http://localhost:5000/api/health' -ForegroundColor Yellow",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "�🚀 Auto Commit & Push",
       "type": "shell",
       "command": ".\\quick-commit.ps1",
       "problemMatcher": [],
@@ -114,6 +125,36 @@
       "label": "🔒 SAFETY: Verify Production Health",
       "type": "shell",
       "command": "Write-Host '🔍 Checking production health...' -ForegroundColor Cyan; `$response = Invoke-WebRequest -Uri 'https://148.230.107.155/api/health' -SkipCertificateCheck -ErrorAction SilentlyContinue; if (`$response.StatusCode -eq 200) { `$data = `$response.Content | ConvertFrom-Json; Write-Host '✅ PRODUCTION HEALTHY' -ForegroundColor Green; Write-Host ('Version: ' + `$data.version) -ForegroundColor Green; Write-Host ('Environment: ' + `$data.environment) -ForegroundColor Green } else { Write-Host '⚠️ Production health check failed' -ForegroundColor Yellow }",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "🔄 LOCALHOST REBUILD: Fresh Docker Build",
+      "type": "shell",
+      "command": "Write-Host '🔨 Rebuilding localhost Docker containers with LATEST CODE...' -ForegroundColor Cyan; cd .; docker-compose down --remove-orphans 2>&1 | Out-Null; docker-compose up --build -d 2>&1 | Select-Object -Last 5; Start-Sleep -Seconds 10; (Invoke-WebRequest -Uri 'http://localhost:5000/api/health' -ErrorAction SilentlyContinue).Content | ConvertFrom-Json | ForEach-Object { Write-Host \"✅ Localhost backend running v$($_.version)\" -ForegroundColor Green }",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "📱 LOCALHOST TEST: Open Frontend",
+      "type": "shell",
+      "command": "Start-Process 'http://localhost'; Write-Host '✅ Frontend opened at http://localhost' -ForegroundColor Green",
+      "presentation": {
+        "reveal": "silent"
+      }
+    },
+    {
+      "label": "🧪 LOCALHOST TEST: Check All APIs",
+      "type": "shell",
+      "command": "Write-Host '🔍 Testing localhost APIs...' -ForegroundColor Cyan; `$response = Invoke-WebRequest -Uri 'http://localhost:5000/api/health' -ErrorAction SilentlyContinue; if (`$response.StatusCode -eq 200) { `$data = `$response.Content | ConvertFrom-Json; Write-Host '✅ Backend: ' + `$data.version -ForegroundColor Green; Write-Host '✅ QR Format: SHIPMENT_XXX and RACK_XXX (simplified)' -ForegroundColor Green; Write-Host '✅ Pallet QR: REMOVED from UI' -ForegroundColor Green } else { Write-Host '❌ Backend API not responding' -ForegroundColor Red }",
       "presentation": {
         "reveal": "always",
         "panel": "shared"

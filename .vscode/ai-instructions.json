@@ -1,0 +1,84 @@
+{
+  "README": "AI WORKFLOW INSTRUCTIONS - MANDATORY DEPLOYMENT PROCEDURE",
+  
+  "CRITICAL_RULE_1": "NEVER push multiple commits rapidly - causes staging crashes",
+  "CRITICAL_RULE_2": "ALWAYS test locally BEFORE any git push",
+  "CRITICAL_RULE_3": "Git push triggers automatic staging deployment (3-5 min)",
+  "CRITICAL_RULE_4": "Production ONLY via manual GitHub Actions approval",
+  "CRITICAL_RULE_5": "Version updates AUTOMATICALLY in commit",
+  
+  "DEPLOYMENT_WORKFLOW": {
+    "step1": {
+      "action": "Make code changes locally",
+      "location": "VSCode editor",
+      "test": "Run task: 🧪 LOCALHOST TEST: Check All APIs"
+    },
+    "step2": {
+      "action": "Commit changes (ONE commit at a time)",
+      "command": "git add . && git commit -m 'your message'",
+      "note": "Version auto-updates in VERSION.md and version.json"
+    },
+    "step3": {
+      "action": "Push ONCE (triggers staging deployment)",
+      "command": "git push origin stable/prisma-mysql-production",
+      "warning": "⚠️ ONLY push ONCE - multiple pushes crash staging"
+    },
+    "step4": {
+      "action": "Wait for GitHub Actions (3-5 minutes)",
+      "check": "https://github.com/Akifbade/wms/actions",
+      "verify": "Build Frontend ✅ → Deploy to Staging ✅"
+    },
+    "step5": {
+      "action": "Test staging thoroughly",
+      "url": "http://148.230.107.155:8080",
+      "tests": [
+        "Frontend loads",
+        "Can login",
+        "QR codes work",
+        "Photo uploads work",
+        "No console errors"
+      ]
+    },
+    "step6": {
+      "action": "Deploy to production (manual approval)",
+      "method": "GitHub Actions → Three-Stage Deployment → Run workflow → Select production → Approve"
+    }
+  },
+  
+  "VERSION_SYSTEM": {
+    "file1": "VERSION.md - Auto-updates on commit",
+    "file2": "frontend/public/version.json - Auto-updates on commit",
+    "file3": "backend/src/config/version.ts - Manual update if needed",
+    "display": "Version shows in UI 'i' button with commit message"
+  },
+  
+  "COMMON_MISTAKES_TO_AVOID": {
+    "mistake1": "❌ Pushing multiple commits rapidly → CAUSES STAGING CRASH",
+    "mistake2": "❌ Not testing localhost first → Breaks staging",
+    "mistake3": "❌ Deploying directly to production → BLOCKED by workflow",
+    "mistake4": "❌ Creating documentation files → NEW AI WON'T READ",
+    "solution": "✅ Use .vscode tasks and this ai-instructions.json"
+  },
+  
+  "IF_STAGING_BREAKS": {
+    "step1": "ssh -i ~/.ssh/github_actions_wms root@148.230.107.155",
+    "step2": "docker logs wms-staging-backend --tail 50",
+    "step3": "docker restart wms-staging-backend",
+    "step4": "Check: curl http://127.0.0.1:5001/api/health"
+  },
+  
+  "AVAILABLE_VSCODE_TASKS": {
+    "localhost_test": "🧪 LOCALHOST TEST: Check All APIs",
+    "localhost_rebuild": "🔄 LOCALHOST REBUILD: Fresh Docker Build",
+    "staging_verify": "🔒 SAFETY: Verify Staging Before Production",
+    "production_verify": "🔒 SAFETY: Verify Production Health",
+    "workflow_guide": "⚡ QUICK WORKFLOW: Local → Staging → Production"
+  },
+  
+  "SAFETY_MECHANISMS": {
+    "pre_deployment_backups": "Auto-created before every deployment",
+    "auto_rollback": "Triggers on any deployment failure",
+    "health_checks": "Verify staging/production after deployment",
+    "manual_production_approval": "No auto-production deployments allowed"
+  }
+}
