@@ -211,6 +211,9 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
         ...rest,
         qrCode,
         capacityUsed: 0,
+        zone: formData.zone.trim() || 'Unassigned', // Same as Bulk Add
+        zoneDescription: formData.zoneDescription || '',
+        zoneIcon: formData.zoneIcon || '📦',
         length: length ? parseFloat(length) : undefined,
         width: width ? parseFloat(width) : undefined,
         height: height ? parseFloat(height) : undefined,
