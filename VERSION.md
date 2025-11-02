@@ -1,10 +1,10 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.1.20**
-- **Released**: Nov 02, 2025 at 00:15:37
+## Current Version: **v2.1.21**
+- **Released**: Nov 02, 2025 at 06:29:08
 - **Author**: akifbade46-del
 - **Status**: Development
-- **Change**: fix: improved camera error detection with detailed mobile debugging logs
+- **Change**: feat: complete scanner rebuild - 2-step QR workflow with single scan per step, success messages, and assignment modal (v2.1.21)
 
 ---
 
