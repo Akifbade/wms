@@ -25,6 +25,7 @@ interface EditRackModalProps {
 export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: EditRackModalProps) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [existingZones, setExistingZones] = useState<Array<{zone: string, zoneIcon: string, zoneDescription: string}>>([]);
   const [formData, setFormData] = useState({
     code: '',
     location: '',
@@ -46,6 +47,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
   const [success, setSuccess] = useState('');
   const [selectedCategoryInfo, setSelectedCategoryInfo] = useState<Category | null>(null);
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [useExistingZone, setUseExistingZone] = useState(false);
 
   const resolveLogoUrl = (logo?: string | null) => {
     if (!logo) return '';
@@ -53,10 +55,11 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
     return logo.startsWith('/') ? logo : `/uploads/${logo}`;
   };
 
-  // Load categories when modal opens
+  // Load categories and existing zones when modal opens
   useEffect(() => {
     if (isOpen) {
       loadCategories();
+      loadExistingZones();
     }
   }, [isOpen]);
 
@@ -79,6 +82,54 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
       setCategories(options);
     } catch (err) {
       console.error('Failed to load categories:', err);
+    }
+  };
+
+  const loadExistingZones = async () => {
+    try {
+      const response = await racksAPI.getAll();
+      const racks = response.racks || [];
+      
+      // Get unique zones with their icons and descriptions
+      const zonesMap = new Map();
+      racks.forEach((r: any) => {
+        if (r.zone && r.zone !== 'Unassigned') {
+          if (!zonesMap.has(r.zone)) {
+            zonesMap.set(r.zone, {
+              zone: r.zone,
+              zoneIcon: r.zoneIcon || '📦',
+              zoneDescription: r.zoneDescription || ''
+            });
+          }
+        }
+      });
+      
+      setExistingZones(Array.from(zonesMap.values()).sort((a, b) => a.zone.localeCompare(b.zone)));
+    } catch (err) {
+      console.error('Failed to load existing zones:', err);
+    }
+  };
+
+  const handleZoneSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedZone = e.target.value;
+    if (selectedZone === 'current') {
+      // Keep current rack's zone
+      setUseExistingZone(false);
+    } else if (selectedZone === 'new') {
+      setUseExistingZone(false);
+      setFormData(prev => ({ ...prev, zone: '', zoneIcon: '📦', zoneDescription: '' }));
+    } else {
+      const zone = existingZones.find(z => z.zone === selectedZone);
+      if (zone) {
+        setUseExistingZone(true);
+        setFormData(prev => ({ 
+          ...prev, 
+          zone: zone.zone,
+          zoneIcon: zone.zoneIcon,
+          zoneDescription: zone.zoneDescription,
+          location: `Zone ${zone.zone}, Rack ${prev.code}`
+        }));
+      }
     }
   };
 
@@ -309,6 +360,97 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Use format like A1, A2, B1, etc.
+                </p>
+              </div>
+
+              {/* Zone Selector - Optional */}
+              {existingZones.length > 0 && (
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <label className="block text-sm font-medium text-blue-900 mb-2">
+                    📍 Quick Select Zone (Optional)
+                  </label>
+                  <select
+                    value={useExistingZone ? 'current' : 'new'}
+                    onChange={handleZoneSelect}
+                    className="w-full px-3 py-2 border border-blue-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="current">Keep Current Zone</option>
+                    <option value="new">Create New Zone</option>
+                    <optgroup label="Existing Zones">
+                      {existingZones.map((zone) => (
+                        <option key={zone.zone} value={zone.zone}>
+                          {zone.zoneIcon ? `${zone.zoneIcon} ` : ''}
+                          {zone.zone}
+                          {zone.zoneDescription ? ` - ${zone.zoneDescription}` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                  <p className="text-xs text-blue-700 mt-2">
+                    💡 Select an existing zone to auto-fill zone details
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Zone <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="zone"
+                  value={formData.zone}
+                  onChange={handleChange}
+                  disabled={useExistingZone}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    useExistingZone ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
+                  placeholder="e.g., Zone A, Warehouse 1, Floor 2..."
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Main zone identifier (e.g., "Zone A")
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Zone Icon
+                </label>
+                <input
+                  type="text"
+                  name="zoneIcon"
+                  value={formData.zoneIcon || ''}
+                  onChange={handleChange}
+                  disabled={useExistingZone}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    useExistingZone ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
+                  placeholder="e.g., 📦 🏢 🚚"
+                  maxLength={10}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Optional emoji or icon
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Zone Description
+                </label>
+                <input
+                  type="text"
+                  name="zoneDescription"
+                  value={formData.zoneDescription || ''}
+                  onChange={handleChange}
+                  disabled={useExistingZone}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    useExistingZone ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
+                  placeholder="e.g., Cold Storage, Main Warehouse..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Optional description of the zone
                 </p>
               </div>
 
