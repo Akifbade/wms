@@ -24,16 +24,19 @@ router.use(authenticateToken);
 // Configure multer for shipment photo uploads
 const photoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = 'uploads/shipments';
+    const uploadDir = path.join(process.cwd(), 'uploads/shipments');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
+    console.log(`📸 Photo upload destination: ${uploadDir}`);
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
-    cb(null, `shipment-${uniqueSuffix}${ext}`);
+    const filename = `shipment-${uniqueSuffix}${ext}`;
+    console.log(`📸 Photo filename: ${filename}`);
+    cb(null, filename);
   }
 });
 
@@ -61,10 +64,19 @@ router.post(
   async (req: AuthRequest, res: Response) => {
     try {
       if (!req.file) {
+        console.error('❌ No file in request');
         return res.status(400).json({ error: 'No photo uploaded' });
       }
 
+      // Verify file was actually written to disk
+      const filePath = path.join(process.cwd(), `uploads/shipments/${req.file.filename}`);
+      if (!fs.existsSync(filePath)) {
+        console.error(`❌ File not found after upload: ${filePath}`);
+        return res.status(500).json({ error: 'File upload failed - file not persisted' });
+      }
+
       const photoUrl = `/uploads/shipments/${req.file.filename}`;
+      console.log(`✅ Photo uploaded successfully: ${photoUrl} (${req.file.size} bytes)`);
 
       res.json({
         success: true,
