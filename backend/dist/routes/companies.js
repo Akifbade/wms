@@ -11,6 +11,24 @@ const fs_1 = __importDefault(require("fs"));
 const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
+const parseBoolean = (value, fallback) => {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true') {
+            return true;
+        }
+        if (normalized === 'false') {
+            return false;
+        }
+    }
+    if (typeof value === 'number') {
+        return value === 1;
+    }
+    return fallback;
+};
 // Configure multer for company logo uploads
 const storage = multer_1.default.diskStorage({
     destination: (req, file, cb) => {
@@ -38,7 +56,14 @@ router.get('/', auth_1.authenticateToken, async (req, res) => {
             where: { companyId },
             orderBy: { name: 'asc' }
         });
-        res.json(profiles);
+        const protocol = req.protocol || 'http';
+        const host = req.get('host');
+        const baseUrl = host ? `${protocol}://${host}` : null;
+        const payload = profiles.map((profile) => ({
+            ...profile,
+            logoUrl: profile.logo && baseUrl ? `${baseUrl}${profile.logo}` : null,
+        }));
+        res.json(payload);
     }
     catch (error) {
         console.error('Error fetching company profiles:', error);
@@ -62,7 +87,13 @@ router.get('/:profileId', auth_1.authenticateToken, async (req, res) => {
         if (!profile) {
             return res.status(404).json({ error: 'Company profile not found' });
         }
-        res.json(profile);
+        const protocol = req.protocol || 'http';
+        const host = req.get('host');
+        const baseUrl = host ? `${protocol}://${host}` : null;
+        res.json({
+            ...profile,
+            logoUrl: profile.logo && baseUrl ? `${baseUrl}${profile.logo}` : null,
+        });
     }
     catch (error) {
         console.error('Error fetching company profile:', error);
@@ -88,6 +119,7 @@ router.post('/', auth_1.authenticateToken, upload.single('logo'), async (req, re
             return res.status(400).json({ error: 'Company profile with this name already exists' });
         }
         const logoPath = req.file ? `/uploads/company-logos/${req.file.filename}` : null;
+        const activeFlag = parseBoolean(isActive, true);
         const profile = await prisma.companyProfile.create({
             data: {
                 name: name.trim(),
@@ -96,11 +128,17 @@ router.post('/', auth_1.authenticateToken, upload.single('logo'), async (req, re
                 contactPhone: contactPhone?.trim() || '',
                 logo: logoPath,
                 contractStatus: contractStatus || 'ACTIVE',
-                isActive: isActive !== false,
+                isActive: activeFlag,
                 companyId
             }
         });
-        res.status(201).json(profile);
+        const protocol = req.protocol || 'http';
+        const host = req.get('host');
+        const baseUrl = host ? `${protocol}://${host}` : null;
+        res.status(201).json({
+            ...profile,
+            logoUrl: profile.logo && baseUrl ? `${baseUrl}${profile.logo}` : null,
+        });
     }
     catch (error) {
         console.error('Error creating company profile:', error);
@@ -159,10 +197,16 @@ router.put('/:profileId', auth_1.authenticateToken, upload.single('logo'), async
                 contactPhone: contactPhone?.trim(),
                 logo: logoPath,
                 contractStatus: contractStatus || profile.contractStatus,
-                isActive: isActive !== undefined ? isActive : profile.isActive
+                isActive: isActive !== undefined ? parseBoolean(isActive, profile.isActive) : profile.isActive
             }
         });
-        res.json(updated);
+        const protocol = req.protocol || 'http';
+        const host = req.get('host');
+        const baseUrl = host ? `${protocol}://${host}` : null;
+        res.json({
+            ...updated,
+            logoUrl: updated.logo && baseUrl ? `${baseUrl}${updated.logo}` : null,
+        });
     }
     catch (error) {
         console.error('Error updating company profile:', error);

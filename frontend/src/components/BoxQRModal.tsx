@@ -144,27 +144,11 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
         const arrDate = (shipment as any)?.arrivalDate ? new Date((shipment as any).arrivalDate) : null;
         const ad = arrDate ? `${arrDate.getFullYear()}-${String(arrDate.getMonth()+1).padStart(2,'0')}-${String(arrDate.getDate()).padStart(2,'0')}` : '';
         const buildPalletQR = (palletNumber: number, pieces: number) => {
-          // Compact summary segment appended to QR for pallet metadata
-          const meta = {
-            t: 'PAL', // type: pallet
-            pn: palletNumber,
-            pc: totalPallets || palletCounts.size,
-            pcs: pieces,
-            ref: shipmentRef,
-            c: client,
-            ad,
-          };
-          let encoded = '';
-          try {
-            encoded = typeof window !== 'undefined' && (window as any).btoa
-              ? (window as any).btoa(JSON.stringify(meta))
-              : btoa(JSON.stringify(meta));
-          } catch {
-            encoded = encodeURIComponent(JSON.stringify(meta));
-          }
-          return master
-            ? `${master}-PAL-${palletNumber}-OF-${totalPallets || palletCounts.size}|S:${encoded}`
-            : `PALLET-${shipmentId}-${palletNumber}|S:${encoded}`;
+          // ✅ SIMPLIFIED: Use same format as SHIPMENT_XXX and RACK_XXX
+          // Format: PALLET_SHIPMENTID_PALLETNUMBER
+          // Example: PALLET_cmhhm6gq1000132e5vadvqil_1
+          // Scanner can easily extract shipmentId and pallet number
+          return `PALLET_${shipmentId}_${palletNumber}`;
         };
         const palletsUnits = Array.from(palletCounts.entries())
           .sort((a, b) => a[0] - b[0])

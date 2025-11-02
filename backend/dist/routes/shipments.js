@@ -25,16 +25,19 @@ router.use(auth_1.authenticateToken);
 // Configure multer for shipment photo uploads
 const photoStorage = multer_1.default.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = 'uploads/shipments';
+        const uploadDir = path_1.default.join(process.cwd(), 'uploads/shipments');
         if (!fs_1.default.existsSync(uploadDir)) {
             fs_1.default.mkdirSync(uploadDir, { recursive: true });
         }
+        console.log(`📸 Photo upload destination: ${uploadDir}`);
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path_1.default.extname(file.originalname);
-        cb(null, `shipment-${uniqueSuffix}${ext}`);
+        const filename = `shipment-${uniqueSuffix}${ext}`;
+        console.log(`📸 Photo filename: ${filename}`);
+        cb(null, filename);
     }
 });
 const photoUpload = (0, multer_1.default)({
@@ -56,9 +59,17 @@ const photoUpload = (0, multer_1.default)({
 router.post('/upload/photo', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), photoUpload.single('photo'), async (req, res) => {
     try {
         if (!req.file) {
+            console.error('❌ No file in request');
             return res.status(400).json({ error: 'No photo uploaded' });
         }
+        // Verify file was actually written to disk
+        const filePath = path_1.default.join(process.cwd(), `uploads/shipments/${req.file.filename}`);
+        if (!fs_1.default.existsSync(filePath)) {
+            console.error(`❌ File not found after upload: ${filePath}`);
+            return res.status(500).json({ error: 'File upload failed - file not persisted' });
+        }
         const photoUrl = `/uploads/shipments/${req.file.filename}`;
+        console.log(`✅ Photo uploaded successfully: ${photoUrl} (${req.file.size} bytes)`);
         res.json({
             success: true,
             photoUrl,
@@ -371,16 +382,16 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         if (settings.requireRackAssignment && !data.rackId) {
             return res.status(400).json({ error: 'Rack assignment is required by company settings' });
         }
-        // Generate master QR code for shipment using settings prefix
-        const qrPrefix = settings.autoGenerateQR ? settings.qrCodePrefix : 'QR-SH';
-        const qrTimestamp = Date.now();
-        const qrBase = `${qrPrefix}-${qrTimestamp}`;
-        const qrMetaSegments = [`P${palletCount}`, `B${boxesPerPallet}`, `T${totalBoxCount}`];
-        const masterQR = [qrBase, ...qrMetaSegments].join('-');
+        // Generate master QR code for shipment - SIMPLE FORMAT: SHIPMENT_ID only
+        // Format: SHIPMENT_{shipmentNumber} - QR must NEVER change once assigned
+        // No metadata in QR (metadata stored in database only)
+        const timestamp = Date.now();
+        const shipmentNumber = `${timestamp}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+        const masterQR = `SHIPMENT_${shipmentNumber}`;
         // ???? USE DEFAULT STORAGE TYPE FROM SETTINGS IF NOT PROVIDED
         const shipmentType = data.type || settings.defaultStorageType;
         const normalizedCustomerName = data.customerName || companyProfileName || data.clientName || null;
-        const referenceId = data.referenceId || `SH-${qrTimestamp}`;
+        const referenceId = data.referenceId || `SH-${timestamp}`;
         // Build create payload as `any` to avoid TS type mismatch if Prisma client
         // hasn't been regenerated yet. Fields are nullable to ensure non-destructive
         // migrations and safe inserts.
@@ -444,7 +455,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                     boxesToCreate.push({
                         shipmentId: shipment.id,
                         boxNumber: boxIdx,
-                        qrCode: `${masterQR}-BOX-${boxIdx}-OF-${totalBoxCount}-PAL-${p}`,
+                        qrCode: `${masterQR}-BOX${String(boxIdx).padStart(3, '0')}`,
                         rackId: data.rackId || null,
                         status: data.rackId ? 'IN_STORAGE' : 'PENDING',
                         assignedAt: data.rackId ? new Date() : null,
@@ -475,7 +486,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                 boxesToCreate.push({
                     shipmentId: shipment.id,
                     boxNumber,
-                    qrCode: `${masterQR}-BOX-${boxNumber}-OF-${totalBoxCount}-PAL-0`,
+                    qrCode: `${masterQR}-BOX${String(boxNumber).padStart(3, '0')}`,
                     rackId: data.rackId || null,
                     status: data.rackId ? 'IN_STORAGE' : 'PENDING',
                     assignedAt: data.rackId ? new Date() : null,
@@ -499,7 +510,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                 boxesToCreate.push({
                     shipmentId: shipment.id,
                     boxNumber: i,
-                    qrCode: `${masterQR}-BOX-${i}-OF-${totalBoxCount}-PAL-${palletNumber}`,
+                    qrCode: `${masterQR}-BOX${String(i).padStart(3, '0')}`,
                     rackId: data.rackId || null, // Assign to rack if provided
                     status: data.rackId ? 'IN_STORAGE' : 'PENDING',
                     assignedAt: data.rackId ? new Date() : null,
@@ -1033,19 +1044,35 @@ router.post('/:id/release-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER')
         res.status(500).json({ error: 'Internal server error' });
     }
 });
-// Delete shipment
+// Delete shipment (STRICT: prevent deletion if materials allocated to racks)
 router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const { id } = req.params;
         const companyId = req.user.companyId;
         const existing = await prisma.shipment.findFirst({
             where: { id, companyId },
+            include: {
+                boxes: {
+                    where: { rackId: { not: null } }, // Check if any box is in a rack
+                },
+            },
         });
         if (!existing) {
             return res.status(404).json({ error: 'Shipment not found' });
         }
-        await prisma.shipment.delete({ where: { id } });
-        res.json({ message: 'Shipment deleted successfully' });
+        // STRICT DELETE: Prevent deletion if materials are allocated to racks
+        if (existing.boxes.length > 0) {
+            return res.status(400).json({
+                error: 'Cannot delete shipment: Materials are currently allocated to racks',
+                detail: `${existing.boxes.length} box(es) in racks. Remove from racks first.`,
+            });
+        }
+        // Soft delete: mark with deletedAt timestamp instead of hard delete
+        await prisma.shipment.update({
+            where: { id },
+            data: { deletedAt: new Date() },
+        });
+        res.json({ message: 'Shipment deleted successfully (archived)' });
     }
     catch (error) {
         console.error('Delete shipment error:', error);
@@ -1111,6 +1138,159 @@ router.post('/cleanup/test-data', (0, auth_1.authorizeRoles)('ADMIN'), async (re
     catch (error) {
         console.error('Cleanup test data error:', error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+// ==========================================
+// ASSIGN BOXES TO RACK (with Pallet support)
+// ==========================================
+router.post('/:shipmentId/assign-rack', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), async (req, res) => {
+    try {
+        const { shipmentId } = req.params;
+        const { rackId, quantity, pallets, looseBoxes, photos } = req.body;
+        console.log('🎯 Assign-rack request:', {
+            shipmentId,
+            rackId,
+            quantity,
+            pallets,
+            looseBoxes,
+            photos: photos?.length || 0
+        });
+        // Validation
+        if (!rackId || !quantity) {
+            return res.status(400).json({
+                error: 'Missing required fields: rackId and quantity'
+            });
+        }
+        // Get shipment with boxes
+        const shipment = await prisma.shipment.findUnique({
+            where: { id: shipmentId },
+            include: {
+                boxes: {
+                    where: { rackId: null }, // Only unassigned boxes
+                    orderBy: { id: 'asc' }
+                }
+            }
+        });
+        if (!shipment) {
+            return res.status(404).json({ error: 'Shipment not found' });
+        }
+        // Check if we have enough unassigned boxes
+        const unassignedBoxes = shipment.boxes || [];
+        if (unassignedBoxes.length < quantity) {
+            return res.status(400).json({
+                error: `Not enough unassigned boxes. Available: ${unassignedBoxes.length}, Requested: ${quantity}`
+            });
+        }
+        // Get rack and check capacity
+        const rack = await prisma.rack.findUnique({
+            where: { id: rackId },
+            include: {
+                boxes: {
+                    include: { shipment: true }
+                }
+            }
+        });
+        if (!rack) {
+            return res.status(404).json({ error: 'Rack not found' });
+        }
+        // Get boxes to assign
+        const boxesToAssign = unassignedBoxes.slice(0, quantity);
+        // Calculate pallet usage for capacity check
+        const boxesPerPallet = shipment.boxesPerPallet || 0;
+        let palletsToAssign = pallets || 0;
+        if (boxesPerPallet > 0 && palletsToAssign === 0) {
+            // Auto-calculate pallets if not provided
+            palletsToAssign = Math.floor(quantity / boxesPerPallet);
+        }
+        // Check rack capacity
+        const currentPalletUsage = rack.capacityUsed || 0;
+        const newPalletUsage = currentPalletUsage + palletsToAssign;
+        if (newPalletUsage > (rack.capacityTotal || 100)) {
+            return res.status(400).json({
+                error: `Rack capacity exceeded. Current: ${currentPalletUsage}, Adding: ${palletsToAssign}, Max: ${rack.capacityTotal}`
+            });
+        }
+        // Assign boxes to rack with photos
+        const photosJson = photos && photos.length > 0 ? JSON.stringify(photos) : null;
+        const updatedBoxes = await prisma.$transaction(boxesToAssign.map((box, index) => {
+            // Calculate pallet number for this box
+            let palletNumber = null;
+            if (boxesPerPallet > 0 && palletsToAssign > 0) {
+                palletNumber = Math.floor(index / boxesPerPallet) + 1;
+                if (palletNumber > palletsToAssign) {
+                    palletNumber = null; // Loose box
+                }
+            }
+            // Store pallet info in pieceQR as JSON
+            const pieceData = box.pieceQR ? JSON.parse(box.pieceQR) : {};
+            pieceData.palletNumber = palletNumber;
+            return prisma.shipmentBox.update({
+                where: { id: box.id },
+                data: {
+                    rackId,
+                    assignedAt: new Date(),
+                    status: 'IN_STORAGE',
+                    pieceQR: JSON.stringify(pieceData),
+                    photos: photosJson // Store photos in all assigned boxes
+                }
+            });
+        }));
+        // Update rack capacity
+        await prisma.rack.update({
+            where: { id: rackId },
+            data: {
+                capacityUsed: newPalletUsage,
+                status: newPalletUsage >= (rack.capacityTotal || 100) ? 'FULL' :
+                    newPalletUsage > 0 ? 'OCCUPIED' : 'AVAILABLE'
+            }
+        });
+        // Recompute rack pallet usage for accuracy (pass required parameters)
+        try {
+            await (0, rackCapacity_1.recomputeRackPalletUsage)(prisma, rackId, req.user.companyId);
+        }
+        catch (err) {
+            console.warn('⚠️ Failed to recompute rack capacity:', err);
+        }
+        // Check remaining boxes and update shipment status
+        const remainingBoxes = await prisma.shipmentBox.count({
+            where: {
+                shipmentId,
+                rackId: null
+            }
+        });
+        let newStatus = shipment.status;
+        if (remainingBoxes === 0) {
+            newStatus = 'IN_WAREHOUSE';
+        }
+        else if (remainingBoxes < shipment.currentBoxCount) {
+            newStatus = 'PARTIAL';
+        }
+        await prisma.shipment.update({
+            where: { id: shipmentId },
+            data: { status: newStatus }
+        });
+        console.log('✅ Assigned successfully:', {
+            shipmentId,
+            rackCode: rack.code,
+            boxesAssigned: updatedBoxes.length,
+            palletsAssigned: palletsToAssign,
+            remainingBoxes,
+            newStatus
+        });
+        res.json({
+            success: true,
+            message: `Successfully assigned ${updatedBoxes.length} boxes to ${rack.code}`,
+            assigned: updatedBoxes.length,
+            pallets: palletsToAssign,
+            looseBoxes: looseBoxes || 0,
+            rackCode: rack.code,
+            remainingBoxes,
+            shipmentStatus: newStatus
+        });
+    }
+    catch (error) {
+        console.error('❌ Assign-rack error:', error);
+        res.status(500).json({ error: 'Failed to assign boxes to rack' });
     }
 });
 exports.default = router;

@@ -11,12 +11,12 @@ const router = express_1.default.Router();
 // Configure multer storage
 const storage = multer_1.default.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/logos');
+        cb(null, 'uploads/company-logos');
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path_1.default.extname(file.originalname);
-        cb(null, `company-logo-${uniqueSuffix}${ext}`);
+        cb(null, `company-${uniqueSuffix}${ext}`);
     }
 });
 const upload = (0, multer_1.default)({
@@ -43,7 +43,7 @@ router.post('/logo', auth_1.authenticateToken, upload.single('logo'), (req, res)
                 error: 'No file uploaded'
             });
         }
-        const logoUrl = `/uploads/logos/${req.file.filename}`;
+        const logoUrl = `/uploads/company-logos/${req.file.filename}`;
         console.log('Logo uploaded successfully:', {
             filename: req.file.filename,
             size: req.file.size,

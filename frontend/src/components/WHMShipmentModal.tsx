@@ -104,10 +104,6 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     taxRate: 0,
   });
 
-  // ???? QR CODE STATE
-  const [showQRPreview, setShowQRPreview] = useState(false);
-  const [qrCodeValue, setQRCodeValue] = useState('');
-
   // ???? INTAKE MODE STATE (Pallet vs Box mode)
   const [intakeMode, setIntakeMode] = useState<'pallet' | 'box'>('pallet');
   const [palletPhotoMap, setPalletPhotoMap] = useState<Record<number, string[]>>({});
@@ -441,16 +437,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     }
   }, [boxesDistribution, extraBoxes, variablePerPallet, intakeMode, formData.palletCount, formData.boxesPerPallet]);
 
-  const generateQRPreview = () => {
-    // Simple QR format: Only shipment number (backend generates unique shipment ID)
-    // QR must be simple and reusable for scanning - no metadata in QR itself
-    const timestamp = Date.now();
-    const shipmentNumber = `${timestamp}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-    const qrValue = `SHIPMENT_${shipmentNumber}`;
 
-    setQRCodeValue(qrValue);
-    setShowQRPreview(true);
-  };
 
   const resolveMediaUrl = (url: string) => {
     if (!url) return '';
@@ -1530,49 +1517,6 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </div>
             )}
 
-            {/* QR Code Preview Modal */}
-            {showQRPreview && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-gray-800">Shipment QR Code</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowQRPreview(false)}
-                      className="text-gray-500 hover:text-gray-700 text-2xl"
-                      >
-                      ×
-                    </button>
-                  </div>
-                  <div className="bg-gray-50 p-6 rounded-lg flex flex-col items-center mb-4">
-                    <div className="mb-4 text-center">
-                      <p className="text-sm text-gray-600 mb-2">Master QR Code</p>
-                      <p className="font-mono bg-white p-4 rounded border border-gray-300 text-sm break-all">
-                        {qrCodeValue}
-                      </p>
-                    </div>
-                    <div className="w-full border-t pt-4 mt-4">
-                      <h4 className="font-semibold text-gray-700 mb-3">Shipment Information:</h4>
-                      <div className="bg-blue-50 p-3 rounded">
-                        <p className="text-gray-600 text-sm mb-1">Use this QR code to scan and identify the shipment</p>
-                        <p className="text-xs text-gray-500">QR codes are permanent and never change</p>
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(qrCodeValue);
-                      alert('QR Code copied to clipboard!');
-                    }}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors"
-                  >
-                    Copy QR Code
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Settings Info Banner */}
             {(shipmentSettings.requireClientEmail || shipmentSettings.requireEstimatedValue || shipmentSettings.requireRackAssignment) && (
               <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-800 p-4 rounded-r-lg">
@@ -2085,14 +2029,6 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={generateQRPreview}
-                className="px-6 py-3 border-2 border-purple-500 text-purple-600 rounded-lg hover:bg-purple-50 font-medium transition-colors flex items-center gap-2"
-                disabled={loading}
-              >
-                View Shipment QR
-              </button>
               <button
                 type="button"
                 onClick={onClose}
