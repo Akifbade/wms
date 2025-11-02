@@ -637,10 +637,8 @@ export const Racks: React.FC = () => {
             const zoneIcon = zoneRacks[0]?.zoneIcon || (zoneName === 'Unassigned' ? '📦' : '🏢');
             const zoneDescription = zoneRacks[0]?.zoneDescription || '';
 
-            // Get company logo from racks in this zone (if all racks belong to same company)
-            const companyLogos = [...new Set(zoneRacks.map((r: any) => r.companyProfile?.logo).filter(Boolean))];
+            // Get company name from racks in this zone (if all racks belong to same company)
             const companyNames = [...new Set(zoneRacks.map((r: any) => r.companyProfile?.name).filter(Boolean))];
-            const singleCompanyLogo = companyLogos.length === 1 ? String(companyLogos[0]) : null;
             const singleCompanyName = companyNames.length === 1 ? String(companyNames[0]) : null;
 
             // Calculate pallet and box totals
@@ -661,18 +659,6 @@ export const Racks: React.FC = () => {
                     <div className="text-5xl">
                       {zoneIcon}
                     </div>
-
-                    {/* Company Logo (if all racks in zone belong to same company) */}
-                    {singleCompanyLogo && (
-                      <div className="flex-shrink-0">
-                        <img
-                          src={resolveLogoUrl(singleCompanyLogo)}
-                          alt={singleCompanyName || 'Company'}
-                          className="w-20 h-20 object-contain rounded-lg border-2 border-gray-300 bg-white p-2 shadow-md"
-                          title={singleCompanyName || 'Company Logo'}
-                        />
-                      </div>
-                    )}
 
                     {/* Zone Info */}
                     <div className="text-left flex-1">
