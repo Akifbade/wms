@@ -180,7 +180,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
               <img 
                 src={settings.companyLogo || companyInfo?.logo} 
                 alt="Logo" 
-                className="h-16 mx-auto mb-2" 
+                className="h-12 mx-auto mb-2 print:h-10" 
               />
             )}
             <h1 className="text-2xl font-bold" style={{ color: primaryColor }}>
