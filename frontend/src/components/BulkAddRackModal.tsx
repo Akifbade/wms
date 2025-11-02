@@ -30,8 +30,8 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
   const [formData, setFormData] = useState({
     zone: '',
     prefix: '',
-    startNumber: 1,
-    endNumber: 10,
+    startNumber: 1, // 1=A
+    endNumber: 6,   // 6=F (creates A, B, C, D, E, F)
     location: '',
     categoryId: '',
     companyProfileId: '',
@@ -107,12 +107,18 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
     }
   };
 
+  // Convert number to letter (1=A, 2=B, 3=C, etc.)
+  const numberToLetter = (num: number): string => {
+    return String.fromCharCode(64 + num); // 65 is 'A', so 64+1=A
+  };
+
   const getPreviewRacks = () => {
     const { prefix, startNumber, endNumber } = formData;
     const count = Math.min(endNumber - startNumber + 1, 5); // Show max 5 previews
     return Array.from({ length: count }, (_, i) => {
       const num = startNumber + i;
-      return `${prefix}${num}`;
+      const letter = numberToLetter(num);
+      return `${prefix}${letter}`;
     });
   };
 
@@ -147,15 +153,16 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
       const racksToCreate = [];
       
       for (let i = formData.startNumber; i <= formData.endNumber; i++) {
-        const rackCode = `${formData.prefix}${i}`;
-        const location = formData.location.replace('{n}', i.toString());
+        const letter = numberToLetter(i);
+        const rackCode = `${formData.prefix}${letter}`;
+        const location = formData.location.replace('{n}', letter);
         
         const selectedCompanyProfileId = formData.companyProfileId || formData.categoryId || '';
         
         const rackData: any = {
           code: rackCode,
           zone: formData.zone,
-          location: location || `${formData.zone}, Position ${i}`,
+          location: location || `Zone ${formData.zone}, Rack ${rackCode}`,
           rackType: formData.rackType,
           capacityMode: formData.capacityMode,
           status: 'ACTIVE'
@@ -250,19 +257,19 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Zone Name <span className="text-red-500">*</span>
+                  Zone Number <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   name="zone"
                   value={formData.zone}
                   onChange={handleChange}
-                  placeholder="e.g., 1A, 1B, 1C (Zone 1 sub-sections)"
+                  placeholder="e.g., 1, 2, 3, 4..."
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  💡 Tip: Use format like <strong>1A, 1B, 1C</strong> for sub-zones, or <strong>Zone 1, Zone 2</strong> for main zones
+                  💡 Tip: Enter zone number like <strong>1</strong>, then create racks <strong>1A, 1B, 1C, 1D</strong> with prefix below
                 </p>
               </div>
 
@@ -314,29 +321,29 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
           {/* Numbering System */}
           <div className="bg-green-50 p-4 rounded-lg border border-green-200">
             <h3 className="text-lg font-semibold mb-4 text-green-800 flex items-center gap-2">
-              🔢 Auto-Numbering System
+              🔢 Rack Code System
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Prefix <span className="text-red-500">*</span>
+                  Rack Code <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   name="prefix"
                   value={formData.prefix}
                   onChange={handleChange}
-                  placeholder="e.g., 1A- (creates 1A-1, 1A-2, ...)"
+                  placeholder="e.g., 1 (creates 1A, 1B, 1C...)"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  💡 Example: Prefix "1A-" with range 1-10 creates: 1A-1, 1A-2, 1A-3 ... 1A-10
+                  💡 Example: Code "1" creates: <strong>1A, 1B, 1C, 1D</strong> (using A, B, C... below)
                 </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start Number
+                  Start Letter (1=A, 2=B...)
                 </label>
                 <input
                   type="number"
@@ -344,12 +351,14 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
                   value={formData.startNumber}
                   onChange={handleChange}
                   min="1"
+                  max="26"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
+                <p className="text-xs text-gray-500 mt-1">1=A, 2=B, 3=C...</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  End Number
+                  End Letter (1=A, 2=B...)
                 </label>
                 <input
                   type="number"
@@ -357,8 +366,10 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
                   value={formData.endNumber}
                   onChange={handleChange}
                   min={formData.startNumber}
+                  max="26"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
+                <p className="text-xs text-gray-500 mt-1">1=A, 4=D, 6=F...</p>
               </div>
             </div>
             
