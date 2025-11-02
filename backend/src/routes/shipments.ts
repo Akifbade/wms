@@ -420,14 +420,15 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
     // Generate master QR code for shipment - SIMPLE FORMAT: SHIPMENT_ID only
     // Format: SHIPMENT_{shipmentNumber} - QR must NEVER change once assigned
     // No metadata in QR (metadata stored in database only)
-    const shipmentNumber = `${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const timestamp = Date.now();
+    const shipmentNumber = `${timestamp}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     const masterQR = `SHIPMENT_${shipmentNumber}`;
 
     // ???? USE DEFAULT STORAGE TYPE FROM SETTINGS IF NOT PROVIDED
     const shipmentType = data.type || settings.defaultStorageType;
 
     const normalizedCustomerName = data.customerName || companyProfileName || data.clientName || null;
-    const referenceId = data.referenceId || `SH-${qrTimestamp}`;
+    const referenceId = data.referenceId || `SH-${timestamp}`;
 
     // Build create payload as `any` to avoid TS type mismatch if Prisma client
     // hasn't been regenerated yet. Fields are nullable to ensure non-destructive
