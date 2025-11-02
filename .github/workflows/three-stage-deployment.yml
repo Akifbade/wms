@@ -168,7 +168,7 @@ jobs:
           VPS_HOST: "148.230.107.155"
           VPS_USER: "root"
         run: |
-          ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} << 'EOF'
           set -e
           cd /root/wms
           
@@ -182,13 +182,16 @@ jobs:
           echo "================================================"
           echo "🎯 STEP 1: Deploy Frontend to Staging"
           echo "================================================"
+          
+          # Create temp directory
+          mkdir -p /tmp/staging-frontend
           EOF
           
           # Copy frontend files via SCP
           echo "📤 Uploading frontend build..."
-          scp -i ~/.ssh/deploy_key -r frontend/dist/* ${VPS_USER}@${VPS_HOST}:/tmp/staging-frontend/
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r frontend/dist/* ${VPS_USER}@${VPS_HOST}:/tmp/staging-frontend/
           
-          ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} << 'EOF'
           docker cp /tmp/staging-frontend/. wms-staging-frontend:/usr/share/nginx/html/
           rm -rf /tmp/staging-frontend
           docker exec wms-staging-frontend nginx -s reload
@@ -198,13 +201,16 @@ jobs:
           echo "================================================"
           echo "🎯 STEP 2: Deploy Backend to Staging"
           echo "================================================"
+          
+          # Create temp directory
+          mkdir -p /tmp/staging-backend
           EOF
           
           # Copy backend code via SCP
           echo "📤 Uploading backend code..."
-          scp -i ~/.ssh/deploy_key -r backend/* ${VPS_USER}@${VPS_HOST}:/tmp/staging-backend/
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r backend/* ${VPS_USER}@${VPS_HOST}:/tmp/staging-backend/
           
-          ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} << 'EOF'
           # Prepare backend directory structure
           mkdir -p backend/staging-temp
           cp -r /tmp/staging-backend/* backend/staging-temp/
@@ -307,7 +313,7 @@ jobs:
           VPS_HOST: "148.230.107.155"
           VPS_USER: "root"
         run: |
-          ssh -i ~/.ssh/deploy_key root@148.230.107.155 << 'EOF'
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no root@148.230.107.155 << 'EOF'
           set -e
           PROD_PATH="/root/NEW START"
           cd "$PROD_PATH"
@@ -604,7 +610,7 @@ jobs:
           echo "❌ DEPLOYMENT FAILED - EMERGENCY ROLLBACK"
           echo "================================================"
           
-          ssh -i ~/.ssh/deploy_key root@148.230.107.155 << 'EOF'
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no root@148.230.107.155 << 'EOF'
           cd "/root/NEW START"
           
           echo "🔍 Finding latest backup..."
