@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.21",
+  "version": "v2.1.22",
   "buildDate": "Nov 02, 2025",
-  "buildTime": "14:18:58",
+  "buildTime": "14:20:44",
   "author": "akifbade46-del",
-  "commitMessage": " fix: decode pallet QR metadata and match shipments robustly",
+  "commitMessage": "chore: rollback to v2.1.20 - stable scanner implementation with working camera",
   "environment": "development"
 }
