@@ -23,6 +23,7 @@ const rackSchema = z.object({
   // NEW: Zone and capacity mode fields
   zone: z.string().optional(),
   zoneDescription: z.string().optional(),
+  zoneIcon: z.string().optional(), // Custom zone icon
   capacityMode: z.enum(['FIXED', 'FLEXIBLE', 'UNLIMITED']).optional(),
   palletCapacity: z.number().int().optional(),
   boxCapacity: z.number().int().optional(),
@@ -86,7 +87,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const { status, section, search } = req.query;
     const companyId = req.user!.companyId;
 
-    const where: any = { companyId };
+    const where: any = { 
+      companyId,
+      deletedAt: null  // Only return non-deleted racks
+    };
 
     if (status) {
       where.status = status;
@@ -187,7 +191,11 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     const companyId = req.user!.companyId;
 
     const rack = await prisma.rack.findFirst({
-      where: { id, companyId },
+      where: { 
+        id, 
+        companyId,
+        deletedAt: null  // Only return non-deleted racks
+      },
       include: {
         inventory: true,
         category: {

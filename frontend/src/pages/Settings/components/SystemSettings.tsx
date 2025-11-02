@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   CubeIcon,
   QrCodeIcon,
   PlusIcon,
@@ -54,7 +54,7 @@ export const SystemSettings: React.FC = () => {
   const [showAddRack, setShowAddRack] = useState(false);
   const [showAddField, setShowAddField] = useState(false);
   const [editingField, setEditingField] = useState<CustomField | null>(null);
-  
+
   // Bulk delete states
   const [selectedRacks, setSelectedRacks] = useState<Set<string>>(new Set());
   const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set());
@@ -86,7 +86,7 @@ export const SystemSettings: React.FC = () => {
         racksAPI.getAll(),
         customFieldsAPI.getAll()
       ]);
-      
+
       // Transform rack data to match component interface
       const transformedRacks = racksResponse.racks.map((rack: any) => ({
         id: rack.id,
@@ -98,7 +98,7 @@ export const SystemSettings: React.FC = () => {
         qrCode: rack.qrCode,
         status: rack.status
       }));
-      
+
       // Transform custom field data - handle both formats
       const fields = fieldsResponse.customFields || fieldsResponse;
       const fieldsArray = Array.isArray(fields) ? fields : [];
@@ -111,7 +111,7 @@ export const SystemSettings: React.FC = () => {
         section: field.section,
         order: 1 // Backend doesn't have order yet
       }));
-      
+
       setRacks(transformedRacks);
       setCustomFields(transformedFields);
     } catch (error: any) {
@@ -140,7 +140,7 @@ export const SystemSettings: React.FC = () => {
       }
 
       const response = await racksAPI.create(newRack);
-      
+
       // Transform and add to state
       const transformedRack = {
         id: response.rack.id,
@@ -152,7 +152,7 @@ export const SystemSettings: React.FC = () => {
         qrCode: response.rack.qrCode,
         status: response.rack.status
       };
-      
+
       setRacks([...racks, transformedRack]);
       setNewRack({ code: '', location: '', rackType: 'STORAGE', capacityTotal: 100 });
       setShowAddRack(false);
@@ -171,19 +171,19 @@ export const SystemSettings: React.FC = () => {
 
       const fieldData = {
         ...newField,
-        fieldOptions: newField.fieldType === 'DROPDOWN' 
-          ? newField.fieldOptions.filter((opt: string) => opt.trim()) 
+        fieldOptions: newField.fieldType === 'DROPDOWN'
+          ? newField.fieldOptions.filter((opt: string) => opt.trim())
           : null
       };
 
       console.log('Creating field with data:', fieldData);
       const response = await customFieldsAPI.create(fieldData);
       console.log('API Response:', response);
-      
+
       // Instead of manual transformation, reload all data from server
       // This ensures we get the exact format the backend returns
       await loadData();
-      
+
       setNewField({ fieldName: '', fieldType: 'TEXT', fieldOptions: [''], isRequired: false, section: 'SHIPMENT' });
       setShowAddField(false);
       alert('Custom field added successfully!');
@@ -232,7 +232,7 @@ export const SystemSettings: React.FC = () => {
 
     const selectedRacksList = racks.filter(r => selectedRacks.has(r.id));
     const racksWithItems = selectedRacksList.filter(r => r.currentLoad > 0);
-    
+
     let confirmMessage = `🗑️ Delete ${selectedRacks.size} racks?`;
     if (racksWithItems.length > 0) {
       confirmMessage = `⚠️ WARNING: ${racksWithItems.length} of ${selectedRacks.size} selected racks contain items!\n\n`;
@@ -408,8 +408,8 @@ export const SystemSettings: React.FC = () => {
       const fieldData = {
         fieldName: newField.fieldName,
         fieldType: newField.fieldType,
-        fieldOptions: newField.fieldType === 'DROPDOWN' 
-          ? newField.fieldOptions.filter((opt: string) => opt.trim()) 
+        fieldOptions: newField.fieldType === 'DROPDOWN'
+          ? newField.fieldOptions.filter((opt: string) => opt.trim())
           : null,
         isRequired: newField.isRequired,
         section: newField.section
@@ -417,10 +417,10 @@ export const SystemSettings: React.FC = () => {
 
       const response = await customFieldsAPI.update(editingField.id, fieldData);
       console.log('Update response:', response);
-      
+
       // Reload all data to ensure consistency
       await loadData();
-      
+
       setNewField({ fieldName: '', fieldType: 'TEXT', fieldOptions: [''], isRequired: false, section: 'SHIPMENT' });
       setEditingField(null);
       setShowAddField(false);
@@ -542,16 +542,15 @@ export const SystemSettings: React.FC = () => {
             return (
               <div
                 key={rack.id}
-                className={`relative border-2 rounded-lg p-4 transition-all hover:shadow-md ${
-                  rack.status === 'ACTIVE' ? 'border-green-200 bg-green-50' :
-                  rack.status === 'MAINTENANCE' ? 'border-yellow-200 bg-yellow-50' :
-                  'border-red-200 bg-red-50'
-                }`}
+                className={`relative border-2 rounded-lg p-4 transition-all hover:shadow-md ${rack.status === 'ACTIVE' ? 'border-green-200 bg-green-50' :
+                    rack.status === 'MAINTENANCE' ? 'border-yellow-200 bg-yellow-50' :
+                      'border-red-200 bg-red-50'
+                  }`}
               >
                 <div className="text-center">
                   <div className="font-bold text-lg">{rack.code}</div>
                   <div className="text-xs text-gray-500 mt-1">{rack.location}</div>
-                  
+
                   {/* Utilization Bar */}
                   <div className="mt-2">
                     <div className="flex justify-between text-xs text-gray-600 mb-1">
@@ -574,7 +573,7 @@ export const SystemSettings: React.FC = () => {
               </div>
             );
           })}
-          
+
           {/* Add Rack Button */}
           <div
             onClick={() => setShowAddRack(true)}
@@ -602,7 +601,7 @@ export const SystemSettings: React.FC = () => {
           </div>
           <div className="flex space-x-2">
             {selectedRacks.size > 0 && (
-              <button 
+              <button
                 onClick={handleBulkDeleteRacks}
                 className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
               >
@@ -683,13 +682,13 @@ export const SystemSettings: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
-                      <button 
+                      <button
                         className="text-green-600 hover:text-green-900"
                         title="Print QR Code"
                       >
                         <PrinterIcon className="h-4 w-4" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDeleteRack(rack.id)}
                         className="text-red-600 hover:text-red-900"
                         title="Delete Rack"
@@ -719,7 +718,7 @@ export const SystemSettings: React.FC = () => {
           </div>
           <div className="flex space-x-2">
             {selectedFields.size > 0 && (
-              <button 
+              <button
                 onClick={handleBulkDeleteFields}
                 className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
               >
@@ -847,7 +846,7 @@ export const SystemSettings: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Rack</h3>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rack Code</label>
@@ -859,7 +858,7 @@ export const SystemSettings: React.FC = () => {
                   placeholder="e.g., A1, B2, C3"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
                 <input
@@ -870,7 +869,7 @@ export const SystemSettings: React.FC = () => {
                   placeholder="e.g., Section A - Row 1"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
                 <select
@@ -883,7 +882,7 @@ export const SystemSettings: React.FC = () => {
                   <option value="EQUIPMENT">Equipment</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Capacity</label>
                 <input
@@ -895,7 +894,7 @@ export const SystemSettings: React.FC = () => {
                 />
               </div>
             </div>
-            
+
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={handleAddRack}
@@ -960,7 +959,7 @@ export const SystemSettings: React.FC = () => {
                 </div>
               </div>
             )}
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Field Name</label>
@@ -972,7 +971,7 @@ export const SystemSettings: React.FC = () => {
                   placeholder="e.g., Priority Level"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Field Type</label>
                 <select
@@ -987,7 +986,7 @@ export const SystemSettings: React.FC = () => {
                   <option value="CHECKBOX">Checkbox</option>
                 </select>
               </div>
-              
+
               {newField.fieldType === 'DROPDOWN' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Options</label>
@@ -1018,7 +1017,7 @@ export const SystemSettings: React.FC = () => {
                   </button>
                 </div>
               )}
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
                 <select
@@ -1031,7 +1030,7 @@ export const SystemSettings: React.FC = () => {
                   <option value="EXPENSE">Expense</option>
                 </select>
               </div>
-              
+
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -1043,7 +1042,7 @@ export const SystemSettings: React.FC = () => {
                 <label htmlFor="required" className="ml-2 text-sm text-gray-700">Required field</label>
               </div>
             </div>
-            
+
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={editingField ? handleUpdateField : handleAddCustomField}

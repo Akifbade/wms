@@ -41,13 +41,12 @@ const ShipmentBoxCard: React.FC<{
             <span className="text-sm font-bold text-blue-600">
               #{shipment?.referenceId || 'N/A'}
             </span>
-            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-              shipment?.status === 'IN_WAREHOUSE' || shipment?.status === 'PARTIAL'
+            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${shipment?.status === 'IN_WAREHOUSE' || shipment?.status === 'PARTIAL'
                 ? 'bg-green-100 text-green-800'
                 : shipment?.status === 'RELEASED'
-                ? 'bg-blue-100 text-blue-800'
-                : 'bg-gray-100 text-gray-800'
-            }`}>
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
               {shipment?.status || 'N/A'}
             </span>
           </div>
@@ -59,7 +58,7 @@ const ShipmentBoxCard: React.FC<{
           </p>
         </div>
       </div>
-      
+
       {photos.length > 0 && (
         <div className="mt-3 pt-3 border-t border-blue-200">
           <button
@@ -71,7 +70,7 @@ const ShipmentBoxCard: React.FC<{
             </span>
             <span className="text-lg">{showPhotos ? '▲' : '▼'}</span>
           </button>
-          
+
           {showPhotos && (
             <div className="grid grid-cols-4 gap-2 mt-2">
               {photos.map((url: string, idx: number) => (
@@ -195,11 +194,11 @@ export const Racks: React.FC = () => {
   // NEW: Render capacity based on mode (INFORMATIVE VERSION)
   const renderCapacity = (rack: any) => {
     const mode = rack.capacityMode || 'FIXED';
-    
+
     if (mode === 'UNLIMITED') {
       return <span className="text-purple-600 font-bold">∞ Unlimited</span>;
     }
-    
+
     if (mode === 'FLEXIBLE') {
       return (
         <span className="flex items-center gap-1 text-blue-700">
@@ -209,7 +208,7 @@ export const Racks: React.FC = () => {
         </span>
       );
     }
-    
+
     // FIXED mode (default)
     return <span className="font-semibold">{rack.capacityUsed || 0}/{rack.capacityTotal || 0} boxes</span>;
   };
@@ -279,14 +278,14 @@ export const Racks: React.FC = () => {
       const canvas = bulkQrCanvasRefs.current[rack.id];
       if (!canvas) return '';
       const qrDataUrl = canvas.toDataURL();
-      
+
       // Determine which logo to use: company profile logo or default company logo
       let logoToUse = companyLogo;
       if (rack.companyProfile?.logo) {
         const logoPath = rack.companyProfile.logo;
         logoToUse = logoPath.startsWith('http') ? logoPath : (logoPath.startsWith('/') ? logoPath : `/uploads/${logoPath}`);
       }
-      
+
       return `
         <div class="qr-item">
           ${logoToUse ? `<img src="${logoToUse}" class="company-logo" alt="Logo" onerror="this.style.display='none'" />` : ''}
@@ -397,42 +396,40 @@ export const Racks: React.FC = () => {
           <div className="flex items-center bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('zones')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                viewMode === 'zones' 
-                  ? 'bg-blue-600 text-white shadow-md' 
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'zones'
+                  ? 'bg-blue-600 text-white shadow-md'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
+                }`}
             >
               🏢 Zones
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                viewMode === 'grid' 
-                  ? 'bg-blue-600 text-white shadow-md' 
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'grid'
+                  ? 'bg-blue-600 text-white shadow-md'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
+                }`}
             >
               📦 Grid
             </button>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={handleBulkQrOpen}
             className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-md"
           >
             <CameraIcon className="h-5 w-5 mr-2" />
             Bulk QR
           </button>
-          <button 
+          <button
             onClick={() => setBulkAddModalOpen(true)}
             className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors shadow-md"
           >
             <SparklesIcon className="h-5 w-5 mr-2" />
             Bulk Add
           </button>
-          <button 
+          <button
             onClick={() => setCreateModalOpen(true)}
             className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-md"
           >
@@ -511,9 +508,8 @@ export const Racks: React.FC = () => {
             <div className="flex items-center flex-wrap gap-2">
               <button
                 onClick={() => setSelectedSection('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  selectedSection === 'all' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedSection === 'all' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
               >
                 All Sections
               </button>
@@ -521,9 +517,8 @@ export const Racks: React.FC = () => {
                 <button
                   key={section}
                   onClick={() => setSelectedSection(section)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    selectedSection === section ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedSection === section ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
                 >
                   Section {section}
                 </button>
@@ -539,41 +534,36 @@ export const Racks: React.FC = () => {
             <div className="flex items-center flex-wrap gap-2">
               <button
                 onClick={() => setSelectedCategory('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  selectedCategory === 'all' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === 'all' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
               >
                 All Categories
               </button>
               <button
                 onClick={() => setSelectedCategory('DIOR')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  selectedCategory === 'DIOR' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === 'DIOR' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                  }`}
               >
                 Dior
               </button>
               <button
                 onClick={() => setSelectedCategory('COMPANY_MATERIAL')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  selectedCategory === 'COMPANY_MATERIAL' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === 'COMPANY_MATERIAL' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                  }`}
               >
                 Company Material
               </button>
               <button
                 onClick={() => setSelectedCategory('JAZEERA')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  selectedCategory === 'JAZEERA' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === 'JAZEERA' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'
+                  }`}
               >
                 Jazeera
               </button>
               <button
                 onClick={() => setSelectedCategory('OTHERS')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  selectedCategory === 'OTHERS' ? 'bg-gray-600 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === 'OTHERS' ? 'bg-gray-600 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                  }`}
               >
                 Others
               </button>
@@ -588,9 +578,8 @@ export const Racks: React.FC = () => {
             <div className="flex items-center flex-wrap gap-2">
               <button
                 onClick={() => setSelectedZone('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  selectedZone === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedZone === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
               >
                 All Zones ({racks.length})
               </button>
@@ -601,18 +590,16 @@ export const Racks: React.FC = () => {
                   <button
                     key={zone}
                     onClick={() => setSelectedZone(zone)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                      selectedZone === zone 
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${selectedZone === zone
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
                         : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-                    }`}
+                      }`}
                   >
                     <span>{zone === 'Unassigned' ? '📦' : '🏢'} {zone}</span>
                     <span className="text-xs opacity-75">({zoneRacks.length})</span>
                     {zoneOccupied > 0 && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                        selectedZone === zone ? 'bg-white/20' : 'bg-green-100 text-green-700'
-                      }`}>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${selectedZone === zone ? 'bg-white/20' : 'bg-green-100 text-green-700'
+                        }`}>
                         {zoneOccupied} active
                       </span>
                     )}
@@ -637,49 +624,147 @@ export const Racks: React.FC = () => {
             const isExpanded = expandedZones.has(zoneName);
             const totalRacks = zoneRacks.length;
             const occupiedRacks = zoneRacks.filter((r: any) => r.capacityUsed > 0).length;
+            const availableRacks = zoneRacks.filter((r: any) => r.capacityUsed === 0).length;
+            const fullRacks = zoneRacks.filter((r: any) => r.capacityUsed >= r.capacityTotal).length;
+            
             const totalCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.capacityTotal || 0), 0);
             const usedCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.capacityUsed || 0), 0);
             const utilizationPercent = totalCapacity > 0 ? Math.round((usedCapacity / totalCapacity) * 100) : 0;
+            
+            // Get zone icon and description from first rack in zone (all racks in zone should have same icon/description)
+            const zoneIcon = zoneRacks[0]?.zoneIcon || (zoneName === 'Unassigned' ? '📦' : '🏢');
+            const zoneDescription = zoneRacks[0]?.zoneDescription || '';
+            
+            // Calculate pallet and box totals
+            const totalPallets = zoneRacks.reduce((sum: number, r: any) => sum + (r.currentPallets || 0), 0);
+            const totalBoxes = zoneRacks.reduce((sum: number, r: any) => sum + (r.currentBoxes || 0), 0);
+            const palletCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.palletCapacity || 0), 0);
+            const boxCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.boxCapacity || 0), 0);
 
             return (
-              <div key={zoneName} className="bg-white rounded-xl shadow-sm border-2 border-gray-200 overflow-hidden">
+              <div key={zoneName} className="bg-white rounded-xl shadow-lg border-2 border-gray-200 overflow-hidden">
                 {/* Zone Header - Clickable */}
                 <button
                   onClick={() => toggleZone(zoneName)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                  className="w-full px-6 py-5 flex items-center justify-between hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`text-4xl ${zoneName === 'Unassigned' ? '📦' : '🏢'}`}>
-                      {zoneName === 'Unassigned' ? '📦' : '🏢'}
+                  <div className="flex items-center gap-4 flex-1">
+                    {/* Zone Icon */}
+                    <div className="text-5xl">
+                      {zoneIcon}
                     </div>
-                    <div className="text-left">
-                      <h3 className="text-2xl font-bold text-gray-900">
-                        {zoneName === 'Unassigned' ? '📦 Unassigned' : `Zone ${zoneName}`}
+                    
+                    {/* Zone Info */}
+                    <div className="text-left flex-1">
+                      <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        {zoneName === 'Unassigned' ? '📦 Unassigned Racks' : `Zone ${zoneName}`}
+                        {totalRacks === 0 && (
+                          <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded">Empty</span>
+                        )}
                       </h3>
-                      <div className="flex items-center gap-4 mt-1">
-                        <span className="text-sm text-gray-600">
-                          <strong>{totalRacks}</strong> racks
-                        </span>
-                        <span className="text-sm text-green-600">
-                          <strong>{occupiedRacks}</strong> active
-                        </span>
-                        <span className="text-sm text-gray-600">
-                          {usedCapacity} / {totalCapacity} capacity
-                        </span>
+                      
+                      {/* Zone Description */}
+                      {zoneDescription && (
+                        <p className="text-sm text-gray-600 mt-1 italic">
+                          {zoneDescription}
+                        </p>
+                      )}
+                      
+                      {/* Detailed Stats */}
+                      <div className="flex flex-wrap items-center gap-4 mt-2">
+                        {/* Total Racks */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                            {totalRacks} Racks
+                          </span>
+                        </div>
+                        
+                        {/* Available */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                          <span className="text-sm text-green-700 font-medium">
+                            {availableRacks} Available
+                          </span>
+                        </div>
+                        
+                        {/* Occupied */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                          <span className="text-sm text-blue-700 font-medium">
+                            {occupiedRacks - fullRacks} In Use
+                          </span>
+                        </div>
+                        
+                        {/* Full */}
+                        {fullRacks > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                            <span className="text-sm text-red-700 font-medium">
+                              {fullRacks} Full
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Capacity Details */}
+                        <div className="flex items-center gap-3 ml-2 border-l pl-3">
+                          {palletCapacity > 0 && (
+                            <span className="text-xs text-gray-600">
+                              🎯 <strong>{totalPallets}/{palletCapacity}</strong> pallets
+                            </span>
+                          )}
+                          {boxCapacity > 0 && (
+                            <span className="text-xs text-gray-600">
+                              📦 <strong>{totalBoxes}/{boxCapacity}</strong> boxes
+                            </span>
+                          )}
+                          {palletCapacity === 0 && boxCapacity === 0 && (
+                            <span className="text-xs text-gray-600">
+                              💼 <strong>{usedCapacity}/{totalCapacity}</strong> items
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Right Side: Utilization & Controls */}
                   <div className="flex items-center gap-4">
-                    {/* Utilization Bar */}
-                    <div className="w-32 bg-gray-200 rounded-full h-3 overflow-hidden">
-                      <div 
-                        className={`h-full transition-all ${getUtilizationColor(utilizationPercent)}`}
-                        style={{ width: `${utilizationPercent}%` }}
-                      />
+                    {/* Utilization Indicator */}
+                    <div className="text-center">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-xs font-semibold ${
+                          utilizationPercent >= 90 ? 'text-red-600' :
+                          utilizationPercent >= 70 ? 'text-yellow-600' :
+                          'text-green-600'
+                        }`}>
+                          {utilizationPercent >= 90 ? '🔴' : utilizationPercent >= 70 ? '🟡' : '🟢'}
+                        </span>
+                        <span className="text-lg font-bold text-gray-900">
+                          {utilizationPercent}%
+                        </span>
+                      </div>
+                      {/* Utilization Bar */}
+                      <div className="w-32 bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            utilizationPercent >= 90 ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                            utilizationPercent >= 70 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
+                            'bg-gradient-to-r from-green-500 to-green-600'
+                          }`}
+                          style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
+                        />
+                      </div>
+                      <span className={`text-[10px] font-medium mt-0.5 block ${
+                        utilizationPercent >= 90 ? 'text-red-600' :
+                        utilizationPercent >= 70 ? 'text-yellow-600' :
+                        'text-green-600'
+                      }`}>
+                        {utilizationPercent >= 90 ? 'Critical' :
+                         utilizationPercent >= 70 ? 'High' :
+                         'Healthy'}
+                      </span>
                     </div>
-                    <span className="text-sm font-semibold text-gray-700 w-12 text-right">
-                      {utilizationPercent}%
-                    </span>
+                    
                     {/* Expand/Collapse Icon */}
                     <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
                       <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -698,7 +783,7 @@ export const Racks: React.FC = () => {
                         const utilization = typeof rack.utilization === 'number'
                           ? rack.utilization
                           : Math.round((rack.capacityUsed / totalCapacity) * 100);
-                        
+
                         const uniqueShipments = new Set();
                         if (rack.boxes && Array.isArray(rack.boxes)) {
                           rack.boxes.forEach((box: any) => {
@@ -709,21 +794,47 @@ export const Racks: React.FC = () => {
                         }
                         const shipmentCount = uniqueShipments.size;
                         const available = Math.max(totalCapacity - rack.capacityUsed, 0);
-                        
+
                         return (
                           <div
                             key={rack.id}
                             onClick={() => handleRackClick(rack)}
                             className="group relative bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 p-3 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer"
                           >
-                            {/* Edit Button */}
+                            {/* Company Logo Badge - Top Right */}
+                            {rack.companyProfile && (
+                              <div 
+                                className="absolute top-2 right-2 group/logo"
+                                title={rack.companyProfile.name || 'Company'}
+                              >
+                                {rack.companyProfile.logo ? (
+                                  <div className="relative">
+                                    <img
+                                      src={rack.companyProfile.logo.startsWith('http') ? rack.companyProfile.logo : `/uploads/${rack.companyProfile.logo}`}
+                                      alt={rack.companyProfile.name}
+                                      className="w-8 h-8 md:w-10 md:h-10 rounded-lg object-contain bg-white border-2 border-gray-200 shadow-md group-hover/logo:scale-110 transition-transform"
+                                    />
+                                    {/* Hover Tooltip */}
+                                    <div className="absolute top-full right-0 mt-1 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover/logo:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
+                                      {rack.companyProfile.name}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs md:text-sm shadow-md border-2 border-white group-hover/logo:scale-110 transition-transform">
+                                    {rack.companyProfile.name?.substring(0, 2).toUpperCase() || 'CO'}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Edit Button - Appears on Hover */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedRack(rack);
                                 setEditModalOpen(true);
                               }}
-                              className="absolute top-2 right-2 p-1.5 bg-white rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 z-10"
+                              className={`absolute ${rack.companyProfile ? 'top-14' : 'top-2'} right-2 p-1.5 bg-white rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 z-10`}
                               title="Edit Rack"
                             >
                               <PencilIcon className="h-3.5 w-3.5 text-blue-600" />
@@ -733,9 +844,8 @@ export const Racks: React.FC = () => {
                             <div className="flex items-center justify-between mb-2">
                               <div className={`w-2.5 h-2.5 rounded-full ${getUtilizationColor(utilization)} animate-pulse`} />
                               {rack.capacityMode && rack.capacityMode !== 'FIXED' && (
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                                  rack.capacityMode === 'UNLIMITED' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                                }`}>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${rack.capacityMode === 'UNLIMITED' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                                  }`}>
                                   {rack.capacityMode === 'UNLIMITED' ? '∞' : '⚡'}
                                 </span>
                               )}
@@ -800,14 +910,14 @@ export const Racks: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {filteredRacks.map((rack: any) => {
               const totalCapacity = rack.capacityTotal && rack.capacityTotal > 0 ? rack.capacityTotal : 1;
               const utilization = typeof rack.utilization === 'number'
                 ? rack.utilization
                 : Math.round((rack.capacityUsed / totalCapacity) * 100);
-              
+
               // Count unique shipments from boxes
               const uniqueShipments = new Set();
               if (rack.boxes && Array.isArray(rack.boxes)) {
@@ -819,7 +929,7 @@ export const Racks: React.FC = () => {
               }
               const shipmentCount = uniqueShipments.size;
               const available = Math.max(totalCapacity - rack.capacityUsed, 0);
-              
+
               return (
                 <div
                   key={rack.id}
@@ -829,23 +939,44 @@ export const Racks: React.FC = () => {
                     borderColor: utilization >= 90 ? '#ef4444' : utilization >= 50 ? '#eab308' : '#10b981'
                   }}
                 >
+                  {/* Company Logo Badge - Top Left */}
+                  {rack.companyProfile && (
+                    <div 
+                      className="absolute -top-2 -left-2 group/logo z-10"
+                      title={rack.companyProfile.name || 'Company'}
+                    >
+                      {rack.companyProfile.logo ? (
+                        <div className="relative">
+                          <img
+                            src={rack.companyProfile.logo.startsWith('http') ? rack.companyProfile.logo : `/uploads/${rack.companyProfile.logo}`}
+                            alt={rack.companyProfile.name}
+                            className="w-7 h-7 md:w-8 md:h-8 rounded-lg object-contain bg-white border-2 border-gray-300 shadow-md group-hover/logo:scale-125 transition-transform"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-[10px] shadow-md border-2 border-white group-hover/logo:scale-125 transition-transform">
+                          {rack.companyProfile.name?.substring(0, 2).toUpperCase() || 'CO'}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Status Badge */}
-                  <div className="absolute -top-2 -right-2">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold shadow ${
-                      rack.status === 'ACTIVE'
-                        ? utilization >= 100 
+                  <div className="absolute -top-2 -right-2 z-10">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold shadow ${rack.status === 'ACTIVE'
+                        ? utilization >= 100
                           ? 'bg-red-500 text-white'
                           : utilization >= 90
-                          ? 'bg-yellow-500 text-white'
-                          : 'bg-green-500 text-white'
+                            ? 'bg-yellow-500 text-white'
+                            : 'bg-green-500 text-white'
                         : 'bg-gray-400 text-white'
-                    }`}>
-                      {rack.status === 'ACTIVE' 
-                        ? utilization >= 100 
-                          ? 'FULL' 
-                          : utilization >= 90 
-                          ? 'BUSY' 
-                          : 'OK'
+                      }`}>
+                      {rack.status === 'ACTIVE'
+                        ? utilization >= 100
+                          ? 'FULL'
+                          : utilization >= 90
+                            ? 'BUSY'
+                            : 'OK'
                         : 'OFF'}
                     </span>
                   </div>
@@ -862,7 +993,7 @@ export const Racks: React.FC = () => {
                   >
                     <PencilIcon className="h-4 w-4 text-blue-600" />
                   </button>
-                  
+
                   {/* Rack Code - ENHANCED SIZE */}
                   <div className="mb-4 mt-3">
                     <div className="flex items-center gap-2 mb-2">
@@ -875,23 +1006,22 @@ export const Racks: React.FC = () => {
                     </div>
                     <p className="text-sm text-gray-600 font-medium">{rack.location || 'N/A'}</p>
                   </div>
-                  
+
                   {/* Capacity Info - Mode Badge */}
                   <div className="space-y-3">
                     {rack.capacityMode && (
                       <div className="flex items-center justify-between mb-2">
-                        <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                          rack.capacityMode === 'UNLIMITED' 
-                            ? 'bg-purple-100 text-purple-700' 
+                        <span className={`px-2 py-1 rounded-lg text-xs font-bold ${rack.capacityMode === 'UNLIMITED'
+                            ? 'bg-purple-100 text-purple-700'
                             : rack.capacityMode === 'FLEXIBLE'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
                           {rack.capacityMode === 'UNLIMITED' ? '∞ Unlimited' : rack.capacityMode === 'FLEXIBLE' ? '⚡ Flexible' : '📦 Fixed'}
                         </span>
                       </div>
                     )}
-                    
+
                     {/* Capacity Display Based on Mode */}
                     {rack.capacityMode === 'UNLIMITED' ? (
                       <div className="text-center py-2">
@@ -920,7 +1050,7 @@ export const Racks: React.FC = () => {
                         <span className="text-lg font-bold text-gray-900">{rack.capacityUsed}/{rack.capacityTotal}</span>
                       </div>
                     )}
-                    
+
                     {/* Progress Bar */}
                     <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                       <div
@@ -931,7 +1061,7 @@ export const Racks: React.FC = () => {
                         <span className="text-xs font-bold text-white drop-shadow-md">{utilization}%</span>
                       </div>
                     </div>
-                    
+
                     {/* Stats - ENHANCED SIZE */}
                     <div className="flex items-center justify-between pt-2 border-t-2 border-gray-200">
                       <div className="text-center">
@@ -1012,13 +1142,12 @@ export const Racks: React.FC = () => {
                   <div className="grid grid-cols-4 gap-4">
                     <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
                       <p className="text-xs text-gray-500 font-medium mb-1">Status</p>
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${
-                        rackDetails?.status === 'ACTIVE'
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${rackDetails?.status === 'ACTIVE'
                           ? rackDetails.capacityUsed >= rackDetails.capacityTotal
                             ? 'bg-red-100 text-red-800'
                             : 'bg-green-100 text-green-800'
                           : 'bg-gray-100 text-gray-800'
-                      }`}>
+                        }`}>
                         {rackDetails?.status === 'ACTIVE'
                           ? rackDetails.capacityUsed >= rackDetails.capacityTotal
                             ? <><ExclamationCircleIcon className="h-4 w-4" /> FULL</>
@@ -1100,15 +1229,14 @@ export const Racks: React.FC = () => {
                         <p className="text-xs text-gray-500 font-medium mb-2 flex items-center gap-1">
                           <TagIcon className="h-4 w-4" /> Category
                         </p>
-                        <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold ${
-                          rackDetails.category === 'DIOR' 
+                        <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold ${rackDetails.category === 'DIOR'
                             ? 'bg-purple-100 text-purple-800 border border-purple-300'
                             : rackDetails.category === 'COMPANY_MATERIAL'
-                            ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                            : rackDetails.category === 'JAZEERA'
-                            ? 'bg-green-100 text-green-800 border border-green-300'
-                            : 'bg-gray-100 text-gray-800 border border-gray-300'
-                        }`}>
+                              ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                              : rackDetails.category === 'JAZEERA'
+                                ? 'bg-green-100 text-green-800 border border-green-300'
+                                : 'bg-gray-100 text-gray-800 border border-gray-300'
+                          }`}>
                           {rackDetails.category === 'DIOR' && 'Dior'}
                           {rackDetails.category === 'COMPANY_MATERIAL' && 'Company Material'}
                           {rackDetails.category === 'JAZEERA' && 'Jazeera'}
@@ -1161,98 +1289,98 @@ export const Racks: React.FC = () => {
                       <RectangleStackIcon className="h-5 w-5" /> Stored Shipments ({rackDetails?.boxes?.length || 0})
                     </h3>
 
-                      {rackDetails?.boxes && rackDetails.boxes.length > 0 ? (
-                        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                          {(() => {
-                            // Group boxes by pallet number
-                            const groups = new Map<number, any[]>();
-                            const filtered = rackDetails.boxes.filter((box: any) => {
-                              if (!companyFilter) return true;
-                              const name = box.shipment?.companyProfile?.name || box.shipment?.clientName || '';
-                              return name === companyFilter;
-                            });
-                            filtered.forEach((box: any) => {
-                              let pn = 0;
-                              try {
-                                const meta = box.pieceQR ? JSON.parse(box.pieceQR) : undefined;
-                                pn = Number(meta?.palletNumber || 0);
-                              } catch {
-                                const m = /-PAL-(\d+)/.exec(box.qrCode || '');
-                                pn = m ? parseInt(m[1], 10) : 0;
-                              }
-                              if (!groups.has(pn)) groups.set(pn, []);
-                              groups.get(pn)!.push(box);
-                            });
-                            // Render groups: pallets first in order, then loose (0)
-                            const ordered = Array.from(groups.entries()).sort((a,b) => {
-                              if (a[0] === 0) return 1;
-                              if (b[0] === 0) return -1;
-                              return a[0] - b[0];
-                            });
-                            return ordered.map(([pn, boxes]) => (
-                              <div key={`grp-${pn}`}>
-                                <div className={`flex items-center justify-between mb-2 ${pn===0 ? 'text-purple-800' : 'text-amber-800'}`}>
-                                  <h4 className={`text-sm font-bold ${pn===0 ? '' : ''}`}>
-                                    {pn === 0 ? 'Loose' : `Pallet #${pn}`} ({boxes.length} pcs)
-                                  </h4>
-                                  <div className={`text-[10px] px-2 py-0.5 rounded-full border ${pn===0 ? 'border-dashed border-purple-400 text-purple-600' : 'border-amber-400 text-amber-600'}`}>
-                                    {pn === 0 ? 'LOOSE' : 'PALLET'}
-                                  </div>
-                                </div>
-                                <div className="space-y-3">
-                                  {(() => {
-                                    // Group boxes by shipment
-                                    const shipmentGroups = new Map<string, any[]>();
-                                    boxes.forEach((box: any) => {
-                                      const shipmentId = box.shipment?.id || 'unknown';
-                                      if (!shipmentGroups.has(shipmentId)) {
-                                        shipmentGroups.set(shipmentId, []);
-                                      }
-                                      shipmentGroups.get(shipmentId)!.push(box);
-                                    });
-
-                                    return Array.from(shipmentGroups.values()).map((shipmentBoxes: any[], shipmentIdx: number) => {
-                                      const firstBox = shipmentBoxes[0];
-                                      const shipment = firstBox.shipment;
-                                      
-                                      // Collect all photos from all boxes in this shipment
-                                      const allPhotos: string[] = [];
-                                      shipmentBoxes.forEach((box: any) => {
-                                        if (box.photos) {
-                                          try {
-                                            const parsed = JSON.parse(box.photos);
-                                            if (Array.isArray(parsed)) {
-                                              allPhotos.push(...parsed);
-                                            }
-                                          } catch (error) {
-                                            console.warn('Failed to parse box photos', error);
-                                          }
-                                        }
-                                      });
-
-                                      return (
-                                        <ShipmentBoxCard
-                                          key={`shipment-${shipmentIdx}`}
-                                          shipment={shipment}
-                                          boxCount={shipmentBoxes.length}
-                                          photos={allPhotos}
-                                        />
-                                      );
-                                    });
-                                  })()}
+                    {rackDetails?.boxes && rackDetails.boxes.length > 0 ? (
+                      <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                        {(() => {
+                          // Group boxes by pallet number
+                          const groups = new Map<number, any[]>();
+                          const filtered = rackDetails.boxes.filter((box: any) => {
+                            if (!companyFilter) return true;
+                            const name = box.shipment?.companyProfile?.name || box.shipment?.clientName || '';
+                            return name === companyFilter;
+                          });
+                          filtered.forEach((box: any) => {
+                            let pn = 0;
+                            try {
+                              const meta = box.pieceQR ? JSON.parse(box.pieceQR) : undefined;
+                              pn = Number(meta?.palletNumber || 0);
+                            } catch {
+                              const m = /-PAL-(\d+)/.exec(box.qrCode || '');
+                              pn = m ? parseInt(m[1], 10) : 0;
+                            }
+                            if (!groups.has(pn)) groups.set(pn, []);
+                            groups.get(pn)!.push(box);
+                          });
+                          // Render groups: pallets first in order, then loose (0)
+                          const ordered = Array.from(groups.entries()).sort((a, b) => {
+                            if (a[0] === 0) return 1;
+                            if (b[0] === 0) return -1;
+                            return a[0] - b[0];
+                          });
+                          return ordered.map(([pn, boxes]) => (
+                            <div key={`grp-${pn}`}>
+                              <div className={`flex items-center justify-between mb-2 ${pn === 0 ? 'text-purple-800' : 'text-amber-800'}`}>
+                                <h4 className={`text-sm font-bold ${pn === 0 ? '' : ''}`}>
+                                  {pn === 0 ? 'Loose' : `Pallet #${pn}`} ({boxes.length} pcs)
+                                </h4>
+                                <div className={`text-[10px] px-2 py-0.5 rounded-full border ${pn === 0 ? 'border-dashed border-purple-400 text-purple-600' : 'border-amber-400 text-amber-600'}`}>
+                                  {pn === 0 ? 'LOOSE' : 'PALLET'}
                                 </div>
                               </div>
-                            ));
-                          })()}
-                        </div>
-                      ) : (
-                        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                          <div className="text-4xl mb-3">????</div>
-                          <p className="text-gray-500 font-medium">No shipments stored</p>
-                          <p className="text-sm text-gray-400 mt-1">This rack is empty</p>
-                        </div>
-                      )}
-                    </div>
+                              <div className="space-y-3">
+                                {(() => {
+                                  // Group boxes by shipment
+                                  const shipmentGroups = new Map<string, any[]>();
+                                  boxes.forEach((box: any) => {
+                                    const shipmentId = box.shipment?.id || 'unknown';
+                                    if (!shipmentGroups.has(shipmentId)) {
+                                      shipmentGroups.set(shipmentId, []);
+                                    }
+                                    shipmentGroups.get(shipmentId)!.push(box);
+                                  });
+
+                                  return Array.from(shipmentGroups.values()).map((shipmentBoxes: any[], shipmentIdx: number) => {
+                                    const firstBox = shipmentBoxes[0];
+                                    const shipment = firstBox.shipment;
+
+                                    // Collect all photos from all boxes in this shipment
+                                    const allPhotos: string[] = [];
+                                    shipmentBoxes.forEach((box: any) => {
+                                      if (box.photos) {
+                                        try {
+                                          const parsed = JSON.parse(box.photos);
+                                          if (Array.isArray(parsed)) {
+                                            allPhotos.push(...parsed);
+                                          }
+                                        } catch (error) {
+                                          console.warn('Failed to parse box photos', error);
+                                        }
+                                      }
+                                    });
+
+                                    return (
+                                      <ShipmentBoxCard
+                                        key={`shipment-${shipmentIdx}`}
+                                        shipment={shipment}
+                                        boxCount={shipmentBoxes.length}
+                                        photos={allPhotos}
+                                      />
+                                    );
+                                  });
+                                })()}
+                              </div>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                        <div className="text-4xl mb-3">????</div>
+                        <p className="text-gray-500 font-medium">No shipments stored</p>
+                        <p className="text-sm text-gray-400 mt-1">This rack is empty</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {companyFilter && (

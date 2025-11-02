@@ -909,8 +909,8 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         <button
           onClick={() => setActiveTab('scanner')}
           className={`flex-1 py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 rounded-md sm:rounded-lg font-bold text-xs sm:text-sm md:text-lg transition-all ${activeTab === 'scanner'
-              ? 'bg-primary-600 text-white shadow-lg'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            ? 'bg-primary-600 text-white shadow-lg'
+            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
         >
           <span className="block">📸 Scanner</span>
@@ -919,8 +919,8 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         <button
           onClick={() => setActiveTab('list')}
           className={`flex-1 py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 rounded-md sm:rounded-lg font-bold text-xs sm:text-sm md:text-lg transition-all ${activeTab === 'list'
-              ? 'bg-primary-600 text-white shadow-lg'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            ? 'bg-primary-600 text-white shadow-lg'
+            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
         >
           <span className="block">📋 Pending List</span>
@@ -1263,18 +1263,18 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
                   {scanResult.type === 'shipment' && (
                     <div className={`border-2 rounded-xl p-6 space-y-4 ${scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
-                        ? 'bg-red-50 border-red-500'
-                        : 'bg-purple-50 border-purple-200'
+                      ? 'bg-red-50 border-red-500'
+                      : 'bg-purple-50 border-purple-200'
                       }`}>
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                           <ArchiveBoxIcon className={`h-8 w-8 ${scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
-                              ? 'text-red-600'
-                              : 'text-purple-600'
+                            ? 'text-red-600'
+                            : 'text-purple-600'
                             }`} />
                           <h4 className={`text-xl font-bold ${scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
-                              ? 'text-red-900'
-                              : 'text-purple-900'
+                            ? 'text-red-900'
+                            : 'text-purple-900'
                             }`}>
                             {scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
                               ? '⛔ Already in Storage!'
@@ -1565,8 +1565,8 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               {shipment.referenceId}
                             </span>
                             <span className={`px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-semibold rounded-full ${shipment.status === 'PARTIAL'
-                                ? 'bg-orange-100 text-orange-800'
-                                : 'bg-yellow-100 text-yellow-800'
+                              ? 'bg-orange-100 text-orange-800'
+                              : 'bg-yellow-100 text-yellow-800'
                               }`}>
                               {shipment.status === 'PARTIAL' ? '🔄 PARTIAL' : '⏳ PENDING'}
                             </span>
