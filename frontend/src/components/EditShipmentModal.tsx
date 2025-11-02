@@ -34,6 +34,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
   const [racks, setRacks] = useState<Rack[]>([]);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [companyProfiles, setCompanyProfiles] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     clientName: '',
     clientPhone: '',
@@ -45,6 +46,17 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
     estimatedValue: '',
     notes: '',
     status: '',
+    // 🆕 NEW WAREHOUSE FIELDS (Phase 2)
+    companyProfileId: '',
+    storageType: 'STANDARD',
+    isWarehouseShipment: false,
+    shipper: '',
+    consignee: '',
+    shipperAddress: '',
+    consigneeAddress: '',
+    shipperPhone: '',
+    consigneePhone: '',
+    specialInstructions: '',
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -53,8 +65,9 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
   useEffect(() => {
     if (isOpen && shipment) {
       loadRacks();
+      loadCompanyProfiles();
       loadCustomFieldsWithValues();
-      // Populate form with existing data
+      // Populate form with existing data (including new warehouse fields)
       setFormData({
         clientName: shipment.clientName || '',
         clientPhone: shipment.clientPhone || '',
@@ -66,6 +79,17 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         estimatedValue: shipment.estimatedValue || '',
         notes: shipment.notes || '',
         status: shipment.status || 'IN_STORAGE',
+        // 🆕 Populate new warehouse fields
+        companyProfileId: shipment.companyProfileId || '',
+        storageType: shipment.storageType || 'STANDARD',
+        isWarehouseShipment: shipment.isWarehouseShipment || false,
+        shipper: shipment.shipper || '',
+        consignee: shipment.consignee || '',
+        shipperAddress: shipment.shipperAddress || '',
+        consigneeAddress: shipment.consigneeAddress || '',
+        shipperPhone: shipment.shipperPhone || '',
+        consigneePhone: shipment.consigneePhone || '',
+        specialInstructions: shipment.specialInstructions || '',
       });
       setError('');
       setSuccess('');
@@ -104,6 +128,20 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
       }
     } catch (err) {
       console.error('Failed to load custom fields:', err);
+    }
+  };
+
+  const loadCompanyProfiles = async () => {
+    try {
+      const response = await fetch('/api/company-profiles', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCompanyProfiles(data.companyProfiles || []);
+      }
+    } catch (err) {
+      console.error('Failed to load company profiles:', err);
     }
   };
 
@@ -156,7 +194,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         throw new Error('Please select a rack');
       }
 
-      // Prepare update data with converted numbers
+      // Prepare update data with converted numbers + new warehouse fields
       const updateData = {
         clientName: formData.clientName,
         clientPhone: formData.clientPhone,
@@ -167,6 +205,17 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         estimatedValue,
         notes: formData.notes,
         status: formData.status,
+        // 🆕 NEW WAREHOUSE FIELDS (Phase 2)
+        companyProfileId: formData.companyProfileId || null,
+        storageType: formData.storageType,
+        isWarehouseShipment: formData.isWarehouseShipment,
+        shipper: formData.shipper || null,
+        consignee: formData.consignee || null,
+        shipperAddress: formData.shipperAddress || null,
+        consigneeAddress: formData.consigneeAddress || null,
+        shipperPhone: formData.shipperPhone || null,
+        consigneePhone: formData.consigneePhone || null,
+        specialInstructions: formData.specialInstructions || null,
       };
 
       await shipmentsAPI.update(shipment.id, updateData);
@@ -299,6 +348,149 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
             </div>
           </div>
 
+          {/* 🆕 NEW: Company Profile & Storage Type */}
+          <div className="border-b pb-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">📋 Company & Storage</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Company Profile
+                </label>
+                <select
+                  name="companyProfileId"
+                  value={formData.companyProfileId}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">-- No Company Profile --</option>
+                  {companyProfiles.map((cp: any) => (
+                    <option key={cp.id} value={cp.id}>
+                      {cp.name} ({cp.contractStatus || 'N/A'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Storage Type
+                </label>
+                <select
+                  name="storageType"
+                  value={formData.storageType}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="STANDARD">🟦 Standard</option>
+                  <option value="FRAGILE">🟨 Fragile</option>
+                  <option value="HAZMAT">🟥 Hazmat</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* 🆕 NEW: Warehouse Shipment Toggle & Info */}
+          <div className="border-b pb-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700 flex items-center gap-2">
+              <input
+                type="checkbox"
+                name="isWarehouseShipment"
+                checked={formData.isWarehouseShipment}
+                onChange={(e) => setFormData(prev => ({ ...prev, isWarehouseShipment: e.target.checked }))}
+                className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              🏢 Warehouse Shipment (International)
+            </h3>
+
+            {formData.isWarehouseShipment && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Shipper Name
+                  </label>
+                  <input
+                    type="text"
+                    name="shipper"
+                    value={formData.shipper}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Sender/Company Name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Consignee Name
+                  </label>
+                  <input
+                    type="text"
+                    name="consignee"
+                    value={formData.consignee}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Receiver/Company Name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Shipper Address
+                  </label>
+                  <textarea
+                    name="shipperAddress"
+                    value={formData.shipperAddress}
+                    onChange={handleChange}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Full origin address..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Consignee Address
+                  </label>
+                  <textarea
+                    name="consigneeAddress"
+                    value={formData.consigneeAddress}
+                    onChange={handleChange}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Full destination address..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Shipper Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="shipperPhone"
+                    value={formData.shipperPhone}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="+965 XXXX XXXX"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Consignee Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="consigneePhone"
+                    value={formData.consigneePhone}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="+965 XXXX XXXX"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Shipment Details */}
           <div className="border-b pb-4">
             <h3 className="text-lg font-semibold mb-4 text-gray-700">Shipment Details</h3>
@@ -402,6 +594,47 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
             </div>
           </div>
 
+          {/* 🆕 NEW: Pallet Information Display (Read-Only) */}
+          {(shipment?.palletCount > 0 || shipment?.boxesPerPallet > 0) && (
+            <div className="border-b pb-4">
+              <h3 className="text-lg font-semibold mb-4 text-gray-700">📦 Pallet Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-gray-600 mb-1">Total Pallets</p>
+                  <p className="text-2xl font-bold text-blue-700">{shipment.palletCount || 0}</p>
+                </div>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-xs text-gray-600 mb-1">Boxes per Pallet</p>
+                  <p className="text-2xl font-bold text-green-700">{shipment.boxesPerPallet || 0}</p>
+                </div>
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                  <p className="text-xs text-gray-600 mb-1">Total Boxes Calculated</p>
+                  <p className="text-2xl font-bold text-purple-700">
+                    {(shipment.palletCount || 0) * (shipment.boxesPerPallet || 0)}
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                ℹ️ Pallet information is set during intake and cannot be edited here.
+              </p>
+            </div>
+          )}
+
+          {/* 🆕 NEW: Special Instructions */}
+          <div className="border-b pb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Special Instructions
+            </label>
+            <textarea
+              name="specialInstructions"
+              value={formData.specialInstructions}
+              onChange={handleChange}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Any special handling, storage requirements, or important notes..."
+            />
+          </div>
+
           {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -413,7 +646,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
               onChange={handleChange}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Any special instructions or notes..."
+              placeholder="Any additional comments or observations..."
             />
           </div>
 
