@@ -153,8 +153,8 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
       const response = await racksAPI.getAll();
       // Include current rack even if full, plus other active racks with capacity
       const availableRacks = response.racks.filter(
-        (rack: Rack) => 
-          rack.id === shipment?.rackId || 
+        (rack: Rack) =>
+          rack.id === shipment?.rackId ||
           (rack.status === 'ACTIVE' && rack.capacityUsed < rack.capacityTotal)
       );
       setRacks(availableRacks);
@@ -242,9 +242,9 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
           console.error('Failed to save custom field values:', err);
         }
       }
-      
+
       alert(`✅ SUCCESS!\n\nShipment ${shipment.referenceId} has been updated successfully!\n\n📦 Current Boxes: ${currentBoxCount}\n📍 Rack: ${formData.rackId}`);
-      
+
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -320,9 +320,8 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                   name="clientName"
                   value={formData.clientName}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                    }`}
                   placeholder="John Doe"
                   required
                   disabled={isRackAssigned}
@@ -389,9 +388,8 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                   name="companyProfileId"
                   value={formData.companyProfileId}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                    }`}
                   disabled={isRackAssigned}
                 >
                   <option value="">-- No Company Profile --</option>
@@ -551,9 +549,8 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                   name="totalBoxCount"
                   value={formData.totalBoxCount}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                    }`}
                   placeholder="10"
                   min="1"
                   required
@@ -571,9 +568,8 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                   name="currentBoxCount"
                   value={formData.currentBoxCount}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                    }`}
                   placeholder="10"
                   min="0"
                   required
@@ -590,9 +586,8 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                   name="status"
                   value={formData.status}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                    }`}
                   disabled={isRackAssigned}
                 >
                   <option value="IN_STORAGE">In Storage</option>
@@ -616,9 +611,8 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                   name="rackId"
                   value={formData.rackId}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                    }`}
                   disabled={isRackAssigned}
                 >
                   <option value="">-- No Rack Assigned --</option>
@@ -634,11 +628,10 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                 <button
                   type="button"
                   onClick={() => setShowRackMap(true)}
-                  className={`w-full px-4 py-2 rounded-md font-medium border-2 ${
-                    isRackAssigned 
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' 
+                  className={`w-full px-4 py-2 rounded-md font-medium border-2 ${isRackAssigned
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300'
                       : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
-                  }`}
+                    }`}
                   disabled={isRackAssigned}
                 >
                   🗺️ {isRackAssigned ? 'Rack Map Locked' : 'Open Rack Map'}
@@ -719,7 +712,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                       {field.fieldName}
                       {field.isRequired && <span className="text-red-500 ml-1">*</span>}
                     </label>
-                    
+
                     {field.fieldType === 'TEXT' && (
                       <input
                         type="text"

@@ -43,9 +43,9 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
                 if (typeof url === 'string' && url && !photos.includes(url)) photos.push(url);
               }
             }
-          } catch {}
+          } catch { }
         }
-        
+
         // Extract pallet number from pieceQR
         if (b.pieceQR) {
           try {
@@ -61,7 +61,7 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
       // Group boxes by rack
       const grouped: Record<string, any[]> = {};
       const unassigned: any[] = [];
-      
+
       for (const box of boxList) {
         if (box.rackId && box.rack) {
           const rackKey = `${box.rack.code}|${box.rack.location || ''}`;
@@ -73,11 +73,11 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
           unassigned.push(box);
         }
       }
-      
+
       if (unassigned.length > 0) {
         grouped['Unassigned|Pending Assignment'] = unassigned;
       }
-      
+
       setRackDistribution(grouped);
     } catch (err) {
       console.error('Failed to load boxes:', err);
@@ -110,7 +110,7 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
       <h4 className="font-bold text-gray-800 mb-3 flex items-center">
         <span className="text-xl mr-2">📦</span> Box Distribution & Locations
       </h4>
-      
+
       {/* Summary Stats */}
       <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-white rounded-lg border border-blue-200">
         <div className="text-center">
@@ -132,15 +132,14 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
         {Object.entries(rackDistribution).map(([rackKey, boxList]) => {
           const [rackCode, rackLocation] = rackKey.split('|');
           const isUnassigned = rackKey.startsWith('Unassigned');
-          
+
           return (
-            <div 
+            <div
               key={rackKey}
-              className={`p-3 rounded-lg border-2 ${
-                isUnassigned 
-                  ? 'bg-yellow-50 border-yellow-300' 
+              className={`p-3 rounded-lg border-2 ${isUnassigned
+                  ? 'bg-yellow-50 border-yellow-300'
                   : 'bg-white border-green-300'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -152,27 +151,25 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
                     )}
                   </div>
                 </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                  isUnassigned 
-                    ? 'bg-yellow-200 text-yellow-800' 
+                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${isUnassigned
+                    ? 'bg-yellow-200 text-yellow-800'
                     : 'bg-green-200 text-green-800'
-                }`}>
+                  }`}>
                   {boxList.length} box{boxList.length !== 1 ? 'es' : ''}
                 </span>
               </div>
-              
+
               {/* Box Grid with Pallet Info */}
               <div className="grid grid-cols-8 gap-1 mt-2">
                 {boxList.map(box => (
                   <div
                     key={box.id}
-                    className={`aspect-square flex flex-col items-center justify-center text-xs font-bold rounded ${
-                      box.status === 'IN_STORAGE' 
-                        ? 'bg-green-500 text-white' 
+                    className={`aspect-square flex flex-col items-center justify-center text-xs font-bold rounded ${box.status === 'IN_STORAGE'
+                        ? 'bg-green-500 text-white'
                         : box.status === 'RELEASED'
-                        ? 'bg-gray-400 text-white'
-                        : 'bg-yellow-400 text-gray-800'
-                    }`}
+                          ? 'bg-gray-400 text-white'
+                          : 'bg-yellow-400 text-gray-800'
+                      }`}
                     title={`Box #${box.boxNumber}${box.palletNumber ? ` - Pallet ${box.palletNumber}` : ''} - ${box.status}`}
                   >
                     <span>{box.boxNumber}</span>
@@ -194,7 +191,7 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
           <div className="grid grid-cols-4 gap-2">
             {photoUrls.map((url, idx) => (
               <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="group relative block aspect-square rounded-lg overflow-hidden border-2 border-blue-200 hover:border-blue-500 transition-all">
-                <img src={url} alt={`Photo ${idx+1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors"></div>
               </a>
             ))}
@@ -435,11 +432,10 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
                     {(shipment as any).companyProfile.contractStatus && (
                       <div>
                         <p className="text-gray-600">Contract Status</p>
-                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                          (shipment as any).companyProfile.contractStatus === 'ACTIVE' ? 'bg-green-200 text-green-800' :
-                          (shipment as any).companyProfile.contractStatus === 'EXPIRED' ? 'bg-red-200 text-red-800' :
-                          'bg-yellow-200 text-yellow-800'
-                        }`}>
+                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${(shipment as any).companyProfile.contractStatus === 'ACTIVE' ? 'bg-green-200 text-green-800' :
+                            (shipment as any).companyProfile.contractStatus === 'EXPIRED' ? 'bg-red-200 text-red-800' :
+                              'bg-yellow-200 text-yellow-800'
+                          }`}>
                           {(shipment as any).companyProfile.contractStatus}
                         </span>
                       </div>
@@ -456,16 +452,15 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-gray-600">Storage Type</p>
-                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
-                      (shipment as any).storageType === 'STANDARD' ? 'bg-blue-100 text-blue-800' :
-                      (shipment as any).storageType === 'FRAGILE' ? 'bg-yellow-100 text-yellow-800' :
-                      (shipment as any).storageType === 'HAZMAT' ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${(shipment as any).storageType === 'STANDARD' ? 'bg-blue-100 text-blue-800' :
+                        (shipment as any).storageType === 'FRAGILE' ? 'bg-yellow-100 text-yellow-800' :
+                          (shipment as any).storageType === 'HAZMAT' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                      }`}>
                       {(shipment as any).storageType === 'STANDARD' ? '🟦 Standard' :
-                       (shipment as any).storageType === 'FRAGILE' ? '🟨 Fragile' :
-                       (shipment as any).storageType === 'HAZMAT' ? '🟥 Hazmat' :
-                       (shipment as any).storageType || 'Standard'}
+                        (shipment as any).storageType === 'FRAGILE' ? '🟨 Fragile' :
+                          (shipment as any).storageType === 'HAZMAT' ? '🟥 Hazmat' :
+                            (shipment as any).storageType || 'Standard'}
                     </span>
                   </div>
                   {((shipment as any).palletCount > 0 || (shipment as any).boxesPerPallet > 0) && (
@@ -597,7 +592,7 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
                       <div key={cfv.id}>
                         <p className="text-gray-600">{cfv.customField.fieldName}</p>
                         <p className="font-semibold text-gray-800">
-                          {cfv.customField.fieldType === 'CHECKBOX' 
+                          {cfv.customField.fieldType === 'CHECKBOX'
                             ? (cfv.fieldValue === 'true' ? '✅ Yes' : '❌ No')
                             : cfv.fieldValue}
                         </p>

@@ -4,186 +4,186 @@ import autoTable from 'jspdf-autotable';
 import { PrinterIcon } from '@heroicons/react/24/outline';
 
 interface ShipmentsPrintReportProps {
-  shipments: any[];
-  searchTerm?: string;
-  activeTab?: string;
-  warehouseFilter?: string;
+    shipments: any[];
+    searchTerm?: string;
+    activeTab?: string;
+    warehouseFilter?: string;
 }
 
-const ShipmentsPrintReport: React.FC<ShipmentsPrintReportProps> = ({ 
-  shipments, 
-  searchTerm = '', 
-  activeTab = 'all',
-  warehouseFilter = 'all'
+const ShipmentsPrintReport: React.FC<ShipmentsPrintReportProps> = ({
+    shipments,
+    searchTerm = '',
+    activeTab = 'all',
+    warehouseFilter = 'all'
 }) => {
-  
-  const getDaysStored = (shipment: any) => {
-    const arrival = new Date(shipment.arrivalDate || shipment.receivedDate);
-    const now = new Date();
-    const diff = now.getTime() - arrival.getTime();
-    return Math.floor(diff / (1000 * 60 * 60 * 24));
-  };
 
-  const getStatusText = (status: string) => {
-    const statusMap: any = {
-      'PENDING': 'Pending',
-      'IN_STORAGE': 'In Storage',
-      'ACTIVE': 'In Storage',
-      'PARTIAL': 'Partial Release',
-      'RELEASED': 'Released'
+    const getDaysStored = (shipment: any) => {
+        const arrival = new Date(shipment.arrivalDate || shipment.receivedDate);
+        const now = new Date();
+        const diff = now.getTime() - arrival.getTime();
+        return Math.floor(diff / (1000 * 60 * 60 * 24));
     };
-    return statusMap[status] || status;
-  };
 
-  const generatePDF = () => {
-    const doc = new jsPDF('landscape');
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    // Header - Company Logo & Title
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('📦 WAREHOUSE MANAGEMENT SYSTEM', pageWidth / 2, 15, { align: 'center' });
-    
-    doc.setFontSize(16);
-    doc.text('Shipments Report', pageWidth / 2, 25, { align: 'center' });
-    
-    // Report Metadata
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    const reportDate = new Date().toLocaleString('en-US', { 
-      dateStyle: 'full', 
-      timeStyle: 'short' 
-    });
-    doc.text(`Generated: ${reportDate}`, 14, 35);
-    
-    // Filter Info
-    let filterText = 'Showing: ';
-    if (searchTerm) filterText += `Search "${searchTerm}" | `;
-    if (activeTab !== 'all') filterText += `Status: ${getStatusText(activeTab.toUpperCase())} | `;
-    if (warehouseFilter !== 'all') filterText += `Type: ${warehouseFilter === 'warehouse' ? 'Warehouse' : 'Regular'} | `;
-    filterText += `Total: ${shipments.length} shipments`;
-    doc.text(filterText, 14, 40);
-    
-    // Summary Statistics
-    const totalBoxes = shipments.reduce((sum, s) => sum + (s.currentBoxCount || 0), 0);
-    const avgDaysStored = shipments.length > 0 
-      ? Math.round(shipments.reduce((sum, s) => sum + getDaysStored(s), 0) / shipments.length)
-      : 0;
-    const longStayCount = shipments.filter(s => getDaysStored(s) >= 30).length;
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`📊 Summary: ${totalBoxes} Total Boxes | Avg Storage: ${avgDaysStored} days | Long Stay (30+d): ${longStayCount} shipments`, 14, 45);
-    
-    // Prepare table data
-    const tableData = shipments.map((shipment) => {
-      const days = getDaysStored(shipment);
-      const daysColor = days >= 60 ? [255, 0, 0] : days >= 30 ? [255, 165, 0] : [0, 128, 0];
-      
-      // Get proper rack display
-      const rackDisplay = shipment.rack?.code 
-        ? `${shipment.rack.code}${shipment.rack.location ? ` (${shipment.rack.location})` : ''}`
-        : shipment.rackLocation || 'Not Assigned';
-      
-      // Get proper date
-      const dateValue = shipment.arrivalDate || shipment.receivedDate || shipment.createdAt;
-      const dateDisplay = dateValue 
-        ? new Date(dateValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        : 'No Date';
-      
-      return [
-        shipment.referenceId || 'N/A',
-        shipment.clientName || 'N/A',
-        shipment.companyProfile?.name || 'Individual',
-        shipment.clientPhone || 'N/A',
-        `${shipment.currentBoxCount || 0} / ${shipment.originalBoxCount || 0}`,
-        shipment.palletCount && shipment.boxesPerPallet 
-          ? `${shipment.palletCount} × ${shipment.boxesPerPallet}`
-          : `${shipment.originalBoxCount || 0} loose`,
-        shipment.isWarehouseShipment ? '🪵 Pallet' : '📦 Regular',
-        rackDisplay,
-        { content: `${days}d`, styles: { textColor: daysColor, fontStyle: 'bold' } },
-        getStatusText(shipment.status),
-        dateDisplay
-      ];
-    });
-    
-    // Table
-    autoTable(doc, {
-      startY: 50,
-      head: [[
-        'Ref ID',
-        'Client',
-        'Company',
-        'Phone',
-        'Boxes',
-        'Pallets',
-        'Type',
-        'Rack',
-        'Days',
-        'Status',
-        'Date'
-      ]],
-      body: tableData,
-      styles: {
-        fontSize: 8,
-        cellPadding: 2,
-      },
-      headStyles: {
-        fillColor: [59, 130, 246], // Blue
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        halign: 'center'
-      },
-      columnStyles: {
-        0: { cellWidth: 25 }, // Ref ID
-        1: { cellWidth: 28 }, // Client
-        2: { cellWidth: 25 }, // Company
-        3: { cellWidth: 22 }, // Phone
-        4: { cellWidth: 18, halign: 'center' }, // Boxes
-        5: { cellWidth: 20, halign: 'center' }, // Pallets
-        6: { cellWidth: 18, halign: 'center' }, // Type
-        7: { cellWidth: 20, halign: 'center' }, // Rack
-        8: { cellWidth: 15, halign: 'center' }, // Days
-        9: { cellWidth: 22, halign: 'center' }, // Status
-        10: { cellWidth: 22, halign: 'center' } // Date
-      },
-      alternateRowStyles: {
-        fillColor: [245, 247, 250]
-      },
-      margin: { left: 14, right: 14 },
-      didDrawPage: (data) => {
-        // Footer on each page
-        const pageCount = doc.getNumberOfPages();
-        doc.setFontSize(8);
-        doc.setTextColor(128);
-        doc.text(
-          `Page ${data.pageNumber} of ${pageCount}`,
-          pageWidth / 2,
-          doc.internal.pageSize.getHeight() - 10,
-          { align: 'center' }
-        );
-        doc.text(
-          '© Warehouse Management System - Confidential',
-          14,
-          doc.internal.pageSize.getHeight() - 10
-        );
-      }
-    });
-    
-    // Save PDF
-    const filename = `WMS-Shipments-Report-${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(filename);
-  };
+    const getStatusText = (status: string) => {
+        const statusMap: any = {
+            'PENDING': 'Pending',
+            'IN_STORAGE': 'In Storage',
+            'ACTIVE': 'In Storage',
+            'PARTIAL': 'Partial Release',
+            'RELEASED': 'Released'
+        };
+        return statusMap[status] || status;
+    };
 
-  const printHTML = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('❌ Please allow pop-ups to print the report');
-      return;
-    }
+    const generatePDF = () => {
+        const doc = new jsPDF('landscape');
+        const pageWidth = doc.internal.pageSize.getWidth();
 
-    const htmlContent = `
+        // Header - Company Logo & Title
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.text('📦 WAREHOUSE MANAGEMENT SYSTEM', pageWidth / 2, 15, { align: 'center' });
+
+        doc.setFontSize(16);
+        doc.text('Shipments Report', pageWidth / 2, 25, { align: 'center' });
+
+        // Report Metadata
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        const reportDate = new Date().toLocaleString('en-US', {
+            dateStyle: 'full',
+            timeStyle: 'short'
+        });
+        doc.text(`Generated: ${reportDate}`, 14, 35);
+
+        // Filter Info
+        let filterText = 'Showing: ';
+        if (searchTerm) filterText += `Search "${searchTerm}" | `;
+        if (activeTab !== 'all') filterText += `Status: ${getStatusText(activeTab.toUpperCase())} | `;
+        if (warehouseFilter !== 'all') filterText += `Type: ${warehouseFilter === 'warehouse' ? 'Warehouse' : 'Regular'} | `;
+        filterText += `Total: ${shipments.length} shipments`;
+        doc.text(filterText, 14, 40);
+
+        // Summary Statistics
+        const totalBoxes = shipments.reduce((sum, s) => sum + (s.currentBoxCount || 0), 0);
+        const avgDaysStored = shipments.length > 0
+            ? Math.round(shipments.reduce((sum, s) => sum + getDaysStored(s), 0) / shipments.length)
+            : 0;
+        const longStayCount = shipments.filter(s => getDaysStored(s) >= 30).length;
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`📊 Summary: ${totalBoxes} Total Boxes | Avg Storage: ${avgDaysStored} days | Long Stay (30+d): ${longStayCount} shipments`, 14, 45);
+
+        // Prepare table data
+        const tableData = shipments.map((shipment) => {
+            const days = getDaysStored(shipment);
+            const daysColor = days >= 60 ? [255, 0, 0] : days >= 30 ? [255, 165, 0] : [0, 128, 0];
+
+            // Get proper rack display
+            const rackDisplay = shipment.rack?.code
+                ? `${shipment.rack.code}${shipment.rack.location ? ` (${shipment.rack.location})` : ''}`
+                : shipment.rackLocation || 'Not Assigned';
+
+            // Get proper date
+            const dateValue = shipment.arrivalDate || shipment.receivedDate || shipment.createdAt;
+            const dateDisplay = dateValue
+                ? new Date(dateValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : 'No Date';
+
+            return [
+                shipment.referenceId || 'N/A',
+                shipment.clientName || 'N/A',
+                shipment.companyProfile?.name || 'Individual',
+                shipment.clientPhone || 'N/A',
+                `${shipment.currentBoxCount || 0} / ${shipment.originalBoxCount || 0}`,
+                shipment.palletCount && shipment.boxesPerPallet
+                    ? `${shipment.palletCount} × ${shipment.boxesPerPallet}`
+                    : `${shipment.originalBoxCount || 0} loose`,
+                shipment.isWarehouseShipment ? '🪵 Pallet' : '📦 Regular',
+                rackDisplay,
+                { content: `${days}d`, styles: { textColor: daysColor, fontStyle: 'bold' } },
+                getStatusText(shipment.status),
+                dateDisplay
+            ];
+        });
+
+        // Table
+        autoTable(doc, {
+            startY: 50,
+            head: [[
+                'Ref ID',
+                'Client',
+                'Company',
+                'Phone',
+                'Boxes',
+                'Pallets',
+                'Type',
+                'Rack',
+                'Days',
+                'Status',
+                'Date'
+            ]],
+            body: tableData,
+            styles: {
+                fontSize: 8,
+                cellPadding: 2,
+            },
+            headStyles: {
+                fillColor: [59, 130, 246], // Blue
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            columnStyles: {
+                0: { cellWidth: 25 }, // Ref ID
+                1: { cellWidth: 28 }, // Client
+                2: { cellWidth: 25 }, // Company
+                3: { cellWidth: 22 }, // Phone
+                4: { cellWidth: 18, halign: 'center' }, // Boxes
+                5: { cellWidth: 20, halign: 'center' }, // Pallets
+                6: { cellWidth: 18, halign: 'center' }, // Type
+                7: { cellWidth: 20, halign: 'center' }, // Rack
+                8: { cellWidth: 15, halign: 'center' }, // Days
+                9: { cellWidth: 22, halign: 'center' }, // Status
+                10: { cellWidth: 22, halign: 'center' } // Date
+            },
+            alternateRowStyles: {
+                fillColor: [245, 247, 250]
+            },
+            margin: { left: 14, right: 14 },
+            didDrawPage: (data) => {
+                // Footer on each page
+                const pageCount = doc.getNumberOfPages();
+                doc.setFontSize(8);
+                doc.setTextColor(128);
+                doc.text(
+                    `Page ${data.pageNumber} of ${pageCount}`,
+                    pageWidth / 2,
+                    doc.internal.pageSize.getHeight() - 10,
+                    { align: 'center' }
+                );
+                doc.text(
+                    '© Warehouse Management System - Confidential',
+                    14,
+                    doc.internal.pageSize.getHeight() - 10
+                );
+            }
+        });
+
+        // Save PDF
+        const filename = `WMS-Shipments-Report-${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(filename);
+    };
+
+    const printHTML = () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('❌ Please allow pop-ups to print the report');
+            return;
+        }
+
+        const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -330,26 +330,26 @@ const ShipmentsPrintReport: React.FC<ShipmentsPrintReportProps> = ({
             </thead>
             <tbody>
               ${shipments.map(shipment => {
-                const days = getDaysStored(shipment);
-                const daysBadgeClass = days >= 60 ? 'badge-red' : days >= 30 ? 'badge-yellow' : 'badge-green';
-                
-                // Get proper rack display
-                const rackDisplay = shipment.rack?.code 
-                  ? `${shipment.rack.code}${shipment.rack.location ? ` (${shipment.rack.location})` : ''}`
-                  : shipment.rackLocation || '<span style="color: #ef4444;">Not Assigned</span>';
-                
-                // Get proper date
-                const dateValue = shipment.arrivalDate || shipment.receivedDate || shipment.createdAt;
-                const dateDisplay = dateValue 
-                  ? new Date(dateValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                  : '<span style="color: #ef4444;">No Date</span>';
-                
-                // Get pallet info
-                const palletInfo = shipment.palletCount && shipment.boxesPerPallet 
-                  ? `<strong>${shipment.palletCount}</strong> × <strong>${shipment.boxesPerPallet}</strong>` 
-                  : `${shipment.originalBoxCount || 0} loose`;
-                
-                return `
+            const days = getDaysStored(shipment);
+            const daysBadgeClass = days >= 60 ? 'badge-red' : days >= 30 ? 'badge-yellow' : 'badge-green';
+
+            // Get proper rack display
+            const rackDisplay = shipment.rack?.code
+                ? `${shipment.rack.code}${shipment.rack.location ? ` (${shipment.rack.location})` : ''}`
+                : shipment.rackLocation || '<span style="color: #ef4444;">Not Assigned</span>';
+
+            // Get proper date
+            const dateValue = shipment.arrivalDate || shipment.receivedDate || shipment.createdAt;
+            const dateDisplay = dateValue
+                ? new Date(dateValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : '<span style="color: #ef4444;">No Date</span>';
+
+            // Get pallet info
+            const palletInfo = shipment.palletCount && shipment.boxesPerPallet
+                ? `<strong>${shipment.palletCount}</strong> × <strong>${shipment.boxesPerPallet}</strong>`
+                : `${shipment.originalBoxCount || 0} loose`;
+
+            return `
                   <tr>
                     <td><strong>${shipment.referenceId || 'N/A'}</strong></td>
                     <td>${shipment.clientName || 'N/A'}</td>
@@ -364,7 +364,7 @@ const ShipmentsPrintReport: React.FC<ShipmentsPrintReportProps> = ({
                     <td style="text-align: center;">${dateDisplay}</td>
                   </tr>
                 `;
-              }).join('')}
+        }).join('')}
             </tbody>
           </table>
           
@@ -376,31 +376,31 @@ const ShipmentsPrintReport: React.FC<ShipmentsPrintReportProps> = ({
       </html>
     `;
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-  };
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    };
 
-  return (
-    <div className="flex gap-2">
-      <button
-        onClick={generatePDF}
-        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
-        title="Download as PDF"
-      >
-        <PrinterIcon className="h-5 w-5 mr-2" />
-        📄 Export PDF
-      </button>
-      
-      <button
-        onClick={printHTML}
-        className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
-        title="Print in Browser"
-      >
-        <PrinterIcon className="h-5 w-5 mr-2" />
-        🖨️ Print Report
-      </button>
-    </div>
-  );
+    return (
+        <div className="flex gap-2">
+            <button
+                onClick={generatePDF}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
+                title="Download as PDF"
+            >
+                <PrinterIcon className="h-5 w-5 mr-2" />
+                📄 Export PDF
+            </button>
+
+            <button
+                onClick={printHTML}
+                className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
+                title="Print in Browser"
+            >
+                <PrinterIcon className="h-5 w-5 mr-2" />
+                🖨️ Print Report
+            </button>
+        </div>
+    );
 };
 
 export default ShipmentsPrintReport;
