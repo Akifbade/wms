@@ -812,15 +812,19 @@ export const Racks: React.FC = () => {
                             {/* Company Logo Badge - Top Right */}
                             {rack.companyProfile && (
                               <div
-                                className="absolute top-2 right-2 group/logo"
+                                className="absolute top-2 right-2 group/logo z-10"
                                 title={rack.companyProfile.name || 'Company'}
                               >
                                 {rack.companyProfile.logo ? (
                                   <div className="relative">
                                     <img
-                                      src={rack.companyProfile.logo.startsWith('http') ? rack.companyProfile.logo : `/uploads/${rack.companyProfile.logo}`}
+                                      src={resolveLogoUrl(rack.companyProfile.logo)}
                                       alt={rack.companyProfile.name}
                                       className="w-8 h-8 md:w-10 md:h-10 rounded-lg object-contain bg-white border-2 border-gray-200 shadow-md group-hover/logo:scale-110 transition-transform"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        console.error('Failed to load logo:', rack.companyProfile.logo);
+                                      }}
                                     />
                                     {/* Hover Tooltip */}
                                     <div className="absolute top-full right-0 mt-1 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover/logo:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
@@ -956,9 +960,13 @@ export const Racks: React.FC = () => {
                       {rack.companyProfile.logo ? (
                         <div className="relative">
                           <img
-                            src={rack.companyProfile.logo.startsWith('http') ? rack.companyProfile.logo : `/uploads/${rack.companyProfile.logo}`}
+                            src={resolveLogoUrl(rack.companyProfile.logo)}
                             alt={rack.companyProfile.name}
                             className="w-7 h-7 md:w-8 md:h-8 rounded-lg object-contain bg-white border-2 border-gray-300 shadow-md group-hover/logo:scale-125 transition-transform"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              console.error('Failed to load logo:', rack.companyProfile.logo);
+                            }}
                           />
                         </div>
                       ) : (
