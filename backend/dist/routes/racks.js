@@ -19,6 +19,15 @@ const rackSchema = zod_1.z.object({
     width: zod_1.z.number().positive().optional(),
     height: zod_1.z.number().positive().optional(),
     dimensionUnit: zod_1.z.enum(['CM', 'INCHES', 'METERS']).optional(),
+    // NEW: Zone and capacity mode fields
+    zone: zod_1.z.string().optional(),
+    zoneDescription: zod_1.z.string().optional(),
+    capacityMode: zod_1.z.enum(['FIXED', 'FLEXIBLE', 'UNLIMITED']).optional(),
+    palletCapacity: zod_1.z.number().int().optional(),
+    boxCapacity: zod_1.z.number().int().optional(),
+    currentPallets: zod_1.z.number().int().optional(),
+    currentBoxes: zod_1.z.number().int().optional(),
+    capacityNotes: zod_1.z.string().optional(),
 });
 // Get categories for rack assignment
 router.get('/categories/list', async (req, res) => {
@@ -297,6 +306,15 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                 width: data.width,
                 height: data.height,
                 dimensionUnit: data.dimensionUnit,
+                // NEW: Zone and capacity fields
+                zone: data.zone,
+                zoneDescription: data.zoneDescription,
+                capacityMode: data.capacityMode || 'FIXED',
+                palletCapacity: data.palletCapacity,
+                boxCapacity: data.boxCapacity,
+                currentPallets: data.currentPallets || 0,
+                currentBoxes: data.currentBoxes || 0,
+                capacityNotes: data.capacityNotes,
                 companyId,
                 qrCode: `RACK_${data.code.replace(/-/g, '_')}`,
                 capacityTotal: data.capacityTotal || 100,
