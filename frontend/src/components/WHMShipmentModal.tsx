@@ -784,8 +784,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 setExtraBoxes(0);
               }}
               className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${intakeMode === 'pallet'
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
             >
               Pallet Mode
@@ -807,8 +807,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 setExtraBoxes(0);
               }}
               className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${intakeMode === 'box'
-                  ? 'bg-green-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-green-600 text-white shadow-lg'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
             >
               Box Mode

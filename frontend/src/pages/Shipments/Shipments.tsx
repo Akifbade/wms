@@ -46,11 +46,11 @@ export const Shipments: React.FC = () => {
   const loadShipments = async () => {
     try {
       setLoading(true);
-      
+
       // Load all shipments first for counts (without filters)
       const allData = await shipmentsAPI.getAll({});
       const allShipments = allData.shipments || [];
-      
+
       // Calculate status counts (Schema: PENDING, IN_STORAGE, PARTIAL, RELEASED)
       const counts = {
         all: allShipments.length,
@@ -83,14 +83,14 @@ export const Shipments: React.FC = () => {
 
       const data = await shipmentsAPI.getAll(params);
       const loadedShipments = data.shipments || [];
-      
+
       // 🔍 DEBUG: Log status values to help debug button visibility
       console.log('📦 Shipments loaded:', loadedShipments.map((s: any) => ({
         id: s.referenceId,
         status: s.status,
         boxes: s.currentBoxCount
       })));
-      
+
       setShipments(loadedShipments);
     } catch (err: any) {
       setError(err.message);
@@ -108,9 +108,9 @@ export const Shipments: React.FC = () => {
       `Boxes: ${shipment?.currentBoxCount || 0}\n\n` +
       `⚠️ This action CANNOT be undone!\n\n` +
       `Are you sure you want to delete this shipment?`;
-    
+
     if (!confirm(confirmMsg)) return;
-    
+
     try {
       await shipmentsAPI.delete(id);
       alert('✅ Shipment deleted successfully!');
@@ -225,9 +225,9 @@ export const Shipments: React.FC = () => {
   // Client-side advanced filtering for instant search
   const filteredShipments = shipments.filter((shipment: any) => {
     if (!searchTerm.trim()) return true; // No filter if search empty
-    
+
     const searchLower = searchTerm.toLowerCase();
-    
+
     // Search across multiple fields
     return (
       shipment.clientName?.toLowerCase().includes(searchLower) ||
@@ -262,15 +262,15 @@ export const Shipments: React.FC = () => {
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Print Report Buttons */}
-          <ShipmentsPrintReport 
+          <ShipmentsPrintReport
             shipments={filteredShipments}
             searchTerm={searchTerm}
             activeTab={activeTab}
             warehouseFilter={warehouseFilter}
           />
-          
+
           {/* New Shipment Button */}
-          <button 
+          <button
             onClick={() => setCreateModalOpen(true)}
             className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md"
           >
@@ -295,32 +295,29 @@ export const Shipments: React.FC = () => {
         <div className="flex gap-2">
           <button
             onClick={() => setWarehouseFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              warehouseFilter === 'all'
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${warehouseFilter === 'all'
                 ? 'bg-primary-100 text-primary-700 border border-primary-300'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+              }`}
           >
             All Types ({warehouseCounts.all})
           </button>
           <button
             onClick={() => setWarehouseFilter('regular')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-              warehouseFilter === 'regular'
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${warehouseFilter === 'regular'
                 ? 'bg-blue-100 text-blue-700 border border-blue-300'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+              }`}
           >
             <HomeIcon className="h-4 w-4" />
             Regular Shipments ({warehouseCounts.regular})
           </button>
           <button
             onClick={() => setWarehouseFilter('warehouse')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-              warehouseFilter === 'warehouse'
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${warehouseFilter === 'warehouse'
                 ? 'bg-orange-100 text-orange-700 border border-orange-300'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+              }`}
           >
             <BuildingStorefrontIcon className="h-4 w-4" />
             Warehouse Shipments ({warehouseCounts.warehouse})
@@ -350,11 +347,10 @@ export const Shipments: React.FC = () => {
           <nav className="flex -mb-px">
             <button
               onClick={() => setActiveTab('all')}
-              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${
-                activeTab === 'all'
+              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'all'
                   ? 'border-b-2 border-blue-500 text-blue-600'
                   : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <span>All Shipments</span>
@@ -367,11 +363,10 @@ export const Shipments: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('pending')}
-              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${
-                activeTab === 'pending'
+              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'pending'
                   ? 'border-b-2 border-yellow-500 text-yellow-600'
                   : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <span>⏳ Pending</span>
@@ -384,11 +379,10 @@ export const Shipments: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('in_storage')}
-              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${
-                activeTab === 'in_storage'
+              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'in_storage'
                   ? 'border-b-2 border-green-500 text-green-600'
                   : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <span>✅ In Storage</span>
@@ -401,11 +395,10 @@ export const Shipments: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('partial')}
-              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${
-                activeTab === 'partial'
+              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'partial'
                   ? 'border-b-2 border-orange-500 text-orange-600'
                   : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <span>� Partial</span>
@@ -418,11 +411,10 @@ export const Shipments: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('released')}
-              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${
-                activeTab === 'released'
+              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'released'
                   ? 'border-b-2 border-blue-500 text-blue-600'
                   : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <span>🔵 Released</span>
@@ -492,141 +484,141 @@ export const Shipments: React.FC = () => {
               ) : (
                 filteredShipments.map((shipment: any) => (
                   <tr key={shipment.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <QrCodeIcon className="h-5 w-5 text-gray-400 mr-2" />
-                      <span className="text-sm font-medium text-gray-900">{shipment.referenceId}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{shipment.clientName}</div>
-                    <div className="text-xs text-gray-500">{getFormattedDate(shipment.receivedDate)}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {shipment.companyProfile?.name ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                        🏢 {shipment.companyProfile.name}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-400 italic">No company</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {shipment.clientPhone}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex flex-col gap-1">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                        📦 {shipment.currentBoxCount} / {shipment.originalBoxCount} pieces
-                      </span>
-                      <span className="text-xs text-gray-500">{getPalletInfo(shipment)}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      {getIntakeType(shipment) === 'PALLET' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
-                          🪵 Pallet
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <QrCodeIcon className="h-5 w-5 text-gray-400 mr-2" />
+                        <span className="text-sm font-medium text-gray-900">{shipment.referenceId}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{shipment.clientName}</div>
+                      <div className="text-xs text-gray-500">{getFormattedDate(shipment.receivedDate)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {shipment.companyProfile?.name ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                          🏢 {shipment.companyProfile.name}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
-                          📦 Box
-                        </span>
+                        <span className="text-xs text-gray-400 italic">No company</span>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-medium text-primary-600">{shipment.rackLocations || 'N/A'}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {(() => {
-                      const days = getDaysStored(shipment);
-                      const storageBadge = getStorageBadge(days);
-                      return (
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
-                          {storageBadge.icon} {storageBadge.badge}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {shipment.clientPhone}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          📦 {shipment.currentBoxCount} / {shipment.originalBoxCount} pieces
                         </span>
-                      );
-                    })()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {(() => {
-                      const badge = getStatusBadge(shipment.status);
-                      return (
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${badge.color}`}>
-                          <span>{badge.icon}</span>
-                          <span>{badge.label}</span>
-                        </span>
-                      );
-                    })()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-2">
-                      {/* QR Code button - show for ALL shipments */}
-                      <button 
-                        onClick={() => {
-                          setSelectedShipment(shipment);
-                          setQrModalOpen(true);
-                        }}
-                        className="text-indigo-600 hover:text-indigo-900 transition-colors"
-                        title="View/Print QR Codes"
-                      >
-                        <QrCodeIcon className="h-5 w-5" />
-                      </button>
-                      
-                      {/* Release button - only for stored shipments with boxes */}
-                      {(shipment.status === 'IN_STORAGE' || 
-                        shipment.status === 'IN_WAREHOUSE' || 
-                        shipment.status === 'PARTIAL' || 
-                        shipment.status === 'STORED' ||
-                        shipment.status === 'ACTIVE') && 
-                        shipment.currentBoxCount > 0 && (
-                        <button 
-                          onClick={() => handleReleaseClick(shipment)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Generate Invoice & Release"
+                        <span className="text-xs text-gray-500">{getPalletInfo(shipment)}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        {getIntakeType(shipment) === 'PALLET' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                            🪵 Pallet
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                            📦 Box
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm font-medium text-primary-600">{shipment.rackLocations || 'N/A'}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {(() => {
+                        const days = getDaysStored(shipment);
+                        const storageBadge = getStorageBadge(days);
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
+                            {storageBadge.icon} {storageBadge.badge}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {(() => {
+                        const badge = getStatusBadge(shipment.status);
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${badge.color}`}>
+                            <span>{badge.icon}</span>
+                            <span>{badge.label}</span>
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        {/* QR Code button - show for ALL shipments */}
+                        <button
+                          onClick={() => {
+                            setSelectedShipment(shipment);
+                            setQrModalOpen(true);
+                          }}
+                          className="text-indigo-600 hover:text-indigo-900 transition-colors"
+                          title="View/Print QR Codes"
                         >
-                          <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                          <QrCodeIcon className="h-5 w-5" />
                         </button>
-                      )}
-                      {shipment.status === 'RELEASED' && (
-                        <button 
-                          onClick={() => handlePrintReleaseNote(shipment)}
-                          className="text-purple-600 hover:text-purple-900"
-                          title="Print Release Note"
+
+                        {/* Release button - only for stored shipments with boxes */}
+                        {(shipment.status === 'IN_STORAGE' ||
+                          shipment.status === 'IN_WAREHOUSE' ||
+                          shipment.status === 'PARTIAL' ||
+                          shipment.status === 'STORED' ||
+                          shipment.status === 'ACTIVE') &&
+                          shipment.currentBoxCount > 0 && (
+                            <button
+                              onClick={() => handleReleaseClick(shipment)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Generate Invoice & Release"
+                            >
+                              <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                            </button>
+                          )}
+                        {shipment.status === 'RELEASED' && (
+                          <button
+                            onClick={() => handlePrintReleaseNote(shipment)}
+                            className="text-purple-600 hover:text-purple-900"
+                            title="Print Release Note"
+                          >
+                            <PrinterIcon className="h-5 w-5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedShipment(shipment);
+                            setDetailModalOpen(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="View Details"
                         >
-                          <PrinterIcon className="h-5 w-5" />
+                          <EyeIcon className="h-5 w-5" />
                         </button>
-                      )}
-                      <button 
-                        onClick={() => {
-                          setSelectedShipment(shipment);
-                          setDetailModalOpen(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="View Details"
-                      >
-                        <EyeIcon className="h-5 w-5" />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setSelectedShipment(shipment);
-                          setEditModalOpen(true);
-                        }}
-                        className="text-gray-600 hover:text-gray-900"
-                        title="Edit Shipment"
-                      >
-                        <PencilIcon className="h-5 w-5" />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(shipment.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <TrashIcon className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                        <button
+                          onClick={() => {
+                            setSelectedShipment(shipment);
+                            setEditModalOpen(true);
+                          }}
+                          className="text-gray-600 hover:text-gray-900"
+                          title="Edit Shipment"
+                        >
+                          <PencilIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(shipment.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 ))
               )}
             </tbody>

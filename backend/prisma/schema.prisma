@@ -238,15 +238,29 @@ model Rack {
   companyProfileId String?   // NEW: FK to CompanyProfile (DIOR, JAZEERA, etc)
   location         String?
   
+  // NEW: Zone-based organization (backwards compatible)
+  zone             String?   @default("Unassigned") // Zone 7, Zone A, Zone B, etc.
+  zoneDescription  String?   @db.Text // Description of zone
+  
   // Size/Dimensions
   length        Float?    // Length in meters/feet
   width         Float?    // Width in meters/feet
   height        Float?    // Height in meters/feet
   dimensionUnit String    @default("METERS") // METERS, FEET
   
+  // EXISTING CAPACITY (Keep for backwards compatibility)
   capacityTotal Float     @default(100)
   capacityUsed  Float     @default(0)
   minCapacity   Int       @default(2) // Minimum capacity requirement
+  
+  // NEW: Flexible Capacity System (backwards compatible - all optional)
+  capacityMode     String?  @default("FIXED") // FIXED, FLEXIBLE, UNLIMITED
+  palletCapacity   Int?     // Max pallets this rack can hold (e.g., 3)
+  boxCapacity      Int?     // Max loose boxes (e.g., 50)
+  currentPallets   Int?     @default(0) // Current pallets stored
+  currentBoxes     Int?     @default(0) // Current loose boxes stored
+  capacityNotes    String?  @db.Text // "3 pallets OR 50 boxes OR mixed"
+  
   status        String    @default("ACTIVE") // ACTIVE, MAINTENANCE, RESERVED
   lastActivity  DateTime?
   companyId     String
