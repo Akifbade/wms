@@ -351,9 +351,48 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       const parts = code.split('_');
       if (parts.length === 3) {
         const shipmentId = parts[1];
-        // Search by shipment ID
+        
+        // Try 1: Direct shipment ID lookup
+        try {
+          const directResponse = await fetch(`/api/shipments/${shipmentId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+          });
+          if (directResponse.ok) {
+            const data = await directResponse.json();
+            const shipment = data.shipment || data;
+            const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
+              headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+            });
+            const boxData = await boxResponse.json();
+            const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
+            setRemainingBoxes(unassignedBoxes);
+            return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode: code };
+          }
+        } catch (err) {
+          console.log('Direct shipment lookup failed, trying search...');
+        }
+        
+        // Try 2: Search by shipment ID
         const response = await shipmentsAPI.getAll({ search: shipmentId });
-        const shipment = response.shipments?.find((s: any) => s.id === shipmentId);
+        const shipment = response.shipments?.find((s: any) => 
+          s.id === shipmentId || s.qrCode?.includes(shipmentId) || s.referenceId?.includes(shipmentId)
+        );
+        if (shipment) {
+          const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+          });
+          const boxData = await boxResponse.json();
+          const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
+          setRemainingBoxes(unassignedBoxes);
+          return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode: code };
+        }
+      }
+      
+      // Try 3: Handle old PALLET-ID-NUM|S:base64 format (backwards compatibility)
+      if (code.includes('|S:')) {
+        const cleanCode = code.split('|S:')[0]; // Remove metadata
+        const response = await shipmentsAPI.getAll({ search: cleanCode });
+        const shipment = response.shipments?.[0]; // Take first match
         if (shipment) {
           const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
