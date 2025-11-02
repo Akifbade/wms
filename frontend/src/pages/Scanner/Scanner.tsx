@@ -743,10 +743,10 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       const boxData = await boxResponse.json();
       const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
       
-      // Calculate pallet info
-      const boxesPerPallet = shipment.boxesPerPallet || 0;
-      const totalPallets = boxesPerPallet > 0 ? Math.floor(unassignedBoxes / boxesPerPallet) : 0;
-      const looseBoxes = boxesPerPallet > 0 ? unassignedBoxes % boxesPerPallet : unassignedBoxes;
+      // ✅ SAME LOGIC AS SCANNER: 20 boxes = 1 pallet (hardcoded, not from database)
+      const boxesPerPallet = 20;
+      const totalPallets = Math.floor(unassignedBoxes / boxesPerPallet);
+      const looseBoxes = unassignedBoxes % boxesPerPallet;
       
       // Set selected shipment and rack
       setSelectedShipmentForRack({
@@ -819,8 +819,8 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       setLoading(true);
       const token = localStorage.getItem('authToken');
       
-      // Calculate total boxes to assign
-      const boxesPerPallet = selectedShipmentForRack.boxesPerPallet || 0;
+      // ✅ SAME LOGIC AS SCANNER: 20 boxes per pallet (hardcoded)
+      const boxesPerPallet = 20;
       const totalBoxesToAssign = (palletQuantity * boxesPerPallet) + looseBoxQuantity;
       
       console.log('🎯 Assigning:', {
@@ -1767,7 +1767,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       <div>
                         <span className="font-bold text-purple-700">{selectedShipmentForRack.totalPallets} Pallets</span>
                         <span className="text-gray-500 text-sm ml-2">
-                          ({selectedShipmentForRack.boxesPerPallet} boxes each)
+                          (20 boxes each)
                         </span>
                       </div>
                     )}
@@ -1865,7 +1865,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       <span className="text-purple-700">
                         {palletQuantity} Pallet{palletQuantity > 1 ? 's' : ''} 
                         <span className="text-sm text-gray-600 ml-1">
-                          ({palletQuantity * (selectedShipmentForRack.boxesPerPallet || 0)} boxes)
+                          ({palletQuantity * 20} boxes)
                         </span>
                       </span>
                     )}
@@ -1874,7 +1874,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                     )}
                   </div>
                   <p className="text-lg font-bold text-green-700 mt-2">
-                    = {(palletQuantity * (selectedShipmentForRack.boxesPerPallet || 0)) + looseBoxQuantity} Total Boxes
+                    = {(palletQuantity * 20) + looseBoxQuantity} Total Boxes
                   </p>
                 </div>
 
