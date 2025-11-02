@@ -123,7 +123,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
 
   const generateQRCode = async (code: string) => {
     try {
-      const qrData = `RACK:${code}`;
+      const qrData = `RACK_${code.replace(/-/g, '_')}`;
       const url = await QRCode.toDataURL(qrData, {
         width: 200,
         margin: 2,
