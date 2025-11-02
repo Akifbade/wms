@@ -62,6 +62,9 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
   const [success, setSuccess] = useState('');
   const [showRackMap, setShowRackMap] = useState(false);
 
+  // 🔒 SECURITY: Check if shipment has boxes assigned to racks (prevent fraud)
+  const isRackAssigned = shipment?.status === 'IN_STORAGE' || shipment?.status === 'PARTIAL' || shipment?.currentBoxCount > 0;
+
   useEffect(() => {
     if (isOpen && shipment) {
       loadRacks();
@@ -270,6 +273,27 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* 🔒 SECURITY WARNING: Show if boxes are assigned */}
+          {isRackAssigned && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700 font-semibold">
+                    🔒 Security Lock: Critical fields are locked because boxes are assigned to racks.
+                  </p>
+                  <p className="text-xs text-yellow-600 mt-1">
+                    Client Name, Company Profile, Box Count, and Status cannot be changed to prevent fraud.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Error/Success Messages */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -289,15 +313,19 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Client Name <span className="text-red-500">*</span>
+                  {isRackAssigned && <span className="ml-2 text-xs text-yellow-600">🔒 Locked</span>}
                 </label>
                 <input
                   type="text"
                   name="clientName"
                   value={formData.clientName}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                  }`}
                   placeholder="John Doe"
                   required
+                  disabled={isRackAssigned}
                 />
               </div>
 
@@ -355,12 +383,16 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Company Profile
+                  {isRackAssigned && <span className="ml-2 text-xs text-yellow-600">🔒 Locked</span>}
                 </label>
                 <select
                   name="companyProfileId"
                   value={formData.companyProfileId}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                  }`}
+                  disabled={isRackAssigned}
                 >
                   <option value="">-- No Company Profile --</option>
                   {companyProfiles.map((cp: any) => (
@@ -512,44 +544,56 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Total Box Count <span className="text-red-500">*</span>
+                  {isRackAssigned && <span className="ml-2 text-xs text-yellow-600">🔒 Locked</span>}
                 </label>
                 <input
                   type="number"
                   name="totalBoxCount"
                   value={formData.totalBoxCount}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                  }`}
                   placeholder="10"
                   min="1"
                   required
+                  disabled={isRackAssigned}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Current Box Count <span className="text-red-500">*</span>
+                  {isRackAssigned && <span className="ml-2 text-xs text-yellow-600">🔒 Auto-Update Only</span>}
                 </label>
                 <input
                   type="number"
                   name="currentBoxCount"
                   value={formData.currentBoxCount}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                  }`}
                   placeholder="10"
                   min="0"
                   required
+                  disabled={isRackAssigned}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Status
+                  {isRackAssigned && <span className="ml-2 text-xs text-yellow-600">🔒 Auto-Update Only</span>}
                 </label>
                 <select
                   name="status"
                   value={formData.status}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                  }`}
+                  disabled={isRackAssigned}
                 >
                   <option value="IN_STORAGE">In Storage</option>
                   <option value="PARTIAL">Partial</option>
@@ -566,12 +610,16 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Select Rack
+                  {isRackAssigned && <span className="ml-2 text-xs text-yellow-600">🔒 Cannot Change</span>}
                 </label>
                 <select
                   name="rackId"
                   value={formData.rackId}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
+                  }`}
+                  disabled={isRackAssigned}
                 >
                   <option value="">-- No Rack Assigned --</option>
                   {racks.map(rack => (
@@ -586,12 +634,22 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                 <button
                   type="button"
                   onClick={() => setShowRackMap(true)}
-                  className="w-full px-4 py-2 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 font-medium border-2 border-purple-300"
+                  className={`w-full px-4 py-2 rounded-md font-medium border-2 ${
+                    isRackAssigned 
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' 
+                      : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
+                  }`}
+                  disabled={isRackAssigned}
                 >
-                  🗺️ Open Rack Map
+                  🗺️ {isRackAssigned ? 'Rack Map Locked' : 'Open Rack Map'}
                 </button>
               </div>
             </div>
+            {isRackAssigned && (
+              <p className="text-xs text-yellow-600 mt-2">
+                ⚠️ Rack assignment is locked. Use Scanner or Pending+Racks to move boxes between racks.
+              </p>
+            )}
           </div>
 
           {/* 🆕 NEW: Pallet Information Display (Read-Only) */}
