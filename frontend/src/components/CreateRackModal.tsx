@@ -282,7 +282,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Location <span className="text-red-500">*</span>
+                  Warehouse Location <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -290,9 +290,12 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
                   value={formData.location}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Zone A, Floor 1, Section North..."
+                  placeholder="Zone A, Floor 1, Section 2, Row 3..."
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Physical location in warehouse (e.g., "Zone A, Floor 2")
+                </p>
               </div>
 
               <div>
@@ -314,7 +317,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category / Company
+                  Company Profile (Owner)
                 </label>
                 <select
                   name="categoryId"
@@ -322,10 +325,10 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="">Select Category / Company...</option>
+                  <option value="">Select Company Profile...</option>
                   {categories.map(cat => (
                     <option key={cat.id} value={cat.id}>
-                      ???? {cat.name}
+                      🏢 {cat.name}
                     </option>
                   ))}
                 </select>
@@ -361,7 +364,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
                   </div>
                 )}
                 <p className="text-xs text-gray-500 mt-1">
-                  Select which company/category this rack belongs to
+                  Which company/client owns the items stored in this rack?
                 </p>
               </div>
 
@@ -399,57 +402,6 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
                   <option value="MAINTENANCE">Maintenance</option>
                   <option value="RESERVED">Reserved</option>
                 </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Zone Configuration */}
-          <div className="border-b pb-4">
-            <h3 className="text-lg font-semibold mb-4 text-gray-700">🏢 Zone Configuration</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Zone Number/Name
-                </label>
-                <input
-                  type="text"
-                  name="zone"
-                  value={formData.zone}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="e.g., 1, 2, Zone A, Zone B..."
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Organize racks by zone for better management
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Zone Icon
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowIconPicker(true)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-purple-500 focus:border-transparent flex items-center gap-3"
-                >
-                  <span className="text-3xl">{formData.zoneIcon}</span>
-                  <span className="text-gray-600">Click to change icon</span>
-                </button>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Zone Description
-                </label>
-                <textarea
-                  name="zoneDescription"
-                  value={formData.zoneDescription}
-                  onChange={(e) => setFormData(prev => ({ ...prev, zoneDescription: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  rows={2}
-                  placeholder="Describe this zone's purpose or location..."
-                />
               </div>
             </div>
           </div>

@@ -202,8 +202,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       const releasedBoxes = shipment.boxes.filter((b: any) => b.status === 'RELEASED').length;
       const inStorageBoxes = shipment.boxes.filter((b: any) => b.status === 'IN_STORAGE').length;
       
-      // Get unique rack codes where boxes are located
-      const rackIds = [...new Set(shipment.boxes.filter((b: any) => b.rackId).map((b: any) => b.rackId))] as string[];
+      // Get unique rack codes where boxes are CURRENTLY located (IN_STORAGE only, exclude RELEASED)
+      const rackIds = [...new Set(
+        shipment.boxes
+          .filter((b: any) => b.rackId && b.status === 'IN_STORAGE') // Only boxes in storage
+          .map((b: any) => b.rackId)
+      )] as string[];
       const racks = rackIds.length > 0 ? await prisma.rack.findMany({
         where: { id: { in: rackIds } },
         select: { code: true }
