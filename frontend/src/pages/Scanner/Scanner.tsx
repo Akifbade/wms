@@ -46,6 +46,8 @@ export const Scanner: React.FC = () => {
   const [palletQuantity, setPalletQuantity] = useState<number>(0);
   const [looseBoxQuantity, setLooseBoxQuantity] = useState<number>(0);
   const [assignmentPhotos, setAssignmentPhotos] = useState<File[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; size: string } | null>(null);
 
   // ✅ Duplicate prevention: Track last scanned code and timestamp
   const lastScanRef = useRef<{ code: string; timestamp: number } | null>(null);
@@ -128,6 +130,55 @@ export const Scanner: React.FC = () => {
     } catch (err) {
       console.log('Warning sound playback failed:', err);
     }
+  };
+
+  // 📸 Compress photo for mobile upload (reduce 10MB → 500KB)
+  const compressPhoto = async (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Max dimensions 1920x1920 (keeps quality but reduces size)
+          const maxSize = 1920;
+          if (width > height && width > maxSize) {
+            height = (height * maxSize) / width;
+            width = maxSize;
+          } else if (height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const compressedFile = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                console.log(`📸 Compressed: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+                resolve(compressedFile);
+              } else {
+                resolve(file); // Fallback to original
+              }
+            },
+            'image/jpeg',
+            0.85 // 85% quality (good balance)
+          );
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   useEffect(() => {
@@ -611,12 +662,29 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       // Upload photos first if any (Same as Pending+Racks)
       let photoUrls: string[] = [];
       if (assignmentPhotos.length > 0) {
+        setUploadingPhotos(true);
         console.log(`📸 Starting upload of ${assignmentPhotos.length} photo(s)...`);
-        for (const photo of assignmentPhotos) {
-          const formData = new FormData();
-          formData.append('photo', photo);
+        
+        for (let i = 0; i < assignmentPhotos.length; i++) {
+          const photo = assignmentPhotos[i];
+          const originalSize = (photo.size / 1024 / 1024).toFixed(2);
+          
+          setUploadProgress({
+            current: i + 1,
+            total: assignmentPhotos.length,
+            size: `${originalSize}MB`
+          });
 
           try {
+            // 📸 Compress photo before upload (mobile cameras = huge files!)
+            console.log(`📸 Compressing photo ${i + 1}/${assignmentPhotos.length} (${originalSize}MB)...`);
+            const compressedPhoto = await compressPhoto(photo);
+            const compressedSize = (compressedPhoto.size / 1024 / 1024).toFixed(2);
+            console.log(`✅ Compressed: ${originalSize}MB → ${compressedSize}MB`);
+
+            const formData = new FormData();
+            formData.append('photo', compressedPhoto);
+
             const uploadRes = await fetch('/api/shipments/upload/photo', {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${token}` },
@@ -626,17 +694,20 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
             if (uploadRes.ok) {
               const uploadData = await uploadRes.json();
               photoUrls.push(uploadData.photoUrl);
-              console.log(`✅ Photo uploaded: ${uploadData.photoUrl}`);
+              console.log(`✅ Photo ${i + 1} uploaded: ${uploadData.photoUrl}`);
             } else {
               const errorText = await uploadRes.text();
-              console.error(`❌ Photo upload failed (${uploadRes.status}):`, errorText);
-              alert(`⚠️ Photo upload failed: ${uploadRes.status} ${errorText.substring(0, 100)}`);
+              console.error(`❌ Photo ${i + 1} upload failed (${uploadRes.status}):`, errorText);
+              alert(`⚠️ Photo ${i + 1} upload failed: ${uploadRes.status} - ${errorText.substring(0, 100)}`);
             }
           } catch (error) {
-            console.error('❌ Photo upload error:', error);
-            alert(`⚠️ Photo upload error: ${error}`);
+            console.error(`❌ Photo ${i + 1} upload error:`, error);
+            alert(`⚠️ Photo ${i + 1} error: ${error}`);
           }
         }
+        
+        setUploadingPhotos(false);
+        setUploadProgress(null);
         console.log(`📸 Successfully uploaded ${photoUrls.length}/${assignmentPhotos.length} photos`);
       }
 
@@ -1244,16 +1315,39 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                   ))}
                                 </div>
                               )}
+
+                              {/* 📸 Upload Progress Indicator */}
+                              {uploadingPhotos && uploadProgress && (
+                                <div className="mt-3 p-3 bg-blue-50 border border-blue-300 rounded-lg">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-bold text-blue-900">
+                                      📸 Uploading Photo {uploadProgress.current}/{uploadProgress.total}
+                                    </span>
+                                    <span className="text-xs text-blue-700">
+                                      Size: {uploadProgress.size}
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-blue-200 rounded-full h-2">
+                                    <div 
+                                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                                    ></div>
+                                  </div>
+                                  <p className="text-xs text-blue-600 mt-1 animate-pulse">
+                                    ⏳ Compressing and uploading... Please wait
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
 
                           <div className="flex gap-2 sm:gap-3">
                             <button
                               onClick={assignShipmentToRack}
-                              disabled={loading || ((palletQuantity || 0) === 0 && (looseBoxQuantity || 0) === 0)}
+                              disabled={loading || uploadingPhotos || ((palletQuantity || 0) === 0 && (looseBoxQuantity || 0) === 0)}
                               className="flex-1 py-2.5 sm:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-bold text-sm sm:text-base md:text-lg"
                             >
-                              ✅ Confirm
+                              {uploadingPhotos ? '⏳ Uploading...' : '✅ Confirm'}
                             </button>
                             <button
                               onClick={() => {
