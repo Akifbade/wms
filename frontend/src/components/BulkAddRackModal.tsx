@@ -176,36 +176,22 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
             <h3 className="text-lg font-semibold mb-4 text-blue-800 flex items-center gap-2">
               🏢 Zone Configuration
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Zone Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="zone"
-                  value={formData.zone}
-                  onChange={handleChange}
-                  placeholder="e.g., Zone 7, Zone A"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Rack Type
-                </label>
-                <select
-                  name="rackType"
-                  value={formData.rackType}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="STORAGE">Storage (Regular)</option>
-                  <option value="MATERIALS">Materials</option>
-                  <option value="EQUIPMENT">Equipment</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Zone Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="zone"
+                value={formData.zone}
+                onChange={handleChange}
+                placeholder="e.g., 1A, 1B, 1C (Zone 1 sub-sections)"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                💡 Tip: Use format like <strong>1A, 1B, 1C</strong> for sub-zones, or <strong>Zone 1, Zone 2</strong> for main zones
+              </p>
             </div>
           </div>
 
@@ -224,10 +210,13 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
                   name="prefix"
                   value={formData.prefix}
                   onChange={handleChange}
-                  placeholder="e.g., A1-Z7-"
+                  placeholder="e.g., 1A- (creates 1A-1, 1A-2, ...)"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  💡 Example: Prefix "1A-" with range 1-10 creates: 1A-1, 1A-2, 1A-3 ... 1A-10
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
