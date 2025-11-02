@@ -873,8 +873,21 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               <input
                 type="number"
                 name="palletCount"
-                value={formData.palletCount}
-                onChange={handleChange}
+                value={formData.palletCount || ''}
+                onChange={(e) => {
+                  const value = Math.max(1, parseInt(e.target.value) || 1);
+                  setFormData(prev => ({
+                    ...prev,
+                    palletCount: value,
+                    pieces: value * (prev.boxesPerPallet || 1)
+                  }));
+                }}
+                onBlur={(e) => {
+                  // Ensure minimum 1 on blur (when user leaves field)
+                  if (!e.target.value || parseInt(e.target.value) < 1) {
+                    setFormData(prev => ({ ...prev, palletCount: 1, pieces: 1 * (prev.boxesPerPallet || 1) }));
+                  }
+                }}
                 className="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50"
                 min="1"
                 required
@@ -887,8 +900,21 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               <input
                 type="number"
                 name="boxesPerPallet"
-                value={formData.boxesPerPallet}
-                onChange={handleChange}
+                value={formData.boxesPerPallet || ''}
+                onChange={(e) => {
+                  const value = Math.max(1, parseInt(e.target.value) || 1);
+                  setFormData(prev => ({
+                    ...prev,
+                    boxesPerPallet: value,
+                    pieces: (prev.palletCount || 1) * value
+                  }));
+                }}
+                onBlur={(e) => {
+                  // Ensure minimum 1 on blur
+                  if (!e.target.value || parseInt(e.target.value) < 1) {
+                    setFormData(prev => ({ ...prev, boxesPerPallet: 1, pieces: (prev.palletCount || 1) * 1 }));
+                  }
+                }}
                 className="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50"
                 min="1"
                 required
@@ -971,13 +997,19 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             <input
               type="number"
               name="pieces"
-              value={formData.pieces}
+              value={formData.pieces || ''}
               onChange={(e) => {
-                const value = parseInt(e.target.value) || 1;
+                const value = Math.max(1, parseInt(e.target.value) || 1);
                 setFormData(prev => ({
                   ...prev,
                   pieces: value
                 }));
+              }}
+              onBlur={(e) => {
+                // Ensure minimum 1 on blur
+                if (!e.target.value || parseInt(e.target.value) < 1) {
+                  setFormData(prev => ({ ...prev, pieces: 1 }));
+                }
               }}
               className="w-full px-4 py-3 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-green-50"
               min="1"
@@ -1618,72 +1650,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </div>
             )}
 
-
-            {/*  OLD HIDDEN SECTIONS REMOVED - All fields now use dynamic conditional rendering above */}
-
-
-            {/* Storage Assignment */}
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <h3 className="text-lg font-semibold mb-4 text-green-800 flex items-center">
-                Storage Assignment
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Assign to Rack {shipmentSettings.requireRackAssignment && <span className="text-red-500">*</span>}
-                  </label>
-                  <select
-                    name="rackId"
-                    value={formData.rackId}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    required={shipmentSettings.requireRackAssignment}
-                  >
-                    <option value="">{shipmentSettings.requireRackAssignment ? 'Select a rack (required)' : 'Select a rack (optional)'}</option>
-                    {racks.map(rack => (
-                      <option key={rack.id} value={rack.id}>
-                        {rack.code} - {rack.location} ({rack.capacityUsed}/{rack.capacityTotal})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* ???? CONDITIONAL: Estimated Storage Days */}
-                {shipmentSettings.showEstimatedDays !== false && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Estimated Storage Days {shipmentSettings.requireEstimatedDays && <span className="text-red-500">*</span>}
-                    </label>
-                    <input
-                      type="number"
-                      name="estimatedDays"
-                      value={formData.estimatedDays}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      min="1"
-                      required={shipmentSettings.requireEstimatedDays}
-                    />
-                  </div>
-                )}
-
-                {/* ???? CONDITIONAL: Special Instructions */}
-                {shipmentSettings.showSpecialInstructions !== false && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Special Instructions
-                    </label>
-                    <textarea
-                      name="specialInstructions"
-                      value={formData.specialInstructions}
-                      onChange={handleChange}
-                      rows={2}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="Any special handling or storage requirements..."
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* ✅ Storage Assignment - Now using renderStorageSection() component above to avoid duplication */}
+            {renderStorageSection()}
 
             {/* Custom Fields */}
             {customFields.length > 0 && (
