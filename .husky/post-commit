@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# 🔄 POST-COMMIT HOOK: Auto-update localhost after commit
+# Windows: Run PowerShell script
+if command -v pwsh >/dev/null 2>&1; then
+    pwsh -File "$(dirname -- "$0")/post-commit.ps1"
+elif command -v powershell >/dev/null 2>&1; then
+    powershell -File "$(dirname -- "$0")/post-commit.ps1"
+else
+    # Fallback for Unix-like systems
+    echo ""
+    echo "🔄 POST-COMMIT: Auto-updating localhost..."
+    cd frontend
+    npm run build > /dev/null 2>&1
+    cd ..
+    docker cp frontend/dist/. wms-frontend:/usr/share/nginx/html/ 2>&1 | grep -v "Successfully copied" || true
+    docker exec wms-frontend nginx -s reload > /dev/null 2>&1
+    echo "✅ Localhost updated!"
+    echo ""
+fi

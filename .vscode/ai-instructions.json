@@ -78,25 +78,28 @@
   },
   
   "DEVELOPMENT_MODE": {
-    "hot_reload_script": "watch-localhost.ps1",
-    "purpose": "Auto-rebuild localhost when source files change - TEST BEFORE COMMIT",
-    "usage": {
-      "automatic": "Run task: 🔄 AUTO-RELOAD: Watch Localhost Changes",
-      "quick_rebuild": "Press Ctrl+Shift+B for fast rebuild",
-      "manual": "Run .\\watch-localhost.ps1 in PowerShell",
-      "stop": "Press Ctrl+C in watch terminal"
+    "auto_update_localhost": "✅ ENABLED - Localhost auto-updates after every commit",
+    "git_hooks": {
+      "post-commit": ".husky/post-commit runs after git commit to auto-update localhost",
+      "behavior": "Frontend rebuilds and deploys to localhost Docker containers automatically"
     },
-    "watched_files": {
-      "backend": "backend/src/**/*.{ts,js} → Auto-restarts backend container",
-      "frontend": "frontend/src/**/*.{tsx,ts,jsx,js,css} → Auto-rebuilds + hot-reloads"
+    "manual_rebuild": {
+      "quick": "Press Ctrl+Shift+B (runs task: ⚡ QUICK: Rebuild Localhost After Changes)",
+      "full": "Run task: 🔄 LOCALHOST REBUILD: Fresh Docker Build"
+    },
+    "watch_script": {
+      "file": "watch-localhost.ps1",
+      "purpose": "Optional background watcher for live development",
+      "usage": "Run task: 🔄 AUTO-RELOAD: Watch Localhost Changes"
     },
     "workflow": [
-      "1. Start watch script (task or manual)",
-      "2. Make changes to code",
-      "3. Watch script auto-detects and rebuilds",
-      "4. Test on http://localhost immediately",
-      "5. ONLY commit when verified working",
-      "6. NEVER push multiple commits"
+      "1. Make changes to code (auto-saves after 1 second)",
+      "2. Test changes by manually refreshing http://localhost",
+      "3. When ready, commit changes (git commit)",
+      "4. 🔄 POST-COMMIT HOOK AUTO-RUNS: Rebuilds frontend + updates localhost",
+      "5. Localhost now has your committed changes",
+      "6. Push to staging ONLY when localhost tested and working",
+      "7. NEVER push multiple commits rapidly"
     ]
   },
   

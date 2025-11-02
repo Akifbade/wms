@@ -7,7 +7,8 @@
             "icon": "terminal-powershell"
         }
     },
-    "files.autoSave": "onFocusChange",
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1000,
     "files.watcherExclude": {
         "**/.git/objects/**": true,
         "**/node_modules/**": true,
@@ -27,5 +28,8 @@
     },
     "git.decorations.enabled": true,
     "git.detectSubmodules": false,
-    "todo-tree.general.tags": ["TODO", "FIXME", "BUG", "HACK"]
+    "todo-tree.general.tags": ["TODO", "FIXME", "BUG", "HACK"],
+    "task.autoDetect": "on",
+    "task.quickOpen.detail": true,
+    "task.quickOpen.skip": false
 }
