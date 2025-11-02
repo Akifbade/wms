@@ -16,11 +16,13 @@ import {
   SquaresPlusIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
-  RectangleStackIcon
+  RectangleStackIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 import { racksAPI } from '../../services/api';
 import CreateRackModal from '../../components/CreateRackModal';
 import EditRackModal from '../../components/EditRackModal';
+import BulkAddRackModal from '../../components/BulkAddRackModal';
 import QRCode from 'qrcode';
 
 // Shipment Box Card Component (to avoid hooks in loops)
@@ -101,10 +103,12 @@ const ShipmentBoxCard: React.FC<{
 export const Racks: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedZone, setSelectedZone] = useState('all'); // NEW: Zone filter
   const [racks, setRacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [bulkAddModalOpen, setBulkAddModalOpen] = useState(false); // NEW: Bulk add modal
   const [selectedRack, setSelectedRack] = useState<any>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [rackDetails, setRackDetails] = useState<any>(null);
@@ -150,8 +154,20 @@ export const Racks: React.FC = () => {
       selected === profileName ||
       selected === profileId;
 
-    return sectionMatch && categoryMatch;
+    // NEW: Zone filter
+    const zone = r.zone || 'Unassigned';
+    const zoneMatch = selectedZone === 'all' || zone === selectedZone;
+
+    return sectionMatch && categoryMatch && zoneMatch;
   });
+
+  // NEW: Get unique zones for filter buttons
+  const uniqueZones = Array.from(new Set(racks.map((r: any) => r.zone || 'Unassigned')))
+    .sort((a, b) => {
+      if (a === 'Unassigned') return 1;
+      if (b === 'Unassigned') return -1;
+      return a.localeCompare(b);
+    });
 
   const getUtilizationColor = (percentage: number) => {
     if (percentage >= 90) return 'bg-red-500';
@@ -334,14 +350,21 @@ export const Racks: React.FC = () => {
         <div className="flex items-center gap-3">
           <button 
             onClick={handleBulkQrOpen}
-            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-md"
           >
             <CameraIcon className="h-5 w-5 mr-2" />
-            Bulk QR Codes
+            Bulk QR
+          </button>
+          <button 
+            onClick={() => setBulkAddModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors shadow-md"
+          >
+            <SparklesIcon className="h-5 w-5 mr-2" />
+            Bulk Add
           </button>
           <button 
             onClick={() => setCreateModalOpen(true)}
-            className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-md"
           >
             <PlusIcon className="h-5 w-5 mr-2" />
             Add Rack
@@ -484,6 +507,48 @@ export const Racks: React.FC = () => {
               >
                 Others
               </button>
+            </div>
+          </div>
+
+          {/* NEW: Zone Filter */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1">
+              🏢 ZONES
+            </p>
+            <div className="flex items-center flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedZone('all')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedZone === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Zones ({racks.length})
+              </button>
+              {uniqueZones.map((zone) => {
+                const zoneRacks = racks.filter(r => (r.zone || 'Unassigned') === zone);
+                const zoneOccupied = zoneRacks.filter(r => r.capacityUsed > 0).length;
+                return (
+                  <button
+                    key={zone}
+                    onClick={() => setSelectedZone(zone)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                      selectedZone === zone 
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                    }`}
+                  >
+                    <span>{zone === 'Unassigned' ? '📦' : '🏢'} {zone}</span>
+                    <span className="text-xs opacity-75">({zoneRacks.length})</span>
+                    {zoneOccupied > 0 && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                        selectedZone === zone ? 'bg-white/20' : 'bg-green-100 text-green-700'
+                      }`}>
+                        {zoneOccupied} active
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1026,6 +1091,16 @@ export const Racks: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Bulk Add Modal */}
+      <BulkAddRackModal
+        isOpen={bulkAddModalOpen}
+        onClose={() => setBulkAddModalOpen(false)}
+        onSuccess={() => {
+          loadRacks();
+          setBulkAddModalOpen(false);
+        }}
+      />
     </div>
   );
 };
