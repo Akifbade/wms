@@ -1557,32 +1557,32 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
               ) : (
                 <div className="divide-y-2 divide-gray-200">
                   {filteredShipments.map((shipment) => (
-                    <div key={shipment.id} className="p-6 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl font-bold text-primary-600">
+                    <div key={shipment.id} className="p-3 sm:p-4 md:p-6 hover:bg-gray-50 transition-colors">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-start sm:justify-between gap-3 sm:gap-4">
+                        <div className="flex-1 w-full space-y-2">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                            <span className="text-lg sm:text-xl md:text-2xl font-bold text-primary-600">
                               {shipment.referenceId}
                             </span>
-                            <span className={`px-3 py-1 text-sm font-semibold rounded-full ${shipment.status === 'PARTIAL'
+                            <span className={`px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-semibold rounded-full ${shipment.status === 'PARTIAL'
                                 ? 'bg-orange-100 text-orange-800'
                                 : 'bg-yellow-100 text-yellow-800'
                               }`}>
                               {shipment.status === 'PARTIAL' ? '🔄 PARTIAL' : '⏳ PENDING'}
                             </span>
                           </div>
-                          <div className="grid grid-cols-2 gap-4 text-lg">
+                          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 text-sm sm:text-base md:text-lg">
                             <div>
-                              <span className="text-gray-500">Client:</span>
-                              <p className="font-semibold text-gray-900">{shipment.clientName}</p>
+                              <span className="text-gray-500 text-xs sm:text-sm">Client:</span>
+                              <p className="font-semibold text-gray-900 truncate">{shipment.clientName}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500">Boxes:</span>
+                              <span className="text-gray-500 text-xs sm:text-sm">Boxes:</span>
                               <p className="font-semibold text-gray-900">
                                 {shipment.remainingBoxes || 0} / {shipment.totalBoxes || shipment.currentBoxCount || 0} 📦
                                 {shipment.status === 'PARTIAL' && (
-                                  <span className="text-sm text-orange-600 ml-2">
-                                    ({shipment.remainingBoxes} remaining)
+                                  <span className="text-xs sm:text-sm text-orange-600 ml-1 sm:ml-2">
+                                    ({shipment.remainingBoxes} left)
                                   </span>
                                 )}
                               </p>
@@ -1594,10 +1594,10 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                         </div>
                         <button
                           onClick={() => handleSelectShipment(shipment)}
-                          className="px-8 py-4 bg-primary-600 text-white font-bold rounded-xl hover:bg-primary-700 transition-all shadow-lg hover:shadow-xl text-lg whitespace-nowrap"
+                          className="px-3 sm:px-5 md:px-8 py-2.5 sm:py-3 md:py-4 bg-primary-600 text-white font-bold rounded-lg sm:rounded-xl hover:bg-primary-700 transition-all shadow-lg hover:shadow-xl text-sm sm:text-base md:text-lg whitespace-nowrap"
                         >
-                          📍 Choose Rack<br />
-                          <span className="text-sm font-normal">اختر الرف</span>
+                          <span className="block">📍 Choose Rack</span>
+                          <span className="hidden sm:block text-xs sm:text-sm font-normal">اختر الرف</span>
                         </button>
                       </div>
 
