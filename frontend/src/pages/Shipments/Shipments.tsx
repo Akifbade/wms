@@ -209,7 +209,7 @@ export const Shipments: React.FC = () => {
     return { badge: `${days}d`, color: 'red', icon: '🔴', text: 'text-red-700', bg: 'bg-red-100' };
   };
 
-  // Calculate long-stay counts (safe - only for display)
+  // Calculate long-stay shipments for warning badges
   const longStayCounts = {
     warning: shipments.filter(s => {
       const days = getDaysStored(s);
@@ -220,6 +220,25 @@ export const Shipments: React.FC = () => {
       return days >= 60;
     }).length
   };
+
+  // Client-side advanced filtering for instant search
+  const filteredShipments = shipments.filter((shipment: any) => {
+    if (!searchTerm.trim()) return true; // No filter if search empty
+    
+    const searchLower = searchTerm.toLowerCase();
+    
+    // Search across multiple fields
+    return (
+      shipment.clientName?.toLowerCase().includes(searchLower) ||
+      shipment.referenceId?.toLowerCase().includes(searchLower) ||
+      shipment.clientPhone?.toLowerCase().includes(searchLower) ||
+      shipment.companyProfile?.name?.toLowerCase().includes(searchLower) ||
+      shipment.barcode?.toLowerCase().includes(searchLower) ||
+      shipment.clientAddress?.toLowerCase().includes(searchLower) ||
+      shipment.status?.toLowerCase().includes(searchLower) ||
+      shipment.rackLocation?.toLowerCase().includes(searchLower)
+    );
+  });
 
   if (loading) {
     return (
@@ -405,17 +424,26 @@ export const Shipments: React.FC = () => {
           </nav>
         </div>
 
-        {/* Search Bar */}
+        {/* Advanced Search Bar */}
         <div className="p-4 bg-gray-50">
-          <div className="relative max-w-md">
+          <div className="relative max-w-2xl">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by client name, phone, or shipment ID..."
+              placeholder="🔍 Search by client, company, reference ID, barcode, phone, or any keyword..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -428,6 +456,7 @@ export const Shipments: React.FC = () => {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Barcode ID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pieces</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
@@ -438,8 +467,19 @@ export const Shipments: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {shipments.map((shipment: any) => (
-                <tr key={shipment.id} className="hover:bg-gray-50">
+              {filteredShipments.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="px-6 py-12 text-center">
+                    <div className="text-gray-400">
+                      <MagnifyingGlassIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p className="text-lg font-medium">No shipments found</p>
+                      <p className="text-sm mt-1">Try adjusting your search or filters</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredShipments.map((shipment: any) => (
+                  <tr key={shipment.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <QrCodeIcon className="h-5 w-5 text-gray-400 mr-2" />
@@ -449,6 +489,15 @@ export const Shipments: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{shipment.clientName}</div>
                     <div className="text-xs text-gray-500">{getFormattedDate(shipment.receivedDate)}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {shipment.companyProfile?.name ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                        🏢 {shipment.companyProfile.name}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">No company</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {shipment.clientPhone}
@@ -566,13 +615,7 @@ export const Shipments: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
-              {shipments.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
-                    No shipments found
-                  </td>
-                </tr>
+                ))
               )}
             </tbody>
           </table>
