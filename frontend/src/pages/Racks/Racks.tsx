@@ -104,6 +104,8 @@ export const Racks: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedZone, setSelectedZone] = useState('all'); // NEW: Zone filter
+  const [viewMode, setViewMode] = useState<'zones' | 'grid'>('zones'); // NEW: View toggle
+  const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set()); // NEW: Track expanded zones
   const [racks, setRacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -168,6 +170,27 @@ export const Racks: React.FC = () => {
       if (b === 'Unassigned') return -1;
       return a.localeCompare(b);
     });
+
+  // NEW: Toggle zone expansion
+  const toggleZone = (zone: string) => {
+    const newExpanded = new Set(expandedZones);
+    if (newExpanded.has(zone)) {
+      newExpanded.delete(zone);
+    } else {
+      newExpanded.add(zone);
+    }
+    setExpandedZones(newExpanded);
+  };
+
+  // NEW: Group racks by zone
+  const racksByZone = filteredRacks.reduce((acc: any, rack: any) => {
+    const zone = rack.zone || 'Unassigned';
+    if (!acc[zone]) {
+      acc[zone] = [];
+    }
+    acc[zone].push(rack);
+    return acc;
+  }, {});
 
   const getUtilizationColor = (percentage: number) => {
     if (percentage >= 90) return 'bg-red-500';
@@ -342,10 +365,35 @@ export const Racks: React.FC = () => {
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold text-gray-900">Warehouse Racks</h1>
             <span className="px-3 py-1 bg-gradient-to-r from-green-500 to-blue-500 text-white text-xs font-bold rounded-full animate-pulse">
-              ✨ UPDATED
+              ✨ ZONE VIEW
             </span>
           </div>
-          <p className="text-gray-600 mt-1">Monitor and manage warehouse storage racks - Now with enhanced UI!</p>
+          <p className="text-gray-600 mt-1">Monitor and manage warehouse storage racks - Now with Zone Organization!</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('zones')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                viewMode === 'zones' 
+                  ? 'bg-blue-600 text-white shadow-md' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🏢 Zones
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                viewMode === 'grid' 
+                  ? 'bg-blue-600 text-white shadow-md' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              📦 Grid
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button 
@@ -554,30 +602,152 @@ export const Racks: React.FC = () => {
         </div>
       </div>
 
-      {/* Visual Rack Grid - Modern & Clean Design */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <BuildingOfficeIcon className="h-5 w-5" /> Warehouse Layout
-          </h3>
-          <div className="flex items-center gap-4 text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span className="text-gray-600">0-50%</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <span className="text-gray-600">50-90%</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <span className="text-gray-600">90-100%</span>
+      {/* Zone View or Grid View */}
+      {viewMode === 'zones' ? (
+        /* Zone Accordion View */
+        <div className="space-y-4">
+          {Object.keys(racksByZone).sort((a, b) => {
+            if (a === 'Unassigned') return 1;
+            if (b === 'Unassigned') return -1;
+            return a.localeCompare(b);
+          }).map((zoneName) => {
+            const zoneRacks = racksByZone[zoneName];
+            const isExpanded = expandedZones.has(zoneName);
+            const totalRacks = zoneRacks.length;
+            const occupiedRacks = zoneRacks.filter((r: any) => r.capacityUsed > 0).length;
+            const totalCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.capacityTotal || 0), 0);
+            const usedCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.capacityUsed || 0), 0);
+            const utilizationPercent = totalCapacity > 0 ? Math.round((usedCapacity / totalCapacity) * 100) : 0;
+
+            return (
+              <div key={zoneName} className="bg-white rounded-xl shadow-sm border-2 border-gray-200 overflow-hidden">
+                {/* Zone Header - Clickable */}
+                <button
+                  onClick={() => toggleZone(zoneName)}
+                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`text-4xl ${zoneName === 'Unassigned' ? '📦' : '🏢'}`}>
+                      {zoneName === 'Unassigned' ? '📦' : '🏢'}
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-2xl font-bold text-gray-900">
+                        {zoneName === 'Unassigned' ? '📦 Unassigned' : `Zone ${zoneName}`}
+                      </h3>
+                      <div className="flex items-center gap-4 mt-1">
+                        <span className="text-sm text-gray-600">
+                          <strong>{totalRacks}</strong> racks
+                        </span>
+                        <span className="text-sm text-green-600">
+                          <strong>{occupiedRacks}</strong> active
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {usedCapacity} / {totalCapacity} capacity
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {/* Utilization Bar */}
+                    <div className="w-32 bg-gray-200 rounded-full h-3 overflow-hidden">
+                      <div 
+                        className={`h-full transition-all ${getUtilizationColor(utilizationPercent)}`}
+                        style={{ width: `${utilizationPercent}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-semibold text-gray-700 w-12 text-right">
+                      {utilizationPercent}%
+                    </span>
+                    {/* Expand/Collapse Icon */}
+                    <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Zone Content - Expandable */}
+                {isExpanded && (
+                  <div className="px-6 py-4 bg-gray-50 border-t-2 border-gray-200">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                      {zoneRacks.map((rack: any) => {
+                        const totalCapacity = rack.capacityTotal && rack.capacityTotal > 0 ? rack.capacityTotal : 1;
+                        const utilization = typeof rack.utilization === 'number'
+                          ? rack.utilization
+                          : Math.round((rack.capacityUsed / totalCapacity) * 100);
+                        
+                        const uniqueShipments = new Set();
+                        if (rack.boxes && Array.isArray(rack.boxes)) {
+                          rack.boxes.forEach((box: any) => {
+                            if (box.shipmentId) {
+                              uniqueShipments.add(box.shipmentId);
+                            }
+                          });
+                        }
+                        const shipmentCount = uniqueShipments.size;
+                        const available = Math.max(totalCapacity - rack.capacityUsed, 0);
+                        
+                        return (
+                          <div
+                            key={rack.id}
+                            onClick={() => handleRackClick(rack)}
+                            className="group relative bg-gradient-to-br from-white to-gray-50 border rounded-xl p-3 hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer"
+                          >
+                            {/* Rack Card Content - Same as Grid View */}
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="text-xs text-gray-500 mb-1">{rack.rackType || 'Storage'}</div>
+                                <div className="text-lg font-bold text-gray-900">{rack.code}</div>
+                              </div>
+                              <div className={`w-3 h-3 rounded-full ${getUtilizationColor(utilization)}`} />
+                            </div>
+                            <div className="text-xs text-gray-600 mb-2 line-clamp-1">{rack.location || 'Warehouse'}</div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-600">{rack.capacityUsed || 0}/{rack.capacityTotal || 0}</span>
+                              <span className="font-bold text-gray-900">{utilization}%</span>
+                            </div>
+                            {shipmentCount > 0 && (
+                              <div className="mt-2 flex items-center gap-1 text-xs">
+                                <TruckIcon className="h-3 w-3 text-blue-500" />
+                                <span className="text-blue-600 font-semibold">{shipmentCount} shipment{shipmentCount > 1 ? 's' : ''}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Original Grid View */
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <BuildingOfficeIcon className="h-5 w-5" /> Warehouse Layout
+            </h3>
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span className="text-gray-600">0-50%</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <span className="text-gray-600">50-90%</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <span className="text-gray-600">90-100%</span>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {filteredRacks.map((rack: any) => {
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {filteredRacks.map((rack: any) => {
               const totalCapacity = rack.capacityTotal && rack.capacityTotal > 0 ? rack.capacityTotal : 1;
               const utilization = typeof rack.utilization === 'number'
                 ? rack.utilization
@@ -685,16 +855,17 @@ export const Racks: React.FC = () => {
                 </div>
               );
             })}
-        </div>
-
-        {filteredRacks.length === 0 && (
-          <div className="text-center py-12">
-            <CubeIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium">No racks found</p>
-            <p className="text-sm text-gray-400 mt-1">Try selecting a different section</p>
           </div>
-        )}
-      </div>
+
+          {filteredRacks.length === 0 && (
+            <div className="text-center py-12">
+              <CubeIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 font-medium">No racks found</p>
+              <p className="text-sm text-gray-400 mt-1">Try selecting a different section</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Create Rack Modal */}
       <CreateRackModal
