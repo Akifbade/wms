@@ -54,6 +54,10 @@ export const SystemSettings: React.FC = () => {
   const [showAddRack, setShowAddRack] = useState(false);
   const [showAddField, setShowAddField] = useState(false);
   const [editingField, setEditingField] = useState<CustomField | null>(null);
+  
+  // Bulk delete states
+  const [selectedRacks, setSelectedRacks] = useState<Set<string>>(new Set());
+  const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set());
 
   const [newRack, setNewRack] = useState({
     code: '',
@@ -190,30 +194,193 @@ export const SystemSettings: React.FC = () => {
   };
 
   const handleDeleteRack = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this rack?')) {
-      return;
+    const rack = racks.find(r => r.id === id);
+    if (!rack) return;
+
+    // Check if rack has items
+    if (rack.currentLoad > 0) {
+      if (!confirm(`⚠️ WARNING: This rack "${rack.code}" contains ${rack.currentLoad} items!\n\nAre you absolutely sure you want to delete it? This action cannot be undone.`)) {
+        return;
+      }
+    } else {
+      if (!confirm(`Delete rack "${rack.code}"?`)) {
+        return;
+      }
     }
 
     try {
       await racksAPI.delete(id);
       setRacks(racks.filter(r => r.id !== id));
+      setSelectedRacks(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      alert(`✅ Rack "${rack.code}" deleted successfully!`);
     } catch (error: any) {
       console.error('Failed to delete rack:', error);
-      alert(error.message || 'Failed to delete rack');
+      alert(`❌ ${error.message || 'Failed to delete rack'}`);
+    }
+  };
+
+  // Bulk delete racks
+  const handleBulkDeleteRacks = async () => {
+    if (selectedRacks.size === 0) {
+      alert('⚠️ Please select racks to delete');
+      return;
+    }
+
+    const selectedRacksList = racks.filter(r => selectedRacks.has(r.id));
+    const racksWithItems = selectedRacksList.filter(r => r.currentLoad > 0);
+    
+    let confirmMessage = `🗑️ Delete ${selectedRacks.size} racks?`;
+    if (racksWithItems.length > 0) {
+      confirmMessage = `⚠️ WARNING: ${racksWithItems.length} of ${selectedRacks.size} selected racks contain items!\n\n`;
+      confirmMessage += racksWithItems.map(r => `- ${r.code} (${r.currentLoad} items)`).join('\n');
+      confirmMessage += `\n\nAre you ABSOLUTELY SURE you want to delete these racks?\nThis action CANNOT be undone!`;
+    }
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      let failCount = 0;
+      const errors: string[] = [];
+
+      for (const id of Array.from(selectedRacks)) {
+        try {
+          await racksAPI.delete(id);
+          successCount++;
+        } catch (error: any) {
+          failCount++;
+          const rack = racks.find(r => r.id === id);
+          errors.push(`${rack?.code || id}: ${error.message}`);
+        }
+      }
+
+      // Update state
+      setRacks(racks.filter(r => !selectedRacks.has(r.id)));
+      setSelectedRacks(new Set());
+
+      // Show results
+      if (failCount === 0) {
+        alert(`✅ Successfully deleted ${successCount} racks!`);
+      } else {
+        alert(`⚠️ Partial success:\n✅ Deleted: ${successCount}\n❌ Failed: ${failCount}\n\nErrors:\n${errors.join('\n')}`);
+      }
+    } catch (error: any) {
+      console.error('Bulk delete failed:', error);
+      alert(`❌ Bulk delete failed: ${error.message}`);
+    }
+  };
+
+  // Toggle rack selection
+  const toggleRackSelection = (id: string) => {
+    setSelectedRacks(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // Select all racks
+  const toggleSelectAllRacks = () => {
+    if (selectedRacks.size === racks.length) {
+      setSelectedRacks(new Set());
+    } else {
+      setSelectedRacks(new Set(racks.map(r => r.id)));
     }
   };
 
   const handleDeleteField = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this custom field?')) {
+    const field = customFields.find(f => f.id === id);
+    if (!confirm(`Delete custom field "${field?.name}"?`)) {
       return;
     }
 
     try {
       await customFieldsAPI.delete(id);
       setCustomFields(customFields.filter(f => f.id !== id));
+      setSelectedFields(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      alert(`✅ Field "${field?.name}" deleted successfully!`);
     } catch (error: any) {
       console.error('Failed to delete custom field:', error);
-      alert(error.message || 'Failed to delete custom field');
+      alert(`❌ ${error.message || 'Failed to delete custom field'}`);
+    }
+  };
+
+  // Bulk delete custom fields
+  const handleBulkDeleteFields = async () => {
+    if (selectedFields.size === 0) {
+      alert('⚠️ Please select fields to delete');
+      return;
+    }
+
+    if (!confirm(`🗑️ Delete ${selectedFields.size} custom fields?\n\nThis action cannot be undone!`)) {
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      let failCount = 0;
+      const errors: string[] = [];
+
+      for (const id of Array.from(selectedFields)) {
+        try {
+          await customFieldsAPI.delete(id);
+          successCount++;
+        } catch (error: any) {
+          failCount++;
+          const field = customFields.find(f => f.id === id);
+          errors.push(`${field?.name || id}: ${error.message}`);
+        }
+      }
+
+      // Update state
+      setCustomFields(customFields.filter(f => !selectedFields.has(f.id)));
+      setSelectedFields(new Set());
+
+      // Show results
+      if (failCount === 0) {
+        alert(`✅ Successfully deleted ${successCount} fields!`);
+      } else {
+        alert(`⚠️ Partial success:\n✅ Deleted: ${successCount}\n❌ Failed: ${failCount}\n\nErrors:\n${errors.join('\n')}`);
+      }
+    } catch (error: any) {
+      console.error('Bulk delete failed:', error);
+      alert(`❌ Bulk delete failed: ${error.message}`);
+    }
+  };
+
+  // Toggle field selection
+  const toggleFieldSelection = (id: string) => {
+    setSelectedFields(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // Select all fields
+  const toggleSelectAllFields = () => {
+    if (selectedFields.size === customFields.length) {
+      setSelectedFields(new Set());
+    } else {
+      setSelectedFields(new Set(customFields.map(f => f.id)));
     }
   };
 
@@ -427,8 +594,22 @@ export const SystemSettings: React.FC = () => {
           <div className="flex items-center space-x-3">
             <CubeIcon className="h-6 w-6 text-primary-600" />
             <h3 className="text-lg font-semibold text-gray-900">Rack Management</h3>
+            {selectedRacks.size > 0 && (
+              <span className="ml-3 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                {selectedRacks.size} selected
+              </span>
+            )}
           </div>
           <div className="flex space-x-2">
+            {selectedRacks.size > 0 && (
+              <button 
+                onClick={handleBulkDeleteRacks}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+              >
+                <TrashIcon className="h-4 w-4" />
+                <span>Delete Selected ({selectedRacks.size})</span>
+              </button>
+            )}
             <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2">
               <PrinterIcon className="h-4 w-4" />
               <span>Print QR Codes</span>
@@ -447,6 +628,14 @@ export const SystemSettings: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={selectedRacks.size === racks.length && racks.length > 0}
+                    onChange={toggleSelectAllRacks}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rack</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
@@ -458,7 +647,15 @@ export const SystemSettings: React.FC = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {racks.map((rack) => (
-                <tr key={rack.id} className="hover:bg-gray-50">
+                <tr key={rack.id} className={`hover:bg-gray-50 ${selectedRacks.has(rack.id) ? 'bg-blue-50' : ''}`}>
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={selectedRacks.has(rack.id)}
+                      onChange={() => toggleRackSelection(rack.id)}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="font-medium text-gray-900">{rack.code}</div>
                   </td>
@@ -514,14 +711,30 @@ export const SystemSettings: React.FC = () => {
           <div className="flex items-center space-x-3">
             <TagIcon className="h-6 w-6 text-primary-600" />
             <h3 className="text-lg font-semibold text-gray-900">Custom Fields</h3>
+            {selectedFields.size > 0 && (
+              <span className="ml-3 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                {selectedFields.size} selected
+              </span>
+            )}
           </div>
-          <button
-            onClick={() => { setEditingField(null); setShowAddField(true); }}
-            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
-          >
-            <DocumentPlusIcon className="h-4 w-4" />
-            <span>Add Field</span>
-          </button>
+          <div className="flex space-x-2">
+            {selectedFields.size > 0 && (
+              <button 
+                onClick={handleBulkDeleteFields}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+              >
+                <TrashIcon className="h-4 w-4" />
+                <span>Delete Selected ({selectedFields.size})</span>
+              </button>
+            )}
+            <button
+              onClick={() => { setEditingField(null); setShowAddField(true); }}
+              className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+            >
+              <DocumentPlusIcon className="h-4 w-4" />
+              <span>Add Field</span>
+            </button>
+          </div>
         </div>
 
         {/* Field Statistics */}
@@ -549,26 +762,60 @@ export const SystemSettings: React.FC = () => {
         {/* Custom Fields by Section */}
         {['SHIPMENT', 'JOB', 'EXPENSE'].map((section) => (
           <div key={section} className="mb-6">
-            <h4 className="font-medium text-gray-900 mb-3">{section} Fields</h4>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium text-gray-900">{section} Fields</h4>
+              {customFields.filter(f => f.section === section).length > 0 && (
+                <button
+                  onClick={() => {
+                    const sectionFields = customFields.filter(f => f.section === section);
+                    const allSelected = sectionFields.every(f => selectedFields.has(f.id));
+                    if (allSelected) {
+                      setSelectedFields(prev => {
+                        const next = new Set(prev);
+                        sectionFields.forEach(f => next.delete(f.id));
+                        return next;
+                      });
+                    } else {
+                      setSelectedFields(prev => {
+                        const next = new Set(prev);
+                        sectionFields.forEach(f => next.add(f.id));
+                        return next;
+                      });
+                    }
+                  }}
+                  className="text-xs text-primary-600 hover:text-primary-800"
+                >
+                  {customFields.filter(f => f.section === section).every(f => selectedFields.has(f.id)) ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
+            </div>
             <div className="space-y-2">
               {customFields
                 .filter(field => field.section === section)
                 .sort((a, b) => a.order - b.order)
                 .map((field) => (
-                  <div key={field.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3">
-                        <span className="font-medium text-gray-900">{field.name}</span>
-                        <span className="text-sm text-gray-500">({field.type})</span>
-                        {field.required && (
-                          <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Required</span>
+                  <div key={field.id} className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg ${selectedFields.has(field.id) ? 'bg-blue-50 border-blue-300' : ''}`}>
+                    <div className="flex items-center space-x-3 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedFields.has(field.id)}
+                        onChange={() => toggleFieldSelection(field.id)}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <span className="font-medium text-gray-900">{field.name}</span>
+                          <span className="text-sm text-gray-500">({field.type})</span>
+                          {field.required && (
+                            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Required</span>
+                          )}
+                        </div>
+                        {field.options && (
+                          <div className="text-sm text-gray-500 mt-1">
+                            Options: {field.options.join(', ')}
+                          </div>
                         )}
                       </div>
-                      {field.options && (
-                        <div className="text-sm text-gray-500 mt-1">
-                          Options: {field.options.join(', ')}
-                        </div>
-                      )}
                     </div>
                     <div className="flex space-x-2">
                       <button
