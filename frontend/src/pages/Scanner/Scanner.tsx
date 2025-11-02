@@ -51,6 +51,64 @@ export const Scanner: React.FC = () => {
   const lastScanRef = useRef<{ code: string; timestamp: number } | null>(null);
   const SCAN_COOLDOWN_MS = 3000; // 3 seconds cooldown between same QR scans
 
+  // 🔊 Sound alerts
+  const playSuccessSound = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800; // High pitch for success
+    oscillator.type = 'sine';
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  };
+
+  const playErrorSound = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Play 3 loud error beeps
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 200; // Low pitch for error
+        oscillator.type = 'square';
+        gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.4);
+      }, i * 500); // 500ms between beeps
+    }
+  };
+
+  const playWarningSound = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 400; // Medium pitch for warning
+    oscillator.type = 'triangle';
+    gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.8);
+  };
+
   useEffect(() => {
     return () => {
       if (scannerRef.current) {
@@ -307,6 +365,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       
       if (lastCode === decodedText && timeSinceLastScan < SCAN_COOLDOWN_MS) {
         console.log(`🚫 Duplicate scan ignored: ${decodedText} (scanned ${Math.round(timeSinceLastScan/1000)}s ago)`);
+        playWarningSound();
         return; // Ignore duplicate scan
       }
     }
@@ -319,13 +378,54 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
     setLoading(true);
     try {
       const result = await processScanCode(decodedText);
+      
+      // 🔊 Play appropriate sound based on result
+      if (result.type === 'unknown') {
+        playErrorSound(); // Loud 3-beep error
+      } else if (result.data?.status === 'IN_STORAGE' && result.type === 'shipment') {
+        playErrorSound(); // Already in storage - error sound
+      } else {
+        playSuccessSound(); // Success sound
+      }
+      
       setScanResult(result);
       setScanHistory(prev => [result, ...prev.slice(0, 9)]);
     } catch (err: any) {
+      playErrorSound();
       setError(err.message || 'Failed to process scan');
     } finally {
       setLoading(false);
     }
+  };
+
+  const validateAndReturnShipment = async (shipment: any, rawCode: string): Promise<ScanResult> => {
+    // Get box information
+    const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+    });
+    const boxData = await boxResponse.json();
+    const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
+    
+    // ⚠️ CHECK: If shipment is IN_STORAGE and has 0 remaining boxes, it's already fully assigned
+    if (shipment.status === 'IN_STORAGE' && unassignedBoxes === 0) {
+      // Find which rack it's assigned to
+      const assignedBoxes = boxData.boxes.filter((b: any) => b.rackId);
+      const rackCodes = [...new Set(assignedBoxes.map((b: any) => b.rack?.code || 'Unknown'))];
+      
+      setError(`⛔ SHIPMENT ALREADY IN STORAGE!\n\nThis shipment is fully assigned to:\n${rackCodes.join(', ')}\n\nAll ${boxData.boxes.length} boxes are already stored.`);
+      return { 
+        type: 'shipment', 
+        data: { 
+          ...shipment, 
+          remainingBoxes: 0,
+          assignedRacks: rackCodes 
+        }, 
+        rawCode 
+      };
+    }
+    
+    setRemainingBoxes(unassignedBoxes);
+    return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode };
   };
 
   const processScanCode = async (code: string): Promise<ScanResult> => {
@@ -373,13 +473,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
           if (directResponse.ok) {
             const data = await directResponse.json();
             const shipment = data.shipment || data;
-            const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
-              headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-            });
-            const boxData = await boxResponse.json();
-            const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
-            setRemainingBoxes(unassignedBoxes);
-            return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode: code };
+            return await validateAndReturnShipment(shipment, code);
           }
         } catch (err) {
           console.log('Direct shipment lookup failed, trying search...');
@@ -391,13 +485,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
           s.id === shipmentId || s.qrCode?.includes(shipmentId) || s.referenceId?.includes(shipmentId)
         );
         if (shipment) {
-          const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-          });
-          const boxData = await boxResponse.json();
-          const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
-          setRemainingBoxes(unassignedBoxes);
-          return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode: code };
+          return await validateAndReturnShipment(shipment, code);
         }
       }
       
@@ -407,13 +495,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         const response = await shipmentsAPI.getAll({ search: cleanCode });
         const shipment = response.shipments?.[0]; // Take first match
         if (shipment) {
-          const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-          });
-          const boxData = await boxResponse.json();
-          const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
-          setRemainingBoxes(unassignedBoxes);
-          return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode: code };
+          return await validateAndReturnShipment(shipment, code);
         }
       }
     }
@@ -425,13 +507,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         s.qrCode?.toUpperCase() === upperCode || s.referenceId?.toUpperCase() === upperCode
       );
       if (shipment) {
-        const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-        });
-        const boxData = await boxResponse.json();
-        const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
-        setRemainingBoxes(unassignedBoxes);
-        return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode: code };
+        return await validateAndReturnShipment(shipment, code);
       }
     }
     
@@ -445,13 +521,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         s.qrCode?.toUpperCase() === masterQR.toUpperCase()
       );
       if (shipment) {
-        const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-        });
-        const boxData = await boxResponse.json();
-        const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
-        setRemainingBoxes(unassignedBoxes);
-        return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode: code };
+        return await validateAndReturnShipment(shipment, code);
       }
     }
     
@@ -461,13 +531,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       s.referenceId?.toUpperCase() === upperCode
     );
     if (shipment) {
-      const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-      });
-      const boxData = await boxResponse.json();
-      const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
-      setRemainingBoxes(unassignedBoxes);
-      return { type: 'shipment', data: { ...shipment, remainingBoxes: unassignedBoxes }, rawCode: code };
+      return await validateAndReturnShipment(shipment, code);
     }
     
     return { type: 'unknown', data: null, rawCode: code };
@@ -1065,13 +1129,33 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                 )}
 
                 {scanResult.type === 'shipment' && (
-                  <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 space-y-4">
+                  <div className={`border-2 rounded-xl p-6 space-y-4 ${
+                    scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
+                      ? 'bg-red-50 border-red-500'
+                      : 'bg-purple-50 border-purple-200'
+                  }`}>
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <ArchiveBoxIcon className="h-8 w-8 text-purple-600" />
-                        <h4 className="text-xl font-bold text-purple-900">Shipment Scanned!</h4>
+                        <ArchiveBoxIcon className={`h-8 w-8 ${
+                          scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
+                            ? 'text-red-600'
+                            : 'text-purple-600'
+                        }`} />
+                        <h4 className={`text-xl font-bold ${
+                          scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
+                            ? 'text-red-900'
+                            : 'text-purple-900'
+                        }`}>
+                          {scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
+                            ? '⛔ Already in Storage!'
+                            : 'Shipment Scanned!'}
+                        </h4>
                       </div>
-                      {(scanResult.data.status === 'PENDING' || scanResult.data.remainingBoxes > 0) && (
+                      {scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE' ? (
+                        <div className="bg-red-600 text-white px-4 py-2 rounded-full font-bold text-sm">
+                          🚫 FULLY STORED
+                        </div>
+                      ) : (scanResult.data.status === 'PENDING' || scanResult.data.remainingBoxes > 0) && (
                         <div className="bg-orange-500 text-white px-4 py-2 rounded-full font-bold text-sm animate-pulse">
                           ⏳ Pending to Assign
                         </div>
@@ -1099,7 +1183,35 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       </div>
                     </div>
                     
-                    {(scanResult.data.status === 'PENDING' || scanResult.data.remainingBoxes > 0) ? (
+                    {scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE' ? (
+                      <div className="mt-4">
+                        <div className="bg-red-100 border-2 border-red-600 p-6 rounded-lg mb-4">
+                          <p className="text-center text-red-900 font-bold text-xl mb-3">
+                            🚨 SHIPMENT ALREADY IN STORAGE
+                          </p>
+                          <p className="text-center text-red-800 text-base mb-3">
+                            All {scanResult.data.currentBoxCount} boxes are already assigned to rack!
+                          </p>
+                          {scanResult.data.assignedRacks && scanResult.data.assignedRacks.length > 0 && (
+                            <div className="bg-white p-3 rounded border border-red-300">
+                              <p className="text-sm text-gray-600 text-center mb-1">Located in:</p>
+                              <p className="text-center font-bold text-lg text-red-900">
+                                {scanResult.data.assignedRacks.join(', ')}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setScanResult(null);
+                            startScanning();
+                          }}
+                          className="w-full py-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-bold text-lg"
+                        >
+                          Scan Next Shipment
+                        </button>
+                      </div>
+                    ) : (scanResult.data.status === 'PENDING' || scanResult.data.remainingBoxes > 0) ? (
                       <div className="mt-4">
                         <div className="bg-blue-50 border border-blue-300 p-4 rounded-lg mb-4">
                           <p className="text-center text-blue-900 font-semibold mb-2">
