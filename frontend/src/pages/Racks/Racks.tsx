@@ -192,24 +192,26 @@ export const Racks: React.FC = () => {
     return acc;
   }, {});
 
-  // NEW: Render capacity based on mode (COMPACT VERSION for small cards)
+  // NEW: Render capacity based on mode (INFORMATIVE VERSION)
   const renderCapacity = (rack: any) => {
     const mode = rack.capacityMode || 'FIXED';
     
     if (mode === 'UNLIMITED') {
-      return <span className="text-purple-600 font-bold">∞</span>;
+      return <span className="text-purple-600 font-bold">∞ Unlimited</span>;
     }
     
     if (mode === 'FLEXIBLE') {
       return (
-        <span className="text-blue-600">
-          🚚{rack.currentPallets || 0}/{rack.palletCapacity || 0} | 📦{rack.currentBoxes || 0}/{rack.boxCapacity || 0}
+        <span className="flex items-center gap-1 text-blue-700">
+          <span className="font-semibold">{rack.currentPallets || 0}/{rack.palletCapacity || 0} 🚚</span>
+          <span className="text-gray-400">or</span>
+          <span className="font-semibold">{rack.currentBoxes || 0}/{rack.boxCapacity || 0} 📦</span>
         </span>
       );
     }
     
     // FIXED mode (default)
-    return <span>{rack.capacityUsed || 0}/{rack.capacityTotal || 0}</span>;
+    return <span className="font-semibold">{rack.capacityUsed || 0}/{rack.capacityTotal || 0} boxes</span>;
   };
 
   const getUtilizationColor = (percentage: number) => {
@@ -712,66 +714,60 @@ export const Racks: React.FC = () => {
                           <div
                             key={rack.id}
                             onClick={() => handleRackClick(rack)}
-                            className="group relative cursor-pointer hover:scale-105 transition-transform duration-200"
+                            className="group relative bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 p-3 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer"
                           >
-                            {/* 3D RACK DESIGN - Looks like real storage rack */}
-                            <div className="relative bg-gradient-to-b from-gray-700 to-gray-800 rounded-t-lg border-2 border-gray-600 shadow-xl">
-                              {/* Top Frame */}
-                              <div className="h-2 bg-gradient-to-r from-gray-600 via-gray-500 to-gray-600 rounded-t border-b-2 border-gray-800"></div>
-                              
-                              {/* Rack Header */}
-                              <div className="px-2 py-1.5 bg-gray-800/90">
-                                <div className="flex items-center justify-between">
-                                  <div className="text-xs font-bold text-white">{rack.code}</div>
-                                  <div className={`w-2 h-2 rounded-full ${getUtilizationColor(utilization)} animate-pulse`} />
-                                </div>
-                              </div>
-                              
-                              {/* Rack Shelves - 4 levels */}
-                              <div className="relative bg-gray-700 p-1">
-                                {/* Vertical Posts */}
-                                <div className="absolute left-1 top-0 bottom-0 w-1 bg-gradient-to-b from-gray-500 via-gray-600 to-gray-500 rounded-full"></div>
-                                <div className="absolute right-1 top-0 bottom-0 w-1 bg-gradient-to-b from-gray-500 via-gray-600 to-gray-500 rounded-full"></div>
-                                
-                                {/* Shelf 1 (Top) */}
-                                <div className="mb-1 mx-2 h-3 bg-gradient-to-b from-yellow-600 to-yellow-700 rounded border border-yellow-800 relative overflow-hidden">
-                                  {utilization >= 25 && <div className="absolute inset-0 bg-blue-500/30 animate-pulse"></div>}
-                                </div>
-                                
-                                {/* Shelf 2 */}
-                                <div className="mb-1 mx-2 h-3 bg-gradient-to-b from-yellow-600 to-yellow-700 rounded border border-yellow-800 relative overflow-hidden">
-                                  {utilization >= 50 && <div className="absolute inset-0 bg-blue-500/30 animate-pulse"></div>}
-                                </div>
-                                
-                                {/* Shelf 3 */}
-                                <div className="mb-1 mx-2 h-3 bg-gradient-to-b from-yellow-600 to-yellow-700 rounded border border-yellow-800 relative overflow-hidden">
-                                  {utilization >= 75 && <div className="absolute inset-0 bg-blue-500/30 animate-pulse"></div>}
-                                </div>
-                                
-                                {/* Shelf 4 (Bottom/Ground) */}
-                                <div className="mx-2 h-3 bg-gradient-to-b from-yellow-600 to-yellow-700 rounded border border-yellow-800 relative overflow-hidden">
-                                  {utilization >= 90 && <div className="absolute inset-0 bg-red-500/40 animate-pulse"></div>}
-                                </div>
-                              </div>
-                              
-                              {/* Base Frame */}
-                              <div className="h-2 bg-gradient-to-r from-gray-600 via-gray-500 to-gray-600 border-t-2 border-gray-800"></div>
-                            </div>
-                            
-                            {/* Info Panel Below Rack */}
-                            <div className="mt-1 p-1.5 bg-white rounded-lg border border-gray-200 shadow-sm">
-                              <div className="text-xs text-gray-500 truncate">{rack.location || 'Zone'}</div>
-                              <div className="flex items-center justify-between mt-1">
-                                <span className="text-xs text-gray-700">{renderCapacity(rack)}</span>
-                                <span className="text-xs font-bold text-gray-900">{utilization}%</span>
-                              </div>
-                              {shipmentCount > 0 && (
-                                <div className="mt-1 pt-1 border-t flex items-center gap-1">
-                                  <TruckIcon className="h-2.5 w-2.5 text-blue-500" />
-                                  <span className="text-xs text-blue-600 font-semibold">{shipmentCount}</span>
-                                </div>
+                            {/* Edit Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedRack(rack);
+                                setEditModalOpen(true);
+                              }}
+                              className="absolute top-2 right-2 p-1.5 bg-white rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 z-10"
+                              title="Edit Rack"
+                            >
+                              <PencilIcon className="h-3.5 w-3.5 text-blue-600" />
+                            </button>
+
+                            {/* Status Indicator */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className={`w-2.5 h-2.5 rounded-full ${getUtilizationColor(utilization)} animate-pulse`} />
+                              {rack.capacityMode && rack.capacityMode !== 'FIXED' && (
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                                  rack.capacityMode === 'UNLIMITED' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {rack.capacityMode === 'UNLIMITED' ? '∞' : '⚡'}
+                                </span>
                               )}
                             </div>
+
+                            {/* Rack Code */}
+                            <div className="mb-2">
+                              <h4 className="text-lg font-bold text-gray-900">{rack.code}</h4>
+                              <p className="text-xs text-gray-500 truncate">{rack.location || 'Warehouse'}</p>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className="relative w-full bg-gray-200 rounded-full h-2 mb-2 overflow-hidden">
+                              <div
+                                className={`h-2 rounded-full transition-all duration-500 ${getUtilizationColor(utilization)}`}
+                                style={{ width: `${Math.min(utilization, 100)}%` }}
+                              />
+                            </div>
+
+                            {/* Capacity Info */}
+                            <div className="flex items-center justify-between text-xs mb-2">
+                              <span className="text-gray-600">{renderCapacity(rack)}</span>
+                              <span className="font-bold text-gray-900">{utilization}%</span>
+                            </div>
+
+                            {/* Shipment Count */}
+                            {shipmentCount > 0 && (
+                              <div className="pt-2 border-t flex items-center gap-1">
+                                <TruckIcon className="h-3.5 w-3.5 text-blue-500" />
+                                <span className="text-xs text-blue-600 font-semibold">{shipmentCount} shipment{shipmentCount > 1 ? 's' : ''}</span>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
