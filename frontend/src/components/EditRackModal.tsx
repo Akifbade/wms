@@ -145,7 +145,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
 
   const generateQRCode = async (code: string) => {
     try {
-      const qrData = `RACK:${code}`;
+      const qrData = `RACK_${code.replace(/-/g, '_')}`;
       const url = await QRCode.toDataURL(qrData, {
         width: 200,
         margin: 2,
