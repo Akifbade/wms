@@ -24,7 +24,7 @@ interface CreateRackModalProps {
 export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRackModalProps) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [existingZones, setExistingZones] = useState<Array<{zone: string, zoneIcon: string, zoneDescription: string}>>([]);
+  const [existingZones, setExistingZones] = useState<Array<{ zone: string, zoneIcon: string, zoneDescription: string }>>([]);
   const [formData, setFormData] = useState({
     code: '',
     location: '',
@@ -88,7 +88,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
     try {
       const response = await racksAPI.getAll();
       const racks = response.racks || [];
-      
+
       // Get unique zones with their icons and descriptions
       const zonesMap = new Map();
       racks.forEach((rack: any) => {
@@ -102,7 +102,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
           }
         }
       });
-      
+
       setExistingZones(Array.from(zonesMap.values()).sort((a, b) => a.zone.localeCompare(b.zone)));
     } catch (err) {
       console.error('Failed to load existing zones:', err);
@@ -117,8 +117,8 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
       const zone = existingZones.find(z => z.zone === selectedZone);
       if (zone) {
         setUseExistingZone(true);
-        setFormData(prev => ({ 
-          ...prev, 
+        setFormData(prev => ({
+          ...prev,
           zone: zone.zone,
           zoneIcon: zone.zoneIcon,
           zoneDescription: zone.zoneDescription

@@ -296,8 +296,8 @@ export const Shipments: React.FC = () => {
           <button
             onClick={() => setWarehouseFilter('all')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${warehouseFilter === 'all'
-                ? 'bg-primary-100 text-primary-700 border border-primary-300'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-primary-100 text-primary-700 border border-primary-300'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
           >
             All Types ({warehouseCounts.all})
@@ -305,8 +305,8 @@ export const Shipments: React.FC = () => {
           <button
             onClick={() => setWarehouseFilter('regular')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${warehouseFilter === 'regular'
-                ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-blue-100 text-blue-700 border border-blue-300'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
           >
             <HomeIcon className="h-4 w-4" />
@@ -315,8 +315,8 @@ export const Shipments: React.FC = () => {
           <button
             onClick={() => setWarehouseFilter('warehouse')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${warehouseFilter === 'warehouse'
-                ? 'bg-orange-100 text-orange-700 border border-orange-300'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-orange-100 text-orange-700 border border-orange-300'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
           >
             <BuildingStorefrontIcon className="h-4 w-4" />
@@ -348,8 +348,8 @@ export const Shipments: React.FC = () => {
             <button
               onClick={() => setActiveTab('all')}
               className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'all'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-b-2 border-blue-500 text-blue-600'
+                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
@@ -364,8 +364,8 @@ export const Shipments: React.FC = () => {
             <button
               onClick={() => setActiveTab('pending')}
               className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'pending'
-                  ? 'border-b-2 border-yellow-500 text-yellow-600'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-b-2 border-yellow-500 text-yellow-600'
+                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
@@ -380,8 +380,8 @@ export const Shipments: React.FC = () => {
             <button
               onClick={() => setActiveTab('in_storage')}
               className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'in_storage'
-                  ? 'border-b-2 border-green-500 text-green-600'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-b-2 border-green-500 text-green-600'
+                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
@@ -396,8 +396,8 @@ export const Shipments: React.FC = () => {
             <button
               onClick={() => setActiveTab('partial')}
               className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'partial'
-                  ? 'border-b-2 border-orange-500 text-orange-600'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-b-2 border-orange-500 text-orange-600'
+                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
@@ -412,8 +412,8 @@ export const Shipments: React.FC = () => {
             <button
               onClick={() => setActiveTab('released')}
               className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'released'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-b-2 border-blue-500 text-blue-600'
+                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
@@ -528,7 +528,17 @@ export const Shipments: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-primary-600">{shipment.rackLocations || 'N/A'}</span>
+                      {shipment.status === 'RELEASED' ? (
+                        shipment.rackLocations && shipment.rackLocations !== 'N/A' ? (
+                          <span className="text-sm text-gray-500 italic">
+                            🚪 Was in: {shipment.rackLocations}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )
+                      ) : (
+                        <span className="text-sm font-medium text-primary-600">{shipment.rackLocations || 'N/A'}</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {(() => {

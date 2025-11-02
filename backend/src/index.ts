@@ -91,14 +91,14 @@ app.get('/uploads/company-logos/:name', (req, res, next) => {
         return res.sendFile(p);
       }
     }
-    
+
     // If no file found, log the error and return 404 with proper message
     console.warn(`⚠️ Company logo not found: ${filename}`);
     console.warn(`Tried paths:`, tryPaths);
-    return res.status(404).json({ 
-      error: 'Logo not found', 
+    return res.status(404).json({
+      error: 'Logo not found',
       filename,
-      message: 'The requested company logo does not exist' 
+      message: 'The requested company logo does not exist'
     });
   } catch (e) {
     console.error('Logo static fallback error:', e);
@@ -111,8 +111,8 @@ app.use('/uploads', express.static('uploads'));
 
 // Health check route with version info
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     message: 'Warehouse Management API is running',
     version: APP_VERSION,
     versionInfo: getVersionInfo(),
@@ -173,7 +173,7 @@ app.use((req, res) => {
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(err.stack);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal Server Error',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
   });
