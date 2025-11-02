@@ -331,17 +331,30 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   const processScanCode = async (code: string): Promise<ScanResult> => {
     const upperCode = code.toUpperCase();
     
-    // ✅ PRIORITY 1: Check for RACK_XXX format (simplified)
-    if (upperCode.startsWith('RACK_')) {
+    // ✅ PRIORITY 1: Check for RACK_XXX or any rack-like format
+    // Handles: RACK_A1_1, A1-1, A1_1, R-A-1, etc.
+    if (upperCode.startsWith('RACK_') || upperCode.match(/^[A-Z]\d+[-_]\d+$/i) || upperCode.match(/^R-[A-Z]-\d+$/i)) {
+      // Extract rack code (remove RACK_ prefix if present)
+      const rackCode = code.replace(/^RACK_/i, '').replace(/_/g, '-');
+      
+      // Try exact match first
       const response = await racksAPI.getAll({ search: code });
-      const rack = response.racks?.find((r: any) => r.code.toUpperCase() === upperCode);
-      if (rack) return { type: 'rack', data: rack, rawCode: code };
-    }
-    
-    // ✅ PRIORITY 2: Check for old R-X-XXX format (backwards compatibility)
-    if (upperCode.match(/^R-[A-Z]-\d+$/i)) {
-      const response = await racksAPI.getAll({ search: code });
-      const rack = response.racks?.find((r: any) => r.code.toUpperCase() === upperCode);
+      let rack = response.racks?.find((r: any) => 
+        r.code.toUpperCase() === upperCode || 
+        r.code.toUpperCase() === rackCode.toUpperCase() ||
+        r.code.replace(/-/g, '_').toUpperCase() === upperCode ||
+        r.code.replace(/-/g, '').toUpperCase() === upperCode.replace(/[-_]/g, '')
+      );
+      
+      // If not found, try searching by extracted code
+      if (!rack && rackCode !== code) {
+        const response2 = await racksAPI.getAll({ search: rackCode });
+        rack = response2.racks?.find((r: any) => 
+          r.code.toUpperCase() === rackCode.toUpperCase() ||
+          r.code.replace(/-/g, '_').toUpperCase() === rackCode.replace(/-/g, '_').toUpperCase()
+        );
+      }
+      
       if (rack) return { type: 'rack', data: rack, rawCode: code };
     }
     
@@ -1053,46 +1066,65 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
                 {scanResult.type === 'shipment' && (
                   <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 space-y-4">
-                    <div className="flex items-center gap-3 mb-4">
-                      <ArchiveBoxIcon className="h-8 w-8 text-purple-600" />
-                      <h4 className="text-xl font-bold text-purple-900">Shipment Information</h4>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <ArchiveBoxIcon className="h-8 w-8 text-purple-600" />
+                        <h4 className="text-xl font-bold text-purple-900">Shipment Scanned!</h4>
+                      </div>
+                      {(scanResult.data.status === 'PENDING' || scanResult.data.remainingBoxes > 0) && (
+                        <div className="bg-orange-500 text-white px-4 py-2 rounded-full font-bold text-sm animate-pulse">
+                          ⏳ Pending to Assign
+                        </div>
+                      )}
                     </div>
-                    <div className="grid grid-cols-2 gap-4 text-lg">
-                      <div>
-                        <span className="text-gray-600">Reference:</span>
-                        <p className="font-bold">{scanResult.data.referenceId}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Client:</span>
-                        <p className="font-bold">{scanResult.data.clientName}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Total Boxes:</span>
-                        <p className="font-bold">{scanResult.data.currentBoxCount}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Remaining:</span>
-                        <p className="font-bold text-blue-600">{scanResult.data.remainingBoxes || 0} 📦</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Status:</span>
-                        <p className="font-bold">{scanResult.data.status}</p>
+                    
+                    <div className="bg-white p-4 rounded-lg border border-purple-200">
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-500 text-xs">Client</span>
+                          <p className="font-bold text-base">{scanResult.data.clientName}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Reference</span>
+                          <p className="font-bold text-base">{scanResult.data.referenceId}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Total Boxes</span>
+                          <p className="font-bold text-base">{scanResult.data.currentBoxCount} 📦</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Remaining</span>
+                          <p className="font-bold text-lg text-orange-600">{scanResult.data.remainingBoxes || 0} 📦</p>
+                        </div>
                       </div>
                     </div>
                     
-                    {(scanResult.data.status === 'PENDING' || scanResult.data.remainingBoxes > 0) && (
-                      <div className="mt-6 pt-6 border-t-2 border-purple-300">
+                    {(scanResult.data.status === 'PENDING' || scanResult.data.remainingBoxes > 0) ? (
+                      <div className="mt-4">
+                        <div className="bg-blue-50 border border-blue-300 p-4 rounded-lg mb-4">
+                          <p className="text-center text-blue-900 font-semibold mb-2">
+                            📍 Next Step: Scan Rack QR Code
+                          </p>
+                          <p className="text-center text-blue-700 text-sm">
+                            Scan the rack where you want to assign this shipment
+                          </p>
+                        </div>
                         <button
                           onClick={() => {
                             setPendingShipment(scanResult.data);
-                            setBoxQuantity(scanResult.data.remainingBoxes || 0);
                             setScanResult(null);
                             startScanning();
                           }}
-                          className="w-full py-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-bold text-lg"
+                          className="w-full py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-lg shadow-lg"
                         >
-                          📍 Scan Rack to Assign ({scanResult.data.remainingBoxes} boxes left)
+                          ✅ Ready - Scan Rack Now ({scanResult.data.remainingBoxes} boxes to assign)
                         </button>
+                      </div>
+                    ) : (
+                      <div className="bg-green-50 border border-green-300 p-4 rounded-lg">
+                        <p className="text-center text-green-900 font-semibold">
+                          ✅ All boxes already assigned!
+                        </p>
                       </div>
                     )}
                   </div>
