@@ -192,6 +192,43 @@ export const Racks: React.FC = () => {
     return acc;
   }, {});
 
+  // NEW: Render capacity based on mode
+  const renderCapacity = (rack: any) => {
+    const mode = rack.capacityMode || 'FIXED';
+    
+    if (mode === 'UNLIMITED') {
+      return (
+        <div className="flex items-center gap-1">
+          <span className="text-2xl">∞</span>
+          <span className="text-xs font-semibold text-purple-600">Unlimited</span>
+        </div>
+      );
+    }
+    
+    if (mode === 'FLEXIBLE') {
+      return (
+        <div className="space-y-1">
+          <div className="flex items-center gap-1 text-xs">
+            <span className="text-lg">🚚</span>
+            <span className="text-gray-600">{rack.currentPallets || 0}/{rack.palletCapacity || 0} pallets</span>
+          </div>
+          <div className="text-xs text-gray-400 font-semibold">OR</div>
+          <div className="flex items-center gap-1 text-xs">
+            <span className="text-lg">📦</span>
+            <span className="text-gray-600">{rack.currentBoxes || 0}/{rack.boxCapacity || 0} boxes</span>
+          </div>
+        </div>
+      );
+    }
+    
+    // FIXED mode (default)
+    return (
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-gray-600">{rack.capacityUsed || 0}/{rack.capacityTotal || 0} boxes</span>
+      </div>
+    );
+  };
+
   const getUtilizationColor = (percentage: number) => {
     if (percentage >= 90) return 'bg-red-500';
     if (percentage >= 75) return 'bg-yellow-500';
@@ -694,21 +731,37 @@ export const Racks: React.FC = () => {
                             onClick={() => handleRackClick(rack)}
                             className="group relative bg-gradient-to-br from-white to-gray-50 border rounded-xl p-3 hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer"
                           >
-                            {/* Rack Card Content - Same as Grid View */}
+                            {/* Rack Card Content with Flexible Capacity */}
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
-                                <div className="text-xs text-gray-500 mb-1">{rack.rackType || 'Storage'}</div>
+                                <div className="flex items-center gap-1 mb-1">
+                                  <div className="text-xs text-gray-500">{rack.rackType || 'Storage'}</div>
+                                  {rack.capacityMode && rack.capacityMode !== 'FIXED' && (
+                                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                                      rack.capacityMode === 'UNLIMITED' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                                    }`}>
+                                      {rack.capacityMode === 'UNLIMITED' ? '∞' : '⚡'}
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="text-lg font-bold text-gray-900">{rack.code}</div>
                               </div>
                               <div className={`w-3 h-3 rounded-full ${getUtilizationColor(utilization)}`} />
                             </div>
                             <div className="text-xs text-gray-600 mb-2 line-clamp-1">{rack.location || 'Warehouse'}</div>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-600">{rack.capacityUsed || 0}/{rack.capacityTotal || 0}</span>
+                            
+                            {/* Capacity Display */}
+                            <div className="mb-2">
+                              {renderCapacity(rack)}
+                            </div>
+                            
+                            {/* Utilization */}
+                            <div className="flex items-center justify-end text-xs mb-2">
                               <span className="font-bold text-gray-900">{utilization}%</span>
                             </div>
+                            
                             {shipmentCount > 0 && (
-                              <div className="mt-2 flex items-center gap-1 text-xs">
+                              <div className="flex items-center gap-1 text-xs border-t pt-2">
                                 <TruckIcon className="h-3 w-3 text-blue-500" />
                                 <span className="text-blue-600 font-semibold">{shipmentCount} shipment{shipmentCount > 1 ? 's' : ''}</span>
                               </div>
@@ -821,12 +874,50 @@ export const Racks: React.FC = () => {
                     <p className="text-sm text-gray-600 font-medium">{rack.location || 'N/A'}</p>
                   </div>
                   
-                  {/* Capacity Info */}
+                  {/* Capacity Info - Mode Badge */}
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-gray-700">Capacity (pallets)</span>
-                      <span className="text-lg font-bold text-gray-900">{rack.capacityUsed}/{rack.capacityTotal}</span>
-                    </div>
+                    {rack.capacityMode && (
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                          rack.capacityMode === 'UNLIMITED' 
+                            ? 'bg-purple-100 text-purple-700' 
+                            : rack.capacityMode === 'FLEXIBLE'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {rack.capacityMode === 'UNLIMITED' ? '∞ Unlimited' : rack.capacityMode === 'FLEXIBLE' ? '⚡ Flexible' : '📦 Fixed'}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* Capacity Display Based on Mode */}
+                    {rack.capacityMode === 'UNLIMITED' ? (
+                      <div className="text-center py-2">
+                        <span className="text-4xl">∞</span>
+                        <p className="text-sm font-semibold text-purple-600 mt-1">Unlimited Capacity</p>
+                      </div>
+                    ) : rack.capacityMode === 'FLEXIBLE' ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg">
+                          <span className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                            🚚 Pallets
+                          </span>
+                          <span className="text-lg font-bold text-gray-900">{rack.currentPallets || 0}/{rack.palletCapacity || 0}</span>
+                        </div>
+                        <div className="text-center text-xs font-bold text-gray-400">OR</div>
+                        <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg">
+                          <span className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                            📦 Boxes
+                          </span>
+                          <span className="text-lg font-bold text-gray-900">{rack.currentBoxes || 0}/{rack.boxCapacity || 0}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-gray-700">Capacity (boxes)</span>
+                        <span className="text-lg font-bold text-gray-900">{rack.capacityUsed}/{rack.capacityTotal}</span>
+                      </div>
+                    )}
                     
                     {/* Progress Bar */}
                     <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-hidden">
