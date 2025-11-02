@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { racksAPI, companiesAPI } from '../services/api';
 import QRCode from 'qrcode';
+import IconPickerModal from './IconPickerModal';
 
 interface Category {
   id: string;
@@ -36,11 +37,15 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
     width: '',
     height: '',
     dimensionUnit: 'METERS',
+    zone: '',
+    zoneDescription: '',
+    zoneIcon: '📦',
   });
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedCategoryInfo, setSelectedCategoryInfo] = useState<Category | null>(null);
+  const [showIconPicker, setShowIconPicker] = useState(false);
 
   const resolveLogoUrl = (logo?: string | null) => {
     if (!logo) return '';
@@ -92,6 +97,9 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
         width: rack.width || '',
         height: rack.height || '',
         dimensionUnit: rack.dimensionUnit || 'METERS',
+        zone: rack.zone || '',
+        zoneDescription: rack.zoneDescription || '',
+        zoneIcon: rack.zoneIcon || '📦',
       });
 
       // Set selected category info
@@ -427,6 +435,57 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
             </div>
           </div>
 
+          {/* Zone Configuration */}
+          <div className="border-b pb-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">🏢 Zone Configuration</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Zone Number/Name
+                </label>
+                <input
+                  type="text"
+                  name="zone"
+                  value={formData.zone}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="e.g., 1, 2, Zone A, Zone B..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Organize racks by zone for better management
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Zone Icon
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowIconPicker(true)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-purple-500 focus:border-transparent flex items-center gap-3"
+                >
+                  <span className="text-3xl">{formData.zoneIcon}</span>
+                  <span className="text-gray-600">Click to change icon</span>
+                </button>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Zone Description
+                </label>
+                <textarea
+                  name="zoneDescription"
+                  value={formData.zoneDescription}
+                  onChange={(e) => setFormData(prev => ({ ...prev, zoneDescription: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  rows={2}
+                  placeholder="Describe this zone's purpose or location..."
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Dimensions */}
           <div className="border-b pb-4">
             <h3 className="text-lg font-semibold mb-4 text-gray-700">???? Dimensions (Size Information)</h3>
@@ -539,6 +598,14 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
           </div>
         </form>
       </div>
+
+      {/* Icon Picker Modal */}
+      <IconPickerModal
+        isOpen={showIconPicker}
+        onClose={() => setShowIconPicker(false)}
+        onSelect={(icon) => setFormData(prev => ({ ...prev, zoneIcon: icon }))}
+        currentIcon={formData.zoneIcon}
+      />
     </div>
   );
 }
