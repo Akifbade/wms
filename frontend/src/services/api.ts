@@ -40,7 +40,7 @@ async function apiCall<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const config: RequestInit = {
     ...options,
     headers: {
@@ -54,7 +54,7 @@ async function apiCall<T>(
 
   try {
     const response = await fetch(url, config);
-    
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
@@ -114,7 +114,7 @@ export const shipmentsAPI = {
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.isWarehouseShipment !== undefined) queryParams.append('isWarehouseShipment', String(params.isWarehouseShipment));
-    
+
     const query = queryParams.toString();
     return apiCall<any>(`/shipments${query ? `?${query}` : ''}`);
   },
@@ -150,7 +150,7 @@ export const racksAPI = {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.search) queryParams.append('search', params.search);
-    
+
     const query = queryParams.toString();
     return apiCall<{ racks: any[] }>(`/racks${query ? `?${query}` : ''}`);
   },
@@ -300,7 +300,7 @@ export const jobsAPI = {
     if (params?.search) queryParams.append('search', params.search);
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
-    
+
     const query = queryParams.toString();
     const jobs = await apiCall<any[]>(`/moving-jobs${query ? `?${query}` : ''}`);
     return { jobs }; // Wrap in object for compatibility
@@ -350,7 +350,7 @@ export const billingAPI = {
     const query = new URLSearchParams();
     if (params?.category) query.append('category', params.category);
     if (params?.active !== undefined) query.append('active', String(params.active));
-    
+
     return apiCall<any[]>(`/billing/charge-types${query.toString() ? '?' + query.toString() : ''}`);
   },
 
@@ -412,7 +412,7 @@ export const withdrawalsAPI = {
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
     if (params?.shipmentId) queryParams.append('shipmentId', params.shipmentId);
-    
+
     const query = queryParams.toString();
     return apiCall<any>(`/withdrawals${query ? `?${query}` : ''}`);
   },
@@ -486,10 +486,10 @@ export const expensesAPI = {
 
   getStats: async (dateRange?: any) => {
     const params = new URLSearchParams(dateRange).toString();
-    return apiCall<{ 
-      totalAmount: number; 
-      totalCount: number; 
-      byCategory: any; 
+    return apiCall<{
+      totalAmount: number;
+      totalCount: number;
+      byCategory: any;
       byStatus: any;
       currency: string;
     }>(`/expenses/stats/summary?${params}`, {

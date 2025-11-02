@@ -735,8 +735,8 @@ export const Racks: React.FC = () => {
                     <div className="text-center">
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`text-xs font-semibold ${utilizationPercent >= 90 ? 'text-red-600' :
-                            utilizationPercent >= 70 ? 'text-yellow-600' :
-                              'text-green-600'
+                          utilizationPercent >= 70 ? 'text-yellow-600' :
+                            'text-green-600'
                           }`}>
                           {utilizationPercent >= 90 ? '🔴' : utilizationPercent >= 70 ? '🟡' : '🟢'}
                         </span>
@@ -748,15 +748,15 @@ export const Racks: React.FC = () => {
                       <div className="w-32 bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
                         <div
                           className={`h-full transition-all duration-300 ${utilizationPercent >= 90 ? 'bg-gradient-to-r from-red-500 to-red-600' :
-                              utilizationPercent >= 70 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
-                                'bg-gradient-to-r from-green-500 to-green-600'
+                            utilizationPercent >= 70 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
+                              'bg-gradient-to-r from-green-500 to-green-600'
                             }`}
                           style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
                         />
                       </div>
                       <span className={`text-[10px] font-medium mt-0.5 block ${utilizationPercent >= 90 ? 'text-red-600' :
-                          utilizationPercent >= 70 ? 'text-yellow-600' :
-                            'text-green-600'
+                        utilizationPercent >= 70 ? 'text-yellow-600' :
+                          'text-green-600'
                         }`}>
                         {utilizationPercent >= 90 ? 'Critical' :
                           utilizationPercent >= 70 ? 'High' :

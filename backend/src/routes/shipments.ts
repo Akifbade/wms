@@ -47,7 +47,7 @@ const photoUpload = multer({
     const allowedTypes = /jpeg|jpg|png|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
-    
+
     if (mimetype && extname) {
       cb(null, true);
     } else {
@@ -201,7 +201,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       const assignedBoxes = shipment.boxes.filter((b: any) => b.rackId !== null).length;
       const releasedBoxes = shipment.boxes.filter((b: any) => b.status === 'RELEASED').length;
       const inStorageBoxes = shipment.boxes.filter((b: any) => b.status === 'IN_STORAGE').length;
-      
+
       // Get unique rack codes where boxes are CURRENTLY located (IN_STORAGE only, exclude RELEASED)
       const rackIds = [...new Set(
         shipment.boxes
@@ -213,7 +213,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         select: { code: true }
       }) : [];
       const rackCodes = racks.map(r => r.code).join(', ');
-      
+
       return {
         ...shipment,
         totalBoxes,
@@ -443,7 +443,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
       originalBoxCount,
       currentBoxCount,
       palletCount,
-  boxesPerPallet,
+      boxesPerPallet,
       type: shipmentType,
       clientName: data.clientName,
       clientPhone: data.clientPhone,
@@ -729,7 +729,7 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
     } = req.body;
 
     const updateData: any = {};
-    
+
     // Only include fields that are provided and valid
     if (name !== undefined) updateData.name = name;
     if (referenceId !== undefined) updateData.referenceId = referenceId;
@@ -779,12 +779,12 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
     }
     if (palletCount !== undefined) updateData.palletCount = parseOptionalInt(palletCount);
     if (boxesPerPallet !== undefined) updateData.boxesPerPallet = parseOptionalInt(boxesPerPallet);
-  if (length !== undefined) updateData.length = parseFloat(length);
-  if (width !== undefined) updateData.width = parseFloat(width);
-  if (height !== undefined) updateData.height = parseFloat(height);
-  if (cbm !== undefined) updateData.cbm = parseFloat(cbm);
-  if (weight !== undefined) updateData.weight = parseFloat(weight);
-    
+    if (length !== undefined) updateData.length = parseFloat(length);
+    if (width !== undefined) updateData.width = parseFloat(width);
+    if (height !== undefined) updateData.height = parseFloat(height);
+    if (cbm !== undefined) updateData.cbm = parseFloat(cbm);
+    if (weight !== undefined) updateData.weight = parseFloat(weight);
+
     updateData.updatedAt = new Date();
 
     const shipment = await prisma.shipment.update({
@@ -814,9 +814,9 @@ router.get('/:id/boxes', async (req: AuthRequest, res: Response) => {
     const companyId = req.user!.companyId;
 
     const boxes = await prisma.shipmentBox.findMany({
-      where: { 
+      where: {
         shipmentId: id,
-        companyId 
+        companyId
       },
       include: {
         rack: {
@@ -838,148 +838,148 @@ router.get('/:id/boxes', async (req: AuthRequest, res: Response) => {
 });
 
 // Assign boxes to rack (for scanner & manual) with optional photos
-router.post('/:id/assign-boxes', 
-  authorizeRoles('ADMIN', 'MANAGER', 'WORKER'), 
+router.post('/:id/assign-boxes',
+  authorizeRoles('ADMIN', 'MANAGER', 'WORKER'),
   photoUpload.array('photos', 10), // Up to 10 photos
   async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { rackId, boxNumbers } = req.body; // boxNumbers can be array or JSON string
-    const companyId = req.user!.companyId;
-    const uploadedFiles = req.files as Express.Multer.File[];
+    try {
+      const { id } = req.params;
+      const { rackId, boxNumbers } = req.body; // boxNumbers can be array or JSON string
+      const companyId = req.user!.companyId;
+      const uploadedFiles = req.files as Express.Multer.File[];
 
-    if (!rackId || !boxNumbers) {
-      return res.status(400).json({ error: 'Rack ID and box numbers required' });
-    }
-
-    const parsedBoxNumbers = Array.isArray(boxNumbers)
-      ? boxNumbers
-      : typeof boxNumbers === 'string'
-        ? JSON.parse(boxNumbers)
-        : [];
-
-    const normalizedBoxNumbers = parsedBoxNumbers
-      .map((value: any) => (typeof value === 'number' ? value : parseInt(value, 10)))
-      .filter((value: number) => Number.isInteger(value) && value > 0);
-
-    if (normalizedBoxNumbers.length === 0) {
-      return res.status(400).json({ error: 'At least one box number required' });
-    }
-
-    // Prepare photo URLs
-    const photoUrls = uploadedFiles?.map(file => `/uploads/shipments/${file.filename}`) || [];
-
-    const boxUpdateData: Record<string, any> = {
-      rackId,
-      status: 'IN_STORAGE',
-      assignedAt: new Date(),
-    };
-
-    if (photoUrls.length > 0) {
-      const existingSample = await prisma.shipmentBox.findFirst({
-        where: {
-          shipmentId: id,
-          boxNumber: {
-            in: normalizedBoxNumbers,
-          },
-          companyId,
-        },
-        select: { photos: true },
-      });
-
-      let mergedPhotos: string[] = [];
-
-      if (existingSample?.photos) {
-        try {
-          const parsed = JSON.parse(existingSample.photos);
-          if (Array.isArray(parsed)) {
-            mergedPhotos = parsed.filter((url: any) => typeof url === 'string');
-          }
-        } catch (parseError) {
-          console.warn('Failed to parse existing shipment box photos', parseError);
-        }
+      if (!rackId || !boxNumbers) {
+        return res.status(400).json({ error: 'Rack ID and box numbers required' });
       }
 
-      photoUrls.forEach(url => {
-        if (!mergedPhotos.includes(url)) {
-          mergedPhotos.push(url);
+      const parsedBoxNumbers = Array.isArray(boxNumbers)
+        ? boxNumbers
+        : typeof boxNumbers === 'string'
+          ? JSON.parse(boxNumbers)
+          : [];
+
+      const normalizedBoxNumbers = parsedBoxNumbers
+        .map((value: any) => (typeof value === 'number' ? value : parseInt(value, 10)))
+        .filter((value: number) => Number.isInteger(value) && value > 0);
+
+      if (normalizedBoxNumbers.length === 0) {
+        return res.status(400).json({ error: 'At least one box number required' });
+      }
+
+      // Prepare photo URLs
+      const photoUrls = uploadedFiles?.map(file => `/uploads/shipments/${file.filename}`) || [];
+
+      const boxUpdateData: Record<string, any> = {
+        rackId,
+        status: 'IN_STORAGE',
+        assignedAt: new Date(),
+      };
+
+      if (photoUrls.length > 0) {
+        const existingSample = await prisma.shipmentBox.findFirst({
+          where: {
+            shipmentId: id,
+            boxNumber: {
+              in: normalizedBoxNumbers,
+            },
+            companyId,
+          },
+          select: { photos: true },
+        });
+
+        let mergedPhotos: string[] = [];
+
+        if (existingSample?.photos) {
+          try {
+            const parsed = JSON.parse(existingSample.photos);
+            if (Array.isArray(parsed)) {
+              mergedPhotos = parsed.filter((url: any) => typeof url === 'string');
+            }
+          } catch (parseError) {
+            console.warn('Failed to parse existing shipment box photos', parseError);
+          }
         }
+
+        photoUrls.forEach(url => {
+          if (!mergedPhotos.includes(url)) {
+            mergedPhotos.push(url);
+          }
+        });
+
+        boxUpdateData.photos = JSON.stringify(mergedPhotos);
+      }
+
+      // Update boxes with photos (if provided)
+      await prisma.shipmentBox.updateMany({
+        where: {
+          shipmentId: id,
+          boxNumber: { in: normalizedBoxNumbers },
+          companyId,
+        },
+        data: boxUpdateData,
       });
 
-      boxUpdateData.photos = JSON.stringify(mergedPhotos);
+      const palletsUsed = await recomputeRackPalletUsage(prisma, rackId, companyId);
+
+      // Update rack capacity based on pallet usage
+      await prisma.rack.update({
+        where: { id: rackId },
+        data: {
+          capacityUsed: palletsUsed,
+          lastActivity: new Date(),
+        },
+      });
+
+      // Check assignment progress and update shipment status accordingly
+      const allBoxes = await prisma.shipmentBox.findMany({
+        where: { shipmentId: id, companyId },
+        select: { rackId: true },
+      });
+      const totalBoxes = allBoxes.length;
+      const assignedCount = allBoxes.filter(box => box.rackId !== null).length;
+      const remainingUnassigned = totalBoxes - assignedCount;
+
+      // Compute new status: IN_STORAGE if all assigned, PARTIAL if some assigned, else PENDING
+      const newStatus = assignedCount === 0
+        ? 'PENDING'
+        : (remainingUnassigned === 0 ? 'IN_STORAGE' : 'PARTIAL');
+
+      await prisma.shipment.update({
+        where: { id },
+        data: {
+          status: newStatus,
+          assignedAt: assignedCount > 0 ? new Date() : null,
+        },
+      });
+
+      // Log activity
+      await prisma.rackActivity.create({
+        data: {
+          rackId,
+          userId: req.user!.id,
+          companyId,
+          activityType: 'ASSIGN',
+          itemDetails: `${normalizedBoxNumbers.length} boxes from shipment ${id}${photoUrls.length > 0 ? ` (${photoUrls.length} photos)` : ''}`,
+          quantityAfter: palletsUsed,
+        },
+      });
+
+      res.json({
+        success: true,
+        assigned: normalizedBoxNumbers.length,
+        assignedTotal: assignedCount,
+        totalBoxes,
+        remainingUnassigned,
+        shipmentStatus: newStatus,
+        palletsUsed,
+        photosUploaded: photoUrls.length,
+        photoUrls
+      });
+    } catch (error) {
+      console.error('Assign boxes error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
-
-    // Update boxes with photos (if provided)
-    await prisma.shipmentBox.updateMany({
-      where: {
-        shipmentId: id,
-        boxNumber: { in: normalizedBoxNumbers },
-        companyId,
-      },
-      data: boxUpdateData,
-    });
-
-    const palletsUsed = await recomputeRackPalletUsage(prisma, rackId, companyId);
-
-    // Update rack capacity based on pallet usage
-    await prisma.rack.update({
-      where: { id: rackId },
-      data: {
-        capacityUsed: palletsUsed,
-        lastActivity: new Date(),
-      },
-    });
-
-    // Check assignment progress and update shipment status accordingly
-    const allBoxes = await prisma.shipmentBox.findMany({
-      where: { shipmentId: id, companyId },
-      select: { rackId: true },
-    });
-    const totalBoxes = allBoxes.length;
-    const assignedCount = allBoxes.filter(box => box.rackId !== null).length;
-    const remainingUnassigned = totalBoxes - assignedCount;
-
-    // Compute new status: IN_STORAGE if all assigned, PARTIAL if some assigned, else PENDING
-    const newStatus = assignedCount === 0
-      ? 'PENDING'
-      : (remainingUnassigned === 0 ? 'IN_STORAGE' : 'PARTIAL');
-
-    await prisma.shipment.update({
-      where: { id },
-      data: {
-        status: newStatus,
-        assignedAt: assignedCount > 0 ? new Date() : null,
-      },
-    });
-
-    // Log activity
-    await prisma.rackActivity.create({
-      data: {
-        rackId,
-        userId: req.user!.id,
-        companyId,
-        activityType: 'ASSIGN',
-        itemDetails: `${normalizedBoxNumbers.length} boxes from shipment ${id}${photoUrls.length > 0 ? ` (${photoUrls.length} photos)` : ''}`,
-        quantityAfter: palletsUsed,
-      },
-    });
-
-    res.json({ 
-      success: true, 
-      assigned: normalizedBoxNumbers.length,
-      assignedTotal: assignedCount,
-      totalBoxes,
-      remainingUnassigned,
-      shipmentStatus: newStatus,
-      palletsUsed,
-      photosUploaded: photoUrls.length,
-      photoUrls 
-    });
-  } catch (error) {
-    console.error('Assign boxes error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  });
 
 // Release boxes from shipment
 router.post('/:id/release-boxes', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
@@ -1027,8 +1027,8 @@ router.post('/:id/release-boxes', authorizeRoles('ADMIN', 'MANAGER'), async (req
     }
 
     if (!releaseAll && boxNumbers && boxNumbers.length < settings.partialReleaseMinBoxes) {
-      return res.status(400).json({ 
-        error: `Minimum ${settings.partialReleaseMinBoxes} boxes required for partial release` 
+      return res.status(400).json({
+        error: `Minimum ${settings.partialReleaseMinBoxes} boxes required for partial release`
       });
     }
 
@@ -1108,13 +1108,13 @@ router.post('/:id/release-boxes', authorizeRoles('ADMIN', 'MANAGER'), async (req
     if (settings.generateReleaseInvoice) {
       const storageDays = Math.ceil((new Date().getTime() - new Date(shipment.arrivalDate).getTime()) / (1000 * 60 * 60 * 24));
       const chargeableDays = Math.max(storageDays, settings.minimumChargeDays);
-      
+
       // Storage charges
       totalCharges += chargeableDays * settings.storageRatePerDay;
       if (settings.storageRatePerBox > 0) {
         totalCharges += boxesToRelease.length * settings.storageRatePerBox;
       }
-      
+
       // Release fees
       totalCharges += settings.releaseHandlingFee;
       totalCharges += boxesToRelease.length * settings.releasePerBoxFee;
@@ -1174,7 +1174,7 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
 
     // STRICT DELETE: Prevent deletion if materials are allocated to racks
     if (existing.boxes.length > 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Cannot delete shipment: Materials are currently allocated to racks',
         detail: `${existing.boxes.length} box(es) in racks. Remove from racks first.`,
       });
@@ -1201,8 +1201,8 @@ router.post('/cleanup/test-data', authorizeRoles('ADMIN'), async (req: AuthReque
 
     // Safety check - must type "DELETE TEST DATA" to confirm
     if (confirmText !== 'DELETE TEST DATA') {
-      return res.status(400).json({ 
-        error: 'Confirmation text incorrect. Please type "DELETE TEST DATA" to confirm.' 
+      return res.status(400).json({
+        error: 'Confirmation text incorrect. Please type "DELETE TEST DATA" to confirm.'
       });
     }
 
@@ -1225,9 +1225,9 @@ router.post('/cleanup/test-data', authorizeRoles('ADMIN'), async (req: AuthReque
     `;
 
     if (testShipments.length === 0) {
-      return res.json({ 
+      return res.json({
         message: 'No test data found to delete.',
-        deleted: 0 
+        deleted: 0
       });
     }
 
@@ -1243,7 +1243,7 @@ router.post('/cleanup/test-data', authorizeRoles('ADMIN'), async (req: AuthReque
       DELETE FROM shipments WHERE id IN (${shipmentIds.join(',')})
     `;
 
-    res.json({ 
+    res.json({
       message: 'Test data deleted successfully',
       deleted: testShipments.length,
       deletedBoxes,
@@ -1264,7 +1264,7 @@ router.post('/cleanup/test-data', authorizeRoles('ADMIN'), async (req: AuthReque
 // ==========================================
 // ASSIGN BOXES TO RACK (with Pallet support)
 // ==========================================
-router.post('/:shipmentId/assign-rack', 
+router.post('/:shipmentId/assign-rack',
   authorizeRoles('ADMIN', 'MANAGER', 'WORKER'),
   async (req: AuthRequest, res: Response) => {
     try {
@@ -1282,15 +1282,15 @@ router.post('/:shipmentId/assign-rack',
 
       // Validation
       if (!rackId || !quantity) {
-        return res.status(400).json({ 
-          error: 'Missing required fields: rackId and quantity' 
+        return res.status(400).json({
+          error: 'Missing required fields: rackId and quantity'
         });
       }
 
       // Get shipment with boxes
       const shipment = await prisma.shipment.findUnique({
         where: { id: shipmentId },
-        include: { 
+        include: {
           boxes: {
             where: { rackId: null }, // Only unassigned boxes
             orderBy: { id: 'asc' }
@@ -1305,8 +1305,8 @@ router.post('/:shipmentId/assign-rack',
       // Check if we have enough unassigned boxes
       const unassignedBoxes = shipment.boxes || [];
       if (unassignedBoxes.length < quantity) {
-        return res.status(400).json({ 
-          error: `Not enough unassigned boxes. Available: ${unassignedBoxes.length}, Requested: ${quantity}` 
+        return res.status(400).json({
+          error: `Not enough unassigned boxes. Available: ${unassignedBoxes.length}, Requested: ${quantity}`
         });
       }
 
@@ -1330,7 +1330,7 @@ router.post('/:shipmentId/assign-rack',
       // Calculate pallet usage for capacity check
       const boxesPerPallet = shipment.boxesPerPallet || 0;
       let palletsToAssign = pallets || 0;
-      
+
       if (boxesPerPallet > 0 && palletsToAssign === 0) {
         // Auto-calculate pallets if not provided
         palletsToAssign = Math.floor(quantity / boxesPerPallet);
@@ -1339,16 +1339,16 @@ router.post('/:shipmentId/assign-rack',
       // Check rack capacity
       const currentPalletUsage = rack.capacityUsed || 0;
       const newPalletUsage = currentPalletUsage + palletsToAssign;
-      
+
       if (newPalletUsage > (rack.capacityTotal || 100)) {
-        return res.status(400).json({ 
-          error: `Rack capacity exceeded. Current: ${currentPalletUsage}, Adding: ${palletsToAssign}, Max: ${rack.capacityTotal}` 
+        return res.status(400).json({
+          error: `Rack capacity exceeded. Current: ${currentPalletUsage}, Adding: ${palletsToAssign}, Max: ${rack.capacityTotal}`
         });
       }
 
       // Assign boxes to rack with photos
       const photosJson = photos && photos.length > 0 ? JSON.stringify(photos) : null;
-      
+
       const updatedBoxes = await prisma.$transaction(
         boxesToAssign.map((box: any, index: number) => {
           // Calculate pallet number for this box
@@ -1366,7 +1366,7 @@ router.post('/:shipmentId/assign-rack',
 
           return prisma.shipmentBox.update({
             where: { id: box.id },
-            data: { 
+            data: {
               rackId,
               assignedAt: new Date(),
               status: 'IN_STORAGE',
@@ -1382,8 +1382,8 @@ router.post('/:shipmentId/assign-rack',
         where: { id: rackId },
         data: {
           capacityUsed: newPalletUsage,
-          status: newPalletUsage >= (rack.capacityTotal || 100) ? 'FULL' : 
-                  newPalletUsage > 0 ? 'OCCUPIED' : 'AVAILABLE'
+          status: newPalletUsage >= (rack.capacityTotal || 100) ? 'FULL' :
+            newPalletUsage > 0 ? 'OCCUPIED' : 'AVAILABLE'
         }
       });
 
@@ -1396,9 +1396,9 @@ router.post('/:shipmentId/assign-rack',
 
       // Check remaining boxes and update shipment status
       const remainingBoxes = await prisma.shipmentBox.count({
-        where: { 
+        where: {
           shipmentId,
-          rackId: null 
+          rackId: null
         }
       });
 
