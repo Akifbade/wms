@@ -24,6 +24,7 @@ interface CreateRackModalProps {
 export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRackModalProps) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [existingZones, setExistingZones] = useState<Array<{zone: string, zoneIcon: string, zoneDescription: string}>>([]);
   const [formData, setFormData] = useState({
     code: '',
     location: '',
@@ -45,6 +46,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
   const [success, setSuccess] = useState('');
   const [selectedCategoryInfo, setSelectedCategoryInfo] = useState<Category | null>(null);
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [useExistingZone, setUseExistingZone] = useState(false);
 
   const resolveLogoUrl = (logo?: string | null) => {
     if (!logo) return '';
@@ -52,10 +54,11 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
     return logo.startsWith('/') ? logo : `/uploads/${logo}`;
   };
 
-  // Load categories when modal opens
+  // Load categories and existing zones when modal opens
   useEffect(() => {
     if (isOpen) {
       loadCategories();
+      loadExistingZones();
     }
   }, [isOpen]);
 
@@ -78,6 +81,49 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
       setCategories(options);
     } catch (err) {
       console.error('Failed to load categories:', err);
+    }
+  };
+
+  const loadExistingZones = async () => {
+    try {
+      const response = await racksAPI.getAll();
+      const racks = response.racks || [];
+      
+      // Get unique zones with their icons and descriptions
+      const zonesMap = new Map();
+      racks.forEach((rack: any) => {
+        if (rack.zone && rack.zone !== 'Unassigned') {
+          if (!zonesMap.has(rack.zone)) {
+            zonesMap.set(rack.zone, {
+              zone: rack.zone,
+              zoneIcon: rack.zoneIcon || '📦',
+              zoneDescription: rack.zoneDescription || ''
+            });
+          }
+        }
+      });
+      
+      setExistingZones(Array.from(zonesMap.values()).sort((a, b) => a.zone.localeCompare(b.zone)));
+    } catch (err) {
+      console.error('Failed to load existing zones:', err);
+    }
+  };
+
+  const handleZoneSelect = (selectedZone: string) => {
+    if (selectedZone === 'new') {
+      setUseExistingZone(false);
+      setFormData(prev => ({ ...prev, zone: '', zoneIcon: '📦', zoneDescription: '' }));
+    } else {
+      const zone = existingZones.find(z => z.zone === selectedZone);
+      if (zone) {
+        setUseExistingZone(true);
+        setFormData(prev => ({ 
+          ...prev, 
+          zone: zone.zone,
+          zoneIcon: zone.zoneIcon,
+          zoneDescription: zone.zoneDescription
+        }));
+      }
     }
   };
 
@@ -274,6 +320,29 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
             <h3 className="text-lg font-semibold mb-4 text-blue-800">🏢 Zone Configuration</h3>
             <div className="space-y-4">
+              {/* Existing Zone Selector */}
+              {existingZones.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quick Select Existing Zone (Optional)
+                  </label>
+                  <select
+                    onChange={(e) => handleZoneSelect(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  >
+                    <option value="new">➕ Create New Zone</option>
+                    {existingZones.map((zone) => (
+                      <option key={zone.zone} value={zone.zone}>
+                        {zone.zoneIcon} Zone {zone.zone} {zone.zoneDescription ? `- ${zone.zoneDescription}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    ⚡ Quick way to add rack to existing zone
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -287,9 +356,10 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
                     placeholder="e.g., 1, 2, A, B..."
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    disabled={useExistingZone}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    💡 Physical zone where this rack is located
+                    💡 {useExistingZone ? 'Auto-filled from selected zone' : 'Physical zone where this rack is located'}
                   </p>
                 </div>
 
@@ -301,9 +371,10 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
                     type="button"
                     onClick={() => setShowIconPicker(true)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center gap-3"
+                    disabled={useExistingZone}
                   >
                     <span className="text-3xl">{formData.zoneIcon}</span>
-                    <span className="text-gray-600">Click to change</span>
+                    <span className="text-gray-600">{useExistingZone ? 'From selected zone' : 'Click to change'}</span>
                   </button>
                 </div>
               </div>
@@ -319,7 +390,13 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={2}
                   placeholder="Describe this zone's purpose or location..."
+                  disabled={useExistingZone}
                 />
+                {useExistingZone && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    ℹ️ Using existing zone settings
+                  </p>
+                )}
               </div>
 
               <div>
