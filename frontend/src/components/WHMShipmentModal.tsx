@@ -456,12 +456,13 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         const palletCount = getSafeNumber(formData.palletCount, 1);
         const boxesPerPallet = getSafeNumber(formData.boxesPerPallet, 1);
         const totalBoxes = palletCount * boxesPerPallet;
-        qrValue = `QR-SH-${timestamp}-P${palletCount}B${boxesPerPallet}T${totalBoxes}`;
+        // Simple format: just timestamp for easy scanning
+        qrValue = `SH-${timestamp}`;
       }
     } else {
-      // Box mode
+      // Box mode - simple format
       const totalBoxes = getSafeNumber(formData.pieces, 1);
-      qrValue = `QR-SH-${timestamp}-BOX-T${totalBoxes}`;
+      qrValue = `SH-${timestamp}`;
     }
 
     setQRCodeValue(qrValue);
