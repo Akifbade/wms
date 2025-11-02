@@ -58,7 +58,7 @@ on:
 
 env:
   NODE_VERSION: '18'
-  PRODUCTION_PATH: '/root/wms-production'
+  PRODUCTION_PATH: '/root/NEW START'
 
 jobs:
   # =============================================================================
@@ -214,7 +214,7 @@ jobs:
           
           # Copy built frontend files
           echo "📦 Copying frontend build..."
-          scp -vvv -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -r frontend/dist/* root@148.230.107.155:"/root/wms-production/frontend/staging-dist/" 2>&1 | grep -E "debug|error|denied" || true
+          scp -vvv -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -r frontend/dist/* root@148.230.107.155:"${{ env.PRODUCTION_PATH }}/frontend/staging-dist/" 2>&1 | grep -E "debug|error|denied" || true
           
           # Copy backend code (exclude node_modules and large files)
           echo "📦 Copying backend code..."
@@ -225,12 +225,12 @@ jobs:
             --exclude 'dist' \
             --exclude '*.log' \
             --exclude 'uploads' \
-            backend/ root@148.230.107.155:"/root/wms-production/backend/staging-temp/"
+            backend/ root@148.230.107.155:"${{ env.PRODUCTION_PATH }}/backend/staging-temp/"
           
           # Deploy to staging containers with safety checks
           ssh -i ~/.ssh/deploy_key root@148.230.107.155 << 'EOF'
           set -e
-          cd "/root/wms-production"
+          cd "${{ env.PRODUCTION_PATH }}"
           
           STAGING_BACKUP_DIR="backups/staging-$(date +%Y%m%d-%H%M%S)"
           DEPLOY_FAILED=false
@@ -449,7 +449,7 @@ jobs:
           
           ssh -i ~/.ssh/deploy_key root@148.230.107.155 << 'EOF'
           set -e
-          cd "/root/wms-production"
+          cd "${{ env.PRODUCTION_PATH }}"
           
           echo "📊 Current Status:"
           docker ps --filter "name=wms-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
@@ -626,7 +626,7 @@ jobs:
           echo "================================================"
           
           ssh -i ~/.ssh/deploy_key ${VPS_USER}@${VPS_HOST} << 'EOF'
-          cd "/root/wms-production"
+          cd "${{ env.PRODUCTION_PATH }}"
           
           echo "� Finding latest backup..."
           LATEST_BACKUP=$(ls -td backups/production-* 2>/dev/null | head -1)
