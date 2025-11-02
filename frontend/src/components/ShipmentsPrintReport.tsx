@@ -80,6 +80,17 @@ const ShipmentsPrintReport: React.FC<ShipmentsPrintReportProps> = ({
       const days = getDaysStored(shipment);
       const daysColor = days >= 60 ? [255, 0, 0] : days >= 30 ? [255, 165, 0] : [0, 128, 0];
       
+      // Get proper rack display
+      const rackDisplay = shipment.rack?.code 
+        ? `${shipment.rack.code}${shipment.rack.location ? ` (${shipment.rack.location})` : ''}`
+        : shipment.rackLocation || 'Not Assigned';
+      
+      // Get proper date
+      const dateValue = shipment.arrivalDate || shipment.receivedDate || shipment.createdAt;
+      const dateDisplay = dateValue 
+        ? new Date(dateValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'No Date';
+      
       return [
         shipment.referenceId || 'N/A',
         shipment.clientName || 'N/A',
@@ -88,12 +99,12 @@ const ShipmentsPrintReport: React.FC<ShipmentsPrintReportProps> = ({
         `${shipment.currentBoxCount || 0} / ${shipment.originalBoxCount || 0}`,
         shipment.palletCount && shipment.boxesPerPallet 
           ? `${shipment.palletCount} × ${shipment.boxesPerPallet}`
-          : 'Loose',
-        shipment.isWarehouseShipment ? 'Pallet' : 'Regular',
-        shipment.rackLocation || 'Unassigned',
+          : `${shipment.originalBoxCount || 0} loose`,
+        shipment.isWarehouseShipment ? '🪵 Pallet' : '📦 Regular',
+        rackDisplay,
         { content: `${days}d`, styles: { textColor: daysColor, fontStyle: 'bold' } },
         getStatusText(shipment.status),
-        shipment.receivedDate ? new Date(shipment.receivedDate).toLocaleDateString() : 'N/A'
+        dateDisplay
       ];
     });
     
@@ -322,6 +333,22 @@ const ShipmentsPrintReport: React.FC<ShipmentsPrintReportProps> = ({
                 const days = getDaysStored(shipment);
                 const daysBadgeClass = days >= 60 ? 'badge-red' : days >= 30 ? 'badge-yellow' : 'badge-green';
                 
+                // Get proper rack display
+                const rackDisplay = shipment.rack?.code 
+                  ? `${shipment.rack.code}${shipment.rack.location ? ` (${shipment.rack.location})` : ''}`
+                  : shipment.rackLocation || '<span style="color: #ef4444;">Not Assigned</span>';
+                
+                // Get proper date
+                const dateValue = shipment.arrivalDate || shipment.receivedDate || shipment.createdAt;
+                const dateDisplay = dateValue 
+                  ? new Date(dateValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : '<span style="color: #ef4444;">No Date</span>';
+                
+                // Get pallet info
+                const palletInfo = shipment.palletCount && shipment.boxesPerPallet 
+                  ? `<strong>${shipment.palletCount}</strong> × <strong>${shipment.boxesPerPallet}</strong>` 
+                  : `${shipment.originalBoxCount || 0} loose`;
+                
                 return `
                   <tr>
                     <td><strong>${shipment.referenceId || 'N/A'}</strong></td>
@@ -329,12 +356,12 @@ const ShipmentsPrintReport: React.FC<ShipmentsPrintReportProps> = ({
                     <td><span class="badge badge-blue">${shipment.companyProfile?.name || 'Individual'}</span></td>
                     <td>${shipment.clientPhone || 'N/A'}</td>
                     <td style="text-align: center;"><span class="badge badge-purple">${shipment.currentBoxCount || 0} / ${shipment.originalBoxCount || 0}</span></td>
-                    <td style="text-align: center;">${shipment.palletCount && shipment.boxesPerPallet ? `${shipment.palletCount} × ${shipment.boxesPerPallet}` : 'Loose'}</td>
+                    <td style="text-align: center;">${palletInfo}</td>
                     <td style="text-align: center;">${shipment.isWarehouseShipment ? '🪵 Pallet' : '📦 Regular'}</td>
-                    <td style="text-align: center;">${shipment.rackLocation || 'Unassigned'}</td>
+                    <td style="text-align: center; font-weight: bold;">${rackDisplay}</td>
                     <td style="text-align: center;"><span class="badge ${daysBadgeClass}">${days}d</span></td>
                     <td style="text-align: center;">${getStatusText(shipment.status)}</td>
-                    <td style="text-align: center;">${shipment.receivedDate ? new Date(shipment.receivedDate).toLocaleDateString() : 'N/A'}</td>
+                    <td style="text-align: center;">${dateDisplay}</td>
                   </tr>
                 `;
               }).join('')}
