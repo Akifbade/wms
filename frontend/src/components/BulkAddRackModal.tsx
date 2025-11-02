@@ -141,9 +141,24 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
     }
 
     if (!formData.zone.trim() || !formData.prefix.trim()) {
-      setError('Zone and prefix are required');
+      setError('❌ Zone and prefix are required! Please enter a zone number (e.g., 1, 2, 3)');
+      console.error('🚫 BULK ADD VALIDATION FAILED:', {
+        zone: formData.zone,
+        zoneTrimmed: formData.zone.trim(),
+        prefix: formData.prefix,
+        prefixTrimmed: formData.prefix.trim()
+      });
       return;
     }
+
+    // 🐛 DEBUG: Log form data before creating racks
+    console.log('✅ BULK ADD VALIDATION PASSED - Starting rack creation:', {
+      zone: formData.zone,
+      prefix: formData.prefix,
+      startNumber: formData.startNumber,
+      endNumber: formData.endNumber,
+      totalRacks: formData.endNumber - formData.startNumber + 1
+    });
 
     setLoading(true);
     setError('');
@@ -161,12 +176,23 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
         
         const rackData: any = {
           code: rackCode,
-          zone: formData.zone,
+          zone: formData.zone.trim() || 'Unassigned', // Ensure zone is not empty
           location: location || `Zone ${formData.zone}, Rack ${rackCode}`,
           rackType: formData.rackType,
           capacityMode: formData.capacityMode,
           status: 'ACTIVE'
         };
+
+        // 🐛 DEBUG: Log what we're sending
+        if (i === formData.startNumber) { // Only log first rack to avoid spam
+          console.log('🎯 BULK ADD - Creating racks with data:', {
+            prefix: formData.prefix,
+            zone: formData.zone,
+            zoneAfterTrim: formData.zone.trim(),
+            finalZoneValue: rackData.zone,
+            firstRackCode: rackCode
+          });
+        }
 
         // Add company profile if selected
         if (selectedCompanyProfileId) {
