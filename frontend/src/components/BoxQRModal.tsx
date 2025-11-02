@@ -82,7 +82,7 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         }
       });
-      
+
       if (shipmentResponse.ok) {
         const shipmentData = await shipmentResponse.json();
         setShipment(shipmentData.shipment || shipmentData);
@@ -142,7 +142,7 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
         const master = (shipment as any)?.qrCode || '';
         const client = (shipment as any)?.clientName || '';
         const arrDate = (shipment as any)?.arrivalDate ? new Date((shipment as any).arrivalDate) : null;
-        const ad = arrDate ? `${arrDate.getFullYear()}-${String(arrDate.getMonth()+1).padStart(2,'0')}-${String(arrDate.getDate()).padStart(2,'0')}` : '';
+        const ad = arrDate ? `${arrDate.getFullYear()}-${String(arrDate.getMonth() + 1).padStart(2, '0')}-${String(arrDate.getDate()).padStart(2, '0')}` : '';
         const buildPalletQR = (palletNumber: number, pieces: number) => {
           // ✅ SIMPLIFIED: Use same format as SHIPMENT_XXX and RACK_XXX
           // Format: PALLET_SHIPMENTID_PALLETNUMBER
@@ -198,7 +198,7 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
   const handlePrintAll = async () => {
     // Preload all images to ensure they're ready for print
     const imgPromises: Promise<void>[] = [];
-    
+
     // Preload logo image if it exists
     if (branding?.logoUrl) {
       imgPromises.push(
@@ -210,7 +210,7 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
         })
       );
     }
-    
+
     // Preload all QR images
     Object.values(qrImages).forEach(qrSrc => {
       imgPromises.push(
@@ -222,10 +222,10 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
         })
       );
     });
-    
+
     // Wait for all images to load before printing
     await Promise.all(imgPromises);
-    
+
     // Small delay to ensure rendering
     setTimeout(() => {
       window.print();
@@ -335,9 +335,9 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
                     {/* Brand mark on label - LOGO ONLY (smaller) */}
                     <div className="flex items-center justify-center gap-2 mb-3">
                       {branding?.logoUrl ? (
-                        <img 
-                          src={branding.logoUrl} 
-                          alt="Logo" 
+                        <img
+                          src={branding.logoUrl}
+                          alt="Logo"
                           className="h-8 w-auto object-contain"
                           onError={(e) => {
                             console.error('❌ Logo failed to load:', branding.logoUrl);

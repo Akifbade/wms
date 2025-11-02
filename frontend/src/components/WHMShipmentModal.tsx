@@ -49,7 +49,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   // Core shipment data (WHM style)
   const [formData, setFormData] = useState({
     // Basic Info
@@ -60,7 +60,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     clientEmail: '',
     clientAddress: '',
     arrivalDate: new Date().toISOString().split('T')[0], // Today's date by default
-    
+
     // Shipment Details
     pieces: 1,
     palletCount: 1,
@@ -73,7 +73,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     cbm: 0, // auto-calculated (m??)
     description: '',
     value: 0,
-    
+
     // Warehouse Info
     isWarehouseShipment: false,
     shipper: '',
@@ -82,12 +82,12 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     consigneeAddress: '',
     shipperPhone: '',
     consigneePhone: '',
-    
+
     // Storage
     rackId: '',
     storageType: 'STANDARD', // STANDARD, FRAGILE, HAZMAT
     specialInstructions: '',
-    
+
     // Pricing
     estimatedDays: 30,
     notes: '',
@@ -112,7 +112,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const [variablePerPallet, setVariablePerPallet] = useState(false);
   const [boxesDistribution, setBoxesDistribution] = useState<number[]>([1]);
   const [extraBoxes, setExtraBoxes] = useState<number>(0);
-  
+
   // ???? SHIPMENT SETTINGS STATE
   const [shipmentSettings, setShipmentSettings] = useState<any>({
     requireClientEmail: false,
@@ -190,7 +190,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         const fields = data.customFields || data;
         const activeFields = Array.isArray(fields) ? fields.filter((field: CustomField) => field.isActive) : [];
         setCustomFields(activeFields);
-        
+
         // Initialize custom field values
         const initialValues: Record<string, string> = {};
         activeFields.forEach((field: CustomField) => {
@@ -264,7 +264,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         const data = await response.json();
         const settings = data.settings || data;
         setShipmentSettings(settings);
-        
+
         // ???? LOAD SECTION ORDER FROM SETTINGS
         if (settings.formSectionOrder) {
           try {
@@ -275,7 +275,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             console.log('Using default section order');
           }
         }
-        
+
         console.log('??? Shipment settings loaded:', settings);
       }
     } catch (err: any) {
@@ -321,9 +321,9 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     setIntakeMode('pallet');
     setPalletPhotoMap({});
     setPalletUploadState({});
-  setVariablePerPallet(false);
-  setBoxesDistribution([1]);
-  setExtraBoxes(0);
+    setVariablePerPallet(false);
+    setBoxesDistribution([1]);
+    setExtraBoxes(0);
     const initialCustomValues: Record<string, string> = {};
     customFields.forEach(field => {
       initialCustomValues[field.id] = '';
@@ -372,10 +372,10 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         const length = getSafeNumber(updated.length, 0);
         const width = getSafeNumber(updated.width, 0);
         const height = getSafeNumber(updated.height, 0);
-        
+
         // CBM = (Length ?? Width ?? Height) / 1,000,000 (since input is in cm)
         // Or: (L ?? W ?? H in cm) / 1,000,000 = CBM in m??
-        const cbm = length > 0 && width > 0 && height > 0 
+        const cbm = length > 0 && width > 0 && height > 0
           ? (length * width * height) / 1000000
           : 0;
 
@@ -515,7 +515,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
   const renderCustomField = (field: CustomField) => {
     const value = customFieldValues[field.id] || '';
-    
+
     switch (field.fieldType) {
       case 'TEXT':
         return (
@@ -529,7 +529,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             required={field.isRequired}
           />
         );
-      
+
       case 'NUMBER':
         return (
           <input
@@ -542,7 +542,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             required={field.isRequired}
           />
         );
-      
+
       case 'DATE':
         return (
           <input
@@ -554,7 +554,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             required={field.isRequired}
           />
         );
-      
+
       case 'DROPDOWN':
         return (
           <select
@@ -570,7 +570,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             ))}
           </select>
         );
-      
+
       case 'CHECKBOX':
         return (
           <div className="flex items-center space-x-3">
@@ -586,7 +586,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             </label>
           </div>
         );
-      
+
       default:
         return null;
     }
@@ -621,7 +621,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       if (shipmentSettings.requireRackAssignment && !formData.rackId) {
         throw new Error('Rack assignment is required by company settings');
       }
-      
+
       // ???? ADDITIONAL CONDITIONAL VALIDATIONS
       if (shipmentSettings.requireClientAddress && !formData.clientAddress) {
         throw new Error('Client address is required by company settings');
@@ -635,7 +635,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       if (shipmentSettings.requireEstimatedDays && !formData.estimatedDays) {
         throw new Error('Estimated storage days are required by company settings');
       }
-      
+
       const palletCount = intakeMode === 'pallet'
         ? getSafeNumber(formData.palletCount, 0)
         : 1;
@@ -684,21 +684,21 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         clientPhone: formData.clientPhone,
         clientEmail: formData.clientEmail,
         clientAddress: formData.clientAddress,
-    arrivalDate: formData.arrivalDate,
-    palletCount,
-    boxesPerPallet: variablePerPallet ? Math.max(0, dist.reduce((m, n) => Math.max(m, n), 0)) : uniformBoxesPerPallet,
+        arrivalDate: formData.arrivalDate,
+        palletCount,
+        boxesPerPallet: variablePerPallet ? Math.max(0, dist.reduce((m, n) => Math.max(m, n), 0)) : uniformBoxesPerPallet,
         description: formData.description,
         originalBoxCount: computedPieces,
         currentBoxCount: computedPieces,
         estimatedValue: formData.value,
         notes: formData.notes,
         rackId: formData.rackId || undefined,
-    palletPhotos: palletPhotosPayload.map(photos => photos.filter(url => !!url)),
-    // Variable per-pallet payload (backend optional)
-    ...(variablePerPallet ? { boxesDistribution: dist, extraBoxes: loose } : {}),
+        palletPhotos: palletPhotosPayload.map(photos => photos.filter(url => !!url)),
+        // Variable per-pallet payload (backend optional)
+        ...(variablePerPallet ? { boxesDistribution: dist, extraBoxes: loose } : {}),
         // Backend will set: PENDING if no rack, IN_STORAGE if rack assigned
         // status: not needed here, backend handles it
-        
+
         // Warehouse data
         isWarehouseShipment: formData.isWarehouseShipment,
         warehouseData: formData.isWarehouseShipment ? JSON.stringify({
@@ -714,7 +714,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
           specialInstructions: formData.specialInstructions,
           estimatedDays: formData.estimatedDays,
         }) : null,
-        
+
         // Custom fields
         customFieldValues: JSON.stringify(customFieldValues),
       };
@@ -731,16 +731,16 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('authToken')}`
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             rackId: formData.rackId,
-            boxNumbers 
+            boxNumbers
           })
         });
       }
 
       // Show success message
-    alert(`SUCCESS!\n\nShipment ${formData.barcode} has been created successfully!\n\nBoxes: ${computedPieces}\nPallets: ${palletCount}${variablePerPallet ? '' : `\nBoxes per pallet: ${uniformBoxesPerPallet}`}${variablePerPallet ? `\nVariable pallets: [${dist.join(', ')}]${loose ? ` + ${loose} loose` : ''}` : ''}\nClient: ${formData.clientName}${formData.rackId ? `\nAssigned to Rack` : ''}`);
-      
+      alert(`SUCCESS!\n\nShipment ${formData.barcode} has been created successfully!\n\nBoxes: ${computedPieces}\nPallets: ${palletCount}${variablePerPallet ? '' : `\nBoxes per pallet: ${uniformBoxesPerPallet}`}${variablePerPallet ? `\nVariable pallets: [${dist.join(', ')}]${loose ? ` + ${loose} loose` : ''}` : ''}\nClient: ${formData.clientName}${formData.rackId ? `\nAssigned to Rack` : ''}`);
+
       onSuccess();
       onClose();
 
@@ -762,7 +762,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         <h3 className="text-lg font-semibold mb-4 text-blue-800 flex items-center">
           Basic Shipment Info
         </h3>
-        
+
         {/* INTAKE MODE TOGGLE */}
         <div className="bg-white p-3 rounded-lg border-2 border-blue-300 mb-4">
           <p className="text-sm font-medium text-gray-700 mb-3">Intake Mode:</p>
@@ -783,11 +783,10 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 setBoxesDistribution([1]);
                 setExtraBoxes(0);
               }}
-              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-                intakeMode === 'pallet'
+              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${intakeMode === 'pallet'
                   ? 'bg-blue-600 text-white shadow-lg'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+                }`}
             >
               Pallet Mode
             </button>
@@ -807,11 +806,10 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 setBoxesDistribution([]);
                 setExtraBoxes(0);
               }}
-              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-                intakeMode === 'box'
+              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${intakeMode === 'box'
                   ? 'bg-green-600 text-white shadow-lg'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+                }`}
             >
               Box Mode
             </button>
@@ -1220,7 +1218,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             placeholder="john@example.com"
           />
         </div>
-        
+
         {shipmentSettings.showClientAddress !== false && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1243,7 +1241,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
   const renderWarehouseSection = () => {
     if (shipmentSettings.showWarehouseMode === false) return null;
-    
+
     return (
       <>
         <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
@@ -1377,7 +1375,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             ))}
           </select>
         </div>
-        
+
         {shipmentSettings.showEstimatedDays !== false && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1394,7 +1392,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             />
           </div>
         )}
-        
+
         {shipmentSettings.showSpecialInstructions !== false && (
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1416,7 +1414,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
   const renderCustomFieldsSection = () => {
     if (customFields.length === 0) return null;
-    
+
     return (
       <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
         <h3 className="text-lg font-semibold mb-4 text-purple-800 flex items-center">
@@ -1486,10 +1484,10 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               <h2 className="text-2xl font-bold">New Shipment Intake</h2>
               <p className="text-blue-100">WHM Warehouse Management System</p>
             </div>
-            <button 
+            <button
               onClick={onClose}
               className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
-              >
+            >
               ×
             </button>
           </div>
@@ -1498,7 +1496,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-100px)]">
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            
+
             {/* Messages */}
             {error && (
               <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-r-lg">
@@ -1551,7 +1549,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                       custom: 'Custom',
                       pricing: 'Pricing'
                     };
-                    
+
                     return (
                       <div key={section} className="flex items-center gap-1 bg-white px-2 py-1 rounded border border-gray-300">
                         <span className="text-xs font-medium">{sectionLabels[section]}</span>
@@ -1622,8 +1620,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
             {/* OLD SECTIONS REMOVED - NOW USING DYNAMIC RENDERING ABOVE */}
             {/* Keeping this comment to mark where old sections were */}
-            
-            <div style={{display: 'none'}} className="bg-gray-50 p-4 rounded-lg">
+
+            <div style={{ display: 'none' }} className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-semibold mb-4 text-gray-800 flex items-center">
                 ??????? Shipment Information
               </h3>
@@ -1705,7 +1703,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                     placeholder="john@example.com"
                   />
                 </div>
-                
+
                 {/* ???? CONDITIONAL: Client Address */}
                 {shipmentSettings.showClientAddress !== false && (
                   <div>
@@ -1729,20 +1727,20 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             {/* ???? CONDITIONAL: Warehouse Toggle */}
             {shipmentSettings.showWarehouseMode !== false && (
               <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-              <div className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  id="isWarehouseShipment"
-                  name="isWarehouseShipment"
-                  checked={formData.isWarehouseShipment}
-                  onChange={handleChange}
-                  className="w-5 h-5 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500"
-                />
-                <label htmlFor="isWarehouseShipment" className="text-sm font-semibold text-orange-800">
-                  This is a warehouse shipment (import/export with shipper/consignee details)
-                </label>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="isWarehouseShipment"
+                    name="isWarehouseShipment"
+                    checked={formData.isWarehouseShipment}
+                    onChange={handleChange}
+                    className="w-5 h-5 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500"
+                  />
+                  <label htmlFor="isWarehouseShipment" className="text-sm font-semibold text-orange-800">
+                    This is a warehouse shipment (import/export with shipper/consignee details)
+                  </label>
+                </div>
               </div>
-            </div>
             )}
 
             {/* Warehouse Details */}
@@ -1875,7 +1873,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                     <option value="SECURE">High Security</option>
                   </select>
                 </div>
-                
+
                 {/* ???? CONDITIONAL: Description */}
                 {shipmentSettings.showDescription !== false && (
                   <div className="md:col-span-2">
@@ -1898,8 +1896,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
             {/* Storage Assignment */}
             <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h3 className="text-lg font-semibold mb-4 text-green-800 flex items-center">
-                  Storage Assignment
+              <h3 className="text-lg font-semibold mb-4 text-green-800 flex items-center">
+                Storage Assignment
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1921,7 +1919,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                     ))}
                   </select>
                 </div>
-                
+
                 {/* ???? CONDITIONAL: Estimated Storage Days */}
                 {shipmentSettings.showEstimatedDays !== false && (
                   <div>
@@ -1939,7 +1937,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                     />
                   </div>
                 )}
-                
+
                 {/* ???? CONDITIONAL: Special Instructions */}
                 {shipmentSettings.showSpecialInstructions !== false && (
                   <div className="md:col-span-2">
