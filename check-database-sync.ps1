@@ -96,7 +96,7 @@ ORDER BY ORDINAL_POSITION;
 "@
     
     Write-Host ""
-    Write-Host "📊 Checking for zone-related columns..." -ForegroundColor Yellow
+    Write-Host "Checking for zone-related columns..." -ForegroundColor Yellow
     ssh -i $SSH_KEY ${VPS_USER}@${VPS_HOST} @"
 docker exec wms-database mysql -u root -prootpassword123 warehouse_wms -e "
 SELECT 
@@ -159,7 +159,7 @@ if ($status -eq "ALL_PRESENT") {
 
 Write-Host ""
 Write-Host "================================================" -ForegroundColor Cyan
-Write-Host "📊 SUMMARY" -ForegroundColor Yellow
+Write-Host "SUMMARY" -ForegroundColor Yellow
 Write-Host "================================================" -ForegroundColor Cyan
 
 if (-not $productionPending -and $status -eq "ALL_PRESENT") {

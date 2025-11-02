@@ -149,7 +149,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const code = e.target.value.toUpperCase();
     setFormData(prev => ({ ...prev, code }));
-    
+
     // Generate QR code preview if code is not empty
     if (code.length > 0) {
       generateQRCode(code);
@@ -160,7 +160,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
 
   const downloadQRCode = () => {
     if (!qrCodeUrl) return;
-    
+
     const link = document.createElement('a');
     link.href = qrCodeUrl;
     link.download = `rack-${formData.code}-qr.png`;
@@ -186,7 +186,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
 
       // Generate unique QR code for the rack
       const qrCode = `RACK-${formData.code}-${Date.now()}`;
-      
+
       const selectedCompanyProfileId = formData.companyProfileId || formData.categoryId || '';
 
       const {
@@ -210,12 +210,12 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
       };
 
       await racksAPI.create(dataToSubmit);
-      
+
       setSuccess('Rack created successfully! ???');
-      
+
       // Generate final QR code for download
       await generateQRCode(formData.code);
-      
+
       setTimeout(() => {
         onSuccess();
         onClose();

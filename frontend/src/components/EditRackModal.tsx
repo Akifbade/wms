@@ -89,8 +89,8 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
         code: rack.code || '',
         location: rack.location || '',
         rackType: rack.rackType || 'STORAGE',
-  categoryId: rack.companyProfileId || rack.categoryId || '',
-  companyProfileId: rack.companyProfileId || '',
+        categoryId: rack.companyProfileId || rack.categoryId || '',
+        companyProfileId: rack.companyProfileId || '',
         capacityTotal: rack.capacityTotal || 100,
         status: rack.status || 'ACTIVE',
         length: rack.length || '',
@@ -118,12 +118,12 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
       } else if (rack.category) {
         setSelectedCategoryInfo(rack.category);
       }
-      
+
       // Generate QR code for existing rack
       if (rack.code) {
         generateQRCode(rack.code);
       }
-      
+
       setError('');
       setSuccess('');
     }
@@ -171,7 +171,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const code = e.target.value.toUpperCase();
     setFormData(prev => ({ ...prev, code }));
-    
+
     // Generate QR code preview if code is not empty
     if (code.length > 0) {
       generateQRCode(code);
@@ -182,7 +182,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
 
   const downloadQRCode = () => {
     if (!qrCodeUrl) return;
-    
+
     const link = document.createElement('a');
     link.href = qrCodeUrl;
     link.download = `rack-${formData.code}-qr.png`;
@@ -228,7 +228,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
       };
 
       await racksAPI.update(rack.id, dataToSubmit);
-      
+
       setSuccess('Rack updated successfully! ???');
       setTimeout(() => {
         onSuccess();

@@ -42,10 +42,10 @@ const ShipmentBoxCard: React.FC<{
               #{shipment?.referenceId || 'N/A'}
             </span>
             <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${shipment?.status === 'IN_WAREHOUSE' || shipment?.status === 'PARTIAL'
-                ? 'bg-green-100 text-green-800'
-                : shipment?.status === 'RELEASED'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-gray-100 text-gray-800'
+              ? 'bg-green-100 text-green-800'
+              : shipment?.status === 'RELEASED'
+                ? 'bg-blue-100 text-blue-800'
+                : 'bg-gray-100 text-gray-800'
               }`}>
               {shipment?.status || 'N/A'}
             </span>
@@ -121,7 +121,9 @@ export const Racks: React.FC = () => {
   const resolveLogoUrl = (logo?: string | null) => {
     if (!logo) return '';
     if (logo.startsWith('http')) return logo;
-    return logo.startsWith('/') ? logo : `/uploads/${logo}`;
+    const url = logo.startsWith('/') ? logo : `/uploads/${logo}`;
+    // Add cache-busting parameter to force fresh load
+    return `${url}?t=${Date.now()}`;
   };
 
   useEffect(() => {
@@ -397,8 +399,8 @@ export const Racks: React.FC = () => {
             <button
               onClick={() => setViewMode('zones')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'zones'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
               🏢 Zones
@@ -406,8 +408,8 @@ export const Racks: React.FC = () => {
             <button
               onClick={() => setViewMode('grid')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'grid'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
               📦 Grid
@@ -591,8 +593,8 @@ export const Racks: React.FC = () => {
                     key={zone}
                     onClick={() => setSelectedZone(zone)}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${selectedZone === zone
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
                       }`}
                   >
                     <span>{zone === 'Unassigned' ? '📦' : '🏢'} {zone}</span>
@@ -626,15 +628,15 @@ export const Racks: React.FC = () => {
             const occupiedRacks = zoneRacks.filter((r: any) => r.capacityUsed > 0).length;
             const availableRacks = zoneRacks.filter((r: any) => r.capacityUsed === 0).length;
             const fullRacks = zoneRacks.filter((r: any) => r.capacityUsed >= r.capacityTotal).length;
-            
+
             const totalCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.capacityTotal || 0), 0);
             const usedCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.capacityUsed || 0), 0);
             const utilizationPercent = totalCapacity > 0 ? Math.round((usedCapacity / totalCapacity) * 100) : 0;
-            
+
             // Get zone icon and description from first rack in zone (all racks in zone should have same icon/description)
             const zoneIcon = zoneRacks[0]?.zoneIcon || (zoneName === 'Unassigned' ? '📦' : '🏢');
             const zoneDescription = zoneRacks[0]?.zoneDescription || '';
-            
+
             // Calculate pallet and box totals
             const totalPallets = zoneRacks.reduce((sum: number, r: any) => sum + (r.currentPallets || 0), 0);
             const totalBoxes = zoneRacks.reduce((sum: number, r: any) => sum + (r.currentBoxes || 0), 0);
@@ -653,7 +655,7 @@ export const Racks: React.FC = () => {
                     <div className="text-5xl">
                       {zoneIcon}
                     </div>
-                    
+
                     {/* Zone Info */}
                     <div className="text-left flex-1">
                       <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -662,14 +664,14 @@ export const Racks: React.FC = () => {
                           <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded">Empty</span>
                         )}
                       </h3>
-                      
+
                       {/* Zone Description */}
                       {zoneDescription && (
                         <p className="text-sm text-gray-600 mt-1 italic">
                           {zoneDescription}
                         </p>
                       )}
-                      
+
                       {/* Detailed Stats */}
                       <div className="flex flex-wrap items-center gap-4 mt-2">
                         {/* Total Racks */}
@@ -678,7 +680,7 @@ export const Racks: React.FC = () => {
                             {totalRacks} Racks
                           </span>
                         </div>
-                        
+
                         {/* Available */}
                         <div className="flex items-center gap-1.5">
                           <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -686,7 +688,7 @@ export const Racks: React.FC = () => {
                             {availableRacks} Available
                           </span>
                         </div>
-                        
+
                         {/* Occupied */}
                         <div className="flex items-center gap-1.5">
                           <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
@@ -694,7 +696,7 @@ export const Racks: React.FC = () => {
                             {occupiedRacks - fullRacks} In Use
                           </span>
                         </div>
-                        
+
                         {/* Full */}
                         {fullRacks > 0 && (
                           <div className="flex items-center gap-1.5">
@@ -704,7 +706,7 @@ export const Racks: React.FC = () => {
                             </span>
                           </div>
                         )}
-                        
+
                         {/* Capacity Details */}
                         <div className="flex items-center gap-3 ml-2 border-l pl-3">
                           {palletCapacity > 0 && (
@@ -726,17 +728,16 @@ export const Racks: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Right Side: Utilization & Controls */}
                   <div className="flex items-center gap-4">
                     {/* Utilization Indicator */}
                     <div className="text-center">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-xs font-semibold ${
-                          utilizationPercent >= 90 ? 'text-red-600' :
-                          utilizationPercent >= 70 ? 'text-yellow-600' :
-                          'text-green-600'
-                        }`}>
+                        <span className={`text-xs font-semibold ${utilizationPercent >= 90 ? 'text-red-600' :
+                            utilizationPercent >= 70 ? 'text-yellow-600' :
+                              'text-green-600'
+                          }`}>
                           {utilizationPercent >= 90 ? '🔴' : utilizationPercent >= 70 ? '🟡' : '🟢'}
                         </span>
                         <span className="text-lg font-bold text-gray-900">
@@ -746,25 +747,23 @@ export const Racks: React.FC = () => {
                       {/* Utilization Bar */}
                       <div className="w-32 bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
                         <div
-                          className={`h-full transition-all duration-300 ${
-                            utilizationPercent >= 90 ? 'bg-gradient-to-r from-red-500 to-red-600' :
-                            utilizationPercent >= 70 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
-                            'bg-gradient-to-r from-green-500 to-green-600'
-                          }`}
+                          className={`h-full transition-all duration-300 ${utilizationPercent >= 90 ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                              utilizationPercent >= 70 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
+                                'bg-gradient-to-r from-green-500 to-green-600'
+                            }`}
                           style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
                         />
                       </div>
-                      <span className={`text-[10px] font-medium mt-0.5 block ${
-                        utilizationPercent >= 90 ? 'text-red-600' :
-                        utilizationPercent >= 70 ? 'text-yellow-600' :
-                        'text-green-600'
-                      }`}>
+                      <span className={`text-[10px] font-medium mt-0.5 block ${utilizationPercent >= 90 ? 'text-red-600' :
+                          utilizationPercent >= 70 ? 'text-yellow-600' :
+                            'text-green-600'
+                        }`}>
                         {utilizationPercent >= 90 ? 'Critical' :
-                         utilizationPercent >= 70 ? 'High' :
-                         'Healthy'}
+                          utilizationPercent >= 70 ? 'High' :
+                            'Healthy'}
                       </span>
                     </div>
-                    
+
                     {/* Expand/Collapse Icon */}
                     <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
                       <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -803,7 +802,7 @@ export const Racks: React.FC = () => {
                           >
                             {/* Company Logo Badge - Top Right */}
                             {rack.companyProfile && (
-                              <div 
+                              <div
                                 className="absolute top-2 right-2 group/logo"
                                 title={rack.companyProfile.name || 'Company'}
                               >
@@ -941,7 +940,7 @@ export const Racks: React.FC = () => {
                 >
                   {/* Company Logo Badge - Top Left */}
                   {rack.companyProfile && (
-                    <div 
+                    <div
                       className="absolute -top-2 -left-2 group/logo z-10"
                       title={rack.companyProfile.name || 'Company'}
                     >
@@ -964,12 +963,12 @@ export const Racks: React.FC = () => {
                   {/* Status Badge */}
                   <div className="absolute -top-2 -right-2 z-10">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold shadow ${rack.status === 'ACTIVE'
-                        ? utilization >= 100
-                          ? 'bg-red-500 text-white'
-                          : utilization >= 90
-                            ? 'bg-yellow-500 text-white'
-                            : 'bg-green-500 text-white'
-                        : 'bg-gray-400 text-white'
+                      ? utilization >= 100
+                        ? 'bg-red-500 text-white'
+                        : utilization >= 90
+                          ? 'bg-yellow-500 text-white'
+                          : 'bg-green-500 text-white'
+                      : 'bg-gray-400 text-white'
                       }`}>
                       {rack.status === 'ACTIVE'
                         ? utilization >= 100
@@ -1012,10 +1011,10 @@ export const Racks: React.FC = () => {
                     {rack.capacityMode && (
                       <div className="flex items-center justify-between mb-2">
                         <span className={`px-2 py-1 rounded-lg text-xs font-bold ${rack.capacityMode === 'UNLIMITED'
-                            ? 'bg-purple-100 text-purple-700'
-                            : rack.capacityMode === 'FLEXIBLE'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-gray-100 text-gray-700'
+                          ? 'bg-purple-100 text-purple-700'
+                          : rack.capacityMode === 'FLEXIBLE'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-700'
                           }`}>
                           {rack.capacityMode === 'UNLIMITED' ? '∞ Unlimited' : rack.capacityMode === 'FLEXIBLE' ? '⚡ Flexible' : '📦 Fixed'}
                         </span>
@@ -1143,10 +1142,10 @@ export const Racks: React.FC = () => {
                     <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
                       <p className="text-xs text-gray-500 font-medium mb-1">Status</p>
                       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${rackDetails?.status === 'ACTIVE'
-                          ? rackDetails.capacityUsed >= rackDetails.capacityTotal
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
+                        ? rackDetails.capacityUsed >= rackDetails.capacityTotal
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
                         }`}>
                         {rackDetails?.status === 'ACTIVE'
                           ? rackDetails.capacityUsed >= rackDetails.capacityTotal
@@ -1230,12 +1229,12 @@ export const Racks: React.FC = () => {
                           <TagIcon className="h-4 w-4" /> Category
                         </p>
                         <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold ${rackDetails.category === 'DIOR'
-                            ? 'bg-purple-100 text-purple-800 border border-purple-300'
-                            : rackDetails.category === 'COMPANY_MATERIAL'
-                              ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                              : rackDetails.category === 'JAZEERA'
-                                ? 'bg-green-100 text-green-800 border border-green-300'
-                                : 'bg-gray-100 text-gray-800 border border-gray-300'
+                          ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                          : rackDetails.category === 'COMPANY_MATERIAL'
+                            ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                            : rackDetails.category === 'JAZEERA'
+                              ? 'bg-green-100 text-green-800 border border-green-300'
+                              : 'bg-gray-100 text-gray-800 border border-gray-300'
                           }`}>
                           {rackDetails.category === 'DIOR' && 'Dior'}
                           {rackDetails.category === 'COMPANY_MATERIAL' && 'Company Material'}
