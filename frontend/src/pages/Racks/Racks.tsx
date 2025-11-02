@@ -186,7 +186,7 @@ export const Racks: React.FC = () => {
         const canvas = bulkQrCanvasRefs.current[rack.id];
         if (canvas) {
           try {
-            await QRCode.toCanvas(canvas, `RACK_${rack.code}`, {
+            await QRCode.toCanvas(canvas, `RACK_${rack.code.replace(/-/g, '_')}`, {
               width: 200,
               margin: 1,
             });
