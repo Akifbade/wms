@@ -5,7 +5,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.logVersionInfo = exports.getVersionInfo = exports.APP_VERSION = void 0;
-exports.APP_VERSION = 'v2.1.0';
+exports.APP_VERSION = 'v2.1.57';
 const getVersionInfo = () => {
     return {
         version: exports.APP_VERSION,

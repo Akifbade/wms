@@ -20,6 +20,15 @@ const rackSchema = z.object({
   width: z.number().positive().optional(),
   height: z.number().positive().optional(),
   dimensionUnit: z.enum(['CM', 'INCHES', 'METERS']).optional(),
+  // NEW: Zone and capacity mode fields
+  zone: z.string().optional(),
+  zoneDescription: z.string().optional(),
+  capacityMode: z.enum(['FIXED', 'FLEXIBLE', 'UNLIMITED']).optional(),
+  palletCapacity: z.number().int().optional(),
+  boxCapacity: z.number().int().optional(),
+  currentPallets: z.number().int().optional(),
+  currentBoxes: z.number().int().optional(),
+  capacityNotes: z.string().optional(),
 });
 
 // Get categories for rack assignment
@@ -327,6 +336,15 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
         width: data.width,
         height: data.height,
         dimensionUnit: data.dimensionUnit,
+        // NEW: Zone and capacity fields
+        zone: data.zone,
+        zoneDescription: data.zoneDescription,
+        capacityMode: data.capacityMode || 'FIXED',
+        palletCapacity: data.palletCapacity,
+        boxCapacity: data.boxCapacity,
+        currentPallets: data.currentPallets || 0,
+        currentBoxes: data.currentBoxes || 0,
+        capacityNotes: data.capacityNotes,
         companyId,
         qrCode: `RACK_${data.code.replace(/-/g, '_')}`,
         capacityTotal: data.capacityTotal || 100,
