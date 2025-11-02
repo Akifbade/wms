@@ -1,8 +1,8 @@
 {
-  "version": "v2.1.8",
-  "buildDate": "Nov 01, 2025",
-  "buildTime": "22:32:09",
+  "version": "v2.1.20",
+  "buildDate": "Nov 02, 2025",
+  "buildTime": "00:15:37",
   "author": "akifbade46-del",
-  "commitMessage": "fix: QR label improvements - smaller logo only, bigger text, 404 error handling",
+  "commitMessage": "fix: improved camera error detection with detailed mobile debugging logs",
   "environment": "development"
 }
