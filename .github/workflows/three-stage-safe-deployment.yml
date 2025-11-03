@@ -224,12 +224,12 @@ jobs:
       - name: � Checkout code
         uses: actions/checkout@v4
 
-      - name: �🔑 Setup SSH
+      - name:  Setup SSH
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_VPS_SSH_KEY }}
+          SSH_PRIVATE_KEY: ${{ secrets.STAGING_VPS_SSH_KEY }}
         run: |
           if [ -z "${SSH_PRIVATE_KEY}" ]; then
-            echo "❌ Missing secret: PRODUCTION_VPS_SSH_KEY"
+            echo "❌ Missing secret: STAGING_VPS_SSH_KEY"
             exit 1
           fi
           mkdir -p ~/.ssh
