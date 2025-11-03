@@ -16,7 +16,7 @@ services:
       MYSQL_PASSWORD: staging_pass_12345
       # KEY: Different database from production
     ports:
-      - "3307:3306"  # ISOLATED PORT (production uses 3306)
+      - "3308:3306"  # ISOLATED PORT (production uses 3307)
     volumes:
       - staging_mysql_data:/var/lib/mysql
       - ./backend/prisma/migrations:/docker-entrypoint-initdb.d
