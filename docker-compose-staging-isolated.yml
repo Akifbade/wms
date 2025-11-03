@@ -117,16 +117,15 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - staging-network  # ISOLATED NETWORK
-    command: sh -c "
-      apk add --no-cache mysql-client docker-cli &&
+    command: >
+      sh -c "apk add --no-cache mysql-client docker-cli &&
       while true; do
-        TIMESTAMP=\$(date +\"%Y%m%d_%H%M%S\")
-        echo \"[Staging] Backing up database at \$TIMESTAMP\" &&
-        docker exec wms-staging-db mysqldump -u staging_user -pstaging_pass_12345 warehouse_staging > /backups-staging/staging_backup_\$TIMESTAMP.sql &&
-        echo \"[Staging] Backup completed: staging_backup_\$TIMESTAMP.sql\" &&
+        TIMESTAMP=$$(date +'%Y%m%d_%H%M%S');
+        echo '[Staging] Backing up at' $$TIMESTAMP;
+        docker exec wms-staging-db mysqldump -u staging_user -pstaging_pass_12345 warehouse_staging > /backups-staging/staging_backup_$$TIMESTAMP.sql;
+        echo '[Staging] Backup completed';
         sleep 3600;
-      done
-    "
+      done"
 
 # ===== NETWORKING - COMPLETELY ISOLATED =====
 networks:
