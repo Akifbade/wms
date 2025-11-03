@@ -155,6 +155,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       where.OR = [
         { name: { contains: search as string } },
         { referenceId: { contains: search as string } },
+        { qrCode: { contains: search as string } }, // ✅ FIX: Search by QR code
         { clientName: { contains: search as string } },
         { customerName: { contains: search as string } },
         { shipper: { contains: search as string } },
