@@ -102,9 +102,8 @@
     // =============================================================================
     // 🔐 GITHUB SECRETS (DO NOT DELETE!)
     // =============================================================================
-    "github.secret.staging": "STAGING_VPS_SSH_KEY",
-    "github.secret.production": "PRODUCTION_VPS_SSH_KEY",
-    "github.warning": "SSH keys already configured - NEVER modify or delete",
+    "github.secret.vps": "STAGING_VPS_SSH_KEY (used for both staging and production)",
+    "github.warning": "SSH key already configured - NEVER modify or delete",
     
     // =============================================================================
     // ⚠️ CRITICAL RULES FOR AI ASSISTANTS
