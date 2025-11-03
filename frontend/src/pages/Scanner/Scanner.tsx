@@ -653,7 +653,20 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   const assignShipmentToRack = async () => {
     if (!pendingShipment || !scanResult || scanResult.type !== 'rack') return;
 
-    const totalBoxes = ((palletQuantity || 0) * 20) + (looseBoxQuantity || 0);
+    // ✅ FIX: Calculate total boxes based on ACTUAL pallet contents, not fixed 20-box rule
+    let totalBoxes = 0;
+    
+    // Add boxes from selected pallets (using actual pallet box counts)
+    if (palletQuantity > 0 && pendingShipment.palletDetails) {
+      for (let i = 0; i < palletQuantity; i++) {
+        if (pendingShipment.palletDetails[i]) {
+          totalBoxes += pendingShipment.palletDetails[i].boxCount;
+        }
+      }
+    }
+    
+    // Add loose boxes
+    totalBoxes += (looseBoxQuantity || 0);
 
     if (totalBoxes <= 0) {
       setError('Please select pallets or boxes to assign');
@@ -842,20 +855,38 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
       });
       const boxData = await boxResponse.json();
-      const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
+      const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId);
 
-      // ✅ SAME LOGIC AS SCANNER: 20 boxes = 1 pallet (hardcoded, not from database)
-      const boxesPerPallet = 20;
-      const totalPallets = Math.floor(unassignedBoxes / boxesPerPallet);
-      const looseBoxes = unassignedBoxes % boxesPerPallet;
+      // ✅ FIX: Calculate pallets based on ACTUAL pallet distribution, not fixed 20-box rule
+      // Group unassigned boxes by palletNumber
+      const palletGroups = unassignedBoxes.reduce((acc: Record<number, number>, box: any) => {
+        const palletNum = box.palletNumber || 0; // 0 = loose boxes
+        acc[palletNum] = (acc[palletNum] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Separate pallets (palletNumber > 0) from loose boxes (palletNumber = 0)
+      const palletNumbers = Object.keys(palletGroups)
+        .map(Number)
+        .filter(num => num > 0)
+        .sort((a, b) => a - b);
+      
+      const totalPallets = palletNumbers.length;
+      const looseBoxes = palletGroups[0] || 0;
+
+      // Build pallet details for display
+      const palletDetails = palletNumbers.map(num => ({
+        palletNumber: num,
+        boxCount: palletGroups[num]
+      }));
 
       // Set selected shipment and rack
       setSelectedShipmentForRack({
         ...shipment,
-        remainingBoxes: unassignedBoxes,
+        remainingBoxes: unassignedBoxes.length,
         totalPallets,
         looseBoxes,
-        boxesPerPallet
+        palletDetails // NEW: Array of {palletNumber, boxCount}
       });
       setSelectedRackForAssignment(rack);
 
@@ -920,9 +951,20 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       setLoading(true);
       const token = localStorage.getItem('authToken');
 
-      // ✅ SAME LOGIC AS SCANNER: 20 boxes per pallet (hardcoded)
-      const boxesPerPallet = 20;
-      const totalBoxesToAssign = (palletQuantity * boxesPerPallet) + looseBoxQuantity;
+      // ✅ FIX: Calculate total boxes based on ACTUAL pallet contents, not fixed 20-box rule
+      let totalBoxesToAssign = 0;
+      
+      // Add boxes from selected pallets (using actual pallet box counts)
+      if (palletQuantity > 0 && selectedShipmentForRack.palletDetails) {
+        for (let i = 0; i < palletQuantity; i++) {
+          if (selectedShipmentForRack.palletDetails[i]) {
+            totalBoxesToAssign += selectedShipmentForRack.palletDetails[i].boxCount;
+          }
+        }
+      }
+      
+      // Add loose boxes
+      totalBoxesToAssign += looseBoxQuantity;
 
       console.log('🎯 Assigning:', {
         pallets: palletQuantity,
