@@ -89,7 +89,7 @@ services:
       - "8080:80"    # ISOLATED PORT (production uses 80)
       - "8443:443"   # ISOLATED PORT (production uses 443)
     volumes:
-      - ./frontend/nginx-staging.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend/staging.nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - staging-backend
     networks:
