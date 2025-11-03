@@ -484,10 +484,10 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
     });
     const boxData = await boxResponse.json();
-    const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
+    const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId);
 
     // ⚠️ CHECK: If shipment is IN_STORAGE and has 0 remaining boxes, it's already fully assigned
-    if (shipment.status === 'IN_STORAGE' && unassignedBoxes === 0) {
+    if (shipment.status === 'IN_STORAGE' && unassignedBoxes.length === 0) {
       // Find which rack it's assigned to
       const assignedBoxes = boxData.boxes.filter((b: any) => b.rackId);
       const rackCodes = [...new Set(assignedBoxes.map((b: any) => b.rack?.code || 'Unknown'))];
@@ -504,19 +504,38 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       };
     }
 
-    // Calculate pallets and loose boxes from remaining boxes
-    const boxesPerPallet = 20; // Standard pallet = 20 boxes
-    const totalPallets = Math.floor(unassignedBoxes / boxesPerPallet);
-    const looseBoxes = unassignedBoxes % boxesPerPallet;
+    // ✅ FIX: Calculate pallets based on ACTUAL pallet distribution, not fixed 20-box rule
+    // Group unassigned boxes by palletNumber
+    const palletGroups = unassignedBoxes.reduce((acc: Record<number, number>, box: any) => {
+      const palletNum = box.palletNumber || 0; // 0 = loose boxes
+      acc[palletNum] = (acc[palletNum] || 0) + 1;
+      return acc;
+    }, {});
 
-    setRemainingBoxes(unassignedBoxes);
+    // Separate pallets (palletNumber > 0) from loose boxes (palletNumber = 0)
+    const palletNumbers = Object.keys(palletGroups)
+      .map(Number)
+      .filter(num => num > 0)
+      .sort((a, b) => a - b);
+
+    const totalPallets = palletNumbers.length;
+    const looseBoxes = palletGroups[0] || 0;
+
+    // Build pallet details for display
+    const palletDetails = palletNumbers.map(num => ({
+      palletNumber: num,
+      boxCount: palletGroups[num]
+    }));
+
+    setRemainingBoxes(unassignedBoxes.length);
     return {
       type: 'shipment',
       data: {
         ...shipment,
-        remainingBoxes: unassignedBoxes,
+        remainingBoxes: unassignedBoxes.length,
         availablePallets: totalPallets,
-        availableLooseBoxes: looseBoxes
+        availableLooseBoxes: looseBoxes,
+        palletDetails // NEW: Array of {palletNumber, boxCount}
       },
       rawCode
     };
@@ -664,11 +683,11 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       if (assignmentPhotos.length > 0) {
         setUploadingPhotos(true);
         console.log(`📸 Starting upload of ${assignmentPhotos.length} photo(s)...`);
-        
+
         for (let i = 0; i < assignmentPhotos.length; i++) {
           const photo = assignmentPhotos[i];
           const originalSize = (photo.size / 1024 / 1024).toFixed(2);
-          
+
           setUploadProgress({
             current: i + 1,
             total: assignmentPhotos.length,
@@ -705,7 +724,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
             alert(`⚠️ Photo ${i + 1} error: ${error}`);
           }
         }
-        
+
         setUploadingPhotos(false);
         setUploadProgress(null);
         console.log(`📸 Successfully uploaded ${photoUrls.length}/${assignmentPhotos.length} photos`);
@@ -1162,7 +1181,13 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                     <span className="text-3xl">🎁</span>
                                     <div>
                                       <p className="font-bold text-xl text-blue-600">{pendingShipment.availablePallets} Pallets</p>
-                                      <p className="text-xs text-gray-500">(20 boxes each)</p>
+                                      {pendingShipment.palletDetails && pendingShipment.palletDetails.length > 0 ? (
+                                        <p className="text-xs text-gray-500">
+                                          {pendingShipment.palletDetails.map((p: any) => `P${p.palletNumber}:${p.boxCount}box`).join(', ')}
+                                        </p>
+                                      ) : (
+                                        <p className="text-xs text-gray-500">(20 boxes each)</p>
+                                      )}
                                     </div>
                                   </div>
                                 )}
@@ -1328,7 +1353,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                     </span>
                                   </div>
                                   <div className="w-full bg-blue-200 rounded-full h-2">
-                                    <div 
+                                    <div
                                       className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                                       style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
                                     ></div>
