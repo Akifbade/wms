@@ -62,7 +62,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    command: sh -c "npx prisma migrate deploy && npx ts-node src/index.ts"
+    command: sh -c "npx prisma migrate deploy || npx prisma db push; npx ts-node src/index.ts"
     # Prevent connection to production network
     sysctls:
       - net.ipv4.ip_forward=0
