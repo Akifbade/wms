@@ -104,10 +104,17 @@ jobs:
       url: http://148.230.107.155:8080
     
     steps:
-      - name: 🔑 Setup SSH
+      - name: � Checkout code
+        uses: actions/checkout@v4
+
+      - name: �🔑 Setup SSH
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_PRIVATE_KEY: ${{ secrets.STAGING_VPS_SSH_KEY }}
         run: |
+          if [ -z "${SSH_PRIVATE_KEY}" ]; then
+            echo "❌ Missing secret: STAGING_VPS_SSH_KEY"
+            exit 1
+          fi
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
@@ -214,10 +221,17 @@ jobs:
       url: https://qgocargo.cloud
     
     steps:
-      - name: 🔑 Setup SSH
+      - name: � Checkout code
+        uses: actions/checkout@v4
+
+      - name: �🔑 Setup SSH
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_VPS_SSH_KEY }}
         run: |
+          if [ -z "${SSH_PRIVATE_KEY}" ]; then
+            echo "❌ Missing secret: PRODUCTION_VPS_SSH_KEY"
+            exit 1
+          fi
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
@@ -370,8 +384,12 @@ jobs:
     steps:
       - name: 🔑 Setup SSH
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_PRIVATE_KEY: ${{ secrets.STAGING_VPS_SSH_KEY }}
         run: |
+          if [ -z "${SSH_PRIVATE_KEY}" ]; then
+            echo "⚠️ Missing secret: STAGING_VPS_SSH_KEY, skipping cleanup"
+            exit 0
+          fi
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
