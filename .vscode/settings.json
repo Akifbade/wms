@@ -31,5 +31,90 @@
     "todo-tree.general.tags": ["TODO", "FIXME", "BUG", "HACK"],
     "task.autoDetect": "on",
     "task.quickOpen.detail": true,
-    "task.quickOpen.skip": false
+    "task.quickOpen.skip": false,
+    
+    // =============================================================================
+    // 🚀 PROJECT: Warehouse Management System (WMS)
+    // =============================================================================
+    "project.name": "WMS - QGO Cargo",
+    "project.description": "Full-stack warehouse management system with QR scanning, shipment tracking, and fleet management",
+    "project.version": "v2.1.125",
+    "project.branch": "stable/prisma-mysql-production",
+    "project.github": "https://github.com/Akifbade/wms",
+    
+    // =============================================================================
+    // 🌐 VPS SERVER DETAILS (Rocky Linux 9.x)
+    // =============================================================================
+    "vps.host": "148.230.107.155",
+    "vps.user": "root",
+    "vps.path": "/root/NEW START",
+    "vps.os": "Rocky Linux 9.x (RHEL-based)",
+    "vps.docker": "Docker + Docker Compose v3.8",
+    
+    // =============================================================================
+    // 🔗 ENVIRONMENTS
+    // =============================================================================
+    "env.localhost.frontend": "http://localhost:80",
+    "env.localhost.backend": "http://localhost:5000",
+    "env.localhost.database": "localhost:3306 (warehouse_wms)",
+    
+    "env.staging.frontend": "http://148.230.107.155:8080",
+    "env.staging.backend": "http://148.230.107.155:5001",
+    "env.staging.database": "148.230.107.155:3308 (warehouse_staging)",
+    "env.staging.credentials": "admin@demo.com / demo123",
+    "env.staging.deployment": "AUTO on push",
+    "env.staging.compose": "docker-compose-staging-isolated.yml",
+    
+    "env.production.frontend": "https://qgocargo.cloud",
+    "env.production.backend": "https://qgocargo.cloud/api",
+    "env.production.database": "148.230.107.155:3307 (warehouse_wms)",
+    "env.production.ssl": "Let's Encrypt (auto-renew)",
+    "env.production.deployment": "MANUAL approval via GitHub Actions",
+    "env.production.compose": "docker-compose.yml + docker-compose.production.yml",
+    
+    // =============================================================================
+    // 🗄️ DATABASE CREDENTIALS
+    // =============================================================================
+    "db.staging.host": "148.230.107.155:3308",
+    "db.staging.database": "warehouse_staging",
+    "db.staging.user": "staging_user",
+    "db.staging.password": "staging_pass_12345",
+    "db.staging.container": "wms-staging-db",
+    
+    "db.production.host": "148.230.107.155:3307",
+    "db.production.database": "warehouse_wms",
+    "db.production.root_password": "rootpassword123",
+    "db.production.user": "wms_user",
+    "db.production.password": "wmspassword123",
+    "db.production.container": "wms-database",
+    
+    // =============================================================================
+    // 🚀 DEPLOYMENT PROCESS (3-STAGE)
+    // =============================================================================
+    "deployment.step1": "Local - Test on localhost",
+    "deployment.step2": "Commit & Push - Use quick-commit.ps1",
+    "deployment.step3": "Staging - Auto-deploys in 3-5 min",
+    "deployment.step4": "Test Staging - Login admin@demo.com / demo123",
+    "deployment.step5": "Production - Manual approval on GitHub Actions",
+    "deployment.workflow_file": ".github/workflows/three-stage-safe-deployment.yml",
+    "deployment.github_actions": "https://github.com/Akifbade/wms/actions",
+    
+    // =============================================================================
+    // 🔐 GITHUB SECRETS (DO NOT DELETE!)
+    // =============================================================================
+    "github.secret.staging": "STAGING_VPS_SSH_KEY",
+    "github.secret.production": "PRODUCTION_VPS_SSH_KEY",
+    "github.warning": "SSH keys already configured - NEVER modify or delete",
+    
+    // =============================================================================
+    // ⚠️ CRITICAL RULES FOR AI ASSISTANTS
+    // =============================================================================
+    "ai.rule1": "NEVER delete or modify SSH keys",
+    "ai.rule2": "ALWAYS test on staging before production",
+    "ai.rule3": "NEVER skip database backups",
+    "ai.rule4": "Keep only 2 backups (auto-cleanup enabled)",
+    "ai.rule5": "Staging is ISOLATED (separate DB, network, containers)",
+    "ai.rule6": "Use GitHub Actions for all deployments",
+    "ai.rule7": "Staging password is admin@demo.com / demo123",
+    "ai.documentation": "Read THREE-STAGE-DEPLOYMENT-GUIDE.md for full details"
 }
