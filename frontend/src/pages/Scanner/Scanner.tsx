@@ -505,9 +505,20 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
     }
 
     // ✅ FIX: Calculate pallets based on ACTUAL pallet distribution, not fixed 20-box rule
-    // Group unassigned boxes by palletNumber
+    // Group unassigned boxes by palletNumber (stored in pieceQR JSON field)
     const palletGroups = unassignedBoxes.reduce((acc: Record<number, number>, box: any) => {
-      const palletNum = box.palletNumber || 0; // 0 = loose boxes
+      let palletNum = 0; // Default: loose box
+
+      // Try to parse palletNumber from pieceQR JSON field
+      if (box.pieceQR) {
+        try {
+          const pieceData = JSON.parse(box.pieceQR);
+          palletNum = pieceData.palletNumber || 0;
+        } catch (e) {
+          console.warn('Failed to parse pieceQR:', box.pieceQR);
+        }
+      }
+
       acc[palletNum] = (acc[palletNum] || 0) + 1;
       return acc;
     }, {});
@@ -858,9 +869,20 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId);
 
       // ✅ FIX: Calculate pallets based on ACTUAL pallet distribution, not fixed 20-box rule
-      // Group unassigned boxes by palletNumber
+      // Group unassigned boxes by palletNumber (stored in pieceQR JSON field)
       const palletGroups = unassignedBoxes.reduce((acc: Record<number, number>, box: any) => {
-        const palletNum = box.palletNumber || 0; // 0 = loose boxes
+        let palletNum = 0; // Default: loose box
+
+        // Try to parse palletNumber from pieceQR JSON field
+        if (box.pieceQR) {
+          try {
+            const pieceData = JSON.parse(box.pieceQR);
+            palletNum = pieceData.palletNumber || 0;
+          } catch (e) {
+            console.warn('Failed to parse pieceQR:', box.pieceQR);
+          }
+        }
+
         acc[palletNum] = (acc[palletNum] || 0) + 1;
         return acc;
       }, {});
