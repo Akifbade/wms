@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  LockClosedIcon, 
-  EnvelopeIcon, 
-  EyeIcon, 
+import {
+  LockClosedIcon,
+  EnvelopeIcon,
+  EyeIcon,
   EyeSlashIcon,
   QrCodeIcon,
   CubeIcon,
@@ -93,10 +93,10 @@ export const Login: React.FC = () => {
       console.log('✅ Token saved:', response.token ? 'Yes' : 'No');
       console.log('✅ User saved:', localStorage.getItem('user') ? 'Yes' : 'No');
       console.log('✅ Auth token:', localStorage.getItem('authToken') ? 'Yes' : 'No');
-      
+
       // Small delay to ensure localStorage is saved
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       console.log('🔄 Navigating to dashboard...');
       // Force navigation using window.location for reliability
       window.location.href = '/dashboard';
@@ -157,7 +157,7 @@ export const Login: React.FC = () => {
 
       {/* Background Image (if selected) */}
       {branding.loginBackgroundType === 'image' && branding.loginBackgroundImage && (
-        <div 
+        <div
           className="absolute inset-0 w-full h-full bg-cover bg-center"
           style={{ backgroundImage: `url(${branding.loginBackgroundImage})` }}
         />
@@ -172,99 +172,99 @@ export const Login: React.FC = () => {
           <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 p-12 relative overflow-hidden">
             {/* Glass Effect Background */}
             <div className={`absolute inset-0 ${branding.loginGlassEffect ? 'bg-white/5 backdrop-blur-md' : 'bg-white/10'}`} />
-          
-          {/* Subtle Pattern */}
-          <div className="absolute inset-0 opacity-5">
-            <div className="absolute inset-0" style={{
-              backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
-              backgroundSize: '40px 40px'
-            }}/>
-          </div>
 
-          <div className="relative z-10 flex flex-col justify-between w-full">
-            {/* Header */}
-            <div>
-              {branding.logo ? (
-                <div className="flex items-center gap-3 mb-12">
-                  <img 
-                    src={branding.logo} 
-                    alt="Logo" 
-                    className="h-12 w-auto"
-                  />
-                  {branding.showCompanyName && branding.name && (
-                    <h1 className="text-2xl font-bold text-white">{branding.name}</h1>
-                  )}
-                </div>
-              ) : (
-                <div className="mb-12">
-                  <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
-                    <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center">
-                      <CubeIcon className="h-6 w-6 text-blue-600" />
+            {/* Subtle Pattern */}
+            <div className="absolute inset-0 opacity-5">
+              <div className="absolute inset-0" style={{
+                backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+                backgroundSize: '40px 40px'
+              }} />
+            </div>
+
+            <div className="relative z-10 flex flex-col justify-between w-full">
+              {/* Header */}
+              <div>
+                {branding.logo ? (
+                  <div className="flex items-center gap-3 mb-12">
+                    <img
+                      src={branding.logo}
+                      alt="Logo"
+                      className="h-12 w-auto"
+                    />
+                    {branding.showCompanyName && branding.name && (
+                      <h1 className="text-2xl font-bold text-white">{branding.name}</h1>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mb-12">
+                    <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
+                      <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center">
+                        <CubeIcon className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <span className="text-2xl font-bold text-white">
+                        {branding.showCompanyName && branding.name ? branding.name : 'Warehouse WMS'}
+                      </span>
                     </div>
-                    <span className="text-2xl font-bold text-white">
-                      {branding.showCompanyName && branding.name ? branding.name : 'Warehouse WMS'}
-                    </span>
                   </div>
-                </div>
-              )}
+                )}
 
-              <h2 className="text-4xl font-bold text-white mb-4">
-                Complete Warehouse Management System
-              </h2>
-              <p className="text-xl text-blue-100 mb-12">
-                Streamline your warehouse operations with modern technology
-              </p>
-            </div>
+                <h2 className="text-4xl font-bold text-white mb-4">
+                  Complete Warehouse Management System
+                </h2>
+                <p className="text-xl text-blue-100 mb-12">
+                  Streamline your warehouse operations with modern technology
+                </p>
+              </div>
 
-            {/* Features Grid */}
-            <div className="grid grid-cols-2 gap-6 mb-12">
-              {features.map((feature, index) => (
-                <div 
-                  key={index}
-                  className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border-2 border-white/30 hover:bg-white/20 hover:border-white/40 transition-all duration-300 group shadow-xl hover:shadow-2xl hover:scale-105"
-                >
-                  <div className="bg-white/20 backdrop-blur-sm w-14 h-14 rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-all">
-                    <feature.icon className="h-7 w-7 text-white group-hover:scale-110 transition-transform" />
+              {/* Features Grid */}
+              <div className="grid grid-cols-2 gap-6 mb-12">
+                {features.map((feature, index) => (
+                  <div
+                    key={index}
+                    className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border-2 border-white/30 hover:bg-white/20 hover:border-white/40 transition-all duration-300 group shadow-xl hover:shadow-2xl hover:scale-105"
+                  >
+                    <div className="bg-white/20 backdrop-blur-sm w-14 h-14 rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-all">
+                      <feature.icon className="h-7 w-7 text-white group-hover:scale-110 transition-transform" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
+                    <p className="text-sm text-blue-100 leading-relaxed">{feature.description}</p>
                   </div>
-                  <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
-                  <p className="text-sm text-blue-100 leading-relaxed">{feature.description}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            {/* Footer Stats */}
-            <div className="grid grid-cols-3 gap-6">
-              <div className="text-center bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 shadow-lg hover:bg-white/15 transition-all">
-                <div className="text-3xl font-bold text-white mb-1">100%</div>
-                <div className="text-sm text-blue-100">Mobile Ready</div>
-              </div>
-              <div className="text-center bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 shadow-lg hover:bg-white/15 transition-all">
-                <div className="text-3xl font-bold text-white mb-1">24/7</div>
-                <div className="text-sm text-blue-100">Real-time Sync</div>
-              </div>
-              <div className="text-center bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 shadow-lg hover:bg-white/15 transition-all">
-                <div className="text-3xl font-bold text-white mb-1">Fast</div>
-                <div className="text-sm text-blue-100">QR Scanning</div>
+              {/* Footer Stats */}
+              <div className="grid grid-cols-3 gap-6">
+                <div className="text-center bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 shadow-lg hover:bg-white/15 transition-all">
+                  <div className="text-3xl font-bold text-white mb-1">100%</div>
+                  <div className="text-sm text-blue-100">Mobile Ready</div>
+                </div>
+                <div className="text-center bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 shadow-lg hover:bg-white/15 transition-all">
+                  <div className="text-3xl font-bold text-white mb-1">24/7</div>
+                  <div className="text-sm text-blue-100">Real-time Sync</div>
+                </div>
+                <div className="text-center bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 shadow-lg hover:bg-white/15 transition-all">
+                  <div className="text-3xl font-bold text-white mb-1">Fast</div>
+                  <div className="text-sm text-blue-100">QR Scanning</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
         )}
 
         {/* Right Side - Login Form */}
         <div className={`w-full ${branding.loginShowFeatures ? 'lg:w-1/2 xl:w-2/5' : 'max-w-md mx-auto'} flex items-center justify-center p-8 sm:p-12 relative`}>
           {/* Glass Background for Login Area */}
           <div className="absolute inset-0 bg-white/10 backdrop-blur-xl lg:bg-white/70 lg:backdrop-blur-sm" />
-          
+
           <div className="w-full max-w-md relative z-10">
             {/* Company Logo - Always Visible Above Login */}
             <div className="mb-8 text-center">
               {branding.logo ? (
                 <div className="flex flex-col items-center gap-3">
                   <div className="bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-2xl border-2 border-white/50">
-                    <img 
-                      src={branding.logo} 
-                      alt="Logo" 
+                    <img
+                      src={branding.logo}
+                      alt="Logo"
                       className="h-20 w-auto"
                     />
                   </div>
@@ -381,7 +381,7 @@ export const Login: React.FC = () => {
                 <CheckCircleIcon className="h-5 w-5 text-blue-600" />
                 <p className="font-semibold text-blue-900">Demo Credentials</p>
               </div>
-              
+
               <div className="space-y-3">
                 <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border border-blue-200/50 shadow-lg hover:shadow-xl transition-all">
                   <div className="flex items-center justify-between mb-2">

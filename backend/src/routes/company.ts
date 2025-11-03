@@ -51,7 +51,7 @@ router.get('/branding', async (req, res: Response) => {
     const protocol = req.protocol || 'http';
     const host = req.get('host');
     const baseUrl = `${protocol}://${host}`;
-    
+
     res.json({
       branding: {
         name: company.name,
@@ -94,10 +94,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const companyId = req.user!.companyId;
 
-  // DEBUG: Log authenticated user and companyId
-  console.log('🔍 GET /api/company - authenticated user:', req.user);
-  console.log('🔍 Fetching company for ID:', companyId);
-  const company = await prisma.company.findUnique({
+    // DEBUG: Log authenticated user and companyId
+    console.log('🔍 GET /api/company - authenticated user:', req.user);
+    console.log('🔍 Fetching company for ID:', companyId);
+    const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: {
         id: true,
@@ -124,8 +124,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const protocol = req.protocol || 'http';
     const host = req.get('host');
     const baseUrl = `${protocol}://${host}`;
-    
-    res.json({ 
+
+    res.json({
       company: {
         ...company,
         logoPath: company.logo,
@@ -142,11 +142,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.put('/', async (req: AuthRequest, res: Response) => {
   try {
     const companyId = req.user!.companyId;
-    const { 
-      name, email, phone, website, address, logo, 
+    const {
+      name, email, phone, website, address, logo,
       primaryColor, secondaryColor, accentColor, showCompanyName,
-      loginVideoUrl, loginVideoEnabled, loginGlassEffect, 
-      loginBackgroundType, loginBackgroundImage, loginShowFeatures 
+      loginVideoUrl, loginVideoEnabled, loginGlassEffect,
+      loginBackgroundType, loginBackgroundImage, loginShowFeatures
     } = req.body;
 
     // Validation
@@ -239,14 +239,14 @@ router.put('/', async (req: AuthRequest, res: Response) => {
     const protocol = req.protocol || 'http';
     const host = req.get('host');
     const baseUrl = `${protocol}://${host}`;
-    
-    res.json({ 
+
+    res.json({
       company: {
         ...company,
         logoPath: company.logo,
         logoUrl: company.logo ? `${baseUrl}${company.logo}` : null,
       },
-      message: 'Company information updated successfully' 
+      message: 'Company information updated successfully'
     });
   } catch (error) {
     console.error('Error updating company:', error);

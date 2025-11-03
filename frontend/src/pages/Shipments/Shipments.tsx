@@ -51,11 +51,11 @@ export const Shipments: React.FC = () => {
       const allData = await shipmentsAPI.getAll({});
       const allShipments = allData.shipments || [];
 
-      // Calculate status counts (Schema: PENDING, IN_STORAGE, PARTIAL, RELEASED)
+      // Calculate status counts (Schema: PENDING, IN_WAREHOUSE, PARTIAL, RELEASED)
       const counts = {
         all: allShipments.length,
         pending: allShipments.filter((s: any) => s.status === 'PENDING').length,
-        in_storage: allShipments.filter((s: any) => s.status === 'IN_STORAGE' || s.status === 'ACTIVE').length, // Support both
+        in_storage: allShipments.filter((s: any) => s.status === 'IN_WAREHOUSE' || s.status === 'IN_STORAGE' || s.status === 'ACTIVE').length, // Support all variants
         partial: allShipments.filter((s: any) => s.status === 'PARTIAL').length,
         released: allShipments.filter((s: any) => s.status === 'RELEASED').length
       };
@@ -72,7 +72,7 @@ export const Shipments: React.FC = () => {
       // Now load filtered shipments for display
       const params: any = {};
       if (activeTab !== 'all') {
-        params.status = activeTab === 'in_storage' ? 'IN_STORAGE' : activeTab.toUpperCase();
+        params.status = activeTab === 'in_storage' ? 'IN_WAREHOUSE' : activeTab.toUpperCase();
       }
       if (warehouseFilter === 'regular') {
         params.isWarehouseShipment = false;
@@ -150,10 +150,12 @@ export const Shipments: React.FC = () => {
     switch (status) {
       case 'PENDING':
         return { color: 'bg-yellow-100 text-yellow-800', icon: '⏳', label: 'Pending' };
-      case 'IN_STORAGE':
-        return { color: 'bg-green-100 text-green-800', icon: '✅', label: 'In Storage' };
+      case 'IN_WAREHOUSE':
+        return { color: 'bg-green-100 text-green-800', icon: '🏢', label: 'In Warehouse' };
+      case 'IN_STORAGE': // Legacy support
+        return { color: 'bg-green-100 text-green-800', icon: '🏢', label: 'In Warehouse' };
       case 'ACTIVE': // Legacy support
-        return { color: 'bg-green-100 text-green-800', icon: '✅', label: 'In Storage' };
+        return { color: 'bg-green-100 text-green-800', icon: '🏢', label: 'In Warehouse' };
       case 'PARTIAL':
         return { color: 'bg-orange-100 text-orange-800', icon: '⚠', label: 'Partial' };
       case 'RELEASED':
@@ -385,7 +387,7 @@ export const Shipments: React.FC = () => {
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <span>✅ In Storage</span>
+                <span>🏢 In Warehouse</span>
                 {statusCounts.in_storage > 0 && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                     {statusCounts.in_storage}

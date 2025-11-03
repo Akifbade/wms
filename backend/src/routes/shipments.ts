@@ -1163,9 +1163,7 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
     const existing = await prisma.shipment.findFirst({
       where: { id, companyId },
       include: {
-        boxes: {
-          where: { rackId: { not: null } }, // Check if any box is in a rack
-        },
+        boxes: true, // Get all boxes to check status
       },
     });
 
@@ -1173,21 +1171,82 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
-    // STRICT DELETE: Prevent deletion if materials are allocated to racks
-    if (existing.boxes.length > 0) {
-      return res.status(400).json({
-        error: 'Cannot delete shipment: Materials are currently allocated to racks',
-        detail: `${existing.boxes.length} box(es) in racks. Remove from racks first.`,
-      });
-    }
+    // SMART DELETE: Allow deletion if shipment status is RELEASED
+    // Block deletion only if shipment is NOT released AND boxes are in storage
+    console.log(`🗑️ DELETE REQUEST: Shipment ${existing.referenceId}, Status: ${existing.status}, Boxes: ${existing.boxes.length}`);
 
-    // Soft delete: mark with deletedAt timestamp instead of hard delete
-    await prisma.shipment.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    if (existing.status !== 'RELEASED') {
+      const hasBoxesInStorage = existing.boxes.some(box =>
+        box.status === 'IN_STORAGE' || box.status === 'IN_WAREHOUSE'
+      );
+
+      if (hasBoxesInStorage) {
+        console.log(`❌ BLOCKED: ${hasBoxesInStorage} boxes in storage, shipment not released`);
+        return res.status(400).json({
+          error: 'Cannot delete shipment: Materials are currently allocated to racks',
+          detail: `Release the shipment first before deletion.`,
+        });
+      }
+    } else {
+      console.log(`✅ ALLOWED: Shipment is RELEASED, ignoring box status`);
+    }
+    // If shipment status is RELEASED, allow deletion regardless of box status (handles data inconsistencies)
+
+    // Delete associated photos from storage if they exist
+    const allBoxes = await prisma.shipmentBox.findMany({
+      where: { shipmentId: id },
+      select: { photos: true }
     });
 
-    res.json({ message: 'Shipment deleted successfully (archived)' });
+    // Collect all photo URLs from boxes
+    const photoUrls: string[] = [];
+    for (const box of allBoxes) {
+      if (box.photos) {
+        try {
+          const photos = JSON.parse(box.photos);
+          if (Array.isArray(photos)) {
+            photoUrls.push(...photos);
+          }
+        } catch (e) {
+          console.log('Failed to parse photos JSON:', e);
+        }
+      }
+    }
+
+    // Delete photo files from disk
+    if (photoUrls.length > 0) {
+      const path = await import('path');
+      const fs = await import('fs');
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+
+      for (const photoUrl of photoUrls) {
+        try {
+          // Extract file path from URL (e.g., "uploads/shipments/photo.jpg")
+          const filePath = path.join(process.cwd(), photoUrl);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`✅ Deleted photo: ${photoUrl}`);
+          }
+        } catch (err) {
+          console.log(`⚠️ Failed to delete photo ${photoUrl}:`, err);
+        }
+      }
+    }
+
+    // Hard delete: First delete boxes (cascade will handle items)
+    await prisma.shipmentBox.deleteMany({
+      where: { shipmentId: id }
+    });
+
+    // Then delete the shipment
+    await prisma.shipment.delete({
+      where: { id }
+    });
+
+    res.json({
+      message: 'Shipment deleted successfully',
+      deletedPhotos: photoUrls.length
+    });
   } catch (error) {
     console.error('Delete shipment error:', error);
     res.status(500).json({ error: 'Internal server error' });

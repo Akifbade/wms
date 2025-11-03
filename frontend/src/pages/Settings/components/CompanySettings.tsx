@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   BuildingOfficeIcon,
   PhotoIcon,
   EnvelopeIcon,
@@ -24,6 +24,12 @@ interface CompanyData {
   accentColor: string;
   showCompanyName: boolean;
   logoSize: string;
+  loginVideoUrl?: string;
+  loginVideoEnabled?: boolean;
+  loginGlassEffect?: boolean;
+  loginBackgroundType?: string;
+  loginBackgroundImage?: string;
+  loginShowFeatures?: boolean;
 }
 
 const COLOR_PRESETS = [
@@ -45,7 +51,13 @@ export const CompanySettings: React.FC = () => {
     secondaryColor: '#7C3AED',
     accentColor: '#10B981',
     showCompanyName: true,
-    logoSize: 'medium'
+    logoSize: 'medium',
+    loginVideoUrl: 'https://cdn.pixabay.com/video/2024/03/08/203404-921381913_large.mp4',
+    loginVideoEnabled: true,
+    loginGlassEffect: true,
+    loginBackgroundType: 'video',
+    loginBackgroundImage: '',
+    loginShowFeatures: true,
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -60,7 +72,7 @@ export const CompanySettings: React.FC = () => {
       try {
         const response = await companyAPI.getInfo();
         const company = response.company;
-        
+
         setCompanyData({
           name: company.name || '',
           email: company.email || '',
@@ -72,7 +84,13 @@ export const CompanySettings: React.FC = () => {
           secondaryColor: company.secondaryColor || '#7C3AED',
           accentColor: company.accentColor || '#10B981',
           showCompanyName: company.showCompanyName !== false,
-          logoSize: company.logoSize || 'medium'
+          logoSize: company.logoSize || 'medium',
+          loginVideoUrl: company.loginVideoUrl || 'https://cdn.pixabay.com/video/2024/03/08/203404-921381913_large.mp4',
+          loginVideoEnabled: company.loginVideoEnabled !== false,
+          loginGlassEffect: company.loginGlassEffect !== false,
+          loginBackgroundType: company.loginBackgroundType || 'video',
+          loginBackgroundImage: company.loginBackgroundImage || '',
+          loginShowFeatures: company.loginShowFeatures !== false,
         });
 
         if (company.logo) {
@@ -136,7 +154,7 @@ export const CompanySettings: React.FC = () => {
   const handleSave = async () => {
     setIsLoading(true);
     setMessage(null);
-    
+
     try {
       let logoUrl = companyData.logo;
 
@@ -160,12 +178,18 @@ export const CompanySettings: React.FC = () => {
         secondaryColor: companyData.secondaryColor,
         accentColor: companyData.accentColor,
         showCompanyName: companyData.showCompanyName,
-        logoSize: companyData.logoSize
+        logoSize: companyData.logoSize,
+        loginVideoUrl: companyData.loginVideoUrl,
+        loginVideoEnabled: companyData.loginVideoEnabled,
+        loginGlassEffect: companyData.loginGlassEffect,
+        loginBackgroundType: companyData.loginBackgroundType,
+        loginBackgroundImage: companyData.loginBackgroundImage,
+        loginShowFeatures: companyData.loginShowFeatures,
       });
-      
+
       setMessage({ type: 'success', text: 'Company settings saved successfully!' });
       setLogoFile(null);
-      
+
       // Reload after 1.5 seconds to show updated settings
       setTimeout(() => {
         window.location.reload();
@@ -205,7 +229,7 @@ export const CompanySettings: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900">Company & Branding</h2>
           <p className="text-gray-600">Manage your company details, logo, and brand colors</p>
         </div>
-        
+
         {/* Save Button */}
         <button
           onClick={handleSave}
@@ -231,9 +255,8 @@ export const CompanySettings: React.FC = () => {
 
       {/* Success/Error Messages */}
       {message && (
-        <div className={`p-4 rounded-lg flex items-center space-x-3 ${
-          message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
-        }`}>
+        <div className={`p-4 rounded-lg flex items-center space-x-3 ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+          }`}>
           {message.type === 'success' ? (
             <CheckCircleIcon className="h-6 w-6" />
           ) : (
@@ -249,7 +272,7 @@ export const CompanySettings: React.FC = () => {
           <PhotoIcon className="h-6 w-6 text-gray-400" />
           <h3 className="text-lg font-semibold text-gray-900">Company Logo</h3>
         </div>
-        
+
         <div className="flex items-center space-x-6">
           <div className="relative">
             {logoPreview ? (
@@ -263,7 +286,7 @@ export const CompanySettings: React.FC = () => {
                 <BuildingOfficeIcon className="h-8 w-8 text-gray-400" />
               </div>
             )}
-            
+
             <label className="absolute -bottom-2 -right-2 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition-colors shadow-lg">
               <PhotoIcon className="h-4 w-4" />
               <input
@@ -274,7 +297,7 @@ export const CompanySettings: React.FC = () => {
               />
             </label>
           </div>
-          
+
           <div>
             <h4 className="font-medium text-gray-900">Upload Company Logo</h4>
             <p className="text-sm text-gray-500 mt-1">
@@ -462,14 +485,12 @@ export const CompanySettings: React.FC = () => {
           </div>
           <button
             onClick={() => setCompanyData({ ...companyData, showCompanyName: !companyData.showCompanyName })}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              companyData.showCompanyName ? 'bg-primary-600' : 'bg-gray-200'
-            }`}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${companyData.showCompanyName ? 'bg-primary-600' : 'bg-gray-200'
+              }`}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                companyData.showCompanyName ? 'translate-x-6' : 'translate-x-1'
-              }`}
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${companyData.showCompanyName ? 'translate-x-6' : 'translate-x-1'
+                }`}
             />
           </button>
         </div>
@@ -491,10 +512,116 @@ export const CompanySettings: React.FC = () => {
         </div>
       </div>
 
+      {/* NEW: Login Page Customization */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <PaintBrushIcon className="h-5 w-5 mr-2" />
+          Login Page Customization
+        </h3>
+
+        {/* Background Video URL */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Background Video URL
+          </label>
+          <input
+            type="url"
+            value={companyData.loginVideoUrl || ''}
+            onChange={(e) => setCompanyData({ ...companyData, loginVideoUrl: e.target.value })}
+            placeholder="https://cdn.pixabay.com/video/..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          />
+          <p className="mt-1 text-xs text-gray-500">Enter MP4 video URL for login background</p>
+        </div>
+
+        {/* Background Type Selector */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Background Type
+          </label>
+          <select
+            value={companyData.loginBackgroundType || 'video'}
+            onChange={(e) => setCompanyData({ ...companyData, loginBackgroundType: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          >
+            <option value="video">Video Background</option>
+            <option value="image">Image Background</option>
+            <option value="gradient">Gradient Only</option>
+          </select>
+        </div>
+
+        {/* Background Image URL (only show if type is image) */}
+        {companyData.loginBackgroundType === 'image' && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Background Image URL
+            </label>
+            <input
+              type="url"
+              value={companyData.loginBackgroundImage || ''}
+              onChange={(e) => setCompanyData({ ...companyData, loginBackgroundImage: e.target.value })}
+              placeholder="https://example.com/image.jpg"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+        )}
+
+        {/* Toggles */}
+        <div className="space-y-3">
+          {/* Video Enabled Toggle */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p className="font-medium text-gray-900">Enable Video Background</p>
+              <p className="text-sm text-gray-500">Show video on login page</p>
+            </div>
+            <button
+              onClick={() => setCompanyData({ ...companyData, loginVideoEnabled: !companyData.loginVideoEnabled })}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${companyData.loginVideoEnabled ? 'bg-primary-600' : 'bg-gray-200'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${companyData.loginVideoEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          {/* Glass Effect Toggle */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p className="font-medium text-gray-900">Glass Blur Effect</p>
+              <p className="text-sm text-gray-500">Frosted glass effect on cards</p>
+            </div>
+            <button
+              onClick={() => setCompanyData({ ...companyData, loginGlassEffect: !companyData.loginGlassEffect })}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${companyData.loginGlassEffect ? 'bg-primary-600' : 'bg-gray-200'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${companyData.loginGlassEffect ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          {/* Show Features Toggle */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p className="font-medium text-gray-900">Show Feature Showcase</p>
+              <p className="text-sm text-gray-500">Display system features on left side</p>
+            </div>
+            <button
+              onClick={() => setCompanyData({ ...companyData, loginShowFeatures: !companyData.loginShowFeatures })}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${companyData.loginShowFeatures ? 'bg-primary-600' : 'bg-gray-200'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${companyData.loginShowFeatures ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            💡 <strong>Tip:</strong> Use free videos from <a href="https://pixabay.com/videos/" target="_blank" rel="noopener noreferrer" className="underline">Pixabay</a> or <a href="https://www.pexels.com/videos/" target="_blank" rel="noopener noreferrer" className="underline">Pexels</a>
+          </p>
+        </div>
+      </div>
+
       {/* Live Preview */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Login Page Preview</h3>
-        <div 
+        <div
           className="relative h-64 rounded-lg overflow-hidden flex items-center justify-center"
           style={{
             background: `linear-gradient(135deg, ${companyData.primaryColor}15 0%, ${companyData.secondaryColor}15 100%)`
@@ -504,7 +631,7 @@ export const CompanySettings: React.FC = () => {
             {logoPreview ? (
               <img src={logoPreview} alt="Logo" className="h-16 w-16 mx-auto mb-4 rounded-lg object-cover" />
             ) : (
-              <div 
+              <div
                 className="h-16 w-16 mx-auto mb-4 rounded-lg flex items-center justify-center"
                 style={{
                   background: `linear-gradient(135deg, ${companyData.primaryColor} 0%, ${companyData.secondaryColor} 100%)`
