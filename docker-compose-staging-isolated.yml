@@ -14,7 +14,7 @@ services:
       MYSQL_DATABASE: warehouse_staging
       MYSQL_USER: staging_user
       MYSQL_PASSWORD: staging_pass_12345
-      # KEY: Different database from production
+      MYSQL_INITDB_ARGS: "--default-storage-engine=InnoDB"
     ports:
       - "3308:3306"  # ISOLATED PORT (production uses 3307)
     volumes:
@@ -27,9 +27,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    environment:
-      # Ensure completely different from production
-      MYSQL_INITDB_ARGS: "--default-storage-engine=InnoDB"
 
   # ===== STAGING BACKEND - ISOLATED FROM PRODUCTION =====
   staging-backend:
