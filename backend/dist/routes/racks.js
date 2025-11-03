@@ -22,6 +22,7 @@ const rackSchema = zod_1.z.object({
     // NEW: Zone and capacity mode fields
     zone: zod_1.z.string().optional(),
     zoneDescription: zod_1.z.string().optional(),
+    zoneIcon: zod_1.z.string().optional(), // Custom zone icon
     capacityMode: zod_1.z.enum(['FIXED', 'FLEXIBLE', 'UNLIMITED']).optional(),
     palletCapacity: zod_1.z.number().int().optional(),
     boxCapacity: zod_1.z.number().int().optional(),
@@ -75,7 +76,10 @@ router.get('/', async (req, res) => {
     try {
         const { status, section, search } = req.query;
         const companyId = req.user.companyId;
-        const where = { companyId };
+        const where = {
+            companyId,
+            deletedAt: null // Only return non-deleted racks
+        };
         if (status) {
             where.status = status;
         }
@@ -169,7 +173,11 @@ router.get('/:id', async (req, res) => {
         const { id } = req.params;
         const companyId = req.user.companyId;
         const rack = await prisma.rack.findFirst({
-            where: { id, companyId },
+            where: {
+                id,
+                companyId,
+                deletedAt: null // Only return non-deleted racks
+            },
             include: {
                 inventory: true,
                 category: {
@@ -422,11 +430,6 @@ router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
         const userId = req.user.id;
         const existing = await prisma.rack.findFirst({
             where: { id, companyId },
-            include: {
-                boxes: {
-                    where: { status: 'IN_STORAGE' },
-                },
-            },
         });
         if (!existing) {
             // Log failed deletion attempt
@@ -442,12 +445,27 @@ router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
             });
             return res.status(404).json({ error: 'Rack not found' });
         }
-        // Check if boxes are allocated to this rack
-        if (existing.boxes.length > 0) {
+        // Check if ACTIVE boxes (IN_STORAGE) are allocated to this rack
+        // Exclude RELEASED boxes - they no longer occupy the rack
+        const activeBoxes = await prisma.shipmentBox.findMany({
+            where: {
+                rackId: id,
+                status: 'IN_STORAGE', // Only check boxes currently in storage
+            },
+            select: {
+                id: true,
+                shipmentId: true,
+                boxNumber: true,
+                status: true,
+            },
+        });
+        // Check if active boxes are allocated to this rack
+        if (activeBoxes.length > 0) {
             // Log failed deletion due to allocated materials
-            const boxDetails = existing.boxes.map(box => ({
+            const boxDetails = activeBoxes.map(box => ({
                 id: box.id,
                 shipmentId: box.shipmentId,
+                boxNumber: box.boxNumber,
                 status: box.status,
             }));
             await prisma.rackAuditLog.create({
@@ -455,10 +473,10 @@ router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
                     rackId: id,
                     action: 'DELETE',
                     status: 'FAILED',
-                    message: `Cannot delete: ${existing.boxes.length} box(es) allocated to this rack`,
+                    message: `Cannot delete: ${activeBoxes.length} box(es) currently in storage on this rack`,
                     details: JSON.stringify({
-                        reason: 'MATERIALS_ALLOCATED',
-                        boxCount: existing.boxes.length,
+                        reason: 'MATERIALS_IN_STORAGE',
+                        boxCount: activeBoxes.length,
                         boxes: boxDetails,
                     }),
                     performedBy: userId,
@@ -466,11 +484,12 @@ router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
                 },
             });
             return res.status(400).json({
-                error: `Cannot delete rack: ${existing.boxes.length} box(es) with materials are currently allocated`,
+                error: `Cannot delete rack: ${activeBoxes.length} box(es) with materials are currently IN STORAGE`,
                 details: {
-                    reason: 'MATERIALS_ALLOCATED',
-                    boxCount: existing.boxes.length,
+                    reason: 'MATERIALS_IN_STORAGE',
+                    boxCount: activeBoxes.length,
                     boxes: boxDetails,
+                    message: 'Only boxes with status IN_STORAGE block deletion. Released boxes do not prevent deletion.',
                 },
             });
         }

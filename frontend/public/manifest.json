@@ -1,11 +1,11 @@
 {
-  "name": "Warehouse Management System",
-  "short_name": "WMS",
-  "description": "Warehouse and shipment management system",
+  "name": "QGOWMS - Warehouse Management System",
+  "short_name": "QGOWMS",
+  "description": "Advanced Warehouse Management System for QGO Cargo",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#2563eb",
-  "theme_color": "#2563eb",
+  "background_color": "#4F46E5",
+  "theme_color": "#4F46E5",
   "orientation": "portrait",
   "scope": "/",
   "icons": [

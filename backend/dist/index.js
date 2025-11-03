@@ -81,15 +81,24 @@ app.get('/uploads/company-logos/:name', (req, res, next) => {
         }
         for (const p of tryPaths) {
             if (fs_1.default.existsSync(p)) {
+                // Add no-cache headers for images too
+                res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
                 return res.sendFile(p);
             }
         }
+        // If no file found, log the error and return 404 with proper message
+        console.warn(`⚠️ Company logo not found: ${filename}`);
+        console.warn(`Tried paths:`, tryPaths);
+        return res.status(404).json({
+            error: 'Logo not found',
+            filename,
+            message: 'The requested company logo does not exist'
+        });
     }
     catch (e) {
         console.error('Logo static fallback error:', e);
+        return res.status(500).json({ error: 'Internal server error' });
     }
-    // Hand off to generic static handler
-    return next();
 });
 // Serve generic static files for uploads (after logo-specific fallback)
 app.use('/uploads', express_1.default.static('uploads'));

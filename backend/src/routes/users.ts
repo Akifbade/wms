@@ -78,9 +78,9 @@ router.get('/profile/me', async (req: AuthRequest, res: Response) => {
     });
 
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        error: 'User not found' 
+        error: 'User not found'
       });
     }
 
@@ -88,7 +88,7 @@ router.get('/profile/me', async (req: AuthRequest, res: Response) => {
     const isDev = process.env.NODE_ENV === 'development';
     const baseUrl = isDev ? `http://${req.get('host')}` : `https://${req.get('host')}`;
 
-    res.json({ 
+    res.json({
       success: true,
       data: {
         ...user,
@@ -101,9 +101,9 @@ router.get('/profile/me', async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Error fetching user profile:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to fetch profile' 
+      error: 'Failed to fetch profile'
     });
   }
 });
@@ -124,9 +124,9 @@ router.put('/profile/me', async (req: AuthRequest, res: Response) => {
     });
 
     if (!existingUser) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        error: 'User not found' 
+        error: 'User not found'
       });
     }
 
@@ -157,16 +157,16 @@ router.put('/profile/me', async (req: AuthRequest, res: Response) => {
       },
     });
 
-    res.json({ 
+    res.json({
       success: true,
       message: 'Profile updated successfully',
-      data: updatedUser 
+      data: updatedUser
     });
   } catch (error) {
     console.error('Error updating user profile:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to update profile' 
+      error: 'Failed to update profile'
     });
   }
 });
@@ -182,16 +182,16 @@ router.put('/profile/password', async (req: AuthRequest, res: Response) => {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Current password and new password are required' 
+        error: 'Current password and new password are required'
       });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'New password must be at least 6 characters long' 
+        error: 'New password must be at least 6 characters long'
       });
     }
 
@@ -201,18 +201,18 @@ router.put('/profile/password', async (req: AuthRequest, res: Response) => {
     });
 
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        error: 'User not found' 
+        error: 'User not found'
       });
     }
 
     // Verify current password
     const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        error: 'Current password is incorrect' 
+        error: 'Current password is incorrect'
       });
     }
 
@@ -225,15 +225,15 @@ router.put('/profile/password', async (req: AuthRequest, res: Response) => {
       data: { password: hashedPassword },
     });
 
-    res.json({ 
+    res.json({
       success: true,
-      message: 'Password changed successfully' 
+      message: 'Password changed successfully'
     });
   } catch (error) {
     console.error('Error changing password:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to change password' 
+      error: 'Failed to change password'
     });
   }
 });
@@ -249,9 +249,9 @@ router.put('/profile/avatar', async (req: AuthRequest, res: Response) => {
     const { avatar } = req.body;
 
     if (!avatar) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Avatar URL is required' 
+        error: 'Avatar URL is required'
       });
     }
 
@@ -261,9 +261,9 @@ router.put('/profile/avatar', async (req: AuthRequest, res: Response) => {
     });
 
     if (!existingUser) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        error: 'User not found' 
+        error: 'User not found'
       });
     }
 
@@ -279,16 +279,16 @@ router.put('/profile/avatar', async (req: AuthRequest, res: Response) => {
       },
     });
 
-    res.json({ 
+    res.json({
       success: true,
       message: 'Avatar updated successfully',
-      data: updatedUser 
+      data: updatedUser
     });
   } catch (error) {
     console.error('Error updating avatar:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to update avatar' 
+      error: 'Failed to update avatar'
     });
   }
 });
@@ -315,9 +315,9 @@ router.get('/profile/stats', async (req: AuthRequest, res: Response) => {
     });
 
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        error: 'User not found' 
+        error: 'User not found'
       });
     }
 
@@ -339,7 +339,7 @@ router.get('/profile/stats', async (req: AuthRequest, res: Response) => {
       (new Date().getTime() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    res.json({ 
+    res.json({
       success: true,
       data: {
         user: {
@@ -357,9 +357,9 @@ router.get('/profile/stats', async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Error fetching user stats:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to fetch user stats' 
+      error: 'Failed to fetch user stats'
     });
   }
 });
@@ -371,7 +371,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     const companyId = req.user!.companyId;
 
     const user = await prisma.user.findFirst({
-      where: { 
+      where: {
         id,
         companyId, // Ensure user belongs to same company
       },
@@ -606,6 +606,92 @@ router.patch('/:id/toggle', authorizeRoles('ADMIN'), async (req: AuthRequest, re
   } catch (error) {
     console.error('Error toggling user status:', error);
     res.status(500).json({ error: 'Failed to toggle user status' });
+  }
+});
+
+// PATCH /api/users/:id/permissions - Update user permissions (ADMIN only)
+router.patch('/:id/permissions', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { permissions } = req.body;
+    const companyId = req.user!.companyId;
+
+    if (!permissions || typeof permissions !== 'object') {
+      return res.status(400).json({ error: 'Valid permissions object required' });
+    }
+
+    // Ensure user belongs to same company
+    const user = await prisma.user.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update permissions (stored as JSON string)
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        permissions: JSON.stringify(permissions),
+        updatedAt: new Date()
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        permissions: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.json({
+      user: {
+        ...updatedUser,
+        permissions: updatedUser.permissions ? JSON.parse(updatedUser.permissions) : null
+      },
+      message: 'User permissions updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating user permissions:', error);
+    res.status(500).json({ error: 'Failed to update user permissions' });
+  }
+});
+
+// GET /api/users/:id/permissions - Get user permissions (ADMIN only)
+router.get('/:id/permissions', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+
+    // Ensure user belongs to same company
+    const user = await prisma.user.findFirst({
+      where: { id, companyId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        permissions: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      user: {
+        ...user,
+        permissions: user.permissions ? JSON.parse(user.permissions) : null
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching user permissions:', error);
+    res.status(500).json({ error: 'Failed to fetch user permissions' });
   }
 });
 

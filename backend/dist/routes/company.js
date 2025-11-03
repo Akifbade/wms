@@ -18,6 +18,12 @@ router.get('/branding', async (req, res) => {
                 accentColor: true,
                 showCompanyName: true,
                 logoSize: true,
+                loginVideoUrl: true,
+                loginVideoEnabled: true,
+                loginGlassEffect: true,
+                loginBackgroundType: true,
+                loginBackgroundImage: true,
+                loginShowFeatures: true,
             },
         });
         if (!company) {
@@ -30,6 +36,12 @@ router.get('/branding', async (req, res) => {
                     secondaryColor: '#7C3AED',
                     accentColor: '#10B981',
                     showCompanyName: true,
+                    loginVideoUrl: 'https://cdn.pixabay.com/video/2024/03/08/203404-921381913_large.mp4',
+                    loginVideoEnabled: true,
+                    loginGlassEffect: true,
+                    loginBackgroundType: 'video',
+                    loginBackgroundImage: null,
+                    loginShowFeatures: true,
                 }
             });
         }
@@ -47,6 +59,12 @@ router.get('/branding', async (req, res) => {
                 accentColor: company.accentColor || '#10B981',
                 showCompanyName: company.showCompanyName !== false,
                 logoSize: company.logoSize || 'medium',
+                loginVideoUrl: company.loginVideoUrl || 'https://cdn.pixabay.com/video/2024/03/08/203404-921381913_large.mp4',
+                loginVideoEnabled: company.loginVideoEnabled !== false,
+                loginGlassEffect: company.loginGlassEffect !== false,
+                loginBackgroundType: company.loginBackgroundType || 'video',
+                loginBackgroundImage: company.loginBackgroundImage || null,
+                loginShowFeatures: company.loginShowFeatures !== false,
             }
         });
     }
@@ -116,7 +134,7 @@ router.get('/', async (req, res) => {
 router.put('/', async (req, res) => {
     try {
         const companyId = req.user.companyId;
-        const { name, email, phone, website, address, logo, primaryColor, secondaryColor, accentColor, showCompanyName } = req.body;
+        const { name, email, phone, website, address, logo, primaryColor, secondaryColor, accentColor, showCompanyName, loginVideoUrl, loginVideoEnabled, loginGlassEffect, loginBackgroundType, loginBackgroundImage, loginShowFeatures } = req.body;
         // Validation
         if (!name || name.trim() === '') {
             return res.status(400).json({ error: 'Company name is required' });
@@ -149,6 +167,25 @@ router.put('/', async (req, res) => {
         }
         if (showCompanyName !== undefined) {
             updateData.showCompanyName = showCompanyName;
+        }
+        // Login page customization fields
+        if (loginVideoUrl !== undefined) {
+            updateData.loginVideoUrl = loginVideoUrl?.trim() || null;
+        }
+        if (loginVideoEnabled !== undefined) {
+            updateData.loginVideoEnabled = loginVideoEnabled;
+        }
+        if (loginGlassEffect !== undefined) {
+            updateData.loginGlassEffect = loginGlassEffect;
+        }
+        if (loginBackgroundType !== undefined) {
+            updateData.loginBackgroundType = loginBackgroundType?.trim() || 'video';
+        }
+        if (loginBackgroundImage !== undefined) {
+            updateData.loginBackgroundImage = loginBackgroundImage?.trim() || null;
+        }
+        if (loginShowFeatures !== undefined) {
+            updateData.loginShowFeatures = loginShowFeatures;
         }
         const company = await prisma.company.update({
             where: { id: companyId },

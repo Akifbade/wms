@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -139,6 +172,7 @@ router.get('/', async (req, res) => {
             where.OR = [
                 { name: { contains: search } },
                 { referenceId: { contains: search } },
+                { qrCode: { contains: search } }, // ✅ FIX: Search by QR code
                 { clientName: { contains: search } },
                 { customerName: { contains: search } },
                 { shipper: { contains: search } },
@@ -183,8 +217,10 @@ router.get('/', async (req, res) => {
             const assignedBoxes = shipment.boxes.filter((b) => b.rackId !== null).length;
             const releasedBoxes = shipment.boxes.filter((b) => b.status === 'RELEASED').length;
             const inStorageBoxes = shipment.boxes.filter((b) => b.status === 'IN_STORAGE').length;
-            // Get unique rack codes where boxes are located
-            const rackIds = [...new Set(shipment.boxes.filter((b) => b.rackId).map((b) => b.rackId))];
+            // Get unique rack codes where boxes are CURRENTLY located (IN_STORAGE only, exclude RELEASED)
+            const rackIds = [...new Set(shipment.boxes
+                    .filter((b) => b.rackId && b.status === 'IN_STORAGE') // Only boxes in storage
+                    .map((b) => b.rackId))];
             const racks = rackIds.length > 0 ? await prisma.rack.findMany({
                 where: { id: { in: rackIds } },
                 select: { code: true }
@@ -1052,27 +1088,75 @@ router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
         const existing = await prisma.shipment.findFirst({
             where: { id, companyId },
             include: {
-                boxes: {
-                    where: { rackId: { not: null } }, // Check if any box is in a rack
-                },
+                boxes: true, // Get all boxes to check status
             },
         });
         if (!existing) {
             return res.status(404).json({ error: 'Shipment not found' });
         }
-        // STRICT DELETE: Prevent deletion if materials are allocated to racks
-        if (existing.boxes.length > 0) {
-            return res.status(400).json({
-                error: 'Cannot delete shipment: Materials are currently allocated to racks',
-                detail: `${existing.boxes.length} box(es) in racks. Remove from racks first.`,
-            });
+        // SMART DELETE: Allow deletion if shipment status is RELEASED
+        // Block deletion only if shipment is NOT released AND boxes are in storage
+        if (existing.status !== 'RELEASED') {
+            const hasBoxesInStorage = existing.boxes.some(box => box.status === 'IN_STORAGE' || box.status === 'IN_WAREHOUSE');
+            if (hasBoxesInStorage) {
+                return res.status(400).json({
+                    error: 'Cannot delete shipment: Materials are currently allocated to racks',
+                    detail: `Release the shipment first before deletion.`,
+                });
+            }
         }
-        // Soft delete: mark with deletedAt timestamp instead of hard delete
-        await prisma.shipment.update({
-            where: { id },
-            data: { deletedAt: new Date() },
+        // If shipment status is RELEASED, allow deletion regardless of box status (handles data inconsistencies)
+        // Delete associated photos from storage if they exist
+        const allBoxes = await prisma.shipmentBox.findMany({
+            where: { shipmentId: id },
+            select: { photos: true }
         });
-        res.json({ message: 'Shipment deleted successfully (archived)' });
+        // Collect all photo URLs from boxes
+        const photoUrls = [];
+        for (const box of allBoxes) {
+            if (box.photos) {
+                try {
+                    const photos = JSON.parse(box.photos);
+                    if (Array.isArray(photos)) {
+                        photoUrls.push(...photos);
+                    }
+                }
+                catch (e) {
+                    console.log('Failed to parse photos JSON:', e);
+                }
+            }
+        }
+        // Delete photo files from disk
+        if (photoUrls.length > 0) {
+            const path = await Promise.resolve().then(() => __importStar(require('path')));
+            const fs = await Promise.resolve().then(() => __importStar(require('fs')));
+            const uploadsDir = path.join(process.cwd(), 'uploads');
+            for (const photoUrl of photoUrls) {
+                try {
+                    // Extract file path from URL (e.g., "uploads/shipments/photo.jpg")
+                    const filePath = path.join(process.cwd(), photoUrl);
+                    if (fs.existsSync(filePath)) {
+                        fs.unlinkSync(filePath);
+                        console.log(`✅ Deleted photo: ${photoUrl}`);
+                    }
+                }
+                catch (err) {
+                    console.log(`⚠️ Failed to delete photo ${photoUrl}:`, err);
+                }
+            }
+        }
+        // Hard delete: First delete boxes (cascade will handle items)
+        await prisma.shipmentBox.deleteMany({
+            where: { shipmentId: id }
+        });
+        // Then delete the shipment
+        await prisma.shipment.delete({
+            where: { id }
+        });
+        res.json({
+            message: 'Shipment deleted successfully',
+            deletedPhotos: photoUrls.length
+        });
     }
     catch (error) {
         console.error('Delete shipment error:', error);
@@ -1153,7 +1237,10 @@ router.post('/:shipmentId/assign-rack', (0, auth_1.authorizeRoles)('ADMIN', 'MAN
             quantity,
             pallets,
             looseBoxes,
-            photos: photos?.length || 0
+            photos: photos?.length || 0,
+            photosReceived: photos,
+            photosType: typeof photos,
+            photosIsArray: Array.isArray(photos)
         });
         // Validation
         if (!rackId || !quantity) {
@@ -1212,6 +1299,12 @@ router.post('/:shipmentId/assign-rack', (0, auth_1.authorizeRoles)('ADMIN', 'MAN
         }
         // Assign boxes to rack with photos
         const photosJson = photos && photos.length > 0 ? JSON.stringify(photos) : null;
+        console.log('📸 Photos processing:', {
+            photosReceived: photos,
+            photosLength: photos?.length,
+            photosJson,
+            willSavePhotos: photosJson !== null
+        });
         const updatedBoxes = await prisma.$transaction(boxesToAssign.map((box, index) => {
             // Calculate pallet number for this box
             let palletNumber = null;

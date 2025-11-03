@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Html5Qrcode } from 'html5-qrcode';
 import { shipmentsAPI, racksAPI } from '../../services/api';
+import ShipmentDetailModal from '../../components/ShipmentDetailModal';
 
 type ScanType = 'rack' | 'shipment' | 'unknown';
 
@@ -48,6 +49,10 @@ export const Scanner: React.FC = () => {
   const [assignmentPhotos, setAssignmentPhotos] = useState<File[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; size: string } | null>(null);
+
+  // Shipment Details Modal state
+  const [showShipmentDetails, setShowShipmentDetails] = useState(false);
+  const [selectedShipmentForDetails, setSelectedShipmentForDetails] = useState<any>(null);
 
   // ✅ Duplicate prevention: Track last scanned code and timestamp
   const lastScanRef = useRef<{ code: string; timestamp: number } | null>(null);
@@ -1542,15 +1547,30 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               </div>
                             )}
                           </div>
-                          <button
-                            onClick={() => {
-                              setScanResult(null);
-                              startScanning();
-                            }}
-                            className="w-full py-2.5 sm:py-3 md:py-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-bold text-sm sm:text-base md:text-lg"
-                          >
-                            Scan Next Shipment
-                          </button>
+                          <div className="space-y-3">
+                            <button
+                              onClick={() => {
+                                setSelectedShipmentForDetails(scanResult.data);
+                                setShowShipmentDetails(true);
+                              }}
+                              className="w-full py-3 sm:py-3.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-sm sm:text-base flex items-center justify-center gap-2"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                              View Full Details
+                            </button>
+                            <button
+                              onClick={() => {
+                                setScanResult(null);
+                                startScanning();
+                              }}
+                              className="w-full py-2.5 sm:py-3 md:py-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-bold text-sm sm:text-base md:text-lg"
+                            >
+                              Scan Next Shipment
+                            </button>
+                          </div>
                         </div>
                       ) : (scanResult.data.status === 'PENDING' || scanResult.data.remainingBoxes > 0) ? (
                         <div className="mt-4">
@@ -1562,22 +1582,52 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               Scan the rack where you want to assign this shipment
                             </p>
                           </div>
-                          <button
-                            onClick={() => {
-                              setPendingShipment(scanResult.data);
-                              setScanResult(null);
-                              startScanning();
-                            }}
-                            className="w-full py-3 sm:py-3.5 md:py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-sm sm:text-base md:text-lg shadow-lg"
-                          >
-                            ✅ Scan Rack Now ({scanResult.data.remainingBoxes} boxes)
-                          </button>
+                          <div className="space-y-3">
+                            <button
+                              onClick={() => {
+                                setPendingShipment(scanResult.data);
+                                setScanResult(null);
+                                startScanning();
+                              }}
+                              className="w-full py-3 sm:py-3.5 md:py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-sm sm:text-base md:text-lg shadow-lg"
+                            >
+                              ✅ Scan Rack Now ({scanResult.data.remainingBoxes} boxes)
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedShipmentForDetails(scanResult.data);
+                                setShowShipmentDetails(true);
+                              }}
+                              className="w-full py-2.5 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-sm sm:text-base flex items-center justify-center gap-2"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                              View Full Details
+                            </button>
+                          </div>
                         </div>
                       ) : (
-                        <div className="bg-green-50 border border-green-300 p-4 rounded-lg">
-                          <p className="text-center text-green-900 font-semibold">
-                            ✅ All boxes already assigned!
-                          </p>
+                        <div className="space-y-3">
+                          <div className="bg-green-50 border border-green-300 p-4 rounded-lg">
+                            <p className="text-center text-green-900 font-semibold">
+                              ✅ All boxes already assigned!
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedShipmentForDetails(scanResult.data);
+                              setShowShipmentDetails(true);
+                            }}
+                            className="w-full py-3 sm:py-3.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-sm sm:text-base flex items-center justify-center gap-2"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            View Full Details
+                          </button>
                         </div>
                       )}
                     </div>
@@ -2168,6 +2218,15 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
             </div>
           </div>
         </div>
+      )}
+
+      {/* Shipment Details Modal */}
+      {showShipmentDetails && selectedShipmentForDetails && (
+        <ShipmentDetailModal
+          isOpen={showShipmentDetails}
+          onClose={() => setShowShipmentDetails(false)}
+          shipmentId={selectedShipmentForDetails.id}
+        />
       )}
     </div>
   );

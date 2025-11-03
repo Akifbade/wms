@@ -65,7 +65,7 @@ export const Layout: React.FC = () => {
       try {
         const userData = JSON.parse(user);
         setCurrentUser(userData);
-        
+
         // Redirect worker from dashboard to scanner
         if (userData.role === 'WORKER' && location.pathname === '/dashboard') {
           navigate('/scanner', { replace: true });
@@ -106,10 +106,10 @@ export const Layout: React.FC = () => {
         {/* Logo */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+            <div className="w-9 h-9 bg-gradient-to-br from-primary-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
               <CubeIcon className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-gray-900">WMS</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-indigo-600 bg-clip-text text-transparent tracking-tight">QGOWMS</span>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -125,7 +125,7 @@ export const Layout: React.FC = () => {
           {currentUser?.role && navigationConfig[currentUser.role as keyof typeof navigationConfig]?.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
-            
+
             return (
               <Link
                 key={item.name}
