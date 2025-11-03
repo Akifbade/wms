@@ -655,7 +655,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
     // ✅ FIX: Calculate total boxes based on ACTUAL pallet contents, not fixed 20-box rule
     let totalBoxes = 0;
-    
+
     // Add boxes from selected pallets (using actual pallet box counts)
     if (palletQuantity > 0 && pendingShipment.palletDetails) {
       for (let i = 0; i < palletQuantity; i++) {
@@ -664,7 +664,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         }
       }
     }
-    
+
     // Add loose boxes
     totalBoxes += (looseBoxQuantity || 0);
 
@@ -761,7 +761,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
       if (response.ok) {
         playSuccessSound();
-        alert(`✅ Assignment Complete!\n\n🎁 ${palletQuantity || 0} Pallet${palletQuantity > 1 ? 's' : ''} (${(palletQuantity || 0) * 20} boxes)\n📦 ${looseBoxQuantity || 0} Loose Box${looseBoxQuantity > 1 ? 'es' : ''}\n\n= ${totalBoxes} Total Boxes assigned to ${scanResult.data.code}!${photoUrls.length > 0 ? `\n� ${photoUrls.length} photo${photoUrls.length > 1 ? 's' : ''} uploaded` : ''}`);
+        alert(`✅ Assignment Complete!\n\n🎁 ${palletQuantity || 0} Pallet${palletQuantity > 1 ? 's' : ''} (${totalBoxes - (looseBoxQuantity || 0)} boxes)\n📦 ${looseBoxQuantity || 0} Loose Box${looseBoxQuantity > 1 ? 'es' : ''}\n\n= ${totalBoxes} Total Boxes assigned to ${scanResult.data.code}!${photoUrls.length > 0 ? `\n📸 ${photoUrls.length} photo${photoUrls.length > 1 ? 's' : ''} uploaded` : ''}`);
         setPendingShipment(null);
         setScanResult(null);
         setPalletQuantity(0);
@@ -870,7 +870,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         .map(Number)
         .filter(num => num > 0)
         .sort((a, b) => a - b);
-      
+
       const totalPallets = palletNumbers.length;
       const looseBoxes = palletGroups[0] || 0;
 
@@ -953,7 +953,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
       // ✅ FIX: Calculate total boxes based on ACTUAL pallet contents, not fixed 20-box rule
       let totalBoxesToAssign = 0;
-      
+
       // Add boxes from selected pallets (using actual pallet box counts)
       if (palletQuantity > 0 && selectedShipmentForRack.palletDetails) {
         for (let i = 0; i < palletQuantity; i++) {
@@ -962,7 +962,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
           }
         }
       }
-      
+
       // Add loose boxes
       totalBoxesToAssign += looseBoxQuantity;
 
@@ -1321,7 +1321,16 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               <p className="font-semibold text-green-900 mb-1">Total to assign:</p>
                               {palletQuantity > 0 && (
                                 <p className="text-lg font-bold text-green-900">
-                                  {palletQuantity} Pallet{palletQuantity > 1 ? 's' : ''} ({palletQuantity * 20} boxes)
+                                  {palletQuantity} Pallet{palletQuantity > 1 ? 's' : ''} (
+                                  {(() => {
+                                    let boxes = 0;
+                                    for (let i = 0; i < palletQuantity; i++) {
+                                      if (pendingShipment.palletDetails && pendingShipment.palletDetails[i]) {
+                                        boxes += pendingShipment.palletDetails[i].boxCount;
+                                      }
+                                    }
+                                    return boxes;
+                                  })()} boxes)
                                 </p>
                               )}
                               {looseBoxQuantity > 0 && (
@@ -1330,7 +1339,15 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                 </p>
                               )}
                               <p className="text-xl font-bold text-green-800 mt-2">
-                                = {((palletQuantity || 0) * 20) + (looseBoxQuantity || 0)} Total Boxes
+                                = {(() => {
+                                  let total = looseBoxQuantity || 0;
+                                  for (let i = 0; i < (palletQuantity || 0); i++) {
+                                    if (pendingShipment.palletDetails && pendingShipment.palletDetails[i]) {
+                                      total += pendingShipment.palletDetails[i].boxCount;
+                                    }
+                                  }
+                                  return total;
+                                })()} Total Boxes
                               </p>
                             </div>
 
@@ -1932,9 +1949,15 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                     {selectedShipmentForRack.totalPallets > 0 && (
                       <div>
                         <span className="font-bold text-purple-700">{selectedShipmentForRack.totalPallets} Pallets</span>
-                        <span className="text-gray-500 text-sm ml-2">
-                          (20 boxes each)
-                        </span>
+                        {selectedShipmentForRack.palletDetails && selectedShipmentForRack.palletDetails.length > 0 ? (
+                          <span className="text-gray-500 text-sm ml-2">
+                            ({selectedShipmentForRack.palletDetails.map((p: any) => `P${p.palletNumber}:${p.boxCount}box`).join(', ')})
+                          </span>
+                        ) : (
+                          <span className="text-gray-500 text-sm ml-2">
+                            (20 boxes each)
+                          </span>
+                        )}
                       </div>
                     )}
                     <div>
