@@ -18,6 +18,12 @@ router.get('/branding', async (req, res: Response) => {
         accentColor: true,
         showCompanyName: true,
         logoSize: true,
+        loginVideoUrl: true,
+        loginVideoEnabled: true,
+        loginGlassEffect: true,
+        loginBackgroundType: true,
+        loginBackgroundImage: true,
+        loginShowFeatures: true,
       },
     });
 
@@ -31,6 +37,12 @@ router.get('/branding', async (req, res: Response) => {
           secondaryColor: '#7C3AED',
           accentColor: '#10B981',
           showCompanyName: true,
+          loginVideoUrl: 'https://cdn.pixabay.com/video/2024/03/08/203404-921381913_large.mp4',
+          loginVideoEnabled: true,
+          loginGlassEffect: true,
+          loginBackgroundType: 'video',
+          loginBackgroundImage: null,
+          loginShowFeatures: true,
         }
       });
     }
@@ -50,6 +62,12 @@ router.get('/branding', async (req, res: Response) => {
         accentColor: company.accentColor || '#10B981',
         showCompanyName: company.showCompanyName !== false,
         logoSize: (company as any).logoSize || 'medium',
+        loginVideoUrl: (company as any).loginVideoUrl || 'https://cdn.pixabay.com/video/2024/03/08/203404-921381913_large.mp4',
+        loginVideoEnabled: (company as any).loginVideoEnabled !== false,
+        loginGlassEffect: (company as any).loginGlassEffect !== false,
+        loginBackgroundType: (company as any).loginBackgroundType || 'video',
+        loginBackgroundImage: (company as any).loginBackgroundImage || null,
+        loginShowFeatures: (company as any).loginShowFeatures !== false,
       }
     });
   } catch (error) {
@@ -124,7 +142,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.put('/', async (req: AuthRequest, res: Response) => {
   try {
     const companyId = req.user!.companyId;
-    const { name, email, phone, website, address, logo, primaryColor, secondaryColor, accentColor, showCompanyName } = req.body;
+    const { 
+      name, email, phone, website, address, logo, 
+      primaryColor, secondaryColor, accentColor, showCompanyName,
+      loginVideoUrl, loginVideoEnabled, loginGlassEffect, 
+      loginBackgroundType, loginBackgroundImage, loginShowFeatures 
+    } = req.body;
 
     // Validation
     if (!name || name.trim() === '') {
@@ -165,6 +188,31 @@ router.put('/', async (req: AuthRequest, res: Response) => {
 
     if (showCompanyName !== undefined) {
       updateData.showCompanyName = showCompanyName;
+    }
+
+    // Login page customization fields
+    if (loginVideoUrl !== undefined) {
+      updateData.loginVideoUrl = loginVideoUrl?.trim() || null;
+    }
+
+    if (loginVideoEnabled !== undefined) {
+      updateData.loginVideoEnabled = loginVideoEnabled;
+    }
+
+    if (loginGlassEffect !== undefined) {
+      updateData.loginGlassEffect = loginGlassEffect;
+    }
+
+    if (loginBackgroundType !== undefined) {
+      updateData.loginBackgroundType = loginBackgroundType?.trim() || 'video';
+    }
+
+    if (loginBackgroundImage !== undefined) {
+      updateData.loginBackgroundImage = loginBackgroundImage?.trim() || null;
+    }
+
+    if (loginShowFeatures !== undefined) {
+      updateData.loginShowFeatures = loginShowFeatures;
     }
 
     const company = await prisma.company.update({
