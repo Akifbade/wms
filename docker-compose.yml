@@ -68,6 +68,27 @@ services:
     networks:
       - wms-network
 
+  # phpMyAdmin - Database Management UI
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: wms-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: database
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      UPLOAD_LIMIT: 100M
+      MAX_EXECUTION_TIME: 600
+    ports:
+      - "${PHPMYADMIN_PORT:-8081}:80"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - wms-network
+
   # Certbot SSL Certificate Service - DISABLED FOR LOCAL DEV
   # certbot:
   #   image: certbot/certbot:latest
