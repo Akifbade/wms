@@ -1,11 +1,11 @@
 "use strict";
 /**
  * Version Configuration for Backend
- * Auto-updated by GitHub Actions
+ * Auto-updated by GitHub Actions or manually for local testing
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.logVersionInfo = exports.getVersionInfo = exports.APP_VERSION = void 0;
-exports.APP_VERSION = 'v2.1.106';
+exports.APP_VERSION = 'v2.1.140'; // ✅ UPDATED for box mode QR fixes
 const getVersionInfo = () => {
     return {
         version: exports.APP_VERSION,

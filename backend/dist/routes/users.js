@@ -549,4 +549,82 @@ router.patch('/:id/toggle', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res
         res.status(500).json({ error: 'Failed to toggle user status' });
     }
 });
+// PATCH /api/users/:id/permissions - Update user permissions (ADMIN only)
+router.patch('/:id/permissions', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { permissions } = req.body;
+        const companyId = req.user.companyId;
+        if (!permissions || typeof permissions !== 'object') {
+            return res.status(400).json({ error: 'Valid permissions object required' });
+        }
+        // Ensure user belongs to same company
+        const user = await prisma.user.findFirst({
+            where: { id, companyId },
+        });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        // Update permissions (stored as JSON string)
+        const updatedUser = await prisma.user.update({
+            where: { id },
+            data: {
+                permissions: JSON.stringify(permissions),
+                updatedAt: new Date()
+            },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                role: true,
+                permissions: true,
+                isActive: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        });
+        res.json({
+            user: {
+                ...updatedUser,
+                permissions: updatedUser.permissions ? JSON.parse(updatedUser.permissions) : null
+            },
+            message: 'User permissions updated successfully'
+        });
+    }
+    catch (error) {
+        console.error('Error updating user permissions:', error);
+        res.status(500).json({ error: 'Failed to update user permissions' });
+    }
+});
+// GET /api/users/:id/permissions - Get user permissions (ADMIN only)
+router.get('/:id/permissions', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const companyId = req.user.companyId;
+        // Ensure user belongs to same company
+        const user = await prisma.user.findFirst({
+            where: { id, companyId },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                role: true,
+                permissions: true,
+            },
+        });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json({
+            user: {
+                ...user,
+                permissions: user.permissions ? JSON.parse(user.permissions) : null
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error fetching user permissions:', error);
+        res.status(500).json({ error: 'Failed to fetch user permissions' });
+    }
+});
 exports.default = router;

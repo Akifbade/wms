@@ -1385,6 +1385,14 @@ router.post('/:shipmentId/assign-rack',
         return res.status(404).json({ error: 'Shipment not found' });
       }
 
+      // 🔒 SAFETY CHECK: Prevent accidental changes to fully assigned shipments
+      if (shipment.status === 'IN_WAREHOUSE' || shipment.status === 'ACTIVE') {
+        return res.status(400).json({
+          error: 'This shipment is already fully assigned to racks. Cannot modify.',
+          currentStatus: shipment.status
+        });
+      }
+
       // Check if we have enough unassigned boxes
       const unassignedBoxes = shipment.boxes || [];
       if (unassignedBoxes.length < quantity) {
@@ -1414,10 +1422,21 @@ router.post('/:shipmentId/assign-rack',
       const boxesPerPallet = shipment.boxesPerPallet || 0;
       let palletsToAssign = pallets || 0;
 
-      if (boxesPerPallet > 0 && palletsToAssign === 0) {
-        // Auto-calculate pallets if not provided
+      // ✅ SAFE FIX: Only auto-calculate pallets if frontend didn't specify
+      // If frontend sends pallets = 0 explicitly (loose boxes only), respect it
+      // If frontend sends looseBoxes > 0, it means loose boxes only, no pallets
+      if (boxesPerPallet > 0 && palletsToAssign === 0 && !looseBoxes && !req.body.hasOwnProperty('pallets')) {
+        // Auto-calculate pallets ONLY if not explicitly specified
         palletsToAssign = Math.floor(quantity / boxesPerPallet);
       }
+
+      console.log('🎯 Pallet calculation:', {
+        boxesPerPallet,
+        quantity,
+        palletsFromFrontend: pallets,
+        looseBoxesFromFrontend: looseBoxes,
+        finalPallets: palletsToAssign
+      });
 
       // Check rack capacity
       const currentPalletUsage = rack.capacityUsed || 0;

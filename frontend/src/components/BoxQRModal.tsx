@@ -33,6 +33,9 @@ interface Shipment {
   companyProfile?: { id: string; name: string } | null;
   arrivalDate: string;
   notes?: string; // Additional information field
+  length?: number | null;
+  width?: number | null;
+  height?: number | null;
 }
 
 export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }: BoxQRModalProps) {
@@ -350,46 +353,53 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
                       )}
                     </div>
 
-                    {/* QR Value (compact with copy) - BIGGER TEXT */}
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                      <p className="text-sm text-gray-600 font-mono truncate max-w-[220px]" title={unit.qrValue}>
-                        {unit.qrValue.replace(/\|S:.+$/, '')}
-                      </p>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(unit.qrValue)}
-                        className="text-indigo-600 hover:text-indigo-800 text-sm underline print:hidden"
-                        title="Copy full QR value"
-                      >Copy</button>
-                    </div>
-
                     {/* Details - BIGGER TEXT */}
                     {unit.type === 'PALLET' ? (
                       <div className="text-sm text-gray-700 space-y-1.5">
                         <div><span className="font-medium">Shipment:</span> <span className="font-bold">{shipmentRef}</span></div>
+                        <div className="bg-indigo-50 -mx-2 px-2 py-1.5 rounded">
+                          <span className="font-medium">Pallet:</span> <span className="font-bold text-indigo-700 text-base">
+                            {(() => {
+                              const pallets = printUnits.filter(u => u.type === 'PALLET');
+                              const palletIndex = pallets.findIndex(u => u.type === 'PALLET' && u.palletNumber === unit.palletNumber);
+                              return `${palletIndex + 1} of ${pallets.length}`;
+                            })()}
+                          </span>
+                        </div>
+                        <div><span className="font-medium">Pieces on Pallet:</span> <span className="font-bold">{unit.pieces}</span></div>
                         {shipment?.companyProfile?.name && (
                           <div><span className="font-medium">Profile:</span> <span className="font-bold">{shipment.companyProfile.name}</span></div>
                         )}
-                        <div><span className="font-medium">Pieces on Pallet:</span> <span className="font-bold">{unit.pieces}</span></div>
                         <div><span className="font-medium">Client:</span> <span className="font-bold">{shipment?.clientName || '—'}</span></div>
                         <div><span className="font-medium">Arrived:</span> <span className="font-bold">{new Date(shipment?.arrivalDate || '').toLocaleDateString()}</span></div>
                         {shipment?.notes && (
-                          <div className="pt-2 border-t border-gray-300">
-                            <span className="font-medium">Notes:</span> <span className="font-bold text-blue-700">{shipment.notes}</span>
+                          <div className="pt-2 mt-2 border-t-2 border-blue-400">
+                            <span className="font-medium text-blue-700">Additional Info:</span>
+                            <p className="font-bold text-blue-900 mt-1">{shipment.notes}</p>
                           </div>
                         )}
                       </div>
                     ) : (
                       <div className="text-sm text-gray-700 space-y-1.5">
                         <div><span className="font-medium">Shipment:</span> <span className="font-bold">{shipmentRef}</span></div>
-                        <div><span className="font-medium">Type:</span> <span className="font-bold">Loose Box</span></div>
+                        <div className="bg-purple-50 -mx-2 px-2 py-1.5 rounded">
+                          <span className="font-medium">Loose Box:</span> <span className="font-bold text-purple-700 text-base">
+                            {(() => {
+                              const looseBoxes = printUnits.filter(u => u.type === 'LOOSE_BOX');
+                              const looseIndex = looseBoxes.findIndex(u => u.type === 'LOOSE_BOX' && u.boxId === unit.boxId);
+                              return `${looseIndex + 1} of ${looseBoxes.length}`;
+                            })()}
+                          </span>
+                        </div>
                         {shipment?.companyProfile?.name && (
                           <div><span className="font-medium">Profile:</span> <span className="font-bold">{shipment.companyProfile.name}</span></div>
                         )}
                         <div><span className="font-medium">Client:</span> <span className="font-bold">{shipment?.clientName || '—'}</span></div>
                         <div><span className="font-medium">Arrived:</span> <span className="font-bold">{new Date(shipment?.arrivalDate || '').toLocaleDateString()}</span></div>
                         {shipment?.notes && (
-                          <div className="pt-2 border-t border-gray-300">
-                            <span className="font-medium">Notes:</span> <span className="font-bold text-blue-700">{shipment.notes}</span>
+                          <div className="pt-2 mt-2 border-t-2 border-blue-400">
+                            <span className="font-medium text-blue-700">Additional Info:</span>
+                            <p className="font-bold text-blue-900 mt-1">{shipment.notes}</p>
                           </div>
                         )}
                       </div>

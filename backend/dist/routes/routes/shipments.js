@@ -322,7 +322,19 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         // Determine mode and compute counts
         let totalBoxCount = 0;
         let originalBoxCount = 0;
-        if (boxesDistribution && boxesDistribution.length > 0) {
+        // Check if box mode FIRST (palletCount === 0 or boxesPerPallet === 0)
+        const isBoxMode = (palletCount === 0 || boxesPerPallet === 0) && boxesDistribution.length === 0;
+        if (isBoxMode) {
+            // ✅ BOX MODE: Use originalBoxCount from request data
+            originalBoxCount = parseOptionalInt(data.originalBoxCount) ?? 0;
+            totalBoxCount = originalBoxCount;
+            palletCount = 0; // Ensure palletCount is 0 for box mode
+            boxesPerPallet = 0; // Ensure boxesPerPallet is 0 for box mode
+            if (originalBoxCount <= 0) {
+                return res.status(400).json({ error: 'Total boxes must be greater than zero in box mode' });
+            }
+        }
+        else if (boxesDistribution && boxesDistribution.length > 0) {
             // Variable mode: palletCount becomes distribution length
             palletCount = boxesDistribution.length;
             const distributionSum = boxesDistribution.reduce((a, b) => a + Math.max(0, Math.trunc(b || 0)), 0);
@@ -332,6 +344,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
             originalBoxCount = totalBoxCount;
         }
         else {
+            // ✅ PALLET MODE validations
             if (!palletCount || palletCount <= 0) {
                 return res.status(400).json({ error: 'Pallet count must be greater than zero' });
             }
@@ -540,9 +553,11 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
             }
         }
         else {
-            // Uniform mode: original logic
+            // Uniform mode: Check if box mode (palletCount === 0 or boxesPerPallet === 0)
+            const isBoxMode = palletCount === 0 || boxesPerPallet === 0;
             for (let i = 1; i <= totalBoxCount; i++) {
-                const palletNumber = Math.ceil(i / boxesPerPallet);
+                const palletNumber = isBoxMode ? 0 : Math.ceil(i / boxesPerPallet);
+                const isLoose = isBoxMode || palletNumber === 0;
                 boxesToCreate.push({
                     shipmentId: shipment.id,
                     boxNumber: i,
@@ -555,6 +570,7 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                         masterQRCode: masterQR,
                         boxNumber: i,
                         palletNumber,
+                        isLoose,
                         palletCount,
                         boxesPerPallet,
                         totalBoxes: totalBoxCount,
@@ -1096,14 +1112,19 @@ router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
         }
         // SMART DELETE: Allow deletion if shipment status is RELEASED
         // Block deletion only if shipment is NOT released AND boxes are in storage
+        console.log(`🗑️ DELETE REQUEST: Shipment ${existing.referenceId}, Status: ${existing.status}, Boxes: ${existing.boxes.length}`);
         if (existing.status !== 'RELEASED') {
             const hasBoxesInStorage = existing.boxes.some(box => box.status === 'IN_STORAGE' || box.status === 'IN_WAREHOUSE');
             if (hasBoxesInStorage) {
+                console.log(`❌ BLOCKED: ${hasBoxesInStorage} boxes in storage, shipment not released`);
                 return res.status(400).json({
                     error: 'Cannot delete shipment: Materials are currently allocated to racks',
                     detail: `Release the shipment first before deletion.`,
                 });
             }
+        }
+        else {
+            console.log(`✅ ALLOWED: Shipment is RELEASED, ignoring box status`);
         }
         // If shipment status is RELEASED, allow deletion regardless of box status (handles data inconsistencies)
         // Delete associated photos from storage if they exist

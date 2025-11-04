@@ -57,6 +57,11 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
     shipperPhone: '',
     consigneePhone: '',
     specialInstructions: '',
+    // 📏 Dimensions
+    length: '',
+    width: '',
+    height: '',
+    cbm: 0, // auto-calculated (m³)
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -93,6 +98,11 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         shipperPhone: shipment.shipperPhone || '',
         consigneePhone: shipment.consigneePhone || '',
         specialInstructions: shipment.specialInstructions || '',
+        // 📏 Dimensions
+        length: shipment.length || '',
+        width: shipment.width || '',
+        height: shipment.height || '',
+        cbm: shipment.cbm || 0,
       });
       setError('');
       setSuccess('');
@@ -165,10 +175,31 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: (name.includes('Count') || name === 'estimatedValue') ? parseNumberInput(value, true) : value
-    }));
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [name]: (name.includes('Count') || name === 'estimatedValue') ? parseNumberInput(value, true) : value
+      };
+
+      // Auto-calculate CBM when dimensions change
+      if (name === 'length' || name === 'width' || name === 'height') {
+        const length = getSafeNumber(updated.length, 0);
+        const width = getSafeNumber(updated.width, 0);
+        const height = getSafeNumber(updated.height, 0);
+
+        // CBM = (Length × Width × Height) / 1,000,000 (cm to m³)
+        const cbm = length > 0 && width > 0 && height > 0
+          ? (length * width * height) / 1000000
+          : 0;
+
+        return {
+          ...updated,
+          cbm: parseFloat(cbm.toFixed(4)), // Round to 4 decimals
+        };
+      }
+
+      return updated;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -187,15 +218,14 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
       if (!formData.clientName || !formData.clientPhone) {
         throw new Error('Client name and phone are required');
       }
-      if (totalBoxCount <= 0) {
-        throw new Error('Total box count must be greater than 0');
-      }
-      if (currentBoxCount > totalBoxCount) {
+      // ✅ REMOVED: Box count validation (allow 0 for flexible editing)
+      if (currentBoxCount > totalBoxCount && totalBoxCount > 0) {
         throw new Error('Current box count cannot exceed total box count');
       }
-      if (!formData.rackId) {
-        throw new Error('Please select a rack');
-      }
+      // ✅ REMOVED: Rack validation (allow save without rack selection)
+      // if (!formData.rackId) {
+      //   throw new Error('Please select a rack');
+      // }
 
       // Prepare update data with converted numbers + new warehouse fields
       const updateData = {
@@ -219,6 +249,11 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         shipperPhone: formData.shipperPhone || null,
         consigneePhone: formData.consigneePhone || null,
         specialInstructions: formData.specialInstructions || null,
+        // 📏 Dimensions
+        length: getSafeNumber(formData.length) || null,
+        width: getSafeNumber(formData.width) || null,
+        height: getSafeNumber(formData.height) || null,
+        cbm: formData.cbm || null,
       };
 
       await shipmentsAPI.update(shipment.id, updateData);
@@ -382,15 +417,12 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Company Profile
-                  {isRackAssigned && <span className="ml-2 text-xs text-yellow-600">🔒 Locked</span>}
                 </label>
                 <select
                   name="companyProfileId"
                   value={formData.companyProfileId}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isRackAssigned ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-300'
-                    }`}
-                  disabled={isRackAssigned}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">-- No Company Profile --</option>
                   {companyProfiles.map((cp: any) => (
@@ -416,6 +448,70 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                   <option value="HAZMAT">🟥 Hazmat</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* 📏 Dimensions Section */}
+          <div className="border-b pb-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">📏 Dimensions (cm)</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Length
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="length"
+                  value={formData.length}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Width
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="width"
+                  value={formData.width}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Height
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="height"
+                  value={formData.height}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            {/* Auto-calculated CBM Display */}
+            <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-900">
+                  CBM (m³)
+                </span>
+                <span className="text-lg font-bold text-blue-700">
+                  {formData.cbm > 0 ? formData.cbm.toFixed(4) : '0.0000'}
+                </span>
+              </div>
+              <p className="text-xs text-blue-600 mt-1">
+                CBM auto-calculates: (Length × Width × Height) / 1,000,000
+              </p>
             </div>
           </div>
 
@@ -629,8 +725,8 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                   type="button"
                   onClick={() => setShowRackMap(true)}
                   className={`w-full px-4 py-2 rounded-md font-medium border-2 ${isRackAssigned
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300'
-                      : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300'
+                    : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
                     }`}
                   disabled={isRackAssigned}
                 >
