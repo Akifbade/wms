@@ -987,10 +987,63 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   // Select shipment from list - show rack selection
   const handleSelectShipment = async (shipment: any) => {
     console.log('🎯 Choose Rack clicked for shipment:', shipment);
-    console.log('📦 Current racks:', racks);
-    setSelectedShipmentForRack(shipment);
-    setShowRackSelection(true);
-    console.log('✅ Rack selection enabled');
+    console.log('📦 Fetching FRESH box data...');
+    
+    try {
+      // ✅ CRITICAL FIX: Fetch CURRENT unassigned boxes, not stale data
+      const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      });
+      const boxData = await boxResponse.json();
+      const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId);
+      
+      console.log('📦 Unassigned boxes:', unassignedBoxes.length);
+      
+      // Recalculate pallet/loose box breakdown from CURRENT boxes
+      const palletGroups = unassignedBoxes.reduce((acc: Record<number, number>, box: any) => {
+        let palletNum = 0; // Default: loose box
+        
+        if (box.pieceQR) {
+          try {
+            const pieceData = JSON.parse(box.pieceQR);
+            palletNum = pieceData.palletNumber || 0;
+          } catch (e) {
+            console.warn('Failed to parse pieceQR:', box.pieceQR);
+          }
+        }
+        
+        acc[palletNum] = (acc[palletNum] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const palletNumbers = Object.keys(palletGroups)
+        .map(Number)
+        .filter(num => num > 0)
+        .sort((a, b) => a - b);
+      
+      const totalPallets = palletNumbers.length;
+      const looseBoxes = palletGroups[0] || 0;
+      
+      const palletDetails = palletNumbers.map(num => ({
+        palletNumber: num,
+        boxCount: palletGroups[num]
+      }));
+      
+      console.log('✅ Fresh data:', { totalPallets, looseBoxes, palletDetails, unassignedBoxes: unassignedBoxes.length });
+      
+      setSelectedShipmentForRack({
+        ...shipment,
+        remainingBoxes: unassignedBoxes.length,
+        totalPallets,
+        looseBoxes,
+        palletDetails
+      });
+      setShowRackSelection(true);
+      console.log('✅ Rack selection enabled with FRESH data');
+    } catch (err) {
+      console.error('Failed to fetch boxes:', err);
+      setError('Failed to load box data');
+    }
   };
 
   // Load racks for rack map
