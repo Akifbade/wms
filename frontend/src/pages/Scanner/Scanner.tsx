@@ -536,12 +536,36 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   };
 
   const validateAndReturnShipment = async (shipment: any, rawCode: string): Promise<ScanResult> => {
-    // Get box information
-    const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+    // Get box information with cache-busting to ensure fresh data
+    const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes?t=${Date.now()}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        'Cache-Control': 'no-cache'
+      }
     });
     const boxData = await boxResponse.json();
-    const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId);
+    // ✅ CRITICAL: Filter out boxes that are assigned (have rackId) OR already in storage/released
+    // A box is unassigned if: rackId is null/undefined AND status is not IN_STORAGE/RELEASED
+    const unassignedBoxes = boxData.boxes.filter((b: any) => {
+      const hasRackId = b.rackId !== null && b.rackId !== undefined && b.rackId !== '';
+      const isInStorage = b.status === 'IN_STORAGE';
+      const isReleased = b.status === 'RELEASED';
+      const isAssigned = hasRackId || isInStorage || isReleased;
+      return !isAssigned; // Return true if NOT assigned
+    });
+
+    console.log('🔍 validateAndReturnShipment - Box filtering:', {
+      shipmentId: shipment.id,
+      totalBoxes: boxData.boxes.length,
+      assignedBoxes: boxData.boxes.filter((b: any) => b.rackId).length,
+      unassignedBoxes: unassignedBoxes.length,
+      boxDetails: boxData.boxes.map((b: any) => ({
+        boxNumber: b.boxNumber,
+        rackId: b.rackId,
+        status: b.status,
+        pieceQR: b.pieceQR
+      }))
+    });
 
     // ⚠️ CHECK: If shipment is IN_STORAGE and has 0 remaining boxes, it's already fully assigned
     if (shipment.status === 'IN_STORAGE' && unassignedBoxes.length === 0) {
@@ -836,6 +860,12 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         setLooseBoxQuantity(0);
         setAssignmentPhotos([]);
         setRemainingBoxes(0);
+
+        // ✅ CRITICAL FIX: Refresh pending shipments list to get updated box counts
+        // This ensures when user comes back to assign more boxes, they see correct counts
+        if (activeTab === 'list') {
+          loadPendingShipments();
+        }
       } else {
         const error = await response.json();
         playErrorSound();
@@ -880,18 +910,60 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
             .filter((s: any) => s.status === 'PENDING' || s.status === 'PARTIAL')
             .map(async (shipment: any) => {
               try {
-                const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
-                  headers: { 'Authorization': `Bearer ${token}` }
+                // ✅ CRITICAL FIX: Fetch fresh box data with cache-busting
+                const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes?t=${Date.now()}`, {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Cache-Control': 'no-cache'
+                  }
                 });
                 const boxData = await boxResponse.json();
-                const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId).length;
+                // ✅ CRITICAL: Filter out boxes that are assigned properly
+                const unassignedBoxes = boxData.boxes.filter((b: any) => {
+                  const hasRackId = b.rackId !== null && b.rackId !== undefined && b.rackId !== '';
+                  const isInStorage = b.status === 'IN_STORAGE';
+                  const isReleased = b.status === 'RELEASED';
+                  return !hasRackId && !isInStorage && !isReleased;
+                });
+
+                // ✅ CRITICAL: Calculate pallet/loose breakdown from unassigned boxes
+                const palletGroups = unassignedBoxes.reduce((acc: Record<number, number>, box: any) => {
+                  let palletNum = 0; // Default: loose box
+                  if (box.pieceQR) {
+                    try {
+                      const pieceData = JSON.parse(box.pieceQR);
+                      palletNum = pieceData.palletNumber || 0;
+                    } catch (e) {
+                      console.warn('Failed to parse pieceQR:', box.pieceQR);
+                    }
+                  }
+                  acc[palletNum] = (acc[palletNum] || 0) + 1;
+                  return acc;
+                }, {});
+
+                const palletNumbers = Object.keys(palletGroups)
+                  .map(Number)
+                  .filter(num => num > 0)
+                  .sort((a, b) => a - b);
+
+                const totalPallets = palletNumbers.length;
+                const looseBoxes = palletGroups[0] || 0;
+                const palletDetails = palletNumbers.map(num => ({
+                  palletNumber: num,
+                  boxCount: palletGroups[num]
+                }));
+
                 const totalBoxes = boxData.boxes.length;
-                return unassignedBoxes > 0 ? {
+                return unassignedBoxes.length > 0 ? {
                   ...shipment,
-                  remainingBoxes: unassignedBoxes,
-                  totalBoxes: totalBoxes
+                  remainingBoxes: unassignedBoxes.length,
+                  totalBoxes: totalBoxes,
+                  availablePallets: totalPallets,
+                  availableLooseBoxes: looseBoxes,
+                  palletDetails: palletDetails
                 } : null;
-              } catch {
+              } catch (err) {
+                console.error('Error processing shipment boxes:', err);
                 return shipment; // Keep shipment if error checking boxes
               }
             })
@@ -918,12 +990,34 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
     try {
       setLoading(true);
 
-      // Get box count and shipment details
-      const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      // Get box count and shipment details with cache-busting
+      const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes?t=${Date.now()}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Cache-Control': 'no-cache'
+        }
       });
       const boxData = await boxResponse.json();
-      const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId);
+      // ✅ CRITICAL: Filter out boxes that are assigned (have rackId) OR already in storage/released
+      const unassignedBoxes = boxData.boxes.filter((b: any) => {
+        const hasRackId = b.rackId !== null && b.rackId !== undefined && b.rackId !== '';
+        const isInStorage = b.status === 'IN_STORAGE';
+        const isReleased = b.status === 'RELEASED';
+        const isAssigned = hasRackId || isInStorage || isReleased;
+        return !isAssigned; // Return true if NOT assigned
+      });
+
+      console.log('📊 handleRackSelectionFromList - Box filtering:', {
+        totalBoxes: boxData.boxes.length,
+        assignedBoxes: boxData.boxes.filter((b: any) => b.rackId).length,
+        unassignedBoxes: unassignedBoxes.length,
+        boxes: boxData.boxes.map((b: any) => ({
+          boxNumber: b.boxNumber,
+          rackId: b.rackId,
+          status: b.status,
+          pieceQR: b.pieceQR
+        }))
+      });
 
       // ✅ FIX: Calculate pallets based on ACTUAL pallet distribution, not fixed 20-box rule
       // Group unassigned boxes by palletNumber (stored in pieceQR JSON field)
@@ -990,12 +1084,37 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
     console.log('📦 Fetching FRESH box data...');
 
     try {
+      setLoading(true);
       // ✅ CRITICAL FIX: Fetch CURRENT unassigned boxes, not stale data
-      const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      // Use cache-busting timestamp to ensure fresh data after assignment
+      const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes?t=${Date.now()}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Cache-Control': 'no-cache'
+        }
       });
       const boxData = await boxResponse.json();
-      const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId);
+      // ✅ CRITICAL: Filter out boxes that are assigned (have rackId) OR already in storage/released
+      // A box is unassigned if: rackId is null/undefined AND status is not IN_STORAGE/RELEASED
+      const unassignedBoxes = boxData.boxes.filter((b: any) => {
+        const hasRackId = b.rackId !== null && b.rackId !== undefined && b.rackId !== '';
+        const isInStorage = b.status === 'IN_STORAGE';
+        const isReleased = b.status === 'RELEASED';
+        const isAssigned = hasRackId || isInStorage || isReleased;
+        return !isAssigned; // Return true if NOT assigned
+      });
+
+      console.log('📊 Box filtering:', {
+        totalBoxes: boxData.boxes.length,
+        assignedBoxes: boxData.boxes.filter((b: any) => b.rackId).length,
+        unassignedBoxes: unassignedBoxes.length,
+        boxes: boxData.boxes.map((b: any) => ({
+          boxNumber: b.boxNumber,
+          rackId: b.rackId,
+          status: b.status,
+          pieceQR: b.pieceQR
+        }))
+      });
 
       console.log('📦 Unassigned boxes:', unassignedBoxes.length);
 
@@ -1039,10 +1158,17 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         palletDetails
       });
       setShowRackSelection(true);
-      console.log('✅ Rack selection enabled with FRESH data');
+      console.log('✅ Rack selection enabled with FRESH data:', {
+        totalPallets,
+        looseBoxes,
+        palletDetails,
+        unassignedBoxes: unassignedBoxes.length
+      });
     } catch (err) {
       console.error('Failed to fetch boxes:', err);
       setError('Failed to load box data');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1154,11 +1280,15 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
         alert(`✅ Successfully assigned ${assignmentSummary} to ${selectedRackForAssignment.code}${photoUrls.length > 0 ? `\n📸 With ${photoUrls.length} photo${photoUrls.length > 1 ? 's' : ''}` : ''}`);
         setShowAssignmentModal(false);
+        setShowRackSelection(false);
+        setSelectedShipmentForRack(null);
+        setSelectedRackForAssignment(null);
         setPalletQuantity(0);
         setLooseBoxQuantity(0);
         setAssignmentPhotos([]);
 
-        // Force refresh the shipment data to get updated pallet/loose counts
+        // ✅ CRITICAL FIX: Force refresh the shipment data to get updated pallet/loose counts
+        // This ensures when user comes back to assign more boxes, they see correct counts
         loadPendingShipments();
         loadRacks();
       } else {
@@ -1692,10 +1822,69 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                           </div>
                           <div className="space-y-3">
                             <button
-                              onClick={() => {
-                                setPendingShipment(scanResult.data);
-                                setScanResult(null);
-                                startScanning();
+                              onClick={async () => {
+                                // ✅ CRITICAL FIX: Re-fetch fresh shipment data before setting pendingShipment
+                                // This ensures we get the latest box counts after any previous assignments
+                                try {
+                                  const freshResponse = await fetch(`/api/shipments/${scanResult.data.id}/boxes?t=${Date.now()}`, {
+                                    headers: {
+                                      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                                      'Cache-Control': 'no-cache'
+                                    }
+                                  });
+                                  const freshBoxData = await freshResponse.json();
+                                  const freshUnassignedBoxes = freshBoxData.boxes.filter((b: any) => {
+                                    const hasRackId = b.rackId !== null && b.rackId !== undefined && b.rackId !== '';
+                                    const isInStorage = b.status === 'IN_STORAGE';
+                                    const isReleased = b.status === 'RELEASED';
+                                    return !hasRackId && !isInStorage && !isReleased;
+                                  });
+
+                                  // Recalculate pallet/loose breakdown from FRESH data
+                                  const freshPalletGroups = freshUnassignedBoxes.reduce((acc: Record<number, number>, box: any) => {
+                                    let palletNum = 0;
+                                    if (box.pieceQR) {
+                                      try {
+                                        const pieceData = JSON.parse(box.pieceQR);
+                                        palletNum = pieceData.palletNumber || 0;
+                                      } catch (e) {
+                                        console.warn('Failed to parse pieceQR:', box.pieceQR);
+                                      }
+                                    }
+                                    acc[palletNum] = (acc[palletNum] || 0) + 1;
+                                    return acc;
+                                  }, {});
+
+                                  const freshPalletNumbers = Object.keys(freshPalletGroups)
+                                    .map(Number)
+                                    .filter(num => num > 0)
+                                    .sort((a, b) => a - b);
+                                  const freshTotalPallets = freshPalletNumbers.length;
+                                  const freshLooseBoxes = freshPalletGroups[0] || 0;
+                                  const freshPalletDetails = freshPalletNumbers.map(num => ({
+                                    palletNumber: num,
+                                    boxCount: freshPalletGroups[num]
+                                  }));
+
+                                  // Update scanResult.data with fresh counts
+                                  const freshShipmentData = {
+                                    ...scanResult.data,
+                                    remainingBoxes: freshUnassignedBoxes.length,
+                                    availablePallets: freshTotalPallets,
+                                    availableLooseBoxes: freshLooseBoxes,
+                                    palletDetails: freshPalletDetails
+                                  };
+
+                                  setPendingShipment(freshShipmentData);
+                                  setScanResult(null);
+                                  startScanning();
+                                } catch (err) {
+                                  console.error('Failed to refresh shipment data:', err);
+                                  // Fallback to original data if refresh fails
+                                  setPendingShipment(scanResult.data);
+                                  setScanResult(null);
+                                  startScanning();
+                                }
                               }}
                               className="w-full py-3 sm:py-3.5 md:py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-sm sm:text-base md:text-lg shadow-lg"
                             >

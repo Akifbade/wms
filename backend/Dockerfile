@@ -7,8 +7,8 @@ WORKDIR /app
 # Install OpenSSL for Prisma
 RUN apt-get update -y && apt-get install -y openssl
 
-# Clean any existing node_modules
-RUN rm -rf node_modules package-lock.json 2>/dev/null || true
+# Clean any existing node_modules and dist folder
+RUN rm -rf node_modules package-lock.json dist 2>/dev/null || true
 
 # Copy package files
 COPY package*.json ./
