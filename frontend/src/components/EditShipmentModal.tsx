@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { racksAPI, shipmentsAPI } from '../services/api';
+import { racksAPI, shipmentsAPI, companiesAPI } from '../services/api';
 import RackMapModal from './RackMapModal';
 import { parseNumberInput, getSafeNumber } from '../utils/inputHelpers';
 
@@ -146,15 +146,19 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
 
   const loadCompanyProfiles = async () => {
     try {
-      const response = await fetch('/api/company-profiles', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCompanyProfiles(data.companyProfiles || []);
-      }
+      const profiles = await companiesAPI.listProfiles();
+      const profileListRaw = Array.isArray(profiles)
+        ? profiles
+        : profiles && Array.isArray((profiles as any).profiles)
+          ? (profiles as any).profiles
+          : [];
+      const activeProfiles = profileListRaw.filter(
+        (profile: any) => profile?.isActive !== false
+      );
+      setCompanyProfiles(activeProfiles);
     } catch (err) {
       console.error('Failed to load company profiles:', err);
+      setCompanyProfiles([]);
     }
   };
 
