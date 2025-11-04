@@ -74,14 +74,22 @@ export const Scanner: React.FC = () => {
   // Helper to calculate pallet box counts from palletDetails
   const getPalletBoxCount = useCallback(
     (details: any[] | undefined, palletCount: number, fallbackPerPallet: number = 0) => {
+      console.log('🔍 getPalletBoxCount called:', { details, palletCount, fallbackPerPallet });
+      
       if (!palletCount) return 0;
-      if (details && details.length) {
-        return [...details]
-          .sort((a, b) => (a?.palletNumber || 0) - (b?.palletNumber || 0))
-          .slice(0, Math.min(palletCount, details.length))
-          .reduce((sum, detail) => sum + (detail?.boxCount || 0), 0);
+      
+      if (details && details.length > 0) {
+        const sorted = [...details].sort((a, b) => (a?.palletNumber || 0) - (b?.palletNumber || 0));
+        const selected = sorted.slice(0, Math.min(palletCount, details.length));
+        const total = selected.reduce((sum, detail) => sum + (detail?.boxCount || 0), 0);
+        
+        console.log('✅ Using palletDetails:', { sorted, selected, total });
+        return total;
       }
-      return palletCount * fallbackPerPallet;
+      
+      const fallback = palletCount * fallbackPerPallet;
+      console.log('⚠️ Using fallback calculation:', { palletCount, fallbackPerPallet, fallback });
+      return fallback;
     },
     []
   );
@@ -2189,7 +2197,11 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       <span className="text-purple-700">
                         {palletQuantity} Pallet{palletQuantity > 1 ? 's' : ''}
                         <span className="text-sm text-gray-600 ml-1">
-                          ({palletQuantity * 20} boxes)
+                          ({getPalletBoxCount(
+                            selectedShipmentForRack.palletDetails,
+                            palletQuantity,
+                            selectedShipmentForRack.boxesPerPallet || 0
+                          )} boxes)
                         </span>
                       </span>
                     )}
@@ -2198,7 +2210,11 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                     )}
                   </div>
                   <p className="text-lg font-bold text-green-700 mt-2">
-                    = {(palletQuantity * 20) + looseBoxQuantity} Total Boxes
+                    = {getPalletBoxCount(
+                      selectedShipmentForRack.palletDetails,
+                      palletQuantity,
+                      selectedShipmentForRack.boxesPerPallet || 0
+                    ) + looseBoxQuantity} Total Boxes
                   </p>
                 </div>
 
