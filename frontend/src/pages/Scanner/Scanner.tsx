@@ -1041,11 +1041,18 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
       if (response.ok) {
         // Success - refresh lists and close modal
-        alert(`✅ Successfully assigned ${palletQuantity} pallets + ${looseBoxQuantity} boxes to ${selectedRackForAssignment.code}${photoUrls.length > 0 ? ` with ${photoUrls.length} photos` : ''}`);
+        const assignedPallets = palletQuantity > 0 ? `${palletQuantity} pallet${palletQuantity > 1 ? 's' : ''} (${palletQuantity * (selectedShipmentForRack.boxesPerPallet || 0)} boxes)` : '';
+        const assignedLoose = looseBoxQuantity > 0 ? `${looseBoxQuantity} loose box${looseBoxQuantity > 1 ? 'es' : ''}` : '';
+        const separator = assignedPallets && assignedLoose ? ' + ' : '';
+        const assignmentSummary = assignedPallets + separator + assignedLoose;
+        
+        alert(`✅ Successfully assigned ${assignmentSummary} to ${selectedRackForAssignment.code}${photoUrls.length > 0 ? `\n📸 With ${photoUrls.length} photo${photoUrls.length > 1 ? 's' : ''}` : ''}`);
         setShowAssignmentModal(false);
         setPalletQuantity(0);
         setLooseBoxQuantity(0);
         setAssignmentPhotos([]);
+        
+        // Force refresh the shipment data to get updated pallet/loose counts
         loadPendingShipments();
         loadRacks();
       } else {
@@ -1345,8 +1352,8 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                             )}
 
                             {/* Total Summary */}
-                            <div className="bg-blue-50 border border-blue-300 p-3 rounded-lg mb-3">
-                              <p className="font-semibold text-gray-800 mb-1">Total to assign:</p>
+                            <div className="bg-green-50 border border-green-300 p-3 rounded-lg mb-3">
+                              <p className="font-semibold text-gray-800 mb-1">📋 Total to assign:</p>
                               {palletQuantity > 0 && (
                                 <p className="text-lg font-bold text-gray-900">
                                   {palletQuantity} Pallet{palletQuantity > 1 ? 's' : ''} (
@@ -1366,7 +1373,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                   + {looseBoxQuantity} Loose Box{looseBoxQuantity > 1 ? 'es' : ''}
                                 </p>
                               )}
-                              <p className="text-xl font-bold text-blue-800 mt-2">
+                              <p className="text-xl font-bold text-green-800 mt-2">
                                 = {(() => {
                                   let total = looseBoxQuantity || 0;
                                   for (let i = 0; i < (palletQuantity || 0); i++) {
@@ -1403,9 +1410,9 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               />
                               <label
                                 htmlFor="scanner-photo-upload"
-                                className="w-full block py-3 bg-purple-600 text-white text-center rounded-lg font-bold cursor-pointer hover:bg-purple-700"
+                                className="w-full block py-3 bg-blue-600 text-white text-center rounded-lg font-semibold cursor-pointer hover:bg-blue-700 transition-colors"
                               >
-                                📷 Take/Select Photos ({assignmentPhotos.length}/10)
+                                📷 Upload Photos ({assignmentPhotos.length}/10)
                               </label>
 
                               {assignmentPhotos.length > 0 && (
