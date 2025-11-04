@@ -6,7 +6,7 @@
 /**
  * Auto-incremented version (updated by pre-commit hook)
  */
-export const APP_VERSION = 'v2.1.143';
+export const APP_VERSION = 'v2.1.147';
 
 export const getVersionInfo = () => {
   return {
