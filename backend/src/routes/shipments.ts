@@ -1484,18 +1484,12 @@ router.post('/:shipmentId/assign-rack',
 
       const updatedBoxes = await prisma.$transaction(
         boxesToAssign.map((box: any, index: number) => {
-          // Calculate pallet number for this box
-          let palletNumber: number | null = null;
-          if (boxesPerPallet > 0 && palletsToAssign > 0) {
-            palletNumber = Math.floor(index / boxesPerPallet) + 1;
-            if (palletNumber > palletsToAssign) {
-              palletNumber = null; // Loose box
-            }
-          }
-
-          // Store pallet info in pieceQR as JSON
+          // ✅ FIX: PRESERVE the original palletNumber from pieceQR
+          // Don't recalculate - the box already knows which pallet it belongs to from intake
           const pieceData = box.pieceQR ? JSON.parse(box.pieceQR) : {};
-          pieceData.palletNumber = palletNumber;
+          
+          // Keep original palletNumber - it was set correctly during shipment intake
+          // DO NOT overwrite with recalculated value based on assignment order
 
           return prisma.shipmentBox.update({
             where: { id: box.id },
@@ -1503,7 +1497,7 @@ router.post('/:shipmentId/assign-rack',
               rackId,
               assignedAt: new Date(),
               status: 'IN_STORAGE',
-              pieceQR: JSON.stringify(pieceData),
+              pieceQR: JSON.stringify(pieceData), // Preserve original data
               photos: photosJson // Store photos in all assigned boxes
             }
           });
