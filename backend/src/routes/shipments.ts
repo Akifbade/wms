@@ -317,7 +317,21 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
     // Determine mode and compute counts
     let totalBoxCount = 0;
     let originalBoxCount = 0;
-    if (boxesDistribution && boxesDistribution.length > 0) {
+
+    // Check if box mode FIRST (palletCount === 0 or boxesPerPallet === 0)
+    const isBoxMode = (palletCount === 0 || boxesPerPallet === 0) && boxesDistribution.length === 0;
+
+    if (isBoxMode) {
+      // ✅ BOX MODE: Use originalBoxCount from request data
+      originalBoxCount = parseOptionalInt(data.originalBoxCount) ?? 0;
+      totalBoxCount = originalBoxCount;
+      palletCount = 0; // Ensure palletCount is 0 for box mode
+      boxesPerPallet = 0; // Ensure boxesPerPallet is 0 for box mode
+
+      if (originalBoxCount <= 0) {
+        return res.status(400).json({ error: 'Total boxes must be greater than zero in box mode' });
+      }
+    } else if (boxesDistribution && boxesDistribution.length > 0) {
       // Variable mode: palletCount becomes distribution length
       palletCount = boxesDistribution.length;
       const distributionSum = boxesDistribution.reduce((a, b) => a + Math.max(0, Math.trunc(b || 0)), 0);
@@ -326,6 +340,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
       totalBoxCount = distributionSum + Math.max(0, Math.trunc(extraBoxes || 0));
       originalBoxCount = totalBoxCount;
     } else {
+      // ✅ PALLET MODE validations
       if (!palletCount || palletCount <= 0) {
         return res.status(400).json({ error: 'Pallet count must be greater than zero' });
       }
@@ -548,9 +563,13 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
         });
       }
     } else {
-      // Uniform mode: original logic
+      // Uniform mode: Check if box mode (palletCount === 0 or boxesPerPallet === 0)
+      const isBoxMode = palletCount === 0 || boxesPerPallet === 0;
+
       for (let i = 1; i <= totalBoxCount; i++) {
-        const palletNumber = Math.ceil(i / (boxesPerPallet as number));
+        const palletNumber = isBoxMode ? 0 : Math.ceil(i / (boxesPerPallet as number));
+        const isLoose = isBoxMode || palletNumber === 0;
+
         boxesToCreate.push({
           shipmentId: shipment.id,
           boxNumber: i,
@@ -563,6 +582,7 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
             masterQRCode: masterQR,
             boxNumber: i,
             palletNumber,
+            isLoose,
             palletCount,
             boxesPerPallet,
             totalBoxes: totalBoxCount,

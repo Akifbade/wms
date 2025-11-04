@@ -32,6 +32,7 @@ interface Shipment {
   companyProfileId?: string;
   companyProfile?: { id: string; name: string } | null;
   arrivalDate: string;
+  notes?: string; // Additional information field
 }
 
 export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }: BoxQRModalProps) {
@@ -371,6 +372,11 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
                         <div><span className="font-medium">Pieces on Pallet:</span> <span className="font-bold">{unit.pieces}</span></div>
                         <div><span className="font-medium">Client:</span> <span className="font-bold">{shipment?.clientName || '—'}</span></div>
                         <div><span className="font-medium">Arrived:</span> <span className="font-bold">{new Date(shipment?.arrivalDate || '').toLocaleDateString()}</span></div>
+                        {shipment?.notes && (
+                          <div className="pt-2 border-t border-gray-300">
+                            <span className="font-medium">Notes:</span> <span className="font-bold text-blue-700">{shipment.notes}</span>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-sm text-gray-700 space-y-1.5">
@@ -381,6 +387,11 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
                         )}
                         <div><span className="font-medium">Client:</span> <span className="font-bold">{shipment?.clientName || '—'}</span></div>
                         <div><span className="font-medium">Arrived:</span> <span className="font-bold">{new Date(shipment?.arrivalDate || '').toLocaleDateString()}</span></div>
+                        {shipment?.notes && (
+                          <div className="pt-2 border-t border-gray-300">
+                            <span className="font-medium">Notes:</span> <span className="font-bold text-blue-700">{shipment.notes}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

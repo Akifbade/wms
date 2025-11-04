@@ -1,9 +1,9 @@
 /**
  * Version Configuration for Backend
- * Auto-updated by GitHub Actions
+ * Auto-updated by GitHub Actions or manually for local testing
  */
 
-export const APP_VERSION = 'v2.1.106';
+export const APP_VERSION = 'v2.1.140'; // ✅ UPDATED for box mode QR fixes
 
 export const getVersionInfo = () => {
   return {

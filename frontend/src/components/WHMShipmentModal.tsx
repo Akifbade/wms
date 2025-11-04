@@ -638,10 +638,10 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
       const palletCount = intakeMode === 'pallet'
         ? getSafeNumber(formData.palletCount, 0)
-        : 1;
+        : 0; // ✅ Box mode: NO pallets (0 = all boxes are loose)
       const uniformBoxesPerPallet = intakeMode === 'pallet'
         ? getSafeNumber(formData.boxesPerPallet, 0)
-        : getSafeNumber(formData.pieces, 0);
+        : 0; // ✅ Box mode: boxes per pallet = 0 (indicating loose boxes)
 
       const dist = variablePerPallet
         ? boxesDistribution.slice(0, Math.max(palletCount, 0)).map(n => Math.max(0, Math.trunc(n || 0)))
@@ -649,14 +649,19 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       const loose = variablePerPallet ? Math.max(0, Math.trunc(extraBoxes || 0)) : 0;
       const computedPieces = variablePerPallet
         ? dist.reduce((a, b) => a + b, 0) + loose
-        : palletCount * uniformBoxesPerPallet;
+        : intakeMode === 'box'
+          ? getSafeNumber(formData.pieces, 0) // Box mode: use pieces count directly
+          : palletCount * uniformBoxesPerPallet; // Pallet mode: multiply pallets × boxes/pallet
 
-      if (palletCount <= 0) {
+      // Validation: Pallet mode specific
+      if (intakeMode === 'pallet' && palletCount <= 0) {
         throw new Error('Pallet count must be at least 1');
       }
-      if (!variablePerPallet && uniformBoxesPerPallet <= 0) {
+      if (intakeMode === 'pallet' && !variablePerPallet && uniformBoxesPerPallet <= 0) {
         throw new Error('Boxes per pallet must be at least 1');
       }
+
+      // Common validation
       if (computedPieces <= 0) {
         throw new Error('Number of boxes must be greater than 0');
       }
