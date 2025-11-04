@@ -54,6 +54,9 @@ export const Scanner: React.FC = () => {
   const [showShipmentDetails, setShowShipmentDetails] = useState(false);
   const [selectedShipmentForDetails, setSelectedShipmentForDetails] = useState<any>(null);
 
+  // Manual code input state
+  const [manualCode, setManualCode] = useState<string>('');
+
   // ✅ Duplicate prevention: Track last scanned code and timestamp
   const lastScanRef = useRef<{ code: string; timestamp: number } | null>(null);
   const SCAN_COOLDOWN_MS = 3000; // 3 seconds cooldown between same QR scans
@@ -67,6 +70,21 @@ export const Scanner: React.FC = () => {
     }
     return audioContextRef.current;
   };
+
+  // Helper to calculate pallet box counts from palletDetails
+  const getPalletBoxCount = useCallback(
+    (details: any[] | undefined, palletCount: number, fallbackPerPallet: number = 0) => {
+      if (!palletCount) return 0;
+      if (details && details.length) {
+        return [...details]
+          .sort((a, b) => (a?.palletNumber || 0) - (b?.palletNumber || 0))
+          .slice(0, Math.min(palletCount, details.length))
+          .reduce((sum, detail) => sum + (detail?.boxCount || 0), 0);
+      }
+      return palletCount * fallbackPerPallet;
+    },
+    []
+  );
 
   const playSuccessSound = () => {
     try {
@@ -438,6 +456,32 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       } catch (err) {
         console.error('Scanner stop error:', err);
       }
+    }
+  };
+
+  const handleManualSearch = async () => {
+    if (!manualCode.trim()) return;
+    
+    setLoading(true);
+    try {
+      const result = await processScanCode(manualCode);
+      
+      if (result.type === 'unknown') {
+        playErrorSound();
+      } else if (result.data?.status === 'IN_STORAGE' && result.type === 'shipment') {
+        playErrorSound();
+      } else {
+        playSuccessSound();
+      }
+      
+      setScanResult(result);
+      setScanHistory(prev => [result, ...prev.slice(0, 9)]);
+      setManualCode('');
+    } catch (err: any) {
+      playErrorSound();
+      setError(err.message || 'Failed to process code');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -2250,17 +2294,3 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
     </div>
   );
 };
-
-  const getPalletBoxCount = useCallback(
-    (details: any[] | undefined, palletCount: number, fallbackPerPallet: number = 0) => {
-      if (!palletCount) return 0;
-      if (details && details.length) {
-        return [...details]
-          .sort((a, b) => (a?.palletNumber || 0) - (b?.palletNumber || 0))
-          .slice(0, Math.min(palletCount, details.length))
-          .reduce((sum, detail) => sum + (detail?.boxCount || 0), 0);
-      }
-      return palletCount * fallbackPerPallet;
-    },
-    []
-  );
