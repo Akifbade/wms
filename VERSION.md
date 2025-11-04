@@ -1,7 +1,7 @@
 ```markdown
 # 📦 WMS Version History
-## Current Version: **v2.1.157**
-- **Released**: Nov 04, 2025 at 20:30:16
+## Current Version: **v2.1.158**
+- **Released**: Nov 04, 2025 at 20:40:04
 - **Author**: local-dev
 - **Status**: Development  
 - **Change**: fix: Box mode QR generation - originalBoxCount initialization + notes in QR print
