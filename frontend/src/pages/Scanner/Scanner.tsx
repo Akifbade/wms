@@ -75,18 +75,18 @@ export const Scanner: React.FC = () => {
   const getPalletBoxCount = useCallback(
     (details: any[] | undefined, palletCount: number, fallbackPerPallet: number = 0) => {
       console.log('🔍 getPalletBoxCount called:', { details, palletCount, fallbackPerPallet });
-      
+
       if (!palletCount) return 0;
-      
+
       if (details && details.length > 0) {
         const sorted = [...details].sort((a, b) => (a?.palletNumber || 0) - (b?.palletNumber || 0));
         const selected = sorted.slice(0, Math.min(palletCount, details.length));
         const total = selected.reduce((sum, detail) => sum + (detail?.boxCount || 0), 0);
-        
+
         console.log('✅ Using palletDetails:', { sorted, selected, total });
         return total;
       }
-      
+
       const fallback = palletCount * fallbackPerPallet;
       console.log('⚠️ Using fallback calculation:', { palletCount, fallbackPerPallet, fallback });
       return fallback;
@@ -469,11 +469,11 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
   const handleManualSearch = async () => {
     if (!manualCode.trim()) return;
-    
+
     setLoading(true);
     try {
       const result = await processScanCode(manualCode);
-      
+
       if (result.type === 'unknown') {
         playErrorSound();
       } else if (result.data?.status === 'IN_STORAGE' && result.type === 'shipment') {
@@ -481,7 +481,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       } else {
         playSuccessSound();
       }
-      
+
       setScanResult(result);
       setScanHistory(prev => [result, ...prev.slice(0, 9)]);
       setManualCode('');
@@ -988,7 +988,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   const handleSelectShipment = async (shipment: any) => {
     console.log('🎯 Choose Rack clicked for shipment:', shipment);
     console.log('📦 Fetching FRESH box data...');
-    
+
     try {
       // ✅ CRITICAL FIX: Fetch CURRENT unassigned boxes, not stale data
       const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes`, {
@@ -996,13 +996,13 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       });
       const boxData = await boxResponse.json();
       const unassignedBoxes = boxData.boxes.filter((b: any) => !b.rackId);
-      
+
       console.log('📦 Unassigned boxes:', unassignedBoxes.length);
-      
+
       // Recalculate pallet/loose box breakdown from CURRENT boxes
       const palletGroups = unassignedBoxes.reduce((acc: Record<number, number>, box: any) => {
         let palletNum = 0; // Default: loose box
-        
+
         if (box.pieceQR) {
           try {
             const pieceData = JSON.parse(box.pieceQR);
@@ -1011,26 +1011,26 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
             console.warn('Failed to parse pieceQR:', box.pieceQR);
           }
         }
-        
+
         acc[palletNum] = (acc[palletNum] || 0) + 1;
         return acc;
       }, {});
-      
+
       const palletNumbers = Object.keys(palletGroups)
         .map(Number)
         .filter(num => num > 0)
         .sort((a, b) => a - b);
-      
+
       const totalPallets = palletNumbers.length;
       const looseBoxes = palletGroups[0] || 0;
-      
+
       const palletDetails = palletNumbers.map(num => ({
         palletNumber: num,
         boxCount: palletGroups[num]
       }));
-      
+
       console.log('✅ Fresh data:', { totalPallets, looseBoxes, palletDetails, unassignedBoxes: unassignedBoxes.length });
-      
+
       setSelectedShipmentForRack({
         ...shipment,
         remainingBoxes: unassignedBoxes.length,
@@ -1151,13 +1151,13 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         const assignedLoose = looseBoxQuantity > 0 ? `${looseBoxQuantity} loose box${looseBoxQuantity > 1 ? 'es' : ''}` : '';
         const separator = assignedPallets && assignedLoose ? ' + ' : '';
         const assignmentSummary = assignedPallets + separator + assignedLoose;
-        
+
         alert(`✅ Successfully assigned ${assignmentSummary} to ${selectedRackForAssignment.code}${photoUrls.length > 0 ? `\n📸 With ${photoUrls.length} photo${photoUrls.length > 1 ? 's' : ''}` : ''}`);
         setShowAssignmentModal(false);
         setPalletQuantity(0);
         setLooseBoxQuantity(0);
         setAssignmentPhotos([]);
-        
+
         // Force refresh the shipment data to get updated pallet/loose counts
         loadPendingShipments();
         loadRacks();

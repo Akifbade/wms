@@ -202,16 +202,16 @@ export const Shipments: React.FC = () => {
   const getPalletInfo = (shipment: any) => {
     const assigned = shipment.originalBoxCount - shipment.currentBoxCount;
     const remaining = shipment.currentBoxCount;
-    
+
     if (shipment.status === 'PARTIAL' && assigned > 0) {
       // Show clear assignment status for partial shipments
       return `✅ ${assigned} assigned, ⏳ ${remaining} pending`;
     }
-    
+
     if (shipment.palletCount > 0 && shipment.boxesPerPallet > 0) {
       return `${shipment.palletCount} pallets × ${shipment.boxesPerPallet} boxes`;
     }
-    
+
     return `${shipment.currentBoxCount || 0} boxes total`;
   };
 
