@@ -1440,12 +1440,49 @@ router.post('/:shipmentId/assign-rack',
         return res.status(404).json({ error: 'Rack not found' });
       }
 
-      // Get boxes to assign
-      const boxesToAssign = unassignedBoxes.slice(0, quantity);
+      // ✅ CRITICAL FIX: Select boxes based on pallet/loose selection from frontend
+      // Group boxes by their palletNumber from pieceQR
+      const boxesByPallet: Record<number, any[]> = {};
+      unassignedBoxes.forEach((box: any) => {
+        const pieceData = box.pieceQR ? JSON.parse(box.pieceQR) : {};
+        const palletNum = pieceData.palletNumber ?? 0; // null/undefined → 0 (loose)
+        if (!boxesByPallet[palletNum]) boxesByPallet[palletNum] = [];
+        boxesByPallet[palletNum].push(box);
+      });
+
+      // Build list of boxes to assign based on frontend selection
+      const boxesToAssign: any[] = [];
+      let palletsToAssign = pallets || 0;
+
+      // If frontend specified pallets, assign those pallet boxes first
+      if (palletsToAssign > 0) {
+        const palletNumbers = Object.keys(boxesByPallet)
+          .map(Number)
+          .filter(n => n > 0) // Only actual pallets, not loose (0)
+          .sort((a, b) => a - b);
+
+        for (let i = 0; i < Math.min(palletsToAssign, palletNumbers.length); i++) {
+          const palletNum = palletNumbers[i];
+          const palletBoxes = boxesByPallet[palletNum] || [];
+          boxesToAssign.push(...palletBoxes);
+        }
+      }
+
+      // Then add loose boxes if requested
+      if (looseBoxes && looseBoxes > 0) {
+        const looseBoxList = boxesByPallet[0] || [];
+        boxesToAssign.push(...looseBoxList.slice(0, looseBoxes));
+      }
+
+      console.log('📦 Box selection:', {
+        requestedPallets: pallets,
+        requestedLooseBoxes: looseBoxes,
+        selectedBoxes: boxesToAssign.length,
+        boxNumbers: boxesToAssign.map((b: any) => b.boxNumber)
+      });
 
       // Calculate pallet usage for capacity check
       const boxesPerPallet = shipment.boxesPerPallet || 0;
-      let palletsToAssign = pallets || 0;
 
       // ✅ SAFE FIX: Only auto-calculate pallets if frontend didn't specify
       // If frontend sends pallets = 0 explicitly (loose boxes only), respect it
@@ -1487,7 +1524,7 @@ router.post('/:shipmentId/assign-rack',
           // ✅ FIX: PRESERVE the original palletNumber from pieceQR
           // Don't recalculate - the box already knows which pallet it belongs to from intake
           const pieceData = box.pieceQR ? JSON.parse(box.pieceQR) : {};
-          
+
           // Keep original palletNumber - it was set correctly during shipment intake
           // DO NOT overwrite with recalculated value based on assignment order
 
