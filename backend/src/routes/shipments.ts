@@ -1253,10 +1253,34 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
       }
     }
 
+    // 🔒 CRITICAL FIX: Get affected racks BEFORE deleting boxes
+    const boxesToDelete = await prisma.shipmentBox.findMany({
+      where: { shipmentId: id },
+      select: { rackId: true }
+    });
+    const affectedRackIds = [...new Set(boxesToDelete.map(b => b.rackId).filter(Boolean))];
+
+    console.log(`📦 Deleting shipment ${existing.referenceId} - Affects ${affectedRackIds.length} racks`);
+
     // Hard delete: First delete boxes (cascade will handle items)
     await prisma.shipmentBox.deleteMany({
       where: { shipmentId: id }
     });
+
+    // 🔧 UPDATE RACK CAPACITIES (prevents capacity leak)
+    for (const rackId of affectedRackIds) {
+      if (rackId) {
+        const palletsUsed = await recomputeRackPalletUsage(prisma, rackId, companyId);
+        await prisma.rack.update({
+          where: { id: rackId },
+          data: {
+            capacityUsed: palletsUsed,
+            lastActivity: new Date()
+          }
+        });
+        console.log(`✅ Updated rack capacity after delete: ${palletsUsed} pallets`);
+      }
+    }
 
     // Then delete the shipment
     await prisma.shipment.delete({
@@ -1265,7 +1289,8 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
 
     res.json({
       message: 'Shipment deleted successfully',
-      deletedPhotos: photoUrls.length
+      deletedPhotos: photoUrls.length,
+      updatedRacks: affectedRackIds.length
     });
   } catch (error) {
     console.error('Delete shipment error:', error);
@@ -1485,22 +1510,25 @@ router.post('/:shipmentId/assign-rack',
         })
       );
 
-      // Update rack capacity
+      // 🔧 CRITICAL FIX: Use ONLY recomputeRackPalletUsage for consistency
+      // This ensures all capacity calculations use the same method
+      const finalPalletsUsed = await recomputeRackPalletUsage(prisma, rackId, req.user!.companyId);
+
       await prisma.rack.update({
         where: { id: rackId },
         data: {
-          capacityUsed: newPalletUsage,
-          status: newPalletUsage >= (rack.capacityTotal || 100) ? 'FULL' :
-            newPalletUsage > 0 ? 'OCCUPIED' : 'AVAILABLE'
+          capacityUsed: finalPalletsUsed, // ✅ Use recomputed value, not manual calculation
+          lastActivity: new Date(),
+          status: finalPalletsUsed >= (rack.capacityTotal || 100) ? 'FULL' :
+            finalPalletsUsed > 0 ? 'OCCUPIED' : 'AVAILABLE'
         }
       });
 
-      // Recompute rack pallet usage for accuracy (pass required parameters)
-      try {
-        await recomputeRackPalletUsage(prisma, rackId, req.user!.companyId);
-      } catch (err) {
-        console.warn('⚠️ Failed to recompute rack capacity:', err);
-      }
+      console.log('✅ Rack capacity updated:', {
+        rackCode: rack.code,
+        manualCalculation: newPalletUsage,
+        actualPalletsUsed: finalPalletsUsed
+      });
 
       // Check remaining boxes and update shipment status
       const remainingBoxes = await prisma.shipmentBox.count({

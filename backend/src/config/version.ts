@@ -3,7 +3,10 @@
  * Auto-updated by GitHub Actions or manually for local testing
  */
 
-export const APP_VERSION = 'v2.1.140'; // ✅ UPDATED for box mode QR fixes
+/**
+ * Auto-incremented version (updated by pre-commit hook)
+ */
+export const APP_VERSION = 'v2.1.143';
 
 export const getVersionInfo = () => {
   return {

@@ -529,7 +529,7 @@ export const Shipments: React.FC = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4">
                       {shipment.status === 'RELEASED' ? (
                         shipment.rackLocations && shipment.rackLocations !== 'N/A' ? (
                           <span className="text-sm text-gray-500 italic">
@@ -538,8 +538,24 @@ export const Shipments: React.FC = () => {
                         ) : (
                           <span className="text-sm text-gray-400">-</span>
                         )
+                      ) : shipment.rackLocations && shipment.rackLocations !== 'N/A' ? (
+                        (() => {
+                          const racks = shipment.rackLocations.split(',').map((r: string) => r.trim()).filter(Boolean);
+                          if (racks.length > 1) {
+                            return (
+                              <div className="flex flex-wrap gap-1">
+                                {racks.map((rack: string, idx: number) => (
+                                  <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">
+                                    📍 {rack}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          }
+                          return <span className="text-sm font-medium text-primary-600">{racks[0]}</span>;
+                        })()
                       ) : (
-                        <span className="text-sm font-medium text-primary-600">{shipment.rackLocations || 'N/A'}</span>
+                        <span className="text-sm text-gray-400">Not Assigned</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
