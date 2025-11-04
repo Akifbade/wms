@@ -237,6 +237,12 @@ export const Shipments: React.FC = () => {
   const filteredShipments = shipments.filter((shipment: any) => {
     if (!searchTerm.trim()) return true; // No filter if search empty
 
+    // Check for company filter prefix
+    if (searchTerm.startsWith('company:')) {
+      const companyName = searchTerm.replace('company:', '').trim();
+      return shipment.companyProfile?.name === companyName;
+    }
+
     const searchLower = searchTerm.toLowerCase();
 
     // Search across multiple fields
@@ -439,26 +445,43 @@ export const Shipments: React.FC = () => {
           </nav>
         </div>
 
-        {/* Advanced Search Bar */}
-        <div className="p-4 bg-gray-50">
-          <div className="relative max-w-2xl">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="🔍 Search by client, company, reference ID, barcode, phone, or any keyword..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                title="Clear search"
+        {/* Advanced Search & Filters */}
+        <div className="p-4 bg-gray-50 border-t border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Search Bar */}
+            <div className="relative md:col-span-2">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search client name, reference ID, phone..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Company Filter */}
+            <div className="relative">
+              <select
+                value={searchTerm.startsWith('company:') ? searchTerm.replace('company:', '') : ''}
+                onChange={(e) => setSearchTerm(e.target.value ? `company:${e.target.value}` : '')}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm appearance-none bg-white"
               >
-                ✕
-              </button>
-            )}
+                <option value="">All Companies</option>
+                {[...new Set(shipments.map((s: any) => s.companyProfile?.name).filter(Boolean))].sort().map((company: any) => (
+                  <option key={company} value={company}>{company}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -467,18 +490,18 @@ export const Shipments: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Barcode ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pieces</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rack</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days Stored</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Reference ID</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Client</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Company</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Contact</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Pieces</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Type</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Rack Location</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Storage Duration</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
