@@ -979,19 +979,12 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       const token = localStorage.getItem('authToken');
 
       // ✅ FIX: Calculate total boxes based on ACTUAL pallet contents, not fixed 20-box rule
-      let totalBoxesToAssign = 0;
-
-      // Add boxes from selected pallets (using actual pallet box counts)
-      if (palletQuantity > 0 && selectedShipmentForRack.palletDetails) {
-        for (let i = 0; i < palletQuantity; i++) {
-          if (selectedShipmentForRack.palletDetails[i]) {
-            totalBoxesToAssign += selectedShipmentForRack.palletDetails[i].boxCount;
-          }
-        }
-      }
-
-      // Add loose boxes
-      totalBoxesToAssign += looseBoxQuantity;
+      const totalBoxesToAssign =
+        getPalletBoxCount(
+          selectedShipmentForRack.palletDetails,
+          palletQuantity || 0,
+          selectedShipmentForRack.boxesPerPallet || 0
+        ) + (looseBoxQuantity || 0);
 
       console.log('🎯 Assigning:', {
         pallets: palletQuantity,
@@ -1041,7 +1034,15 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
       if (response.ok) {
         // Success - refresh lists and close modal
-        const assignedPallets = palletQuantity > 0 ? `${palletQuantity} pallet${palletQuantity > 1 ? 's' : ''} (${palletQuantity * (selectedShipmentForRack.boxesPerPallet || 0)} boxes)` : '';
+        const assignedPalletBoxCount = getPalletBoxCount(
+          selectedShipmentForRack.palletDetails,
+          palletQuantity || 0,
+          selectedShipmentForRack.boxesPerPallet || 0
+        );
+
+        const assignedPallets = palletQuantity > 0
+          ? `${palletQuantity} pallet${palletQuantity > 1 ? 's' : ''} (${assignedPalletBoxCount} box${assignedPalletBoxCount === 1 ? '' : 'es'})`
+          : '';
         const assignedLoose = looseBoxQuantity > 0 ? `${looseBoxQuantity} loose box${looseBoxQuantity > 1 ? 'es' : ''}` : '';
         const separator = assignedPallets && assignedLoose ? ' + ' : '';
         const assignmentSummary = assignedPallets + separator + assignedLoose;
@@ -1357,15 +1358,11 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               {palletQuantity > 0 && (
                                 <p className="text-lg font-bold text-gray-900">
                                   {palletQuantity} Pallet{palletQuantity > 1 ? 's' : ''} (
-                                  {(() => {
-                                    let boxes = 0;
-                                    for (let i = 0; i < palletQuantity; i++) {
-                                      if (pendingShipment.palletDetails && pendingShipment.palletDetails[i]) {
-                                        boxes += pendingShipment.palletDetails[i].boxCount;
-                                      }
-                                    }
-                                    return boxes;
-                                  })()} boxes)
+                                  {getPalletBoxCount(
+                                    pendingShipment.palletDetails,
+                                    palletQuantity,
+                                    pendingShipment.boxesPerPallet || 0
+                                  )} boxes)
                                 </p>
                               )}
                               {looseBoxQuantity > 0 && (
@@ -1374,15 +1371,13 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                 </p>
                               )}
                               <p className="text-xl font-bold text-green-800 mt-2">
-                                = {(() => {
-                                  let total = looseBoxQuantity || 0;
-                                  for (let i = 0; i < (palletQuantity || 0); i++) {
-                                    if (pendingShipment.palletDetails && pendingShipment.palletDetails[i]) {
-                                      total += pendingShipment.palletDetails[i].boxCount;
-                                    }
-                                  }
-                                  return total;
-                                })()} Total Boxes
+                                =
+                                {getPalletBoxCount(
+                                  pendingShipment.palletDetails,
+                                  palletQuantity || 0,
+                                  pendingShipment.boxesPerPallet || 0
+                                ) + (looseBoxQuantity || 0)}{' '}
+                                Total Boxes
                               </p>
                             </div>
 
@@ -2255,3 +2250,17 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
     </div>
   );
 };
+
+  const getPalletBoxCount = useCallback(
+    (details: any[] | undefined, palletCount: number, fallbackPerPallet: number = 0) => {
+      if (!palletCount) return 0;
+      if (details && details.length) {
+        return [...details]
+          .sort((a, b) => (a?.palletNumber || 0) - (b?.palletNumber || 0))
+          .slice(0, Math.min(palletCount, details.length))
+          .reduce((sum, detail) => sum + (detail?.boxCount || 0), 0);
+      }
+      return palletCount * fallbackPerPallet;
+    },
+    []
+  );
