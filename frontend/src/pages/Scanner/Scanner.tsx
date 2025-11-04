@@ -1237,34 +1237,35 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                           </div>
 
                           {/* How Many to Assign? */}
-                          <div className="mb-4 bg-orange-50 border border-orange-300 p-4 rounded-lg">
-                            <p className="text-orange-800 font-semibold mb-3 flex items-center gap-2">
+                          <div className="mb-4 bg-gray-50 border border-gray-300 p-4 rounded-lg">
+                            <p className="text-gray-800 font-semibold mb-3 flex items-center gap-2">
                               📦 How Many to Assign?
                             </p>
 
                             <div className="bg-white p-3 rounded border mb-3">
-                              <p className="text-sm text-gray-600 mb-2">Available for assignment:</p>
+                              <p className="text-sm text-gray-700 font-medium mb-2">Available for assignment:</p>
                               <div className="flex items-center justify-center gap-6">
                                 {pendingShipment.availablePallets > 0 && (
                                   <div className="flex items-center gap-2">
-                                    <span className="text-3xl">🎁</span>
+                                    <span className="text-2xl">📦</span>
                                     <div>
-                                      <p className="font-bold text-xl text-blue-600">{pendingShipment.availablePallets} Pallets</p>
+                                      <p className="font-bold text-lg text-gray-800">{pendingShipment.availablePallets} Pallet{pendingShipment.availablePallets > 1 ? 's' : ''}</p>
                                       {pendingShipment.palletDetails && pendingShipment.palletDetails.length > 0 ? (
-                                        <p className="text-xs text-gray-500">
-                                          {pendingShipment.palletDetails.map((p: any) => `P${p.palletNumber}:${p.boxCount}box`).join(', ')}
+                                        <p className="text-xs text-gray-600">
+                                          {pendingShipment.palletDetails.map((p: any) => `P${p.palletNumber}: ${p.boxCount} boxes`).join(', ')}
                                         </p>
                                       ) : (
-                                        <p className="text-xs text-gray-500">(20 boxes each)</p>
+                                        <p className="text-xs text-gray-600">(Palletized boxes)</p>
                                       )}
                                     </div>
                                   </div>
                                 )}
                                 {pendingShipment.availableLooseBoxes > 0 && (
                                   <div className="flex items-center gap-2">
-                                    <span className="text-3xl">📦</span>
+                                    <span className="text-2xl">📦</span>
                                     <div>
-                                      <p className="font-bold text-xl text-orange-600">{pendingShipment.availableLooseBoxes} Loose Boxes</p>
+                                      <p className="font-bold text-lg text-gray-800">{pendingShipment.availableLooseBoxes} Loose Box{pendingShipment.availableLooseBoxes > 1 ? 'es' : ''}</p>
+                                      <p className="text-xs text-gray-600">(Individual boxes)</p>
                                     </div>
                                   </div>
                                 )}
@@ -1274,11 +1275,11 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                             {/* Pallets to Assign - Only show if pallets available - MOBILE OPTIMIZED */}
                             {pendingShipment.availablePallets > 0 && (
                               <div className="mb-3">
-                                <label className="block text-xs sm:text-sm font-semibold mb-2">🎁 Pallets to Assign:</label>
+                                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">📦 Pallets to Assign:</label>
                                 <div className="flex items-center gap-1.5 sm:gap-2">
                                   <button
                                     onClick={() => setPalletQuantity(Math.max(0, (palletQuantity || 0) - 1))}
-                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600 text-sm sm:text-base"
+                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 text-sm sm:text-base"
                                   >
                                     −
                                   </button>
@@ -1292,29 +1293,29 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                   />
                                   <button
                                     onClick={() => setPalletQuantity(Math.min(pendingShipment.availablePallets, (palletQuantity || 0) + 1))}
-                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 text-sm sm:text-base"
+                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 text-sm sm:text-base"
                                   >
                                     +
                                   </button>
                                   <button
                                     onClick={() => setPalletQuantity(pendingShipment.availablePallets)}
-                                    className="px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 text-xs sm:text-sm"
+                                    className="px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 text-xs sm:text-sm"
                                   >
-                                    🎁 All
+                                    All
                                   </button>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">⚠️ Max: {pendingShipment.availablePallets} | Remaining: {pendingShipment.availablePallets - (palletQuantity || 0)}</p>
+                                <p className="text-xs text-gray-600 mt-1">Max: {pendingShipment.availablePallets} | Remaining: {pendingShipment.availablePallets - (palletQuantity || 0)}</p>
                               </div>
                             )}
 
                             {/* Loose Boxes to Assign - Only show if loose boxes available - MOBILE OPTIMIZED */}
                             {pendingShipment.availableLooseBoxes > 0 && (
                               <div className="mb-3">
-                                <label className="block text-xs sm:text-sm font-semibold mb-2">📦 Loose Boxes to Assign:</label>
+                                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">📦 Loose Boxes to Assign:</label>
                                 <div className="flex items-center gap-1.5 sm:gap-2">
                                   <button
                                     onClick={() => setLooseBoxQuantity(Math.max(0, (looseBoxQuantity || 0) - 1))}
-                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600 text-sm sm:text-base"
+                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 text-sm sm:text-base"
                                   >
                                     −
                                   </button>
@@ -1328,26 +1329,26 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                   />
                                   <button
                                     onClick={() => setLooseBoxQuantity(Math.min(pendingShipment.availableLooseBoxes, (looseBoxQuantity || 0) + 1))}
-                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 text-sm sm:text-base"
+                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 text-sm sm:text-base"
                                   >
                                     +
                                   </button>
                                   <button
                                     onClick={() => setLooseBoxQuantity(pendingShipment.availableLooseBoxes)}
-                                    className="px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 text-xs sm:text-sm"
+                                    className="px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 text-xs sm:text-sm"
                                   >
-                                    📦 All
+                                    All
                                   </button>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">⚠️ Max: {pendingShipment.availableLooseBoxes} | Remaining: {pendingShipment.availableLooseBoxes - (looseBoxQuantity || 0)}</p>
+                                <p className="text-xs text-gray-600 mt-1">Max: {pendingShipment.availableLooseBoxes} | Remaining: {pendingShipment.availableLooseBoxes - (looseBoxQuantity || 0)}</p>
                               </div>
                             )}
 
                             {/* Total Summary */}
-                            <div className="bg-green-50 border border-green-300 p-3 rounded-lg mb-3">
-                              <p className="font-semibold text-green-900 mb-1">Total to assign:</p>
+                            <div className="bg-blue-50 border border-blue-300 p-3 rounded-lg mb-3">
+                              <p className="font-semibold text-gray-800 mb-1">Total to assign:</p>
                               {palletQuantity > 0 && (
-                                <p className="text-lg font-bold text-green-900">
+                                <p className="text-lg font-bold text-gray-900">
                                   {palletQuantity} Pallet{palletQuantity > 1 ? 's' : ''} (
                                   {(() => {
                                     let boxes = 0;
@@ -1361,11 +1362,11 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                 </p>
                               )}
                               {looseBoxQuantity > 0 && (
-                                <p className="text-lg font-bold text-green-900">
+                                <p className="text-lg font-bold text-gray-900">
                                   + {looseBoxQuantity} Loose Box{looseBoxQuantity > 1 ? 'es' : ''}
                                 </p>
                               )}
-                              <p className="text-xl font-bold text-green-800 mt-2">
+                              <p className="text-xl font-bold text-blue-800 mt-2">
                                 = {(() => {
                                   let total = looseBoxQuantity || 0;
                                   for (let i = 0; i < (palletQuantity || 0); i++) {
@@ -1838,12 +1839,28 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               <p className="font-semibold text-gray-900 truncate">{shipment.clientName}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 text-xs sm:text-sm">Boxes:</span>
+                              <span className="text-gray-500 text-xs sm:text-sm">Available:</span>
                               <p className="font-semibold text-gray-900">
-                                {shipment.remainingBoxes || 0} / {shipment.totalBoxes || shipment.currentBoxCount || 0} 📦
+                                {/* Show Pallet + Loose Box breakdown */}
+                                {shipment.availablePallets > 0 && (
+                                  <span className="text-blue-700">
+                                    {shipment.availablePallets} Pallet{shipment.availablePallets > 1 ? 's' : ''}
+                                    {shipment.palletDetails && shipment.palletDetails.length > 0 && (
+                                      <span className="text-xs text-gray-600">
+                                        {' '}({shipment.palletDetails.map((p: any) => `${p.boxCount}box`).join(', ')})
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                                {shipment.availablePallets > 0 && shipment.availableLooseBoxes > 0 && <span> + </span>}
+                                {shipment.availableLooseBoxes > 0 && (
+                                  <span className="text-orange-700">
+                                    {shipment.availableLooseBoxes} Loose Box{shipment.availableLooseBoxes > 1 ? 'es' : ''}
+                                  </span>
+                                )}
                                 {shipment.status === 'PARTIAL' && (
-                                  <span className="text-xs sm:text-sm text-orange-600 ml-1 sm:ml-2">
-                                    ({shipment.remainingBoxes} left)
+                                  <span className="text-xs sm:text-sm text-gray-600 ml-1 sm:ml-2">
+                                    ({shipment.remainingBoxes} unassigned)
                                   </span>
                                 )}
                               </p>
