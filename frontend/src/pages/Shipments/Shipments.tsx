@@ -200,10 +200,19 @@ export const Shipments: React.FC = () => {
   };
 
   const getPalletInfo = (shipment: any) => {
-    if (shipment.palletCount > 0 && shipment.boxesPerPallet > 0) {
-      return `${shipment.palletCount} × ${shipment.boxesPerPallet}`;
+    const assigned = shipment.originalBoxCount - shipment.currentBoxCount;
+    const remaining = shipment.currentBoxCount;
+    
+    if (shipment.status === 'PARTIAL' && assigned > 0) {
+      // Show clear assignment status for partial shipments
+      return `✅ ${assigned} assigned, ⏳ ${remaining} pending`;
     }
-    return `${shipment.totalBoxCount || 0} boxes`;
+    
+    if (shipment.palletCount > 0 && shipment.boxesPerPallet > 0) {
+      return `${shipment.palletCount} pallets × ${shipment.boxesPerPallet} boxes`;
+    }
+    
+    return `${shipment.currentBoxCount || 0} boxes total`;
   };
 
   const getStorageBadge = (days: number) => {
