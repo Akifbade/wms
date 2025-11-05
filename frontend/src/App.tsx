@@ -5,6 +5,7 @@ import { VersionBadge } from './components/VersionBadge';
 import { Layout } from './components/Layout/Layout';
 import { Dashboard } from './pages/Dashboard/Dashboard';
 import { Shipments } from './pages/Shipments/Shipments';
+import ShipmentReport from './pages/ShipmentReport/ShipmentReport';
 import { Racks } from './pages/Racks/Racks';
 import { MovingJobs } from './pages/MovingJobs/MovingJobs';
 import { Settings } from './pages/Settings/Settings';
@@ -38,7 +39,7 @@ function App() {
     const checkAuth = () => {
       const token = getAuthToken();
       const user = localStorage.getItem('user');
-      
+
       if (token && user) {
         // Token exists, verify it's not expired
         try {
@@ -84,7 +85,7 @@ function App() {
           {/* Protected Routes */}
           <Route path="/" element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
-            
+
             {/* ADMIN & MANAGER Routes */}
             <Route path="dashboard" element={
               <Dashboard />
@@ -92,6 +93,11 @@ function App() {
             <Route path="shipments" element={
               <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                 <Shipments />
+              </ProtectedRoute>
+            } />
+            <Route path="shipment-report/:id" element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                <ShipmentReport />
               </ProtectedRoute>
             } />
             <Route path="racks" element={
@@ -177,7 +183,7 @@ function App() {
             {/* All Roles - Scanner & Profile */}
             <Route path="scanner" element={<Scanner />} />
             <Route path="profile" element={<UserProfile />} />
-            
+
             {/* Worker-specific routes */}
             <Route path="my-jobs" element={
               <ProtectedRoute allowedRoles={['WORKER']}>
@@ -197,7 +203,7 @@ function App() {
             } />
           </Route>
 
-        {/* Catch all - redirect based on role */}
+          {/* Catch all - redirect based on role */}
           <Route path="*" element={<Navigate to="/scanner" replace />} />
         </Routes>
         <VersionBadge />

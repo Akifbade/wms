@@ -288,6 +288,35 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
             </div>
           ) : (
             <>
+              {/* Shipment Photos Section */}
+              {shipment?.shipmentPhotos && shipment.shipmentPhotos.length > 0 && (
+                <div className="mb-6 print:hidden">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                    Shipment Photos ({shipment.shipmentPhotos.length})
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {shipment.shipmentPhotos.map((photo: string, idx: number) => (
+                      <div key={idx} className="relative group">
+                        <img
+                          src={`http://localhost:5000${photo}`}
+                          alt={`Shipment photo ${idx + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border-2 border-gray-300 hover:border-indigo-500 cursor-pointer transition-all"
+                          onClick={() => window.open(`http://localhost:5000${photo}`, '_blank')}
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all flex items-center justify-center">
+                          <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                          </svg>
+                        </div>
+                        <div className="absolute bottom-1 right-1 bg-black bg-opacity-70 text-white text-xs px-2 py-0.5 rounded">
+                          Photo {idx + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* PALLET + LOOSE BOX VIEW - ONE QR PER PALLET, PLUS EACH LOOSE BOX */}
               <div className="mb-6 flex justify-between items-center print:hidden">
                 <div>

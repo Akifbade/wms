@@ -6,6 +6,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { recomputeRackPalletUsage } from '../utils/rackCapacity';
+import { calculateShipmentCharges, updateShipmentCharges, previewShipmentCharges } from '../utils/chargeCalculation';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -173,6 +174,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
               boxNumber: true,
               status: true,
               rackId: true,
+              pieceQR: true, // ✅ FIX: Include pieceQR for pallet breakdown
+              photos: true,  // ✅ FIX: Include photos for shipment display
               rack: {
                 select: {
                   id: true,
@@ -215,13 +218,40 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       }) : [];
       const rackCodes = racks.map(r => r.code).join(', ');
 
+      // 🔧 FIX: Parse pieceQR to get proper pallet/loose breakdown
+      const boxesWithParsedQR = shipment.boxes.map((b: any) => {
+        try {
+          const pieceData = b.pieceQR ? (typeof b.pieceQR === 'string' ? JSON.parse(b.pieceQR) : b.pieceQR) : null;
+          return { ...b, pieceQR: pieceData };
+        } catch (e) {
+          return { ...b, pieceQR: null };
+        }
+      });
+
+      // 🔧 FIX: Collect shipment photos from boxes
+      const shipmentPhotosSet = new Set<string>();
+      for (const box of shipment.boxes) {
+        if (box.photos) {
+          try {
+            const photos = typeof box.photos === 'string' ? JSON.parse(box.photos) : box.photos;
+            if (Array.isArray(photos)) {
+              photos.forEach((p: string) => shipmentPhotosSet.add(p));
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+
       return {
         ...shipment,
+        boxes: boxesWithParsedQR, // Replace with parsed version
         totalBoxes,
         assignedBoxes,
         releasedBoxes,
         inStorageBoxes,
         rackLocations: rackCodes || null, // Comma-separated rack codes
+        shipmentPhotos: Array.from(shipmentPhotosSet), // 🔧 FIX: Add photos array
         // Don't override currentBoxCount - it's the source of truth from database
       };
     }));
@@ -268,8 +298,28 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
           select: {
             id: true,
             name: true,
+            contactPerson: true,
+            phone: true,
+            email: true,
           },
         },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+        assignedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+        charges: true, // Include charging information
       },
     });
 
@@ -277,15 +327,44 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
+    // Type cast to any to avoid TypeScript errors with Prisma types
+    const shipmentData = shipment as any;
+
     // Add computed box counts
-    const totalBoxes = shipment.boxes.length;
-    const assignedBoxes = shipment.boxes.filter((b: any) => b.rackId !== null).length;
-    const releasedBoxes = shipment.boxes.filter((b: any) => b.status === 'RELEASED').length;
-    const inStorageBoxes = shipment.boxes.filter((b: any) => b.status === 'IN_STORAGE').length;
+    const totalBoxes = shipmentData.boxes.length;
+    const assignedBoxes = shipmentData.boxes.filter((b: any) => b.rackId !== null).length;
+    const releasedBoxes = shipmentData.boxes.filter((b: any) => b.status === 'RELEASED').length;
+    const inStorageBoxes = shipmentData.boxes.filter((b: any) => b.status === 'IN_STORAGE').length;
+
+    // 🔧 FIX: Parse pieceQR and collect photos
+    const boxesWithParsedQR = shipmentData.boxes.map((b: any) => {
+      try {
+        const pieceData = b.pieceQR ? (typeof b.pieceQR === 'string' ? JSON.parse(b.pieceQR) : b.pieceQR) : null;
+        return { ...b, pieceQR: pieceData };
+      } catch (e) {
+        return { ...b, pieceQR: null };
+      }
+    });
+
+    const shipmentPhotosSet = new Set<string>();
+    for (const box of shipmentData.boxes) {
+      if (box.photos) {
+        try {
+          const photos = typeof box.photos === 'string' ? JSON.parse(box.photos) : box.photos;
+          if (Array.isArray(photos)) {
+            photos.forEach((p: string) => shipmentPhotosSet.add(p));
+          }
+        } catch (e) {
+          // Ignore
+        }
+      }
+    }
 
     res.json({
       shipment: {
-        ...shipment,
+        ...shipmentData,
+        boxes: boxesWithParsedQR, // 🔧 FIX: Use parsed boxes
+        shipmentPhotos: Array.from(shipmentPhotosSet), // 🔧 FIX: Add photos
         totalBoxes,
         assignedBoxes,
         releasedBoxes,
@@ -1363,6 +1442,151 @@ router.post('/cleanup/test-data', authorizeRoles('ADMIN'), async (req: AuthReque
   } catch (error) {
     console.error('Cleanup test data error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ==========================================
+// CUSTOM CHARGES MANAGEMENT (Per-Shipment Pricing)
+// ==========================================
+
+// Get current charges calculation for a shipment
+router.get('/:id/charges-calculation', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+
+    const calculation = await calculateShipmentCharges(prisma, id, companyId);
+
+    res.json({
+      success: true,
+      shipmentId: id,
+      calculation
+    });
+  } catch (error: any) {
+    console.error('Get charges calculation error:', error);
+    res.status(500).json({ error: error.message || 'Failed to calculate charges' });
+  }
+});
+
+// Preview charges with different rate scenarios (doesn't save)
+router.post('/:id/charges-preview', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { customRateEnabled, ratePerCBMPerDay, ratePerBoxPerDay } = req.body;
+    const companyId = req.user!.companyId;
+
+    const preview = await previewShipmentCharges(prisma, id, companyId, {
+      enabled: customRateEnabled,
+      ratePerCBMPerDay: ratePerCBMPerDay ? parseFloat(ratePerCBMPerDay) : undefined,
+      ratePerBoxPerDay: ratePerBoxPerDay ? parseFloat(ratePerBoxPerDay) : undefined
+    });
+
+    res.json({
+      success: true,
+      shipmentId: id,
+      preview
+    });
+  } catch (error: any) {
+    console.error('Preview charges error:', error);
+    res.status(500).json({ error: error.message || 'Failed to preview charges' });
+  }
+});
+
+// Set custom charges for a shipment
+router.patch('/:id/custom-charges', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { customRateEnabled, ratePerCBMPerDay, ratePerBoxPerDay, notes } = req.body;
+    const companyId = req.user!.companyId;
+
+    // Validation
+    if (typeof customRateEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'customRateEnabled must be a boolean' });
+    }
+
+    if (customRateEnabled) {
+      if (!ratePerCBMPerDay && !ratePerBoxPerDay) {
+        return res.status(400).json({
+          error: 'At least one rate must be provided when custom rates are enabled'
+        });
+      }
+      if (ratePerCBMPerDay && ratePerCBMPerDay < 0) {
+        return res.status(400).json({ error: 'Rate per CBM cannot be negative' });
+      }
+      if (ratePerBoxPerDay && ratePerBoxPerDay < 0) {
+        return res.status(400).json({ error: 'Rate per box cannot be negative' });
+      }
+    }
+
+    // Verify shipment exists and belongs to company
+    const shipment = await prisma.shipment.findFirst({
+      where: { id, companyId }
+    });
+
+    if (!shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    // Update shipment with custom rates
+    const updated = await prisma.shipment.update({
+      where: { id },
+      data: {
+        customRateEnabled,
+        customRatePerCBMPerDay: customRateEnabled && ratePerCBMPerDay ? parseFloat(ratePerCBMPerDay) : null,
+        customRatePerBoxPerDay: customRateEnabled && ratePerBoxPerDay ? parseFloat(ratePerBoxPerDay) : null,
+        customRateNotes: notes || null
+      } as any // Type cast for new fields
+    });
+
+    // Type cast to access custom rate fields
+    const updatedData = updated as any;
+
+    // Recalculate charges with new rates
+    await updateShipmentCharges(prisma, id, companyId);
+
+    // Get updated calculation for response
+    const calculation = await calculateShipmentCharges(prisma, id, companyId);
+
+    console.log(`✅ Custom charges ${customRateEnabled ? 'enabled' : 'disabled'} for shipment ${shipment.referenceId}`);
+
+    res.json({
+      success: true,
+      message: customRateEnabled
+        ? 'Custom charges enabled and calculated successfully'
+        : 'Custom charges disabled - using company default rates',
+      shipment: {
+        id: updatedData.id,
+        referenceId: updatedData.referenceId,
+        customRateEnabled: updatedData.customRateEnabled,
+        customRatePerCBMPerDay: updatedData.customRatePerCBMPerDay,
+        customRatePerBoxPerDay: updatedData.customRatePerBoxPerDay,
+        customRateNotes: updatedData.customRateNotes
+      },
+      calculation
+    });
+  } catch (error: any) {
+    console.error('Set custom charges error:', error);
+    res.status(500).json({ error: error.message || 'Failed to set custom charges' });
+  }
+});
+
+// Recalculate charges manually (useful after data changes)
+router.post('/:id/recalculate-charges', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+
+    await updateShipmentCharges(prisma, id, companyId);
+    const calculation = await calculateShipmentCharges(prisma, id, companyId);
+
+    res.json({
+      success: true,
+      message: 'Charges recalculated successfully',
+      calculation
+    });
+  } catch (error: any) {
+    console.error('Recalculate charges error:', error);
+    res.status(500).json({ error: error.message || 'Failed to recalculate charges' });
   }
 });
 

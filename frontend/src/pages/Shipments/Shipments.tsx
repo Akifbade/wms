@@ -84,11 +84,16 @@ export const Shipments: React.FC = () => {
       const data = await shipmentsAPI.getAll(params);
       const loadedShipments = data.shipments || [];
 
-      // 🔍 DEBUG: Log status values to help debug button visibility
-      console.log('📦 Shipments loaded:', loadedShipments.map((s: any) => ({
+      // 🔍 DEBUG: Log pallet breakdown data
+      console.log('📦 Shipments loaded with pallet data:', loadedShipments.map((s: any) => ({
         id: s.referenceId,
         status: s.status,
-        boxes: s.currentBoxCount
+        boxes: s.boxes?.length || 0,
+        photos: s.shipmentPhotos?.length || 0,
+        sampleBox: s.boxes?.[0] ? {
+          boxNum: s.boxes[0].boxNumber,
+          pieceQR: s.boxes[0].pieceQR
+        } : null
       })));
 
       setShipments(loadedShipments);
@@ -233,15 +238,18 @@ export const Shipments: React.FC = () => {
     }).length
   };
 
+  // Track selected company filter
+  const [selectedCompany, setSelectedCompany] = useState<string>('');
+
   // Client-side advanced filtering for instant search
   const filteredShipments = shipments.filter((shipment: any) => {
-    if (!searchTerm.trim()) return true; // No filter if search empty
-
-    // Check for company filter prefix
-    if (searchTerm.startsWith('company:')) {
-      const companyName = searchTerm.replace('company:', '').trim();
-      return shipment.companyProfile?.name === companyName;
+    // Company filter (if set)
+    if (selectedCompany && shipment.companyProfile?.name !== selectedCompany) {
+      return false;
     }
+
+    // Search filter
+    if (!searchTerm.trim()) return true;
 
     const searchLower = searchTerm.toLowerCase();
 
@@ -257,6 +265,30 @@ export const Shipments: React.FC = () => {
       shipment.rackLocation?.toLowerCase().includes(searchLower)
     );
   });
+
+  // Group shipments by company for folder view
+  const groupedByCompany = filteredShipments.reduce((acc: any, shipment: any) => {
+    const companyName = shipment.companyProfile?.name || 'No Company';
+    if (!acc[companyName]) {
+      acc[companyName] = [];
+    }
+    acc[companyName].push(shipment);
+    return acc;
+  }, {});
+
+  // Track expanded folders
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'table' | 'folders'>('folders'); // Default to folder view
+
+  const toggleFolder = (companyName: string) => {
+    const newExpanded = new Set(expandedFolders);
+    if (newExpanded.has(companyName)) {
+      newExpanded.delete(companyName);
+    } else {
+      newExpanded.add(companyName);
+    }
+    setExpandedFolders(newExpanded);
+  };
 
   if (loading) {
     return (
@@ -447,6 +479,34 @@ export const Shipments: React.FC = () => {
 
         {/* Advanced Search & Filters */}
         <div className="p-4 bg-gray-50 border-t border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode('folders')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all text-sm ${viewMode === 'folders'
+                  ? 'bg-gray-800 text-white shadow-md'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                  }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                Folder View
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all text-sm ${viewMode === 'table'
+                  ? 'bg-gray-800 text-white shadow-md'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                  }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Table View
+              </button>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Search Bar */}
             <div className="relative md:col-span-2">
@@ -472,8 +532,8 @@ export const Shipments: React.FC = () => {
             {/* Company Filter */}
             <div className="relative">
               <select
-                value={searchTerm.startsWith('company:') ? searchTerm.replace('company:', '') : ''}
-                onChange={(e) => setSearchTerm(e.target.value ? `company:${e.target.value}` : '')}
+                value={selectedCompany}
+                onChange={(e) => setSelectedCompany(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm appearance-none bg-white"
               >
                 <option value="">All Companies</option>
@@ -486,205 +546,558 @@ export const Shipments: React.FC = () => {
         </div>
       </div>
 
-      {/* Shipments Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-              <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Reference ID</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Client</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Company</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Contact</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Pieces</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Type</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Rack Location</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Storage Duration</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredShipments.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center">
-                    <div className="text-gray-400">
-                      <MagnifyingGlassIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p className="text-lg font-medium">No shipments found</p>
-                      <p className="text-sm mt-1">Try adjusting your search or filters</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filteredShipments.map((shipment: any) => (
-                  <tr key={shipment.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <QrCodeIcon className="h-5 w-5 text-gray-400 mr-2" />
-                        <span className="text-sm font-medium text-gray-900">{shipment.referenceId}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{shipment.clientName}</div>
-                      <div className="text-xs text-gray-500">{getFormattedDate(shipment.receivedDate)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {shipment.companyProfile?.name ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                          🏢 {shipment.companyProfile.name}
-                        </span>
+      {/* Folder View */}
+      {viewMode === 'folders' ? (
+        <div className="space-y-3">
+          {Object.entries(groupedByCompany).map(([companyName, companyShipments]: [string, any]) => {
+            const isExpanded = expandedFolders.has(companyName);
+            const shipmentCount = companyShipments.length;
+            const totalBoxes = companyShipments.reduce((sum: number, s: any) => sum + (s.currentBoxCount || 0), 0);
+            const inWarehouse = companyShipments.filter((s: any) => s.status === 'IN_WAREHOUSE').length;
+            const partial = companyShipments.filter((s: any) => s.status === 'PARTIAL').length;
+            const released = companyShipments.filter((s: any) => s.status === 'RELEASED').length;
+
+            return (
+              <div key={companyName} className="bg-white rounded-lg shadow-sm border border-gray-300 overflow-hidden hover:shadow-md transition-shadow">
+                {/* Clean Folder Header */}
+                <button
+                  onClick={() => toggleFolder(companyName)}
+                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="bg-gray-700 p-2.5 rounded-lg group-hover:bg-gray-800 transition-colors">
+                      {isExpanded ? (
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+                        </svg>
                       ) : (
-                        <span className="text-xs text-gray-400 italic">No company</span>
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
                       )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {shipment.clientPhone}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col gap-1">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                          📦 {shipment.currentBoxCount} / {shipment.originalBoxCount} pieces
-                        </span>
-                        <span className="text-xs text-gray-500">{getPalletInfo(shipment)}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        {getIntakeType(shipment) === 'PALLET' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
-                            🪵 Pallet
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
-                            📦 Box
-                          </span>
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-lg font-bold text-gray-900">{companyName}</h3>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
+                        <span className="font-semibold">{shipmentCount} shipments</span>
+                        <span className="text-gray-400">•</span>
+                        <span className="font-semibold">{totalBoxes} boxes</span>
+                        {inWarehouse > 0 && (
+                          <>
+                            <span className="text-gray-400">•</span>
+                            <span className="text-green-600 font-semibold">{inWarehouse} active</span>
+                          </>
+                        )}
+                        {partial > 0 && (
+                          <>
+                            <span className="text-gray-400">•</span>
+                            <span className="text-orange-600 font-semibold">{partial} partial</span>
+                          </>
+                        )}
+                        {released > 0 && (
+                          <>
+                            <span className="text-gray-400">•</span>
+                            <span className="text-gray-500 font-semibold">{released} released</span>
+                          </>
                         )}
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {shipment.status === 'RELEASED' ? (
-                        shipment.rackLocations && shipment.rackLocations !== 'N/A' ? (
-                          <span className="text-sm text-gray-500 italic">
-                            🚪 Was in: {shipment.rackLocations}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-400">-</span>
-                        )
-                      ) : shipment.rackLocations && shipment.rackLocations !== 'N/A' ? (
-                        (() => {
-                          const racks = shipment.rackLocations.split(',').map((r: string) => r.trim()).filter(Boolean);
-                          if (racks.length > 1) {
-                            return (
-                              <div className="flex flex-wrap gap-1">
-                                {racks.map((rack: string, idx: number) => (
-                                  <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">
-                                    📍 {rack}
-                                  </span>
-                                ))}
-                              </div>
-                            );
-                          }
-                          return <span className="text-sm font-medium text-primary-600">{racks[0]}</span>;
-                        })()
-                      ) : (
-                        <span className="text-sm text-gray-400">Not Assigned</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {/* Quick Stats */}
+                    <div className="hidden md:flex items-center gap-2 text-xs">
+                      {inWarehouse > 0 && (
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded font-semibold">
+                          {inWarehouse} Active
+                        </span>
                       )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {(() => {
+                      {partial > 0 && (
+                        <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded font-semibold">
+                          {partial} Partial
+                        </span>
+                      )}
+                    </div>
+                    <svg className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+
+                {/* Clean Folder Contents */}
+                {isExpanded && (
+                  <div className="border-t border-gray-200 bg-gray-50">
+                    <div className="p-4 space-y-3">
+                      {companyShipments.map((shipment: any) => {
+                        const badge = getStatusBadge(shipment.status);
                         const days = getDaysStored(shipment);
                         const storageBadge = getStorageBadge(days);
-                        return (
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
-                            {storageBadge.icon} {storageBadge.badge}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {(() => {
-                        const badge = getStatusBadge(shipment.status);
-                        return (
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${badge.color}`}>
-                            <span>{badge.icon}</span>
-                            <span>{badge.label}</span>
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        {/* QR Code button - show for ALL shipments */}
-                        <button
-                          onClick={() => {
-                            setSelectedShipment(shipment);
-                            setQrModalOpen(true);
-                          }}
-                          className="text-indigo-600 hover:text-indigo-900 transition-colors"
-                          title="View/Print QR Codes"
-                        >
-                          <QrCodeIcon className="h-5 w-5" />
-                        </button>
 
-                        {/* Release button - only for stored shipments with boxes */}
-                        {(shipment.status === 'IN_STORAGE' ||
-                          shipment.status === 'IN_WAREHOUSE' ||
-                          shipment.status === 'PARTIAL' ||
-                          shipment.status === 'STORED' ||
-                          shipment.status === 'ACTIVE') &&
-                          shipment.currentBoxCount > 0 && (
-                            <button
-                              onClick={() => handleReleaseClick(shipment)}
-                              className="text-green-600 hover:text-green-900"
-                              title="Generate Invoice & Release"
-                            >
-                              <ArrowRightOnRectangleIcon className="h-5 w-5" />
-                            </button>
-                          )}
-                        {shipment.status === 'RELEASED' && (
-                          <button
-                            onClick={() => handlePrintReleaseNote(shipment)}
-                            className="text-purple-600 hover:text-purple-900"
-                            title="Print Release Note"
-                          >
-                            <PrinterIcon className="h-5 w-5" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            setSelectedShipment(shipment);
-                            setDetailModalOpen(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="View Details"
-                        >
-                          <EyeIcon className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedShipment(shipment);
-                            setEditModalOpen(true);
-                          }}
-                          className="text-gray-600 hover:text-gray-900"
-                          title="Edit Shipment"
-                        >
-                          <PencilIcon className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(shipment.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <TrashIcon className="h-5 w-5" />
-                        </button>
+                        return (
+                          <div key={shipment.id} className="bg-white rounded-lg p-4 border border-gray-200 hover:border-gray-400 hover:shadow-md transition-all">
+                            <div className="flex items-start justify-between gap-4">
+                              {/* Left: Shipment Info */}
+                              <div className="flex-1 space-y-3">
+                                {/* Header Row */}
+                                <div className="flex items-center gap-3 pb-2 border-b">
+                                  <span className="text-base font-bold text-gray-900">{shipment.referenceId}</span>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${badge.color}`}>
+                                    {badge.icon} {badge.label}
+                                  </span>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
+                                    {storageBadge.icon} {storageBadge.badge}
+                                  </span>
+                                </div>
+
+                                {/* Info Grid */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm bg-gray-50 p-3 rounded-lg">
+                                  <div className="flex items-center gap-2">
+                                    <div className="bg-blue-100 p-2 rounded-lg">
+                                      <svg className="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                      </svg>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-500">Client</p>
+                                      <p className="font-bold text-gray-900">{shipment.clientName}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="bg-green-100 p-2 rounded-lg">
+                                      <svg className="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                      </svg>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-500">Contact</p>
+                                      <p className="font-bold text-gray-900">{shipment.clientPhone || '-'}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="bg-purple-100 p-2 rounded-lg">
+                                      <svg className="w-4 h-4 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                      </svg>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-500">Boxes</p>
+                                      <p className="font-bold text-gray-900">{shipment.currentBoxCount} / {shipment.originalBoxCount}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="bg-orange-100 p-2 rounded-lg">
+                                      <svg className="w-4 h-4 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                                      </svg>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-500">Weight</p>
+                                      <p className="font-bold text-gray-900">{shipment.totalWeight ? `${shipment.totalWeight} kg` : '-'}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="bg-indigo-100 p-2 rounded-lg">
+                                      <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-500">Arrival Date</p>
+                                      <p className="font-bold text-gray-900">
+                                        {shipment.arrivalDate && !isNaN(new Date(shipment.arrivalDate).getTime())
+                                          ? new Date(shipment.arrivalDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                                          : shipment.receivedAt && !isNaN(new Date(shipment.receivedAt).getTime())
+                                            ? new Date(shipment.receivedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                                            : '-'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="bg-gray-200 p-2 rounded-lg">
+                                      <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                      </svg>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-500">Stored On</p>
+                                      <p className="font-bold text-gray-900">
+                                        {shipment.receivedAt && !isNaN(new Date(shipment.receivedAt).getTime())
+                                          ? new Date(shipment.receivedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                                          : '-'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Rack Locations */}
+                                {shipment.rackLocations && shipment.rackLocations !== 'N/A' && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <span className="text-xs text-gray-600 font-semibold">Racks:</span>
+                                    <div className="flex flex-wrap gap-1">
+                                      {shipment.rackLocations.split(',').map((rack: string, idx: number) => (
+                                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-700 text-white text-xs font-semibold">
+                                          📍 {rack.trim()}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Pallet & Loose Box Breakdown */}
+                                <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
+                                  {(() => {
+                                    // 🔧 DEBUG: Log boxes data
+                                    if (!shipment.boxes || shipment.boxes.length === 0) {
+                                      console.warn(`⚠️ No boxes data for shipment ${shipment.referenceId}`, shipment);
+                                    }
+
+                                    const palletBoxes = shipment.boxes?.filter((b: any) => b.pieceQR?.palletNumber > 0) || [];
+                                    const looseBoxes = shipment.boxes?.filter((b: any) => !b.pieceQR?.palletNumber || b.pieceQR?.palletNumber === 0) || [];
+                                    const uniquePallets = [...new Set(palletBoxes.map((b: any) => b.pieceQR?.palletNumber))].sort((a, b) => a - b);
+
+                                    return (
+                                      <>
+                                        {uniquePallets.length > 0 && uniquePallets.map((palletNum, idx) => {
+                                          const count = palletBoxes.filter((b: any) => b.pieceQR?.palletNumber === palletNum).length;
+                                          return (
+                                            <span key={idx} className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-100 text-blue-900 rounded-lg text-xs font-bold border-2 border-blue-300">
+                                              📦 Pallet #{palletNum} ({count} pcs)
+                                            </span>
+                                          );
+                                        })}
+                                        {looseBoxes.length > 0 && (
+                                          <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-100 text-orange-900 rounded-lg text-xs font-bold border-2 border-orange-300">
+                                            📦 Loose ({looseBoxes.length} pcs)
+                                          </span>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+
+                                {/* Shipment Photos - Direct Display */}
+                                {shipment.shipmentPhotos && shipment.shipmentPhotos.length > 0 && (
+                                  <div className="space-y-2 pt-2 border-t">
+                                    <span className="text-xs text-gray-600 font-semibold">Shipment Photos ({shipment.shipmentPhotos.length}):</span>
+                                    <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                                      {shipment.shipmentPhotos.map((photo: string, idx: number) => (
+                                        <div key={idx} className="relative group">
+                                          <img
+                                            src={`http://localhost:5000${photo}`}
+                                            alt={`Photo ${idx + 1}`}
+                                            className="w-full h-20 object-cover rounded-lg border-2 border-gray-300 hover:border-indigo-500 cursor-pointer transition-all hover:scale-105"
+                                            onClick={() => window.open(`http://localhost:5000${photo}`, '_blank')}
+                                          />
+                                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all flex items-center justify-center">
+                                            <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                                            </svg>
+                                          </div>
+                                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent text-white text-xs px-1 py-0.5 rounded-b-lg text-center">
+                                            {idx + 1}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Notes Preview */}
+                                {shipment.notes && (
+                                  <div className="text-xs text-gray-600 bg-yellow-50 border-l-2 border-yellow-400 px-2 py-1">
+                                    <span className="font-semibold">Note:</span> {shipment.notes.substring(0, 100)}{shipment.notes.length > 100 ? '...' : ''}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Right: Action Buttons */}
+                              <div className="flex flex-col gap-1.5 min-w-[100px]">
+                                <button
+                                  onClick={() => {
+                                    window.open(`/shipment-report/${shipment.id}`, '_blank');
+                                  }}
+                                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-xs font-semibold"
+                                  title="View Full Report"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  Report
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedShipment(shipment);
+                                    setDetailsModalOpen(true);
+                                  }}
+                                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold"
+                                  title="View Details"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedShipment(shipment);
+                                    setQrModalOpen(true);
+                                  }}
+                                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors text-xs font-semibold"
+                                  title="View QR Codes"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                  </svg>
+                                  QR Codes
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedShipment(shipment);
+                                    setEditModalOpen(true);
+                                  }}
+                                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-semibold"
+                                  title="Edit"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                  Edit
+                                </button>
+                                {(shipment.status === 'IN_WAREHOUSE' || shipment.status === 'PARTIAL') && (
+                                  <button
+                                    onClick={() => handleReleaseClick(shipment)}
+                                    className="flex items-center justify-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-semibold"
+                                    title="Release"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                    </svg>
+                                    Release
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDelete(shipment.id)}
+                                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-semibold"
+                                  title="Delete"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Table View */
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Reference ID</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Client</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Company</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Contact</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Pieces</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Type</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Rack Location</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Storage Duration</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredShipments.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="px-6 py-12 text-center">
+                      <div className="text-gray-400">
+                        <MagnifyingGlassIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p className="text-lg font-medium">No shipments found</p>
+                        <p className="text-sm mt-1">Try adjusting your search or filters</p>
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  filteredShipments.map((shipment: any) => (
+                    <tr key={shipment.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <QrCodeIcon className="h-5 w-5 text-gray-400 mr-2" />
+                          <span className="text-sm font-medium text-gray-900">{shipment.referenceId}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{shipment.clientName}</div>
+                        <div className="text-xs text-gray-500">{getFormattedDate(shipment.receivedDate)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {shipment.companyProfile?.name ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                            🏢 {shipment.companyProfile.name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">No company</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {shipment.clientPhone}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            📦 {shipment.currentBoxCount} / {shipment.originalBoxCount} pieces
+                          </span>
+                          <span className="text-xs text-gray-500">{getPalletInfo(shipment)}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {getIntakeType(shipment) === 'PALLET' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                              🪵 Pallet
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                              📦 Box
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {shipment.status === 'RELEASED' ? (
+                          shipment.rackLocations && shipment.rackLocations !== 'N/A' ? (
+                            <span className="text-sm text-gray-500 italic">
+                              🚪 Was in: {shipment.rackLocations}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )
+                        ) : shipment.rackLocations && shipment.rackLocations !== 'N/A' ? (
+                          (() => {
+                            const racks = shipment.rackLocations.split(',').map((r: string) => r.trim()).filter(Boolean);
+                            if (racks.length > 1) {
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {racks.map((rack: string, idx: number) => (
+                                    <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">
+                                      📍 {rack}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return <span className="text-sm font-medium text-primary-600">{racks[0]}</span>;
+                          })()
+                        ) : (
+                          <span className="text-sm text-gray-400">Not Assigned</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {(() => {
+                          const days = getDaysStored(shipment);
+                          const storageBadge = getStorageBadge(days);
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
+                              {storageBadge.icon} {storageBadge.badge}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {(() => {
+                          const badge = getStatusBadge(shipment.status);
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${badge.color}`}>
+                              <span>{badge.icon}</span>
+                              <span>{badge.label}</span>
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-2">
+                          {/* QR Code button - show for ALL shipments */}
+                          <button
+                            onClick={() => {
+                              setSelectedShipment(shipment);
+                              setQrModalOpen(true);
+                            }}
+                            className="text-indigo-600 hover:text-indigo-900 transition-colors"
+                            title="View/Print QR Codes"
+                          >
+                            <QrCodeIcon className="h-5 w-5" />
+                          </button>
+
+                          {/* Release button - only for stored shipments with boxes */}
+                          {(shipment.status === 'IN_STORAGE' ||
+                            shipment.status === 'IN_WAREHOUSE' ||
+                            shipment.status === 'PARTIAL' ||
+                            shipment.status === 'STORED' ||
+                            shipment.status === 'ACTIVE') &&
+                            shipment.currentBoxCount > 0 && (
+                              <button
+                                onClick={() => handleReleaseClick(shipment)}
+                                className="text-green-600 hover:text-green-900"
+                                title="Generate Invoice & Release"
+                              >
+                                <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                              </button>
+                            )}
+                          {shipment.status === 'RELEASED' && (
+                            <button
+                              onClick={() => handlePrintReleaseNote(shipment)}
+                              className="text-purple-600 hover:text-purple-900"
+                              title="Print Release Note"
+                            >
+                              <PrinterIcon className="h-5 w-5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedShipment(shipment);
+                              setDetailModalOpen(true);
+                            }}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="View Details"
+                          >
+                            <EyeIcon className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedShipment(shipment);
+                              setEditModalOpen(true);
+                            }}
+                            className="text-gray-600 hover:text-gray-900"
+                            title="Edit Shipment"
+                          >
+                            <PencilIcon className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(shipment.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <TrashIcon className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* WHM Shipment Modal */}
       <WHMShipmentModal

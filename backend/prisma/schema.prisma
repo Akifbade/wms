@@ -410,6 +410,12 @@ model Shipment {
   cbm               Float?    // Cubic meters (m³) - auto-calculated: (L×W×H)/1000000
   weight            Float?    // Weight in kilograms
 
+  // NEW: Custom Rate Override (per-shipment pricing)
+  customRateEnabled      Boolean @default(false) // Enable custom pricing (overrides company BillingSettings)
+  customRatePerCBMPerDay Float?  // Custom rate per CBM per day (KWD) - only if customRateEnabled=true
+  customRatePerBoxPerDay Float?  // Custom rate per box per day (KWD) - only if customRateEnabled=true
+  customRateNotes        String? @db.Text // Notes explaining custom rate (special discount, contract, etc.)
+
   // Relations
   company            Company           @relation(fields: [companyId], references: [id])
   companyProfile     CompanyProfile?   @relation(fields: [companyProfileId], references: [id], onDelete: SetNull) // NEW: FK to CompanyProfile
