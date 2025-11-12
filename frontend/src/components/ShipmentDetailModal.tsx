@@ -137,8 +137,8 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
             <div
               key={rackKey}
               className={`p-3 rounded-lg border-2 ${isUnassigned
-                  ? 'bg-yellow-50 border-yellow-300'
-                  : 'bg-white border-green-300'
+                ? 'bg-yellow-50 border-yellow-300'
+                : 'bg-white border-green-300'
                 }`}
             >
               <div className="flex items-center justify-between mb-2">
@@ -152,8 +152,8 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
                   </div>
                 </div>
                 <span className={`px-2 py-1 rounded-full text-xs font-semibold ${isUnassigned
-                    ? 'bg-yellow-200 text-yellow-800'
-                    : 'bg-green-200 text-green-800'
+                  ? 'bg-yellow-200 text-yellow-800'
+                  : 'bg-green-200 text-green-800'
                   }`}>
                   {boxList.length} box{boxList.length !== 1 ? 'es' : ''}
                 </span>
@@ -165,10 +165,10 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
                   <div
                     key={box.id}
                     className={`aspect-square flex flex-col items-center justify-center text-xs font-bold rounded ${box.status === 'IN_STORAGE'
-                        ? 'bg-green-500 text-white'
-                        : box.status === 'RELEASED'
-                          ? 'bg-gray-400 text-white'
-                          : 'bg-yellow-400 text-gray-800'
+                      ? 'bg-green-500 text-white'
+                      : box.status === 'RELEASED'
+                        ? 'bg-gray-400 text-white'
+                        : 'bg-yellow-400 text-gray-800'
                       }`}
                     title={`Box #${box.boxNumber}${box.palletNumber ? ` - Pallet ${box.palletNumber}` : ''} - ${box.status}`}
                   >
@@ -240,8 +240,8 @@ interface Shipment {
   releasedAt?: string;
   createdAt: string;
   updatedAt: string;
-  createdBy?: string;
-  updatedBy?: string;
+  createdBy?: string | { id: string; name: string; email: string; role: string };
+  updatedBy?: string | { id: string; name: string; email: string; role: string };
   rack?: {
     id: string;
     code: string;
@@ -435,8 +435,8 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
                       <div>
                         <p className="text-gray-600">Contract Status</p>
                         <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${(shipment as any).companyProfile.contractStatus === 'ACTIVE' ? 'bg-green-200 text-green-800' :
-                            (shipment as any).companyProfile.contractStatus === 'EXPIRED' ? 'bg-red-200 text-red-800' :
-                              'bg-yellow-200 text-yellow-800'
+                          (shipment as any).companyProfile.contractStatus === 'EXPIRED' ? 'bg-red-200 text-red-800' :
+                            'bg-yellow-200 text-yellow-800'
                           }`}>
                           {(shipment as any).companyProfile.contractStatus}
                         </span>
@@ -455,9 +455,9 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
                   <div>
                     <p className="text-gray-600">Storage Type</p>
                     <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${(shipment as any).storageType === 'STANDARD' ? 'bg-blue-100 text-blue-800' :
-                        (shipment as any).storageType === 'FRAGILE' ? 'bg-yellow-100 text-yellow-800' :
-                          (shipment as any).storageType === 'HAZMAT' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
+                      (shipment as any).storageType === 'FRAGILE' ? 'bg-yellow-100 text-yellow-800' :
+                        (shipment as any).storageType === 'HAZMAT' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
                       }`}>
                       {(shipment as any).storageType === 'STANDARD' ? '🟦 Standard' :
                         (shipment as any).storageType === 'FRAGILE' ? '🟨 Fragile' :
@@ -634,12 +634,20 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
                   <div>
                     <p className="text-gray-600">Created</p>
                     <p className="font-semibold text-gray-800">{new Date(shipment.createdAt).toLocaleString()}</p>
-                    {shipment.createdBy && <p className="text-xs text-gray-500">By: User ID {shipment.createdBy}</p>}
+                    {shipment.createdBy && (
+                      <p className="text-xs text-gray-500">
+                        By: {typeof shipment.createdBy === 'object' ? shipment.createdBy.name || shipment.createdBy.email : `User ID ${shipment.createdBy}`}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <p className="text-gray-600">Last Updated</p>
                     <p className="font-semibold text-gray-800">{new Date(shipment.updatedAt).toLocaleString()}</p>
-                    {shipment.updatedBy && <p className="text-xs text-gray-500">By: User ID {shipment.updatedBy}</p>}
+                    {shipment.updatedBy && (
+                      <p className="text-xs text-gray-500">
+                        By: {typeof shipment.updatedBy === 'object' ? shipment.updatedBy.name || shipment.updatedBy.email : `User ID ${shipment.updatedBy}`}
+                      </p>
+                    )}
                   </div>
                   {shipment.releasedAt && (
                     <div>

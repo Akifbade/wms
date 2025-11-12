@@ -779,24 +779,28 @@ export const Shipments: React.FC = () => {
                                   <div className="space-y-2 pt-2 border-t">
                                     <span className="text-xs text-gray-600 font-semibold">Shipment Photos ({shipment.shipmentPhotos.length}):</span>
                                     <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
-                                      {shipment.shipmentPhotos.map((photo: string, idx: number) => (
-                                        <div key={idx} className="relative group">
-                                          <img
-                                            src={photo}
-                                            alt={`Photo ${idx + 1}`}
-                                            className="w-full h-20 object-cover rounded-lg border-2 border-gray-300 hover:border-indigo-500 cursor-pointer transition-all hover:scale-105"
-                                            onClick={() => window.open(photo, '_blank')}
-                                          />
-                                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all flex items-center justify-center">
-                                            <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                                            </svg>
+                                      {shipment.shipmentPhotos.map((photo: string, idx: number) => {
+                                        // Fix: Prepend backend URL if photo path is relative
+                                        const photoUrl = photo.startsWith('http') ? photo : `http://localhost:5000${photo}`;
+                                        return (
+                                          <div key={idx} className="relative group">
+                                            <img
+                                              src={photoUrl}
+                                              alt={`Photo ${idx + 1}`}
+                                              className="w-full h-20 object-cover rounded-lg border-2 border-gray-300 hover:border-indigo-500 cursor-pointer transition-all hover:scale-105"
+                                              onClick={() => window.open(photoUrl, '_blank')}
+                                            />
+                                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all flex items-center justify-center">
+                                              <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                                              </svg>
+                                            </div>
+                                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent text-white text-xs px-1 py-0.5 rounded-b-lg text-center">
+                                              {idx + 1}
+                                            </div>
                                           </div>
-                                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent text-white text-xs px-1 py-0.5 rounded-b-lg text-center">
-                                            {idx + 1}
-                                          </div>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 )}
