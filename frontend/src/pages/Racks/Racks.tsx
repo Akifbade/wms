@@ -135,6 +135,7 @@ export const Racks: React.FC = () => {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [bulkQrModalOpen, setBulkQrModalOpen] = useState(false);
   const bulkQrCanvasRefs = useRef<{ [key: string]: HTMLCanvasElement | null }>({});
+  const [selectedRacks, setSelectedRacks] = useState<Set<string>>(new Set());
 
   const resolveLogoUrl = (logo?: string | null) => {
     if (!logo) return '';
@@ -260,6 +261,7 @@ export const Racks: React.FC = () => {
 
   const handleBulkQrOpen = async () => {
     setBulkQrModalOpen(true);
+    setSelectedRacks(new Set(racks.map((r: any) => r.id))); // Select all by default
     // Generate QR codes for all racks
     setTimeout(async () => {
       for (const rack of racks) {
@@ -278,6 +280,24 @@ export const Racks: React.FC = () => {
     }, 100);
   };
 
+  const handleSelectAll = () => {
+    setSelectedRacks(new Set(racks.map((r: any) => r.id)));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedRacks(new Set());
+  };
+
+  const handleToggleRack = (rackId: string) => {
+    const newSelected = new Set(selectedRacks);
+    if (newSelected.has(rackId)) {
+      newSelected.delete(rackId);
+    } else {
+      newSelected.add(rackId);
+    }
+    setSelectedRacks(newSelected);
+  };
+
   const handlePrintAllQR = async () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -294,7 +314,10 @@ export const Racks: React.FC = () => {
       console.warn('Could not load branding:', err);
     }
 
-    const qrGridHtml = racks.map(rack => {
+    // Only print selected racks
+    const racksToprint = racks.filter((rack: any) => selectedRacks.has(rack.id));
+
+    const qrGridHtml = racksToprint.map(rack => {
       const canvas = bulkQrCanvasRefs.current[rack.id];
       if (!canvas) return '';
       const qrDataUrl = canvas.toDataURL();
@@ -1466,7 +1489,7 @@ export const Racks: React.FC = () => {
                   Bulk QR Codes - All Racks
                 </h2>
                 <p className="text-sm text-purple-100 mt-1">
-                  {racks.length} racks total
+                  {racks.length} racks total • {selectedRacks.size} selected
                 </p>
               </div>
               <button
@@ -1477,25 +1500,71 @@ export const Racks: React.FC = () => {
               </button>
             </div>
 
+            {/* Selection Controls */}
+            <div className="px-6 py-4 border-b bg-gray-50 flex gap-3 flex-wrap">
+              <button
+                onClick={handleSelectAll}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm"
+              >
+                Select All
+              </button>
+              <button
+                onClick={handleDeselectAll}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm"
+              >
+                Deselect All
+              </button>
+              <div className="flex-1"></div>
+              <div className="text-sm text-gray-600 flex items-center">
+                <InformationCircleIcon className="h-5 w-5 inline mr-1" />
+                Click on cards to select/deselect
+              </div>
+            </div>
+
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {racks.map((rack) => (
-                  <div
-                    key={rack.id}
-                    className="bg-white border-2 border-gray-200 rounded-xl p-4 text-center hover:border-purple-400 hover:shadow-lg transition-all"
-                  >
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{rack.code}</h3>
-                    <p className="text-xs text-gray-500 mb-3">{rack.location || 'Warehouse'}</p>
-                    <canvas
-                      ref={(el) => {
-                        if (el) bulkQrCanvasRefs.current[rack.id] = el;
-                      }}
-                      className="mx-auto mb-3"
-                    />
-                    <p className="text-xs font-mono font-bold text-gray-600">RACK_{rack.code}</p>
-                  </div>
-                ))}
+                {racks.map((rack) => {
+                  const isSelected = selectedRacks.has(rack.id);
+                  return (
+                    <div
+                      key={rack.id}
+                      onClick={() => handleToggleRack(rack.id)}
+                      className={`
+                        relative bg-white border-2 rounded-xl p-4 text-center cursor-pointer transition-all
+                        ${isSelected 
+                          ? 'border-purple-600 shadow-lg ring-2 ring-purple-300' 
+                          : 'border-gray-200 hover:border-purple-400 hover:shadow-md'
+                        }
+                      `}
+                    >
+                      {/* Checkbox Indicator */}
+                      <div className={`
+                        absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all
+                        ${isSelected 
+                          ? 'bg-purple-600 border-purple-600' 
+                          : 'bg-white border-gray-300'
+                        }
+                      `}>
+                        {isSelected && (
+                          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">{rack.code}</h3>
+                      <p className="text-xs text-gray-500 mb-3">{rack.location || 'Warehouse'}</p>
+                      <canvas
+                        ref={(el) => {
+                          if (el) bulkQrCanvasRefs.current[rack.id] = el;
+                        }}
+                        className="mx-auto mb-3"
+                      />
+                      <p className="text-xs font-mono font-bold text-gray-600">RACK_{rack.code}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -1503,7 +1572,7 @@ export const Racks: React.FC = () => {
             <div className="p-6 border-t bg-gray-50 flex justify-between items-center">
               <div className="text-sm text-gray-600">
                 <InformationCircleIcon className="h-5 w-5 inline mr-1" />
-                Print all QR codes at once
+                Print selected QR codes
               </div>
               <div className="flex gap-3">
                 <button
@@ -1514,10 +1583,17 @@ export const Racks: React.FC = () => {
                 </button>
                 <button
                   onClick={handlePrintAllQR}
-                  className="inline-flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold shadow-lg"
+                  disabled={selectedRacks.size === 0}
+                  className={`
+                    inline-flex items-center gap-2 px-6 py-2 rounded-lg font-semibold shadow-lg
+                    ${selectedRacks.size === 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-purple-600 text-white hover:bg-purple-700'
+                    }
+                  `}
                 >
                   <PrinterIcon className="h-5 w-5" />
-                  Print All QR Codes
+                  Print Selected ({selectedRacks.size})
                 </button>
               </div>
             </div>

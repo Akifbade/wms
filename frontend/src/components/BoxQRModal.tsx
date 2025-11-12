@@ -56,6 +56,7 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
     | { type: 'PALLET'; key: string; palletNumber: number; pieces: number; qrValue: string }
     | { type: 'LOOSE_BOX'; key: string; boxId: string; boxNumber: number; qrValue: string }
   >>([]);
+  const [selectedUnits, setSelectedUnits] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -181,6 +182,9 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
 
         const units = [...palletsUnits, ...looseUnits];
         setPrintUnits(units);
+        
+        // Select all by default
+        setSelectedUnits(new Set(units.map(u => u.key)));
 
         // Pre-render QR images for all units
         const images: Record<string, string> = {};
@@ -322,40 +326,94 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
               <div className="mb-6 flex justify-between items-center print:hidden">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800">
-                    QRs to Print: {printUnits.length} (Pallets: {printUnits.filter(u => u.type === 'PALLET').length}, Loose Boxes: {printUnits.filter(u => u.type === 'LOOSE_BOX').length})
+                    QRs to Print: {selectedUnits.size} / {printUnits.length} selected
                   </h3>
                   <p className="text-sm text-gray-600">
-                    One QR per pallet with details, plus one for each loose box
+                    Select individual QR codes to print
                   </p>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => setSelectedUnits(new Set(printUnits.map(u => u.key)))}
+                      className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={() => setSelectedUnits(new Set())}
+                      className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+                    >
+                      Deselect All
+                    </button>
+                    <button
+                      onClick={() => setSelectedUnits(new Set(printUnits.filter(u => u.type === 'PALLET').map(u => u.key)))}
+                      className="text-xs px-3 py-1 bg-blue-100 hover:bg-blue-200 rounded"
+                    >
+                      Pallets Only
+                    </button>
+                    <button
+                      onClick={() => setSelectedUnits(new Set(printUnits.filter(u => u.type === 'LOOSE_BOX').map(u => u.key)))}
+                      className="text-xs px-3 py-1 bg-orange-100 hover:bg-orange-200 rounded"
+                    >
+                      Loose Boxes Only
+                    </button>
+                  </div>
                 </div>
                 <button
                   onClick={handlePrintAll}
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center gap-2"
+                  disabled={selectedUnits.size === 0}
+                  className={`px-6 py-2 rounded-lg transition flex items-center gap-2 ${
+                    selectedUnits.size === 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  }`}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                   </svg>
-                  Print All QR Codes
+                  Print Selected ({selectedUnits.size})
                 </button>
               </div>
 
               {/* QR Codes Grid (Pallets + Loose Boxes) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {printUnits.map(unit => (
-                  <div
-                    key={unit.key}
-                    className="border-2 border-gray-200 rounded-lg p-4 text-center hover:border-indigo-400 transition print:border print:border-black print:break-inside-avoid"
-                  >
-                    {/* Header */}
-                    {unit.type === 'PALLET' ? (
-                      <div className="bg-blue-100 text-blue-800 font-bold text-lg rounded-md py-2 mb-3">
-                        Pallet #{unit.palletNumber}
+                {printUnits.map(unit => {
+                  const isSelected = selectedUnits.has(unit.key);
+                  return (
+                    <div
+                      key={unit.key}
+                      className={`relative border-2 rounded-lg p-4 text-center transition cursor-pointer print:border print:border-black print:break-inside-avoid ${
+                        isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-indigo-400'
+                      } ${!isSelected ? 'print:hidden' : ''}`}
+                      onClick={() => {
+                        const newSelected = new Set(selectedUnits);
+                        if (isSelected) {
+                          newSelected.delete(unit.key);
+                        } else {
+                          newSelected.add(unit.key);
+                        }
+                        setSelectedUnits(newSelected);
+                      }}
+                    >
+                      {/* Checkbox overlay (only visible on screen) */}
+                      <div className="print:hidden absolute top-2 right-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}} // Handled by parent div onClick
+                          className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        />
                       </div>
-                    ) : (
-                      <div className="bg-purple-100 text-purple-800 font-bold text-lg rounded-md py-2 mb-3">
-                        Loose Box #{unit.boxNumber}
-                      </div>
-                    )}
+
+                      {/* Header */}
+                      {unit.type === 'PALLET' ? (
+                        <div className="bg-blue-100 text-blue-800 font-bold text-lg rounded-md py-2 mb-3">
+                          Pallet #{unit.palletNumber}
+                        </div>
+                      ) : (
+                        <div className="bg-purple-100 text-purple-800 font-bold text-lg rounded-md py-2 mb-3">
+                          Loose Box #{unit.boxNumber}
+                        </div>
+                      )}
 
                     {/* QR Image */}
                     {qrImages[unit.key] && (
@@ -435,7 +493,8 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
                       </div>
                     )}
                   </div>
-                ))}
+                );
+                })}
               </div>
 
               {boxes.length === 0 && (
