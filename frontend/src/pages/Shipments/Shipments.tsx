@@ -782,10 +782,10 @@ export const Shipments: React.FC = () => {
                                       {shipment.shipmentPhotos.map((photo: string, idx: number) => (
                                         <div key={idx} className="relative group">
                                           <img
-                                            src={`http://localhost:5000${photo}`}
+                                            src={`/api${photo}`}
                                             alt={`Photo ${idx + 1}`}
                                             className="w-full h-20 object-cover rounded-lg border-2 border-gray-300 hover:border-indigo-500 cursor-pointer transition-all hover:scale-105"
-                                            onClick={() => window.open(`http://localhost:5000${photo}`, '_blank')}
+                                            onClick={() => window.open(`/api${photo}`, '_blank')}
                                           />
                                           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all flex items-center justify-center">
                                             <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -826,7 +826,7 @@ export const Shipments: React.FC = () => {
                                 <button
                                   onClick={() => {
                                     setSelectedShipment(shipment);
-                                    setDetailsModalOpen(true);
+                                    setDetailModalOpen(true);
                                   }}
                                   className="flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold"
                                   title="View Details"

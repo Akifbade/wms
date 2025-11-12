@@ -299,8 +299,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
             id: true,
             name: true,
             contactPerson: true,
-            phone: true,
-            email: true,
+            contactPhone: true,
           },
         },
         createdBy: {
