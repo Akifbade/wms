@@ -335,7 +335,9 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
         <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 flex justify-between items-center rounded-t-lg">
           <div>
             <h2 className="text-2xl font-bold">📦 Shipment Details</h2>
-            <p className="text-blue-100 text-sm mt-1">Reference: {shipment?.referenceId}</p>
+            {shipment?.referenceId && (
+              <p className="text-blue-100 text-sm mt-1">Reference: {shipment.referenceId}</p>
+            )}
           </div>
           <button
             onClick={onClose}
