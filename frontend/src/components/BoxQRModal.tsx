@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
+import { getBackendUrl } from '../services/api';
 
 interface BoxQRModalProps {
   isOpen: boolean;
@@ -298,10 +299,10 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
                     {shipment.shipmentPhotos.map((photo: string, idx: number) => (
                       <div key={idx} className="relative group">
                         <img
-                          src={`http://localhost:5000${photo}`}
+                          src={`${getBackendUrl()}${photo}`}
                           alt={`Shipment photo ${idx + 1}`}
                           className="w-full h-32 object-cover rounded-lg border-2 border-gray-300 hover:border-indigo-500 cursor-pointer transition-all"
-                          onClick={() => window.open(`http://localhost:5000${photo}`, '_blank')}
+                          onClick={() => window.open(`${getBackendUrl()}${photo}`, '_blank')}
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all flex items-center justify-center">
                           <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">

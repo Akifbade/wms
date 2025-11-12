@@ -669,7 +669,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       console.log('🔍 Scanning pallet QR:', code);
       const parts = code.split('_');
       console.log('📦 Pallet QR parts:', parts);
-      
+
       if (parts.length === 3) {
         const shipmentId = parts[1];
         console.log('🎯 Extracted shipmentId:', shipmentId);
@@ -696,13 +696,13 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         console.log('🔍 Try 2: Search API for shipmentId:', shipmentId);
         const response = await shipmentsAPI.getAll({ search: shipmentId });
         console.log('📊 Search results:', response.shipments?.length, 'shipments found');
-        
+
         const shipment = response.shipments?.find((s: any) => {
           const match = s.id === shipmentId || s.qrCode?.includes(shipmentId) || s.referenceId?.includes(shipmentId);
           console.log(`  - Checking ${s.referenceId}: id=${s.id === shipmentId}, qr=${s.qrCode?.includes(shipmentId)}, ref=${s.referenceId?.includes(shipmentId)} → ${match}`);
           return match;
         });
-        
+
         if (shipment) {
           console.log('✅ Found shipment via search:', shipment.referenceId);
           return await validateAndReturnShipment(shipment, code);

@@ -1,6 +1,16 @@
 // API configuration
 const API_BASE_URL = '/api';
 
+// Helper to get the backend base URL for uploads (works in both local and production)
+export const getBackendUrl = (): string => {
+  // In production, use the same domain (nginx proxies to backend)
+  // In local development, use localhost:5000
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000';
+  }
+  return ''; // Use relative path in production (nginx handles routing)
+};
+
 // Helper to get auth token
 export const getAuthToken = (): string | null => {
   const storedToken = localStorage.getItem('authToken') || localStorage.getItem('token');

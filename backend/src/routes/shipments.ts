@@ -1818,7 +1818,7 @@ router.post('/:shipmentId/assign-rack',
 
       await prisma.shipment.update({
         where: { id: shipmentId },
-        data: { 
+        data: {
           status: newStatus,
           assignedById: req.user!.id, // Track who assigned
           assignedAt: new Date()

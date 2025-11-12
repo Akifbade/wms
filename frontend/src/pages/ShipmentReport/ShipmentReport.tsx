@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { shipmentsAPI } from '../../services/api';
+import { shipmentsAPI, getBackendUrl } from '../../services/api';
 import CustomChargesModal from '../../components/CustomChargesModal';
 
 interface ShipmentDetails {
@@ -239,11 +239,11 @@ const ShipmentReport: React.FC = () => {
                                 <div className="bg-white rounded-lg p-4 border border-green-200">
                                     <p className="text-sm text-gray-600 mb-1">Created By</p>
                                     <p className="font-bold text-lg text-gray-900">
-                                        {(shipment as any).createdBy 
-                                          ? (typeof (shipment as any).createdBy === 'object' 
-                                              ? (shipment as any).createdBy.name || (shipment as any).createdBy.email 
-                                              : (shipment as any).createdBy)
-                                          : 'N/A'}
+                                        {(shipment as any).createdBy
+                                            ? (typeof (shipment as any).createdBy === 'object'
+                                                ? (shipment as any).createdBy.name || (shipment as any).createdBy.email
+                                                : (shipment as any).createdBy)
+                                            : 'N/A'}
                                     </p>
                                 </div>
                                 <div className="bg-white rounded-lg p-4 border border-green-200">
@@ -328,11 +328,11 @@ const ShipmentReport: React.FC = () => {
                                 <div>
                                     <p className="text-sm text-gray-600 mb-1">Created By</p>
                                     <p className="font-semibold text-gray-900">
-                                        {(shipment as any).createdBy 
-                                          ? (typeof (shipment as any).createdBy === 'object' 
-                                              ? (shipment as any).createdBy.name || (shipment as any).createdBy.email 
-                                              : (shipment as any).createdBy)
-                                          : 'N/A'}
+                                        {(shipment as any).createdBy
+                                            ? (typeof (shipment as any).createdBy === 'object'
+                                                ? (shipment as any).createdBy.name || (shipment as any).createdBy.email
+                                                : (shipment as any).createdBy)
+                                            : 'N/A'}
                                     </p>
                                 </div>
                             </div>
@@ -412,7 +412,7 @@ const ShipmentReport: React.FC = () => {
                                     {shipment.shipmentPhotos.map((photo, idx) => (
                                         <div key={idx} className="border-2 border-gray-300 rounded-lg overflow-hidden">
                                             <img
-                                                src={`http://localhost:5000${photo}`}
+                                                src={`${getBackendUrl()}${photo}`}
                                                 alt={`Shipment photo ${idx + 1}`}
                                                 className="w-full h-48 object-cover"
                                             />

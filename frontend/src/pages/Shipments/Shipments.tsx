@@ -12,7 +12,7 @@ import {
   FunnelIcon,
   PrinterIcon
 } from '@heroicons/react/24/outline';
-import { shipmentsAPI } from '../../services/api';
+import { shipmentsAPI, getBackendUrl } from '../../services/api';
 import { ReleaseNoteModal } from '../../components/ReleaseNoteModal';
 import { WithdrawalModal } from '../../components/WithdrawalModal';
 import WHMShipmentModal from '../../components/WHMShipmentModal';
@@ -720,10 +720,10 @@ export const Shipments: React.FC = () => {
                                     <div>
                                       <p className="text-xs text-gray-500">Created By</p>
                                       <p className="font-bold text-gray-900">
-                                        {shipment.createdBy 
-                                          ? (typeof shipment.createdBy === 'object' 
-                                              ? shipment.createdBy.name || shipment.createdBy.email 
-                                              : shipment.createdBy)
+                                        {shipment.createdBy
+                                          ? (typeof shipment.createdBy === 'object'
+                                            ? shipment.createdBy.name || shipment.createdBy.email
+                                            : shipment.createdBy)
                                           : 'N/A'}
                                       </p>
                                     </div>
@@ -738,8 +738,8 @@ export const Shipments: React.FC = () => {
                                       <div>
                                         <p className="text-xs text-gray-500">Assigned By</p>
                                         <p className="font-bold text-gray-900">
-                                          {typeof shipment.assignedBy === 'object' 
-                                            ? shipment.assignedBy.name || shipment.assignedBy.email 
+                                          {typeof shipment.assignedBy === 'object'
+                                            ? shipment.assignedBy.name || shipment.assignedBy.email
                                             : shipment.assignedBy}
                                         </p>
                                       </div>
@@ -800,7 +800,7 @@ export const Shipments: React.FC = () => {
                                     <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
                                       {shipment.shipmentPhotos.map((photo: string, idx: number) => {
                                         // Fix: Prepend backend URL if photo path is relative
-                                        const photoUrl = photo.startsWith('http') ? photo : `http://localhost:5000${photo}`;
+                                        const photoUrl = photo.startsWith('http') ? photo : `${getBackendUrl()}${photo}`;
                                         return (
                                           <div key={idx} className="relative group">
                                             <img
