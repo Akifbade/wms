@@ -15,7 +15,8 @@ import {
   BanknotesIcon,
   ArrowRightOnRectangleIcon,
   ChartBarIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  ServerStackIcon
 } from '@heroicons/react/24/outline';
 import { VersionBadgeHeader } from '../VersionBadgeHeader';
 
@@ -32,6 +33,7 @@ const navigationConfig = {
     { name: 'Invoices', href: '/invoices', icon: DocumentTextIcon },
     { name: 'Expenses', href: '/expenses', icon: BanknotesIcon },
     { name: 'Scanner', href: '/scanner', icon: QrCodeIcon },
+    { name: 'Backups', href: '/backups', icon: ServerStackIcon },
     { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
   ],
   MANAGER: [

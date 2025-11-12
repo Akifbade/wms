@@ -44,6 +44,7 @@ const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const rackCapacity_1 = require("../utils/rackCapacity");
+const chargeCalculation_1 = require("../utils/chargeCalculation");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 const parseOptionalInt = (value) => {
@@ -189,6 +190,8 @@ router.get('/', async (req, res) => {
                             boxNumber: true,
                             status: true,
                             rackId: true,
+                            pieceQR: true, // ✅ FIX: Include pieceQR for pallet breakdown
+                            photos: true, // ✅ FIX: Include photos for shipment display
                             rack: {
                                 select: {
                                     id: true,
@@ -202,6 +205,22 @@ router.get('/', async (req, res) => {
                         select: {
                             id: true,
                             name: true,
+                        },
+                    },
+                    createdBy: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                        },
+                    },
+                    assignedBy: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
                         },
                     },
                 },
@@ -226,13 +245,40 @@ router.get('/', async (req, res) => {
                 select: { code: true }
             }) : [];
             const rackCodes = racks.map(r => r.code).join(', ');
+            // 🔧 FIX: Parse pieceQR to get proper pallet/loose breakdown
+            const boxesWithParsedQR = shipment.boxes.map((b) => {
+                try {
+                    const pieceData = b.pieceQR ? (typeof b.pieceQR === 'string' ? JSON.parse(b.pieceQR) : b.pieceQR) : null;
+                    return { ...b, pieceQR: pieceData };
+                }
+                catch (e) {
+                    return { ...b, pieceQR: null };
+                }
+            });
+            // 🔧 FIX: Collect shipment photos from boxes
+            const shipmentPhotosSet = new Set();
+            for (const box of shipment.boxes) {
+                if (box.photos) {
+                    try {
+                        const photos = typeof box.photos === 'string' ? JSON.parse(box.photos) : box.photos;
+                        if (Array.isArray(photos)) {
+                            photos.forEach((p) => shipmentPhotosSet.add(p));
+                        }
+                    }
+                    catch (e) {
+                        // Ignore parse errors
+                    }
+                }
+            }
             return {
                 ...shipment,
+                boxes: boxesWithParsedQR, // Replace with parsed version
                 totalBoxes,
                 assignedBoxes,
                 releasedBoxes,
                 inStorageBoxes,
                 rackLocations: rackCodes || null, // Comma-separated rack codes
+                shipmentPhotos: Array.from(shipmentPhotosSet), // 🔧 FIX: Add photos array
                 // Don't override currentBoxCount - it's the source of truth from database
             };
         }));
@@ -277,21 +323,68 @@ router.get('/:id', async (req, res) => {
                     select: {
                         id: true,
                         name: true,
+                        contactPerson: true,
+                        contactPhone: true,
                     },
                 },
+                createdBy: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+                assignedBy: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+                charges: true, // Include charging information
             },
         });
         if (!shipment) {
             return res.status(404).json({ error: 'Shipment not found' });
         }
+        // Type cast to any to avoid TypeScript errors with Prisma types
+        const shipmentData = shipment;
         // Add computed box counts
-        const totalBoxes = shipment.boxes.length;
-        const assignedBoxes = shipment.boxes.filter((b) => b.rackId !== null).length;
-        const releasedBoxes = shipment.boxes.filter((b) => b.status === 'RELEASED').length;
-        const inStorageBoxes = shipment.boxes.filter((b) => b.status === 'IN_STORAGE').length;
+        const totalBoxes = shipmentData.boxes.length;
+        const assignedBoxes = shipmentData.boxes.filter((b) => b.rackId !== null).length;
+        const releasedBoxes = shipmentData.boxes.filter((b) => b.status === 'RELEASED').length;
+        const inStorageBoxes = shipmentData.boxes.filter((b) => b.status === 'IN_STORAGE').length;
+        // 🔧 FIX: Parse pieceQR and collect photos
+        const boxesWithParsedQR = shipmentData.boxes.map((b) => {
+            try {
+                const pieceData = b.pieceQR ? (typeof b.pieceQR === 'string' ? JSON.parse(b.pieceQR) : b.pieceQR) : null;
+                return { ...b, pieceQR: pieceData };
+            }
+            catch (e) {
+                return { ...b, pieceQR: null };
+            }
+        });
+        const shipmentPhotosSet = new Set();
+        for (const box of shipmentData.boxes) {
+            if (box.photos) {
+                try {
+                    const photos = typeof box.photos === 'string' ? JSON.parse(box.photos) : box.photos;
+                    if (Array.isArray(photos)) {
+                        photos.forEach((p) => shipmentPhotosSet.add(p));
+                    }
+                }
+                catch (e) {
+                    // Ignore
+                }
+            }
+        }
         res.json({
             shipment: {
-                ...shipment,
+                ...shipmentData,
+                boxes: boxesWithParsedQR, // 🔧 FIX: Use parsed boxes
+                shipmentPhotos: Array.from(shipmentPhotosSet), // 🔧 FIX: Add photos
                 totalBoxes,
                 assignedBoxes,
                 releasedBoxes,
@@ -917,6 +1010,7 @@ async (req, res) => {
             data: {
                 status: newStatus,
                 assignedAt: assignedCount > 0 ? new Date() : null,
+                assignedById: assignedCount > 0 ? req.user.id : null, // Track who assigned
             },
         });
         // Log activity
@@ -1268,6 +1362,134 @@ router.post('/cleanup/test-data', (0, auth_1.authorizeRoles)('ADMIN'), async (re
     }
 });
 // ==========================================
+// CUSTOM CHARGES MANAGEMENT (Per-Shipment Pricing)
+// ==========================================
+// Get current charges calculation for a shipment
+router.get('/:id/charges-calculation', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const companyId = req.user.companyId;
+        const calculation = await (0, chargeCalculation_1.calculateShipmentCharges)(prisma, id, companyId);
+        res.json({
+            success: true,
+            shipmentId: id,
+            calculation
+        });
+    }
+    catch (error) {
+        console.error('Get charges calculation error:', error);
+        res.status(500).json({ error: error.message || 'Failed to calculate charges' });
+    }
+});
+// Preview charges with different rate scenarios (doesn't save)
+router.post('/:id/charges-preview', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { customRateEnabled, ratePerCBMPerDay, ratePerBoxPerDay } = req.body;
+        const companyId = req.user.companyId;
+        const preview = await (0, chargeCalculation_1.previewShipmentCharges)(prisma, id, companyId, {
+            enabled: customRateEnabled,
+            ratePerCBMPerDay: ratePerCBMPerDay ? parseFloat(ratePerCBMPerDay) : undefined,
+            ratePerBoxPerDay: ratePerBoxPerDay ? parseFloat(ratePerBoxPerDay) : undefined
+        });
+        res.json({
+            success: true,
+            shipmentId: id,
+            preview
+        });
+    }
+    catch (error) {
+        console.error('Preview charges error:', error);
+        res.status(500).json({ error: error.message || 'Failed to preview charges' });
+    }
+});
+// Set custom charges for a shipment
+router.patch('/:id/custom-charges', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { customRateEnabled, ratePerCBMPerDay, ratePerBoxPerDay, notes } = req.body;
+        const companyId = req.user.companyId;
+        // Validation
+        if (typeof customRateEnabled !== 'boolean') {
+            return res.status(400).json({ error: 'customRateEnabled must be a boolean' });
+        }
+        if (customRateEnabled) {
+            if (!ratePerCBMPerDay && !ratePerBoxPerDay) {
+                return res.status(400).json({
+                    error: 'At least one rate must be provided when custom rates are enabled'
+                });
+            }
+            if (ratePerCBMPerDay && ratePerCBMPerDay < 0) {
+                return res.status(400).json({ error: 'Rate per CBM cannot be negative' });
+            }
+            if (ratePerBoxPerDay && ratePerBoxPerDay < 0) {
+                return res.status(400).json({ error: 'Rate per box cannot be negative' });
+            }
+        }
+        // Verify shipment exists and belongs to company
+        const shipment = await prisma.shipment.findFirst({
+            where: { id, companyId }
+        });
+        if (!shipment) {
+            return res.status(404).json({ error: 'Shipment not found' });
+        }
+        // Update shipment with custom rates
+        const updated = await prisma.shipment.update({
+            where: { id },
+            data: {
+                customRateEnabled,
+                customRatePerCBMPerDay: customRateEnabled && ratePerCBMPerDay ? parseFloat(ratePerCBMPerDay) : null,
+                customRatePerBoxPerDay: customRateEnabled && ratePerBoxPerDay ? parseFloat(ratePerBoxPerDay) : null,
+                customRateNotes: notes || null
+            } // Type cast for new fields
+        });
+        // Type cast to access custom rate fields
+        const updatedData = updated;
+        // Recalculate charges with new rates
+        await (0, chargeCalculation_1.updateShipmentCharges)(prisma, id, companyId);
+        // Get updated calculation for response
+        const calculation = await (0, chargeCalculation_1.calculateShipmentCharges)(prisma, id, companyId);
+        console.log(`✅ Custom charges ${customRateEnabled ? 'enabled' : 'disabled'} for shipment ${shipment.referenceId}`);
+        res.json({
+            success: true,
+            message: customRateEnabled
+                ? 'Custom charges enabled and calculated successfully'
+                : 'Custom charges disabled - using company default rates',
+            shipment: {
+                id: updatedData.id,
+                referenceId: updatedData.referenceId,
+                customRateEnabled: updatedData.customRateEnabled,
+                customRatePerCBMPerDay: updatedData.customRatePerCBMPerDay,
+                customRatePerBoxPerDay: updatedData.customRatePerBoxPerDay,
+                customRateNotes: updatedData.customRateNotes
+            },
+            calculation
+        });
+    }
+    catch (error) {
+        console.error('Set custom charges error:', error);
+        res.status(500).json({ error: error.message || 'Failed to set custom charges' });
+    }
+});
+// Recalculate charges manually (useful after data changes)
+router.post('/:id/recalculate-charges', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const companyId = req.user.companyId;
+        await (0, chargeCalculation_1.updateShipmentCharges)(prisma, id, companyId);
+        const calculation = await (0, chargeCalculation_1.calculateShipmentCharges)(prisma, id, companyId);
+        res.json({
+            success: true,
+            message: 'Charges recalculated successfully',
+            calculation
+        });
+    }
+    catch (error) {
+        console.error('Recalculate charges error:', error);
+        res.status(500).json({ error: error.message || 'Failed to recalculate charges' });
+    }
+});
+// ==========================================
 // ASSIGN BOXES TO RACK (with Pallet support)
 // ==========================================
 router.post('/:shipmentId/assign-rack', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), async (req, res) => {
@@ -1330,11 +1552,44 @@ router.post('/:shipmentId/assign-rack', (0, auth_1.authorizeRoles)('ADMIN', 'MAN
         if (!rack) {
             return res.status(404).json({ error: 'Rack not found' });
         }
-        // Get boxes to assign
-        const boxesToAssign = unassignedBoxes.slice(0, quantity);
+        // ✅ CRITICAL FIX: Select boxes based on pallet/loose selection from frontend
+        // Group boxes by their palletNumber from pieceQR
+        const boxesByPallet = {};
+        unassignedBoxes.forEach((box) => {
+            const pieceData = box.pieceQR ? JSON.parse(box.pieceQR) : {};
+            const palletNum = pieceData.palletNumber ?? 0; // null/undefined → 0 (loose)
+            if (!boxesByPallet[palletNum])
+                boxesByPallet[palletNum] = [];
+            boxesByPallet[palletNum].push(box);
+        });
+        // Build list of boxes to assign based on frontend selection
+        const boxesToAssign = [];
+        let palletsToAssign = pallets || 0;
+        // If frontend specified pallets, assign those pallet boxes first
+        if (palletsToAssign > 0) {
+            const palletNumbers = Object.keys(boxesByPallet)
+                .map(Number)
+                .filter(n => n > 0) // Only actual pallets, not loose (0)
+                .sort((a, b) => a - b);
+            for (let i = 0; i < Math.min(palletsToAssign, palletNumbers.length); i++) {
+                const palletNum = palletNumbers[i];
+                const palletBoxes = boxesByPallet[palletNum] || [];
+                boxesToAssign.push(...palletBoxes);
+            }
+        }
+        // Then add loose boxes if requested
+        if (looseBoxes && looseBoxes > 0) {
+            const looseBoxList = boxesByPallet[0] || [];
+            boxesToAssign.push(...looseBoxList.slice(0, looseBoxes));
+        }
+        console.log('📦 Box selection:', {
+            requestedPallets: pallets,
+            requestedLooseBoxes: looseBoxes,
+            selectedBoxes: boxesToAssign.length,
+            boxNumbers: boxesToAssign.map((b) => b.boxNumber)
+        });
         // Calculate pallet usage for capacity check
         const boxesPerPallet = shipment.boxesPerPallet || 0;
-        let palletsToAssign = pallets || 0;
         // ✅ SAFE FIX: Only auto-calculate pallets if frontend didn't specify
         // If frontend sends pallets = 0 explicitly (loose boxes only), respect it
         // If frontend sends looseBoxes > 0, it means loose boxes only, no pallets
@@ -1366,24 +1621,18 @@ router.post('/:shipmentId/assign-rack', (0, auth_1.authorizeRoles)('ADMIN', 'MAN
             willSavePhotos: photosJson !== null
         });
         const updatedBoxes = await prisma.$transaction(boxesToAssign.map((box, index) => {
-            // Calculate pallet number for this box
-            let palletNumber = null;
-            if (boxesPerPallet > 0 && palletsToAssign > 0) {
-                palletNumber = Math.floor(index / boxesPerPallet) + 1;
-                if (palletNumber > palletsToAssign) {
-                    palletNumber = null; // Loose box
-                }
-            }
-            // Store pallet info in pieceQR as JSON
+            // ✅ FIX: PRESERVE the original palletNumber from pieceQR
+            // Don't recalculate - the box already knows which pallet it belongs to from intake
             const pieceData = box.pieceQR ? JSON.parse(box.pieceQR) : {};
-            pieceData.palletNumber = palletNumber;
+            // Keep original palletNumber - it was set correctly during shipment intake
+            // DO NOT overwrite with recalculated value based on assignment order
             return prisma.shipmentBox.update({
                 where: { id: box.id },
                 data: {
                     rackId,
                     assignedAt: new Date(),
                     status: 'IN_STORAGE',
-                    pieceQR: JSON.stringify(pieceData),
+                    pieceQR: JSON.stringify(pieceData), // Preserve original data
                     photos: photosJson // Store photos in all assigned boxes
                 }
             });
@@ -1421,7 +1670,11 @@ router.post('/:shipmentId/assign-rack', (0, auth_1.authorizeRoles)('ADMIN', 'MAN
         }
         await prisma.shipment.update({
             where: { id: shipmentId },
-            data: { status: newStatus }
+            data: {
+                status: newStatus,
+                assignedById: req.user.id, // Track who assigned
+                assignedAt: new Date()
+            }
         });
         console.log('✅ Assigned successfully:', {
             shipmentId,

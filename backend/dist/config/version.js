@@ -5,7 +5,10 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.logVersionInfo = exports.getVersionInfo = exports.APP_VERSION = void 0;
-exports.APP_VERSION = 'v2.1.140'; // ✅ UPDATED for box mode QR fixes
+/**
+ * Auto-incremented version (updated by pre-commit hook)
+ */
+exports.APP_VERSION = 'v2.1.147';
 const getVersionInfo = () => {
     return {
         version: exports.APP_VERSION,

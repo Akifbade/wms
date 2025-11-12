@@ -25,6 +25,7 @@ import { MaterialsManagement } from './pages/Materials';
 import MaterialReports from './pages/Materials/MaterialReports';
 import { DamageReport } from './components/reports/DamageReport';
 import { DebugLogin } from './pages/DebugLogin';
+import BackupManagement from './pages/BackupManagement/BackupManagement';
 
 import { getAuthToken } from './services/api';
 import { PermissionProvider } from './contexts/PermissionContext';
@@ -175,6 +176,11 @@ function App() {
             <Route path="settings/templates" element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <TemplateSettingsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="backups" element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <BackupManagement />
               </ProtectedRoute>
             } />
 

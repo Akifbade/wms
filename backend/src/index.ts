@@ -36,6 +36,7 @@ import customerMaterialsRoutes from './routes/customer-materials';
 import workerDashboardRoutes from './routes/worker-dashboard';
 import categoriesRoutes from './routes/categories'; // NEW: Category management
 import companiesRoutes from './routes/companies'; // NEW: Company profiles management
+import backupsRoutes from './routes/backups'; // NEW: Backup management
 
 // Load environment variables FIRST (but allow env vars to override .env)
 dotenv.config({ override: false });
@@ -160,6 +161,7 @@ app.use('/api/plugins', pluginsRoutes);
 app.use('/api/job-files', jobFilesRoutes); // NEW: Job file management
 app.use('/api/categories', categoriesRoutes); // NEW: Category management
 app.use('/api/company-profiles', companiesRoutes); // NEW: Company profiles (DIOR, JAZEERA, etc)
+app.use('/api/backups', backupsRoutes); // NEW: Backup management system
 // NEW: Enhanced warehouse routes
 app.use('/api', shipmentItemsRoutes); // Handles /api/shipments/:id/items
 app.use('/api', customerMaterialsRoutes); // Handles /api/customers/*

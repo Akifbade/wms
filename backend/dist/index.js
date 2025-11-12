@@ -40,6 +40,7 @@ const customer_materials_1 = __importDefault(require("./routes/customer-material
 const worker_dashboard_1 = __importDefault(require("./routes/worker-dashboard"));
 const categories_1 = __importDefault(require("./routes/categories")); // NEW: Category management
 const companies_1 = __importDefault(require("./routes/companies")); // NEW: Company profiles management
+const backups_1 = __importDefault(require("./routes/backups")); // NEW: Backup management
 // Load environment variables FIRST (but allow env vars to override .env)
 dotenv_1.default.config({ override: false });
 // Initialize Express app
@@ -151,6 +152,7 @@ app.use('/api/plugins', plugins_1.default);
 app.use('/api/job-files', job_files_1.default); // NEW: Job file management
 app.use('/api/categories', categories_1.default); // NEW: Category management
 app.use('/api/company-profiles', companies_1.default); // NEW: Company profiles (DIOR, JAZEERA, etc)
+app.use('/api/backups', backups_1.default); // NEW: Backup management system
 // NEW: Enhanced warehouse routes
 app.use('/api', shipment_items_1.default); // Handles /api/shipments/:id/items
 app.use('/api', customer_materials_1.default); // Handles /api/customers/*
