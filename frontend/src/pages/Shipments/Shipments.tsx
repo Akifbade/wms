@@ -714,18 +714,37 @@ export const Shipments: React.FC = () => {
                                   <div className="flex items-center gap-2">
                                     <div className="bg-gray-200 p-2 rounded-lg">
                                       <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                       </svg>
                                     </div>
                                     <div>
-                                      <p className="text-xs text-gray-500">Stored On</p>
+                                      <p className="text-xs text-gray-500">Created By</p>
                                       <p className="font-bold text-gray-900">
-                                        {shipment.receivedAt && !isNaN(new Date(shipment.receivedAt).getTime())
-                                          ? new Date(shipment.receivedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                                          : '-'}
+                                        {shipment.createdBy 
+                                          ? (typeof shipment.createdBy === 'object' 
+                                              ? shipment.createdBy.name || shipment.createdBy.email 
+                                              : shipment.createdBy)
+                                          : 'N/A'}
                                       </p>
                                     </div>
                                   </div>
+                                  {shipment.assignedBy && (
+                                    <div className="flex items-center gap-2">
+                                      <div className="bg-indigo-100 p-2 rounded-lg">
+                                        <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                        </svg>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-gray-500">Assigned By</p>
+                                        <p className="font-bold text-gray-900">
+                                          {typeof shipment.assignedBy === 'object' 
+                                            ? shipment.assignedBy.name || shipment.assignedBy.email 
+                                            : shipment.assignedBy}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
 
                                 {/* Rack Locations */}

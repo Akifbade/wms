@@ -666,31 +666,48 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
     // ✅ PRIORITY 3: Check for PALLET_SHIPMENTID_NUMBER format (simplified pallet QR)
     // Example: PALLET_cmhhm6gq1000132e5vadvqil_1
     if (upperCode.startsWith('PALLET_')) {
+      console.log('🔍 Scanning pallet QR:', code);
       const parts = code.split('_');
+      console.log('📦 Pallet QR parts:', parts);
+      
       if (parts.length === 3) {
         const shipmentId = parts[1];
+        console.log('🎯 Extracted shipmentId:', shipmentId);
 
         // Try 1: Direct shipment ID lookup
         try {
+          console.log('🔍 Try 1: Direct API lookup for shipmentId:', shipmentId);
           const directResponse = await fetch(`/api/shipments/${shipmentId}`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
           });
           if (directResponse.ok) {
             const data = await directResponse.json();
             const shipment = data.shipment || data;
+            console.log('✅ Found shipment via direct lookup:', shipment.referenceId);
             return await validateAndReturnShipment(shipment, code);
+          } else {
+            console.warn('❌ Direct lookup failed with status:', directResponse.status);
           }
         } catch (err) {
-          console.log('Direct shipment lookup failed, trying search...');
+          console.warn('❌ Direct shipment lookup error:', err);
         }
 
-        // Try 2: Search by shipment ID
+        // Try 2: Search by shipment ID (this should work since ID is unique)
+        console.log('🔍 Try 2: Search API for shipmentId:', shipmentId);
         const response = await shipmentsAPI.getAll({ search: shipmentId });
-        const shipment = response.shipments?.find((s: any) =>
-          s.id === shipmentId || s.qrCode?.includes(shipmentId) || s.referenceId?.includes(shipmentId)
-        );
+        console.log('📊 Search results:', response.shipments?.length, 'shipments found');
+        
+        const shipment = response.shipments?.find((s: any) => {
+          const match = s.id === shipmentId || s.qrCode?.includes(shipmentId) || s.referenceId?.includes(shipmentId);
+          console.log(`  - Checking ${s.referenceId}: id=${s.id === shipmentId}, qr=${s.qrCode?.includes(shipmentId)}, ref=${s.referenceId?.includes(shipmentId)} → ${match}`);
+          return match;
+        });
+        
         if (shipment) {
+          console.log('✅ Found shipment via search:', shipment.referenceId);
           return await validateAndReturnShipment(shipment, code);
+        } else {
+          console.error('❌ No shipment found matching ID:', shipmentId);
         }
       }
 

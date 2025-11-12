@@ -191,6 +191,22 @@ router.get('/', async (req: AuthRequest, res: Response) => {
               name: true,
             },
           },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
+          assignedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (parseInt(page as string) - 1) * parseInt(limit as string),
@@ -1048,6 +1064,7 @@ router.post('/:id/assign-boxes',
         data: {
           status: newStatus,
           assignedAt: assignedCount > 0 ? new Date() : null,
+          assignedById: assignedCount > 0 ? req.user!.id : null, // Track who assigned
         },
       });
 
@@ -1801,7 +1818,11 @@ router.post('/:shipmentId/assign-rack',
 
       await prisma.shipment.update({
         where: { id: shipmentId },
-        data: { status: newStatus }
+        data: { 
+          status: newStatus,
+          assignedById: req.user!.id, // Track who assigned
+          assignedAt: new Date()
+        }
       });
 
       console.log('✅ Assigned successfully:', {

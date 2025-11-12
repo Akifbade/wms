@@ -237,9 +237,13 @@ const ShipmentReport: React.FC = () => {
                                     </p>
                                 </div>
                                 <div className="bg-white rounded-lg p-4 border border-green-200">
-                                    <p className="text-sm text-gray-600 mb-1">Stored On</p>
+                                    <p className="text-sm text-gray-600 mb-1">Created By</p>
                                     <p className="font-bold text-lg text-gray-900">
-                                        {shipment.receivedAt ? new Date(shipment.receivedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                                        {(shipment as any).createdBy 
+                                          ? (typeof (shipment as any).createdBy === 'object' 
+                                              ? (shipment as any).createdBy.name || (shipment as any).createdBy.email 
+                                              : (shipment as any).createdBy)
+                                          : 'N/A'}
                                     </p>
                                 </div>
                                 <div className="bg-white rounded-lg p-4 border border-green-200">
@@ -322,11 +326,13 @@ const ShipmentReport: React.FC = () => {
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-600 mb-1">Stored On</p>
+                                    <p className="text-sm text-gray-600 mb-1">Created By</p>
                                     <p className="font-semibold text-gray-900">
-                                        {shipment.receivedAt && !isNaN(new Date(shipment.receivedAt).getTime())
-                                            ? new Date(shipment.receivedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                                            : '-'}
+                                        {(shipment as any).createdBy 
+                                          ? (typeof (shipment as any).createdBy === 'object' 
+                                              ? (shipment as any).createdBy.name || (shipment as any).createdBy.email 
+                                              : (shipment as any).createdBy)
+                                          : 'N/A'}
                                     </p>
                                 </div>
                             </div>
