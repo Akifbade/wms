@@ -35,7 +35,6 @@ const navigationConfig = {
     { name: 'Expenses', href: '/expenses', icon: BanknotesIcon },
     { name: 'Scanner', href: '/scanner', icon: QrCodeIcon },
     { name: 'Backups', href: '/backups', icon: ServerStackIcon },
-    { name: '🔧 Patch Manager', href: '/patch-manager', icon: Cog6ToothIcon },
     { name: '⚙️ Plugin Settings', href: '/plugin-settings', icon: Cog6ToothIcon },
     { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
   ],

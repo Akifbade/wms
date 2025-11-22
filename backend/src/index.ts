@@ -38,8 +38,6 @@ import workerDashboardRoutes from './routes/worker-dashboard';
 import categoriesRoutes from './routes/categories'; // NEW: Category management
 import companiesRoutes from './routes/companies'; // NEW: Company profiles management
 import backupsRoutes from './routes/backups'; // NEW: Backup management
-import systemPatchesRoutes from './routes/system-patches';
-import { loadPatches } from './patches/engine';
 
 // Load environment variables FIRST (but allow env vars to override .env)
 dotenv.config({ override: false });
@@ -167,7 +165,6 @@ app.use('/api/categories', categoriesRoutes); // NEW: Category management
 app.use('/api/companies', companiesRoutes); // NEW: Company profiles (DIOR, JAZEERA, etc) - matches frontend /api/companies/:profileId/analytics
 app.use('/api/company-profiles', companiesRoutes); // Legacy alias for older frontend calls
 app.use('/api/backups', backupsRoutes); // NEW: Backup management system
-app.use('/api/system-patches', systemPatchesRoutes);
 
 // Plugin routes will be added dynamically by patch system
 // These are registered in patches/modules/* via app.get/post/etc
@@ -188,14 +185,12 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const startServer = async () => {
   try {
-    await loadPatches(app, prisma);
-
     // 404 handler - registered AFTER plugins so their routes work
     app.use((req, res) => {
       res.status(404).json({ error: 'Route not found' });
     });
   } catch (error) {
-    console.error('⚠️  Patch engine failed to initialize; continuing without patches.', error);
+    console.error('⚠️  Server initialization error:', error);
   }
 
   server = app.listen(PORT, () => {

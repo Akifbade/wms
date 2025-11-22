@@ -12,7 +12,6 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { dashboardAPI } from '../../services/api';
 import MovingJobsManager from '../../components/moving-jobs/MovingJobsManager';
-import { usePatchEnabled } from '../../contexts/PatchContext';
 
 export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<any>(null);
@@ -23,7 +22,7 @@ export const Dashboard: React.FC = () => {
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const analyticsEnabled = usePatchEnabled('dashboard-safe-analytics');
+  const analyticsEnabled = true; // Default to true since patch system is removed
 
   useEffect(() => {
     loadDashboardData();

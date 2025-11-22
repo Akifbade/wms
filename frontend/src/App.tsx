@@ -28,13 +28,11 @@ import MaterialReports from './pages/Materials/MaterialReports';
 import { DamageReport } from './components/reports/DamageReport';
 import { DebugLogin } from './pages/DebugLogin';
 import BackupManagement from './pages/BackupManagement/BackupManagement';
-import PatchManager from './pages/Settings/PatchManager';
 import PluginSettings from './pages/Settings/PluginSettings';
 
 import { getAuthToken } from './services/api';
 import { PermissionProvider } from './contexts/PermissionContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { PatchProvider } from './contexts/PatchContext';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 
 function App() {
@@ -81,7 +79,6 @@ function App() {
 
   return (
     <PermissionProvider>
-      <PatchProvider isAuthenticated={isAuthenticated}>
         <Router>
           <GlobalErrorBoundary>
             <Routes>
@@ -147,11 +144,6 @@ function App() {
                 <Route path="job-reports" element={
                   <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                     <JobReportsDashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="patch-manager" element={
-                  <ProtectedRoute allowedRoles={['ADMIN']}>
-                    <PatchManager />
                   </ProtectedRoute>
                 } />
                 <Route path="plugin-settings" element={
@@ -248,7 +240,6 @@ function App() {
             <VersionBadge />
           </GlobalErrorBoundary>
         </Router>
-      </PatchProvider>
     </PermissionProvider>
   );
 }
