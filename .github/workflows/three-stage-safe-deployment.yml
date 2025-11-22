@@ -19,14 +19,12 @@ name: 🚀 Three-Stage Safe Deployment
 # =============================================================================
 
 on:
-  push:
-    branches:
-      - stable/prisma-mysql-production
-    paths:
-      - 'frontend/**'
-      - 'backend/**'
-      - '.github/workflows/**'
+  # DISABLED: Auto-deploy on push (too many unwanted deployments)
+  # push:
+  #   branches:
+  #     - stable/prisma-mysql-production
   
+  # ONLY MANUAL DEPLOYMENT (prevents accidental staging deploys)
   workflow_dispatch:
     inputs:
       environment:
