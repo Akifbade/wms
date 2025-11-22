@@ -31,9 +31,23 @@ if [ "$MEMORY_USED" -gt "$MEMORY_THRESHOLD" ]; then
 fi
 
 # 4. Stop staging if running (production only mode)
+# NOTE: Staging auto-starts during GitHub Actions deployment
 if docker ps | grep -q "wms-staging"; then
-    echo "Staging detected - stopping to save memory..." >> $LOGFILE
-    cd "/root/NEW START" && docker-compose -f docker-compose-staging-isolated.yml down >> $LOGFILE 2>&1
+    # Check if staging was recently started (within last 10 minutes)
+    STAGING_UPTIME=$(docker inspect wms-staging-backend --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
+    if [ -n "$STAGING_UPTIME" ]; then
+        STARTED_TS=$(date -d "$STAGING_UPTIME" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "$STAGING_UPTIME" +%s 2>/dev/null)
+        CURRENT_TS=$(date +%s)
+        UPTIME_MINUTES=$(( ($CURRENT_TS - $STARTED_TS) / 60 ))
+        
+        # Only stop if running for more than 30 minutes (deployment finished)
+        if [ "$UPTIME_MINUTES" -gt 30 ]; then
+            echo "Staging running for ${UPTIME_MINUTES}min - stopping to save memory..." >> $LOGFILE
+            cd "/root/NEW START" && docker-compose -f docker-compose-staging-isolated.yml down >> $LOGFILE 2>&1
+        else
+            echo "Staging recently started (${UPTIME_MINUTES}min ago) - keeping running (deployment in progress)" >> $LOGFILE
+        fi
+    fi
 fi
 
 # 5. Clean old logs (keep last 7 days) - SAFE: only .log files, never database/uploads

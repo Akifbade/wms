@@ -151,7 +151,10 @@ jobs:
             cd "${{ env.VPS_PATH }}"
             echo "🔄 Deploying staging containers..."
             
-            # Build and restart staging containers
+            # Stop staging first (in case auto-cleanup stopped it)
+            docker-compose -f docker-compose-staging-isolated.yml down 2>/dev/null || true
+            
+            # Build and start fresh staging containers
             docker-compose -f docker-compose-staging-isolated.yml up -d --build
             
             echo "⏳ Waiting for containers to stabilize..."
@@ -198,6 +201,19 @@ jobs:
             echo "❌ Staging frontend health check failed"
             exit 1
           fi
+
+      - name: 📊 Staging Deployment Summary
+        if: success()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ STAGING DEPLOYMENT SUCCESSFUL"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🌐 Frontend: http://${{ env.VPS_HOST }}:${{ env.STAGING_PORT }}"
+          echo "🔌 Backend:  http://${{ env.VPS_HOST }}:${{ env.STAGING_API_PORT }}/api/health"
+          echo ""
+          echo "ℹ️  Staging will auto-stop after 30 minutes to save memory"
+          echo "ℹ️  Production remains unaffected and running"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: 📊 Staging Deployment Summary
         run: |
