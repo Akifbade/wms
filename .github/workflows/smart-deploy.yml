@@ -110,6 +110,27 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ env.VPS_HOST }} >> ~/.ssh/known_hosts
 
+      - name: 🔍 Check Container Existence
+        id: container_check
+        run: |
+          echo "Checking if target containers exist..."
+          
+          if [ "${{ inputs.environment }}" == "staging" ]; then
+            CONTAINER_NAME="wms-staging-backend"
+          else
+            CONTAINER_NAME="wms-backend"
+          fi
+          
+          CONTAINERS_EXIST=$(ssh root@${{ env.VPS_HOST }} "docker ps -a --filter name=$CONTAINER_NAME --format '{{.Names}}'" || echo "")
+          
+          if [ -z "$CONTAINERS_EXIST" ]; then
+            echo "⚠️ Target containers don't exist - FULL REBUILD required"
+            echo "containers_exist=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Containers exist - can use hot reload if code-only changes"
+            echo "containers_exist=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: 💾 Backup Database (Safety First)
         run: |
           ssh root@${{ env.VPS_HOST }} << 'BACKUP_EOF'
@@ -207,7 +228,7 @@ jobs:
           MIGRATE_EOF
 
       - name: ⚡ HOT RELOAD Deploy (Fast)
-        if: needs.detect-changes.outputs.deploy_type == 'hot_reload' && inputs.force_rebuild != true
+        if: needs.detect-changes.outputs.deploy_type == 'hot_reload' && inputs.force_rebuild != true && steps.container_check.outputs.containers_exist == 'true'
         run: |
           ssh root@${{ env.VPS_HOST }} << 'HOTRELOAD_EOF'
             cd "${{ env.VPS_PATH }}"
@@ -246,7 +267,7 @@ jobs:
           HOTRELOAD_EOF
 
       - name: 🔨 FULL REBUILD Deploy (Slow)
-        if: needs.detect-changes.outputs.deploy_type == 'full_rebuild' || inputs.force_rebuild == true
+        if: needs.detect-changes.outputs.deploy_type == 'full_rebuild' || inputs.force_rebuild == true || steps.container_check.outputs.containers_exist == 'false'
         run: |
           ssh root@${{ env.VPS_HOST }} << 'REBUILD_EOF'
             cd "${{ env.VPS_PATH }}"
