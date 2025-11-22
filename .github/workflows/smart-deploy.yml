@@ -399,7 +399,13 @@ jobs:
               mkdir -p frontend/dist
               tar -xzf /tmp/frontend-dist.tar.gz -C frontend/dist/
               rm /tmp/frontend-dist.tar.gz
-              echo "✅ Frontend extracted"
+              
+              # SWAP DOCKERFILE to use pre-built assets
+              echo "🔄 Swapping Frontend Dockerfile to use pre-built assets..."
+              mv frontend/Dockerfile frontend/Dockerfile.original
+              cp frontend/Dockerfile.prebuilt frontend/Dockerfile
+              
+              echo "✅ Frontend extracted and Dockerfile swapped"
             fi
             
             # Extract pre-built backend if transferred
@@ -409,6 +415,13 @@ jobs:
               tar -xzf /tmp/backend-dist.tar.gz
               cd ..
               rm /tmp/backend-dist.tar.gz
+              
+              # Note: We don't swap backend Dockerfile because node_modules might be arch-specific
+              # But if we did, we would do it here. For now, let VPS build backend (it's fast enough)
+              # or if we trust the pre-built node_modules:
+              # mv backend/Dockerfile backend/Dockerfile.original
+              # cp backend/Dockerfile.prebuilt backend/Dockerfile
+              
               echo "✅ Backend extracted"
             fi
             
@@ -423,6 +436,14 @@ jobs:
               docker-compose -f docker-compose.yml -f docker-compose.production.yml build --no-cache
               docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
             fi
+            
+            # Restore original Dockerfiles (cleanup)
+            if [ -f frontend/Dockerfile.original ]; then
+              mv frontend/Dockerfile.original frontend/Dockerfile
+            fi
+            # if [ -f backend/Dockerfile.original ]; then
+            #   mv backend/Dockerfile.original backend/Dockerfile
+            # fi
             
             sleep 20
             echo "✅ Full rebuild complete in 2-3 minutes (GitHub runner build)"
