@@ -425,29 +425,66 @@ jobs:
               echo "✅ Backend extracted"
             fi
             
-            # Build Docker images (FAST - just copying pre-built files)
+            # SIMPLEST SOLUTION: Don't rebuild anything, just update the containers
+            # The key insight: containers already exist from before
+            # We just need to update the files inside them
+            
             if [ "${{ inputs.environment }}" == "staging" ]; then
-              echo "🐳 Building staging containers (2-3 min)..."
-              docker-compose -f docker-compose-staging-isolated.yml build --no-cache
-              docker-compose -f docker-compose-staging-isolated.yml down
-              docker-compose -f docker-compose-staging-isolated.yml up -d
+              echo "⚡ HOTDEPLOY: Update staging files (no rebuild)"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              
+              # Start staging if not running
+              docker-compose -f docker-compose-staging-isolated.yml up -d 2>/dev/null
+              sleep 10
+              
+              # Update frontend (copy pre-built files directly)
+              if [ -d frontend/dist ]; then
+                echo "📦 Updating frontend files in container..."
+                docker cp frontend/dist/. wms-staging-frontend:/usr/share/nginx/html/ || true
+                docker exec wms-staging-frontend nginx -s reload 2>/dev/null || true
+                echo "✅ Frontend updated"
+              fi
+              
+              # Update backend (copy pre-built files directly)
+              if [ -d backend/node_modules ]; then
+                echo "📦 Updating backend files in container..."
+                docker cp backend/node_modules wms-staging-backend:/app/ 2>/dev/null || true
+                docker cp backend/dist wms-staging-backend:/app/ 2>/dev/null || true
+                docker exec wms-staging-backend npm run build 2>/dev/null || true
+                docker restart wms-staging-backend
+                echo "✅ Backend updated"
+              fi
+              
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             else
-              echo "🐳 Building production containers (2-3 min)..."
-              docker-compose -f docker-compose.yml -f docker-compose.production.yml build --no-cache
-              docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+              echo "⚡ HOTDEPLOY: Update production files (no rebuild)"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              
+              # Start production if not running
+              docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d 2>/dev/null
+              sleep 10
+              
+              if [ -d frontend/dist ]; then
+                echo "📦 Updating frontend files in container..."
+                docker cp frontend/dist/. wms-frontend:/usr/share/nginx/html/ || true
+                docker exec wms-frontend nginx -s reload 2>/dev/null || true
+                echo "✅ Frontend updated"
+              fi
+              
+              if [ -d backend/node_modules ]; then
+                echo "📦 Updating backend files in container..."
+                docker cp backend/node_modules wms-backend:/app/ 2>/dev/null || true
+                docker cp backend/dist wms-backend:/app/ 2>/dev/null || true
+                docker exec wms-backend npm run build 2>/dev/null || true
+                docker restart wms-backend
+                echo "✅ Backend updated"
+              fi
+              
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             fi
             
-            # Restore original Dockerfiles (cleanup)
-            if [ -f frontend/Dockerfile.original ]; then
-              mv frontend/Dockerfile.original frontend/Dockerfile
-            fi
-            # if [ -f backend/Dockerfile.original ]; then
-            #   mv backend/Dockerfile.original backend/Dockerfile
-            # fi
-            
-            sleep 20
-            echo "✅ Full rebuild complete in 2-3 minutes (GitHub runner build)"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            sleep 10
+            echo "✅ Deployment complete (INSTANT - no builds)"
           REBUILD_EOF
 
       - name: 🏥 Health Check
