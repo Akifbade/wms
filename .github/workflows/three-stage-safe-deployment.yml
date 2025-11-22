@@ -145,21 +145,6 @@ jobs:
             echo "✅ Code pulled successfully"
           PULL_EOF
 
-      - name: 🗄️ Apply Prisma Migrations to Staging
-        run: |
-          ssh root@${{ env.VPS_HOST }} << 'MIGRATE_EOF'
-            cd "${{ env.VPS_PATH }}"
-            echo "🔄 Applying Prisma migrations to staging..."
-            
-            # Try migrate deploy first, fallback to db push
-            docker exec wms-staging-backend npx prisma migrate deploy || {
-              echo "⚠️ Migration failed, using db push as fallback..."
-              docker exec wms-staging-backend npx prisma db push --accept-data-loss
-            }
-            
-            echo "✅ Staging database schema updated"
-          MIGRATE_EOF
-
       - name: 🚀 Deploy Staging Containers
         run: |
           ssh root@${{ env.VPS_HOST }} << 'DEPLOY_EOF'
@@ -170,10 +155,25 @@ jobs:
             docker-compose -f docker-compose-staging-isolated.yml up -d --build
             
             echo "⏳ Waiting for containers to stabilize..."
-            sleep 15
+            sleep 20
             
             echo "✅ Staging containers deployed"
           DEPLOY_EOF
+
+      - name: 🗄️ Apply Prisma Migrations to Staging
+        run: |
+          ssh root@${{ env.VPS_HOST }} << 'MIGRATE_EOF'
+            cd "${{ env.VPS_PATH }}"
+            echo "🔄 Applying Prisma migrations to staging..."
+            
+            # Run migrations inside the container
+            docker exec wms-staging-backend npx prisma migrate deploy || {
+              echo "⚠️ Migration failed, using db push as fallback..."
+              docker exec wms-staging-backend npx prisma db push --accept-data-loss --skip-generate
+            }
+            
+            echo "✅ Staging database schema updated"
+          MIGRATE_EOF
 
       - name: 🏥 Health Check - Staging Backend
         run: |
