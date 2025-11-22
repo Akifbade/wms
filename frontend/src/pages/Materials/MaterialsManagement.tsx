@@ -43,21 +43,24 @@ const MaterialsManagement = () => {
   const [stockBatches, setStockBatches] = useState<StockBatch[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [userRole, setUserRole] = useState<string>('');
+
   // Material History Modal
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
-  
+
   // Category Form
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryForm, setCategoryForm] = useState({
     name: '',
     parentId: '',
     description: ''
   });
-  
+
   // Material Form
   const [showMaterialForm, setShowMaterialForm] = useState(false);
+  const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
   const [materialForm, setMaterialForm] = useState({
     sku: '',
     name: '',
@@ -67,8 +70,9 @@ const MaterialsManagement = () => {
     minStockLevel: 5,
     unitCost: 0,
     sellingPrice: 0,
+    isActive: true,
   });
-  
+
   // Stock Form
   const [showStockForm, setShowStockForm] = useState(false);
   const [stockForm, setStockForm] = useState({
@@ -87,7 +91,18 @@ const MaterialsManagement = () => {
       window.location.href = '/login';
       return;
     }
-    
+
+    // Get user role
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const userData = JSON.parse(userStr);
+        setUserRole(userData.role || '');
+      } catch (e) {
+        console.error('Failed to parse user data');
+      }
+    }
+
     fetchCategories();
     fetchMaterials();
   }, []);
@@ -110,9 +125,9 @@ const MaterialsManagement = () => {
         window.location.href = '/login';
         return;
       }
-      
+
       const response = await fetch('/api/materials/categories', { headers });
-      
+
       if (response.status === 401 || response.status === 403) {
         console.error('Authentication failed - invalid or expired token');
         alert('Your session has expired. Please login again.');
@@ -120,7 +135,7 @@ const MaterialsManagement = () => {
         window.location.href = '/login';
         return;
       }
-      
+
       if (response.ok) {
         const data = await response.json();
         setCategories(data);
@@ -140,9 +155,9 @@ const MaterialsManagement = () => {
         window.location.href = '/login';
         return;
       }
-      
+
       const response = await fetch('/api/materials', { headers });
-      
+
       if (response.status === 401 || response.status === 403) {
         console.error('Authentication failed - invalid or expired token');
         alert('Your session has expired. Please login again.');
@@ -150,7 +165,7 @@ const MaterialsManagement = () => {
         window.location.href = '/login';
         return;
       }
-      
+
       if (response.ok) {
         const data = await response.json();
         setMaterials(data);
@@ -166,8 +181,8 @@ const MaterialsManagement = () => {
 
   const fetchStockBatches = async (materialId?: string) => {
     try {
-      const url = materialId 
-        ? `/api/materials/${materialId}/stock` 
+      const url = materialId
+        ? `/api/materials/${materialId}/stock`
         : '/api/materials/stock/all';
       const response = await fetch(url, {
         headers: getAuthHeaders()
@@ -184,52 +199,109 @@ const MaterialsManagement = () => {
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/materials/categories', {
-        method: 'POST',
+      const url = editingCategoryId
+        ? `/api/materials/categories/${editingCategoryId}`
+        : '/api/materials/categories';
+
+      const method = editingCategoryId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: getAuthHeaders(),
         body: JSON.stringify(categoryForm)
       });
-      
+
       if (response.status === 401 || response.status === 403) {
         alert('Session expired. Please login again.');
         localStorage.removeItem('authToken');
         window.location.href = '/login';
         return;
       }
-      
+
       if (response.ok) {
-        alert('Category added successfully!');
+        alert(`Category ${editingCategoryId ? 'updated' : 'added'} successfully!`);
         setShowCategoryForm(false);
+        setEditingCategoryId(null);
         setCategoryForm({ name: '', parentId: '', description: '' });
         fetchCategories();
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to add category');
+        alert(error.error || 'Failed to save category');
       }
     } catch (error) {
-      alert('Failed to add category');
+      alert('Failed to save category');
+    }
+  };
+
+  const handleEditCategory = (category: MaterialCategory) => {
+    setCategoryForm({
+      name: category.name,
+      parentId: category.parentId || '',
+      description: category.description || ''
+    });
+    setEditingCategoryId(category.id);
+    setShowCategoryForm(true);
+  };
+
+  const handleDeleteCategory = async (category: MaterialCategory) => {
+    if (userRole !== 'ADMIN') {
+      alert('Only admins can delete categories');
+      return;
+    }
+
+    if (category._count?.materials && category._count.materials > 0) {
+      alert('Cannot delete category containing materials. Please remove materials first.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete category "${category.name}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/materials/categories/${category.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        alert('Category deleted successfully');
+        fetchCategories();
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to delete category');
+      }
+    } catch (error) {
+      alert('Failed to delete category');
     }
   };
 
   const handleAddMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/materials', {
-        method: 'POST',
+      const url = editingMaterialId
+        ? `/api/materials/${editingMaterialId}`
+        : '/api/materials';
+
+      const method = editingMaterialId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: getAuthHeaders(),
         body: JSON.stringify(materialForm)
       });
-      
+
       if (response.status === 401 || response.status === 403) {
         alert('Session expired. Please login again.');
         localStorage.removeItem('authToken');
         window.location.href = '/login';
         return;
       }
-      
+
       if (response.ok) {
-        alert('Material added successfully!');
+        alert(`Material ${editingMaterialId ? 'updated' : 'added'} successfully!`);
         setShowMaterialForm(false);
+        setEditingMaterialId(null);
         setMaterialForm({
           sku: '',
           name: '',
@@ -239,14 +311,64 @@ const MaterialsManagement = () => {
           minStockLevel: 5,
           unitCost: 0,
           sellingPrice: 0,
+          isActive: true,
         });
         fetchMaterials();
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to add material');
+        alert(error.error || 'Failed to save material');
       }
     } catch (error) {
-      alert('Failed to add material');
+      alert('Failed to save material');
+    }
+  };
+
+  const handleEditMaterial = (material: Material) => {
+    setMaterialForm({
+      sku: material.sku,
+      name: material.name,
+      description: '', // Description might not be in the list view, would need to fetch or include it
+      categoryId: material.categoryId,
+      unit: material.unit,
+      minStockLevel: material.minStockLevel,
+      unitCost: material.unitCost || 0,
+      sellingPrice: material.sellingPrice || 0,
+      isActive: material.isActive
+    });
+    setEditingMaterialId(material.id);
+    setShowMaterialForm(true);
+  };
+
+  const handleDeleteMaterial = async (material: Material) => {
+    if (userRole !== 'ADMIN') {
+      alert('Only admins can delete materials');
+      return;
+    }
+
+    if (material.totalQuantity > 0) {
+      alert('Cannot delete material with existing stock. Please clear stock first.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete material "${material.name}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/materials/${material.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        alert('Material deleted successfully');
+        fetchMaterials();
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to delete material');
+      }
+    } catch (error) {
+      alert('Failed to delete material');
     }
   };
 
@@ -258,7 +380,7 @@ const MaterialsManagement = () => {
         headers: getAuthHeaders(),
         body: JSON.stringify(stockForm)
       });
-      
+
       if (response.ok) {
         alert('Stock added successfully!');
         setShowStockForm(false);
@@ -294,13 +416,31 @@ const MaterialsManagement = () => {
               )}
             </div>
           </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleEditCategory(cat)}
+              className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+              title="Edit Category"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+            {userRole === 'ADMIN' && (!cat._count?.materials || cat._count.materials === 0) && (
+              <button
+                onClick={() => handleDeleteCategory(cat)}
+                className="p-1 text-red-600 hover:bg-red-50 rounded"
+                title="Delete Category"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
         {cat.children && cat.children.length > 0 && renderCategoryTree(cat.children, level + 1)}
       </div>
     ));
   };
 
-  const filteredMaterials = materials.filter(m => 
+  const filteredMaterials = materials.filter(m =>
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -316,22 +456,20 @@ const MaterialsManagement = () => {
       <div className="flex gap-4 mb-6 border-b">
         <button
           onClick={() => setActiveTab('categories')}
-          className={`px-6 py-3 font-semibold transition ${
-            activeTab === 'categories'
+          className={`px-6 py-3 font-semibold transition ${activeTab === 'categories'
               ? 'border-b-2 border-blue-600 text-blue-600'
               : 'text-gray-600 hover:text-gray-800'
-          }`}
+            }`}
         >
           <FolderTree className="w-5 h-5 inline mr-2" />
           Categories
         </button>
         <button
           onClick={() => setActiveTab('materials')}
-          className={`px-6 py-3 font-semibold transition ${
-            activeTab === 'materials'
+          className={`px-6 py-3 font-semibold transition ${activeTab === 'materials'
               ? 'border-b-2 border-blue-600 text-blue-600'
               : 'text-gray-600 hover:text-gray-800'
-          }`}
+            }`}
         >
           <Package className="w-5 h-5 inline mr-2" />
           Materials
@@ -341,11 +479,10 @@ const MaterialsManagement = () => {
             setActiveTab('stock');
             fetchStockBatches();
           }}
-          className={`px-6 py-3 font-semibold transition ${
-            activeTab === 'stock'
+          className={`px-6 py-3 font-semibold transition ${activeTab === 'stock'
               ? 'border-b-2 border-blue-600 text-blue-600'
               : 'text-gray-600 hover:text-gray-800'
-          }`}
+            }`}
         >
           <Archive className="w-5 h-5 inline mr-2" />
           Stock Batches
@@ -358,7 +495,11 @@ const MaterialsManagement = () => {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">Material Categories</h2>
             <button
-              onClick={() => setShowCategoryForm(true)}
+              onClick={() => {
+                setEditingCategoryId(null);
+                setCategoryForm({ name: '', parentId: '', description: '' });
+                setShowCategoryForm(true);
+              }}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
             >
               <Plus className="w-5 h-5" />
@@ -369,8 +510,12 @@ const MaterialsManagement = () => {
           {showCategoryForm && (
             <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold">New Category</h3>
-                <button onClick={() => setShowCategoryForm(false)}>
+                <h3 className="text-lg font-bold">{editingCategoryId ? 'Edit Category' : 'New Category'}</h3>
+                <button onClick={() => {
+                  setShowCategoryForm(false);
+                  setEditingCategoryId(null);
+                  setCategoryForm({ name: '', parentId: '', description: '' });
+                }}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -455,7 +600,21 @@ const MaterialsManagement = () => {
               </div>
             </div>
             <button
-              onClick={() => setShowMaterialForm(true)}
+              onClick={() => {
+                setEditingMaterialId(null);
+                setMaterialForm({
+                  sku: '',
+                  name: '',
+                  description: '',
+                  categoryId: '',
+                  unit: 'PCS',
+                  minStockLevel: 5,
+                  unitCost: 0,
+                  sellingPrice: 0,
+                  isActive: true,
+                });
+                setShowMaterialForm(true);
+              }}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
             >
               <Plus className="w-5 h-5" />
@@ -466,8 +625,22 @@ const MaterialsManagement = () => {
           {showMaterialForm && (
             <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold">New Material</h3>
-                <button onClick={() => setShowMaterialForm(false)}>
+                <h3 className="text-lg font-bold">{editingMaterialId ? 'Edit Material' : 'New Material'}</h3>
+                <button onClick={() => {
+                  setShowMaterialForm(false);
+                  setEditingMaterialId(null);
+                  setMaterialForm({
+                    sku: '',
+                    name: '',
+                    description: '',
+                    categoryId: '',
+                    unit: 'PCS',
+                    minStockLevel: 5,
+                    unitCost: 0,
+                    sellingPrice: 0,
+                    isActive: true,
+                  });
+                }}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -538,8 +711,8 @@ const MaterialsManagement = () => {
                     type="number"
                     required
                     value={materialForm.minStockLevel === 0 ? '' : materialForm.minStockLevel}
-                    onChange={(e) => setMaterialForm({ 
-                      ...materialForm, 
+                    onChange={(e) => setMaterialForm({
+                      ...materialForm,
                       minStockLevel: e.target.value === '' ? 0 : parseInt(e.target.value)
                     })}
                     className="w-full border rounded-lg px-3 py-2"
@@ -552,8 +725,8 @@ const MaterialsManagement = () => {
                     type="number"
                     step="0.01"
                     value={materialForm.unitCost === 0 ? '' : materialForm.unitCost}
-                    onChange={(e) => setMaterialForm({ 
-                      ...materialForm, 
+                    onChange={(e) => setMaterialForm({
+                      ...materialForm,
                       unitCost: e.target.value === '' ? 0 : parseFloat(e.target.value)
                     })}
                     className="w-full border rounded-lg px-3 py-2"
@@ -615,16 +788,34 @@ const MaterialsManagement = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <button
-                          onClick={() => {
-                            setSelectedMaterial(material);
-                            setHistoryModalOpen(true);
-                          }}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
-                        >
-                          <History className="w-4 h-4" />
-                          History
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedMaterial(material);
+                              setHistoryModalOpen(true);
+                            }}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
+                            title="View History"
+                          >
+                            <History className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEditMaterial(material)}
+                            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-1"
+                            title="Edit Material"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          {userRole === 'ADMIN' && material.totalQuantity === 0 && (
+                            <button
+                              onClick={() => handleDeleteMaterial(material)}
+                              className="px-3 py-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200 flex items-center gap-1"
+                              title="Delete Material"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -690,9 +881,9 @@ const MaterialsManagement = () => {
                     required
                     min="1"
                     value={stockForm.quantityReceived}
-                    onChange={(e) => setStockForm({ 
-                      ...stockForm, 
-                      quantityReceived: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 
+                    onChange={(e) => setStockForm({
+                      ...stockForm,
+                      quantityReceived: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
                     })}
                     className="w-full border rounded-lg px-3 py-2"
                   />
@@ -704,9 +895,9 @@ const MaterialsManagement = () => {
                     step="0.01"
                     min="0"
                     value={stockForm.unitCost}
-                    onChange={(e) => setStockForm({ 
-                      ...stockForm, 
-                      unitCost: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 
+                    onChange={(e) => setStockForm({
+                      ...stockForm,
+                      unitCost: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
                     })}
                     className="w-full border rounded-lg px-3 py-2"
                   />

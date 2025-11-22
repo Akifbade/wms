@@ -113,6 +113,272 @@ router.get('/:profileId', authenticateToken, async (req: AuthRequest, res: Respo
   }
 });
 
+// Get comprehensive company profile analytics
+router.get('/:profileId/analytics', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { profileId } = req.params;
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    // Get company profile
+    let profile = await prisma.companyProfile.findFirst({
+      where: { id: profileId, companyId }
+    });
+
+    let placeholderProfile: any = null;
+
+    if (!profile) {
+      const firstShipment = await prisma.shipment.findFirst({
+        where: {
+          companyId,
+          companyProfileId: profileId
+        }
+      });
+
+      if (!firstShipment) {
+        return res.status(404).json({ error: 'Company profile not found' });
+      }
+
+      placeholderProfile = {
+        id: profileId,
+        name: firstShipment.customerName || firstShipment.clientName || 'Company',
+        description: '',
+        logo: null,
+        contactPerson: '',
+        contactPhone: firstShipment.clientPhone || '',
+        contractStatus: 'ACTIVE',
+        isActive: true,
+        companyId,
+        createdAt: firstShipment.createdAt,
+        updatedAt: firstShipment.updatedAt
+      };
+
+      profile = placeholderProfile;
+    }
+
+    // Get all shipments for this company profile
+    const allShipments = await prisma.shipment.findMany({
+      where: {
+        companyId,
+        companyProfileId: profileId
+      },
+      include: {
+        boxes: true,
+        withdrawals: true,
+        invoices: {
+          include: {
+            payments: true
+          }
+        }
+      }
+    });
+
+    // Get all invoices for this company profile
+    const allInvoices = await prisma.invoice.findMany({
+      where: {
+        shipment: {
+          companyProfileId: profileId
+        }
+      },
+      include: {
+        payments: true,
+        lineItems: true
+      }
+    });
+
+    // Calculate shipment statistics
+    const totalShipments = allShipments.length;
+    const activeShipments = allShipments.filter(s =>
+      s.status === 'IN_WAREHOUSE' || s.status === 'ACTIVE' || s.status === 'PARTIAL'
+    ).length;
+    const releasedShipments = allShipments.filter(s => s.status === 'RELEASED').length;
+    const pendingShipments = allShipments.filter(s => s.status === 'PENDING').length;
+
+    // Calculate box statistics
+    const totalBoxes = allShipments.reduce((sum, s) => sum + (s.originalBoxCount || 0), 0);
+    const currentBoxes = allShipments.reduce((sum, s) => sum + (s.currentBoxCount || 0), 0);
+
+    // Calculate storage duration
+    const storageDays = allShipments
+      .filter(s => s.arrivalDate)
+      .map(s => {
+        const arrival = new Date(s.arrivalDate!);
+        const end = s.releasedAt ? new Date(s.releasedAt) : new Date();
+        return Math.floor((end.getTime() - arrival.getTime()) / (1000 * 60 * 60 * 24));
+      });
+    const avgStorageDays = storageDays.length > 0
+      ? Math.round(storageDays.reduce((a, b) => a + b, 0) / storageDays.length)
+      : 0;
+
+    // Calculate invoice statistics
+    const totalInvoices = allInvoices.length;
+    const totalInvoiceAmount = allInvoices.reduce((sum, inv) =>
+      sum + (inv.totalAmount ?? 0), 0
+    );
+
+    const paidInvoices = allInvoices.filter(inv => inv.paymentStatus === 'PAID').length;
+    const partialInvoices = allInvoices.filter(inv => inv.paymentStatus === 'PARTIAL').length;
+    const pendingInvoices = allInvoices.filter(inv => inv.paymentStatus === 'PENDING').length;
+    const overdueInvoices = allInvoices.filter(inv => inv.paymentStatus === 'OVERDUE').length;
+
+    // Calculate payment statistics
+    const totalPaidAmount = allInvoices.reduce((sum, inv) =>
+      sum + (inv.paidAmount ?? 0), 0
+    );
+    const outstandingBalance = totalInvoiceAmount - totalPaidAmount;
+
+    // Get all payments
+    const allPayments = allInvoices.flatMap(inv => inv.payments || []);
+    const totalPayments = allPayments.length;
+
+    // Payment method breakdown
+    const paymentMethods = allPayments.reduce((acc: any, payment) => {
+      const method = payment.paymentMethod || 'UNKNOWN';
+      acc[method] = (acc[method] || 0) + (payment.amount ?? 0);
+      return acc;
+    }, {});
+
+    // Recent activity (last 10 activities)
+    const recentShipments = allShipments
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+
+    const recentInvoices = allInvoices
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+
+    const recentPayments = allPayments
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+
+    // Monthly revenue (last 6 months)
+    const monthlyRevenue = [];
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+
+      const monthInvoices = allInvoices.filter(inv => {
+        const invDate = new Date(inv.invoiceDate);
+        return invDate.getFullYear() === year && invDate.getMonth() + 1 === month;
+      });
+
+      monthlyRevenue.push({
+        month: `${year}-${month.toString().padStart(2, '0')}`,
+        revenue: monthInvoices.reduce((sum, inv) => sum + (inv.totalAmount ?? 0), 0),
+        invoiceCount: monthInvoices.length
+      });
+    }
+
+    const protocol = req.protocol || 'http';
+    const host = req.get('host');
+    const baseUrl = host ? `${protocol}://${host}` : null;
+
+    res.json({
+      profile: {
+        ...profile,
+        logoUrl: profile.logo && baseUrl ? `${baseUrl}${profile.logo}` : null,
+        isPlaceholder: Boolean(placeholderProfile),
+        placeholderMessage: placeholderProfile
+          ? 'Company profile record is missing in the database; analytics is built from shipment history.'
+          : undefined
+      },
+      stats: {
+        // Shipment stats
+        totalShipments,
+        activeShipments,
+        releasedShipments,
+        pendingShipments,
+
+        // Box stats
+        totalBoxes,
+        currentBoxes,
+        avgStorageDays,
+
+        // Invoice stats
+        totalInvoices,
+        totalInvoiceAmount: parseFloat(totalInvoiceAmount.toFixed(3)),
+        paidInvoices,
+        partialInvoices,
+        pendingInvoices,
+        overdueInvoices,
+
+        // Payment stats
+        totalPaidAmount: parseFloat(totalPaidAmount.toFixed(3)),
+        outstandingBalance: parseFloat(outstandingBalance.toFixed(3)),
+        totalPayments,
+        avgInvoiceAmount: totalInvoices > 0 ? parseFloat((totalInvoiceAmount / totalInvoices).toFixed(3)) : 0
+      },
+      paymentMethods,
+      monthlyRevenue,
+      recentActivity: {
+        shipments: recentShipments.map(s => ({
+          id: s.id,
+          referenceId: s.referenceId,
+          clientName: s.clientName,
+          status: s.status,
+          createdAt: s.createdAt
+        })),
+        invoices: recentInvoices.map(inv => ({
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+          totalAmount: inv.totalAmount,
+          paymentStatus: inv.paymentStatus,
+          createdAt: inv.createdAt
+        })),
+        payments: recentPayments.map(p => ({
+          id: p.id,
+          amount: p.amount,
+          paymentMethod: p.paymentMethod,
+          createdAt: p.createdAt
+        }))
+      }
+    });
+  } catch (error: any) {
+    console.error('Error fetching company analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch company analytics' });
+  }
+});
+
+// Get single company profile (original endpoint kept for compatibility)
+router.get('/:profileId/details', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { profileId } = req.params;
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    const profile = await prisma.companyProfile.findFirst({
+      where: {
+        id: profileId,
+        companyId
+      }
+    });
+
+    if (!profile) {
+      return res.status(404).json({ error: 'Company profile not found' });
+    }
+
+    const protocol = req.protocol || 'http';
+    const host = req.get('host');
+    const baseUrl = host ? `${protocol}://${host}` : null;
+
+    res.json({
+      ...profile,
+      logoUrl: profile.logo && baseUrl ? `${baseUrl}${profile.logo}` : null,
+    });
+  } catch (error: any) {
+    console.error('Error fetching company profile:', error);
+    res.status(500).json({ error: 'Failed to fetch company profile' });
+  }
+});
+
 // Create new company profile
 router.post('/', authenticateToken, upload.single('logo'), async (req: AuthRequest, res: Response) => {
   try {

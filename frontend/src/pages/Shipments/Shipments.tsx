@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   PlusIcon,
   MagnifyingGlassIcon,
@@ -10,7 +11,9 @@ import {
   BuildingStorefrontIcon,
   HomeIcon,
   FunnelIcon,
-  PrinterIcon
+  PrinterIcon,
+  DocumentTextIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
 import { shipmentsAPI, getBackendUrl } from '../../services/api';
 import { ReleaseNoteModal } from '../../components/ReleaseNoteModal';
@@ -20,8 +23,10 @@ import EditShipmentModal from '../../components/EditShipmentModal';
 import ShipmentDetailModal from '../../components/ShipmentDetailModal';
 import BoxQRModal from '../../components/BoxQRModal';
 import ShipmentsPrintReport from '../../components/ShipmentsPrintReport';
+import { ShipmentPhoto } from '../../components/ShipmentPhoto';
 
 export const Shipments: React.FC = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'in_storage' | 'partial' | 'released'>('all');
   const [warehouseFilter, setWarehouseFilter] = useState<'all' | 'regular' | 'warehouse'>('all');
@@ -131,24 +136,8 @@ export const Shipments: React.FC = () => {
   };
 
   const handlePrintReleaseNote = (shipment: any) => {
-    // Calculate storage duration
-    const arrivalDate = new Date(shipment.arrivalDate);
-    const releaseDate = shipment.releasedAt ? new Date(shipment.releasedAt) : new Date();
-    const storageDays = Math.ceil((releaseDate.getTime() - arrivalDate.getTime()) / (1000 * 60 * 60 * 24));
-
-    // Prepare release note data
-    const releaseData = {
-      shipment,
-      invoice: null, // Will fetch if needed
-      releaseDate: shipment.releasedAt || new Date(),
-      releasedBy: 'Admin User', // TODO: Get from auth context
-      collectorID: 'N/A', // Not stored, would need to add to shipment model
-      releaseType: shipment.currentBoxCount === 0 ? 'FULL' : 'PARTIAL',
-      boxesReleased: shipment.originalBoxCount - shipment.currentBoxCount,
-    };
-
-    setReleaseNoteData(releaseData);
-    setReleaseNoteModalOpen(true);
+    // Open release receipt page with shipment ID
+    window.open(`/release-receipt.html?shipmentId=${shipment.id}`, '_blank');
   };
 
   const getStatusBadge = (status: string) => {
@@ -302,12 +291,14 @@ export const Shipments: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">📦 Warehouse Shipments</h1>
-          <p className="text-gray-600 mt-1">Complete warehouse management with intake, tracking, and release</p>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            📦 Warehouse Shipments
+          </h1>
+          <p className="text-gray-600 mt-2 text-lg">Complete warehouse management with intake, tracking, and release</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Print Report Buttons */}
@@ -321,10 +312,11 @@ export const Shipments: React.FC = () => {
           {/* New Shipment Button */}
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md"
+            className="group relative inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold overflow-hidden"
           >
-            <PlusIcon className="h-5 w-5 mr-2" />
-            📦 New Shipment Intake
+            <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
+            <PlusIcon className="h-6 w-6 mr-2 relative z-10" />
+            <span className="relative z-10">📦 New Shipment Intake</span>
           </button>
         </div>
       </div>
@@ -336,44 +328,46 @@ export const Shipments: React.FC = () => {
       )}
 
       {/* Warehouse Type Filter */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <FunnelIcon className="h-5 w-5 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">Shipment Type</span>
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg">
+            <FunnelIcon className="h-6 w-6 text-white" />
+          </div>
+          <span className="text-lg font-bold text-gray-800">Shipment Type</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <button
             onClick={() => setWarehouseFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${warehouseFilter === 'all'
-              ? 'bg-primary-100 text-primary-700 border border-primary-300'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 ${warehouseFilter === 'all'
+              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 shadow-sm'
               }`}
           >
             All Types ({warehouseCounts.all})
           </button>
           <button
             onClick={() => setWarehouseFilter('regular')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${warehouseFilter === 'regular'
-              ? 'bg-blue-100 text-blue-700 border border-blue-300'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 flex items-center gap-2 ${warehouseFilter === 'regular'
+              ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 shadow-sm'
               }`}
           >
-            <HomeIcon className="h-4 w-4" />
+            <HomeIcon className="h-5 w-5" />
             Regular Shipments ({warehouseCounts.regular})
           </button>
           <button
             onClick={() => setWarehouseFilter('warehouse')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${warehouseFilter === 'warehouse'
-              ? 'bg-orange-100 text-orange-700 border border-orange-300'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 flex items-center gap-2 ${warehouseFilter === 'warehouse'
+              ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white shadow-lg'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 shadow-sm'
               }`}
           >
-            <BuildingStorefrontIcon className="h-4 w-4" />
+            <BuildingStorefrontIcon className="h-5 w-5" />
             Warehouse Shipments ({warehouseCounts.warehouse})
           </button>
           {longStayCounts.warning > 0 && (
             <button
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-yellow-100 text-yellow-700 border border-yellow-300 flex items-center gap-2"
+              className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-lg flex items-center gap-2 transform hover:scale-105 transition-all duration-300"
               title="Shipments stored 30-60 days"
             >
               🟡 Warning: {longStayCounts.warning}
@@ -391,20 +385,20 @@ export const Shipments: React.FC = () => {
       </div>
 
       {/* Status Tabs */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
         <div className="border-b border-gray-200">
           <nav className="flex -mb-px">
             <button
               onClick={() => setActiveTab('all')}
-              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'all'
-                ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              className={`group flex-1 py-5 px-6 text-center font-bold text-sm transition-all duration-300 ${activeTab === 'all'
+                ? 'border-b-4 border-indigo-600 text-indigo-600 bg-indigo-50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <span>All Shipments</span>
+                <span className="text-base">All Shipments</span>
                 {statusCounts.all > 0 && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md">
                     {statusCounts.all}
                   </span>
                 )}
@@ -412,15 +406,15 @@ export const Shipments: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('pending')}
-              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'pending'
-                ? 'border-b-2 border-yellow-500 text-yellow-600'
-                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              className={`group flex-1 py-5 px-6 text-center font-bold text-sm transition-all duration-300 ${activeTab === 'pending'
+                ? 'border-b-4 border-yellow-600 text-yellow-600 bg-yellow-50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <span>⏳ Pending</span>
+                <span className="text-base">⏳ Pending</span>
                 {statusCounts.pending > 0 && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-md">
                     {statusCounts.pending}
                   </span>
                 )}
@@ -428,15 +422,15 @@ export const Shipments: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('in_storage')}
-              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'in_storage'
-                ? 'border-b-2 border-green-500 text-green-600'
-                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              className={`group flex-1 py-5 px-6 text-center font-bold text-sm transition-all duration-300 ${activeTab === 'in_storage'
+                ? 'border-b-4 border-green-600 text-green-600 bg-green-50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <span>🏢 In Warehouse</span>
+                <span className="text-base">🏢 In Warehouse</span>
                 {statusCounts.in_storage > 0 && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-green-600 to-green-700 text-white shadow-md">
                     {statusCounts.in_storage}
                   </span>
                 )}
@@ -444,15 +438,15 @@ export const Shipments: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('partial')}
-              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'partial'
-                ? 'border-b-2 border-orange-500 text-orange-600'
-                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              className={`group flex-1 py-5 px-6 text-center font-bold text-sm transition-all duration-300 ${activeTab === 'partial'
+                ? 'border-b-4 border-orange-600 text-orange-600 bg-orange-50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <span>� Partial</span>
+                <span className="text-base">⚠️ Partial</span>
                 {statusCounts.partial > 0 && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-orange-600 to-orange-700 text-white shadow-md">
                     {statusCounts.partial}
                   </span>
                 )}
@@ -466,9 +460,9 @@ export const Shipments: React.FC = () => {
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <span>🔵 Released</span>
+                <span className="text-base">✅ Released</span>
                 {statusCounts.released > 0 && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
                     {statusCounts.released}
                   </span>
                 )}
@@ -478,29 +472,29 @@ export const Shipments: React.FC = () => {
         </div>
 
         {/* Advanced Search & Filters */}
-        <div className="p-4 bg-gray-50 border-t border-gray-200">
+        <div className="p-6 bg-gradient-to-r from-gray-50 to-blue-50 border-t border-gray-200">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setViewMode('folders')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all text-sm ${viewMode === 'folders'
-                  ? 'bg-gray-800 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all duration-300 text-sm transform hover:scale-105 ${viewMode === 'folders'
+                  ? 'bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-2 border-gray-300 shadow-sm'
                   }`}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
                 Folder View
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all text-sm ${viewMode === 'table'
-                  ? 'bg-gray-800 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all duration-300 text-sm transform hover:scale-105 ${viewMode === 'table'
+                  ? 'bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-2 border-gray-300 shadow-sm'
                   }`}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
                 Table View
@@ -510,18 +504,20 @@ export const Shipments: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Search Bar */}
             <div className="relative md:col-span-2">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg">
+                <MagnifyingGlassIcon className="h-5 w-5 text-white" />
+              </div>
               <input
                 type="text"
-                placeholder="Search client name, reference ID, phone..."
+                placeholder="🔍 Search client name, reference ID, phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full pl-16 pr-12 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300"
               />
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-300 font-bold shadow-md"
                   title="Clear search"
                 >
                   ✕
@@ -534,7 +530,7 @@ export const Shipments: React.FC = () => {
               <select
                 value={selectedCompany}
                 onChange={(e) => setSelectedCompany(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm appearance-none bg-white"
+                className="w-full px-4 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium appearance-none bg-white shadow-sm hover:shadow-md transition-all duration-300"
               >
                 <option value="">All Companies</option>
                 {[...new Set(shipments.map((s: any) => s.companyProfile?.name).filter(Boolean))].sort().map((company: any) => (
@@ -793,33 +789,25 @@ export const Shipments: React.FC = () => {
                                   })()}
                                 </div>
 
-                                {/* Shipment Photos - Direct Display */}
+                                {/* Shipment Photos - Direct Display with RELEASED Stamp */}
                                 {shipment.shipmentPhotos && shipment.shipmentPhotos.length > 0 && (
                                   <div className="space-y-2 pt-2 border-t">
-                                    <span className="text-xs text-gray-600 font-semibold">Shipment Photos ({shipment.shipmentPhotos.length}):</span>
+                                    <span className="text-xs text-gray-600 font-semibold">
+                                      Shipment Photos ({shipment.shipmentPhotos.length})
+                                      {shipment.status === 'RELEASED' && (
+                                        <span className="ml-2 text-red-600 font-bold">● RELEASED</span>
+                                      )}
+                                    </span>
                                     <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
-                                      {shipment.shipmentPhotos.map((photo: string, idx: number) => {
-                                        // Fix: Prepend backend URL if photo path is relative
-                                        const photoUrl = photo.startsWith('http') ? photo : `${getBackendUrl()}${photo}`;
-                                        return (
-                                          <div key={idx} className="relative group">
-                                            <img
-                                              src={photoUrl}
-                                              alt={`Photo ${idx + 1}`}
-                                              className="w-full h-20 object-cover rounded-lg border-2 border-gray-300 hover:border-indigo-500 cursor-pointer transition-all hover:scale-105"
-                                              onClick={() => window.open(photoUrl, '_blank')}
-                                            />
-                                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all flex items-center justify-center">
-                                              <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                                              </svg>
-                                            </div>
-                                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent text-white text-xs px-1 py-0.5 rounded-b-lg text-center">
-                                              {idx + 1}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
+                                      {shipment.shipmentPhotos.map((photo: string, idx: number) => (
+                                        <ShipmentPhoto
+                                          key={idx}
+                                          photoUrl={photo}
+                                          index={idx}
+                                          status={shipment.status}
+                                          showStamp={true}
+                                        />
+                                      ))}
                                     </div>
                                   </div>
                                 )}
@@ -833,80 +821,84 @@ export const Shipments: React.FC = () => {
                               </div>
 
                               {/* Right: Action Buttons */}
-                              <div className="flex flex-col gap-1.5 min-w-[100px]">
+                              <div className="flex flex-col gap-2 min-w-[140px]">
                                 <button
                                   onClick={() => {
                                     window.open(`/shipment-report/${shipment.id}`, '_blank');
                                   }}
-                                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-xs font-semibold"
+                                  className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl hover:from-indigo-700 hover:to-indigo-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
                                   title="View Full Report"
                                 >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                  </svg>
-                                  Report
+                                  <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
+                                  <DocumentTextIcon className="w-5 h-5 relative z-10" />
+                                  <span className="relative z-10">Report</span>
                                 </button>
                                 <button
                                   onClick={() => {
                                     setSelectedShipment(shipment);
                                     setDetailModalOpen(true);
                                   }}
-                                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold"
+                                  className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
                                   title="View Details"
                                 >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                  </svg>
-                                  View
+                                  <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
+                                  <EyeIcon className="w-5 h-5 relative z-10" />
+                                  <span className="relative z-10">View</span>
                                 </button>
                                 <button
                                   onClick={() => {
                                     setSelectedShipment(shipment);
                                     setQrModalOpen(true);
                                   }}
-                                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors text-xs font-semibold"
+                                  className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-gray-700 to-gray-800 text-white rounded-xl hover:from-gray-800 hover:to-gray-900 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
                                   title="View QR Codes"
                                 >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                                  </svg>
-                                  QR Codes
+                                  <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
+                                  <QrCodeIcon className="w-5 h-5 relative z-10" />
+                                  <span className="relative z-10">QR Codes</span>
                                 </button>
                                 <button
                                   onClick={() => {
                                     setSelectedShipment(shipment);
                                     setEditModalOpen(true);
                                   }}
-                                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-semibold"
+                                  className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
                                   title="Edit"
                                 >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                  Edit
+                                  <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
+                                  <PencilIcon className="w-5 h-5 relative z-10" />
+                                  <span className="relative z-10">Edit</span>
                                 </button>
                                 {(shipment.status === 'IN_WAREHOUSE' || shipment.status === 'PARTIAL') && (
                                   <button
                                     onClick={() => handleReleaseClick(shipment)}
-                                    className="flex items-center justify-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-semibold"
+                                    className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
                                     title="Release"
                                   >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                    </svg>
-                                    Release
+                                    <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
+                                    <ArrowRightOnRectangleIcon className="w-5 h-5 relative z-10" />
+                                    <span className="relative z-10">Release</span>
+                                  </button>
+                                )}
+                                {shipment.status === 'RELEASED' && (
+                                  <button
+                                    onClick={() => handlePrintReleaseNote(shipment)}
+                                    className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
+                                    title="Download Release Receipt"
+                                  >
+                                    <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
+                                    <ArrowDownTrayIcon className="w-5 h-5 relative z-10" />
+                                    <span className="relative z-10">Release Receipt</span>
                                   </button>
                                 )}
                                 <button
                                   onClick={() => handleDelete(shipment.id)}
-                                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-semibold"
+                                  className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
                                   title="Delete"
                                 >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                  Delete
+                                  <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
+                                  <TrashIcon className="w-5 h-5 relative z-10" />
+                                  <span className="relative z-10">Delete</span>
                                 </button>
                               </div>
                             </div>
@@ -1048,14 +1040,14 @@ export const Shipments: React.FC = () => {
                         })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center gap-2">
                           {/* QR Code button - show for ALL shipments */}
                           <button
                             onClick={() => {
                               setSelectedShipment(shipment);
                               setQrModalOpen(true);
                             }}
-                            className="text-indigo-600 hover:text-indigo-900 transition-colors"
+                            className="group relative p-2 bg-gradient-to-r from-gray-700 to-gray-800 text-white rounded-lg hover:from-gray-800 hover:to-gray-900 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
                             title="View/Print QR Codes"
                           >
                             <QrCodeIcon className="h-5 w-5" />
@@ -1070,7 +1062,7 @@ export const Shipments: React.FC = () => {
                             shipment.currentBoxCount > 0 && (
                               <button
                                 onClick={() => handleReleaseClick(shipment)}
-                                className="text-green-600 hover:text-green-900"
+                                className="group relative p-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
                                 title="Generate Invoice & Release"
                               >
                                 <ArrowRightOnRectangleIcon className="h-5 w-5" />
@@ -1079,7 +1071,7 @@ export const Shipments: React.FC = () => {
                           {shipment.status === 'RELEASED' && (
                             <button
                               onClick={() => handlePrintReleaseNote(shipment)}
-                              className="text-purple-600 hover:text-purple-900"
+                              className="group relative p-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
                               title="Print Release Note"
                             >
                               <PrinterIcon className="h-5 w-5" />
@@ -1090,7 +1082,7 @@ export const Shipments: React.FC = () => {
                               setSelectedShipment(shipment);
                               setDetailModalOpen(true);
                             }}
-                            className="text-blue-600 hover:text-blue-900"
+                            className="group relative p-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
                             title="View Details"
                           >
                             <EyeIcon className="h-5 w-5" />
@@ -1100,14 +1092,15 @@ export const Shipments: React.FC = () => {
                               setSelectedShipment(shipment);
                               setEditModalOpen(true);
                             }}
-                            className="text-gray-600 hover:text-gray-900"
+                            className="group relative p-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
                             title="Edit Shipment"
                           >
                             <PencilIcon className="h-5 w-5" />
                           </button>
                           <button
                             onClick={() => handleDelete(shipment.id)}
-                            className="text-red-600 hover:text-red-900"
+                            className="group relative p-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
+                            title="Delete"
                           >
                             <TrashIcon className="h-5 w-5" />
                           </button>

@@ -15,6 +15,7 @@ const router = express_1.default.Router();
 const prisma = new client_1.PrismaClient();
 const execAsync = (0, util_1.promisify)(child_process_1.exec);
 const BACKUP_DIR = process.env.BACKUP_DIR || 'C:\\WMS_BACKUPS';
+const FULL_BACKUP_DIR = process.env.FULL_BACKUP_DIR || 'C:\\WMS_FULL_BACKUPS';
 const MAX_BACKUPS = 7;
 // Ensure backup directory exists
 async function ensureBackupDir() {
@@ -27,25 +28,56 @@ async function ensureBackupDir() {
 }
 /**
  * GET /api/backups
- * List all available backups
+ * List all available backups (both quick and full system)
  */
 router.get('/', async (req, res) => {
     try {
         await ensureBackupDir();
-        const files = await promises_1.default.readdir(BACKUP_DIR);
         const backups = [];
-        for (const file of files) {
-            if (file.endsWith('.zip') && file.startsWith('WMS_BACKUP_')) {
-                const filePath = path_1.default.join(BACKUP_DIR, file);
-                const stats = await promises_1.default.stat(filePath);
-                backups.push({
-                    name: file,
-                    path: filePath,
-                    size: stats.size,
-                    createdAt: stats.birthtime,
-                    modifiedAt: stats.mtime,
-                });
+        // Get quick backups
+        try {
+            const files = await promises_1.default.readdir(BACKUP_DIR);
+            for (const file of files) {
+                if (file.endsWith('.zip') && file.startsWith('WMS_BACKUP_')) {
+                    const filePath = path_1.default.join(BACKUP_DIR, file);
+                    const stats = await promises_1.default.stat(filePath);
+                    backups.push({
+                        name: file,
+                        path: filePath,
+                        size: stats.size,
+                        createdAt: stats.birthtime,
+                        modifiedAt: stats.mtime,
+                        type: 'quick',
+                        directory: BACKUP_DIR,
+                    });
+                }
             }
+        }
+        catch (err) {
+            console.log('No quick backups found or directory does not exist');
+        }
+        // Get full system backups
+        try {
+            await promises_1.default.mkdir(FULL_BACKUP_DIR, { recursive: true });
+            const fullFiles = await promises_1.default.readdir(FULL_BACKUP_DIR);
+            for (const file of fullFiles) {
+                if (file.endsWith('.zip') && file.startsWith('WMS_FULL_SYSTEM_')) {
+                    const filePath = path_1.default.join(FULL_BACKUP_DIR, file);
+                    const stats = await promises_1.default.stat(filePath);
+                    backups.push({
+                        name: file,
+                        path: filePath,
+                        size: stats.size,
+                        createdAt: stats.birthtime,
+                        modifiedAt: stats.mtime,
+                        type: 'full-system',
+                        directory: FULL_BACKUP_DIR,
+                    });
+                }
+            }
+        }
+        catch (err) {
+            console.log('No full system backups found or directory does not exist');
         }
         // Sort by creation time, newest first
         backups.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -53,6 +85,7 @@ router.get('/', async (req, res) => {
             success: true,
             backups,
             backupDir: BACKUP_DIR,
+            fullBackupDir: FULL_BACKUP_DIR,
             maxBackups: MAX_BACKUPS,
         });
     }
@@ -79,14 +112,14 @@ router.post('/create', async (req, res) => {
         console.log('📊 Backing up database...');
         const dbBackupFile = path_1.default.join(backupPath, 'database_warehouse_wms.sql');
         const dbConfig = {
-            host: process.env.DB_HOST || 'localhost',
-            port: process.env.DB_PORT || '3307',
+            host: process.env.DB_HOST || 'database',
+            port: '3306', // Internal port within Docker network
             user: process.env.DB_USER || 'wms_user',
-            password: process.env.DB_PASSWORD || 'wms_secure_password_2024',
+            password: process.env.DB_PASSWORD || 'wmspassword123',
             database: process.env.DB_NAME || 'warehouse_wms',
         };
-        // Use Docker exec for more reliable backup
-        const mysqldumpCmd = `docker exec wms-database mysqldump -u ${dbConfig.user} -p${dbConfig.password} --single-transaction --routines --triggers --events --databases ${dbConfig.database} > "${dbBackupFile}"`;
+        // Use mysqldump from host through Docker network (no docker CLI needed)
+        const mysqldumpCmd = `mysqldump -h ${dbConfig.host} -P ${dbConfig.port} -u ${dbConfig.user} -p${dbConfig.password} --single-transaction --routines --triggers --events ${dbConfig.database} > "${dbBackupFile}"`;
         try {
             await execAsync(mysqldumpCmd);
             console.log('✅ Database backed up');
@@ -173,7 +206,7 @@ router.post('/create', async (req, res) => {
 });
 /**
  * GET /api/backups/download/:filename
- * Download a backup file
+ * Download a backup file (from either quick or full backup directory)
  */
 router.get('/download/:filename', async (req, res) => {
     try {
@@ -185,16 +218,23 @@ router.get('/download/:filename', async (req, res) => {
                 error: 'Invalid filename',
             });
         }
-        const filePath = path_1.default.join(BACKUP_DIR, filename);
-        // Check if file exists
+        // Check in quick backup directory first
+        let filePath = path_1.default.join(BACKUP_DIR, filename);
         try {
             await promises_1.default.access(filePath);
         }
         catch {
-            return res.status(404).json({
-                success: false,
-                error: 'Backup file not found',
-            });
+            // If not found, check in full backup directory
+            filePath = path_1.default.join(FULL_BACKUP_DIR, filename);
+            try {
+                await promises_1.default.access(filePath);
+            }
+            catch {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Backup file not found',
+                });
+            }
         }
         // Send file
         res.download(filePath, filename);
@@ -209,7 +249,7 @@ router.get('/download/:filename', async (req, res) => {
 });
 /**
  * DELETE /api/backups/:filename
- * Delete a backup file
+ * Delete a backup file (from either quick or full backup directory)
  */
 router.delete('/:filename', async (req, res) => {
     try {
@@ -221,16 +261,23 @@ router.delete('/:filename', async (req, res) => {
                 error: 'Invalid filename',
             });
         }
-        const filePath = path_1.default.join(BACKUP_DIR, filename);
-        // Check if file exists
+        // Check in quick backup directory first
+        let filePath = path_1.default.join(BACKUP_DIR, filename);
         try {
             await promises_1.default.access(filePath);
         }
         catch {
-            return res.status(404).json({
-                success: false,
-                error: 'Backup file not found',
-            });
+            // If not found, check in full backup directory
+            filePath = path_1.default.join(FULL_BACKUP_DIR, filename);
+            try {
+                await promises_1.default.access(filePath);
+            }
+            catch {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Backup file not found',
+                });
+            }
         }
         // Delete file
         await promises_1.default.unlink(filePath);
@@ -244,6 +291,64 @@ router.delete('/:filename', async (req, res) => {
         res.status(500).json({
             success: false,
             error: error.message,
+        });
+    }
+});
+/**
+ * POST /api/backups/create-full-system
+ * Returns instructions for creating a complete system backup from the host
+ * (Cannot be done from Docker as it needs access to source code on host)
+ */
+router.post('/create-full-system', async (req, res) => {
+    try {
+        console.log('🚀 Starting complete system backup from WMS...');
+        const scriptPath = path_1.default.join(__dirname, '..', '..', 'scripts', 'create-complete-backup.js');
+        // Execute Node.js script
+        const command = `node "${scriptPath}"`;
+        const { stdout, stderr } = await execAsync(command, {
+            cwd: path_1.default.join(__dirname, '..', '..'),
+            maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+            env: {
+                ...process.env,
+                FULL_BACKUP_DIR: 'C:\\WMS_FULL_BACKUPS'
+            }
+        });
+        if (stderr && !stderr.includes('Warning') && !stderr.includes('deprecated')) {
+            console.error('Backup stderr:', stderr);
+        }
+        console.log('Backup output:', stdout);
+        // Parse result from output
+        const successMatch = stdout.match(/✅ SUCCESS: ({.*})/);
+        if (!successMatch) {
+            throw new Error('Failed to parse backup result');
+        }
+        const result = JSON.parse(successMatch[1]);
+        console.log('✅ Complete system backup created successfully');
+        res.json({
+            success: true,
+            message: 'Complete plug-and-play system backup created successfully',
+            backup: {
+                name: result.name,
+                path: result.path,
+                size: result.size,
+                createdAt: result.createdAt,
+                type: 'full-system',
+                includes: {
+                    sourceCode: true,
+                    database: true,
+                    uploads: true,
+                    dockerConfigs: true,
+                    environmentFiles: true,
+                    restoreInstructions: true,
+                },
+            },
+        });
+    }
+    catch (error) {
+        console.error('Full system backup error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to create complete system backup',
         });
     }
 });

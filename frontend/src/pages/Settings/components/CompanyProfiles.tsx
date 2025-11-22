@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   BuildingOfficeIcon,
   PhotoIcon,
@@ -9,7 +10,9 @@ import {
   PencilIcon,
   TrashIcon,
   PhoneIcon,
-  UserIcon
+  UserIcon,
+  EyeIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 import { companiesAPI } from '../../../services/api';
 
@@ -43,6 +46,7 @@ const CONTRACT_STATUSES = [
 ];
 
 export const CompanyProfiles: React.FC = () => {
+  const navigate = useNavigate();
   const [profiles, setProfiles] = useState<CompanyProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -128,7 +132,7 @@ export const CompanyProfiles: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name.trim()) {
       setMessage({ type: 'error', text: 'Company name is required' });
       return;
@@ -143,7 +147,7 @@ export const CompanyProfiles: React.FC = () => {
       data.append('contactPhone', formData.contactPhone);
       data.append('contractStatus', formData.contractStatus);
       data.append('isActive', String(formData.isActive));
-      
+
       if (logoFile) {
         data.append('logo', logoFile);
       }
@@ -218,9 +222,8 @@ export const CompanyProfiles: React.FC = () => {
 
       {/* Messages */}
       {message && (
-        <div className={`p-4 rounded-lg flex items-center space-x-3 ${
-          message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
-        }`}>
+        <div className={`p-4 rounded-lg flex items-center space-x-3 ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+          }`}>
           {message.type === 'success' ? (
             <CheckCircleIcon className="h-6 w-6" />
           ) : (
@@ -363,14 +366,12 @@ export const CompanyProfiles: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, isActive: !formData.isActive })}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  formData.isActive ? 'bg-primary-600' : 'bg-gray-200'
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.isActive ? 'bg-primary-600' : 'bg-gray-200'
+                  }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    formData.isActive ? 'translate-x-6' : 'translate-x-1'
-                  }`}
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.isActive ? 'translate-x-6' : 'translate-x-1'
+                    }`}
                 />
               </button>
             </div>
@@ -475,9 +476,8 @@ export const CompanyProfiles: React.FC = () => {
                 {/* Active Status */}
                 <div className="mb-4 flex items-center space-x-2 text-sm">
                   <div
-                    className={`w-2 h-2 rounded-full ${
-                      profile.isActive ? 'bg-green-500' : 'bg-gray-300'
-                    }`}
+                    className={`w-2 h-2 rounded-full ${profile.isActive ? 'bg-green-500' : 'bg-gray-300'
+                      }`}
                   />
                   <span className={profile.isActive ? 'text-green-700' : 'text-gray-700'}>
                     {profile.isActive ? 'Active' : 'Inactive'}
@@ -507,18 +507,23 @@ export const CompanyProfiles: React.FC = () => {
                 ) : (
                   <div className="flex space-x-2">
                     <button
+                      onClick={() => navigate(`/company-profile/${profile.id}`)}
+                      className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1 font-semibold"
+                    >
+                      <ChartBarIcon className="h-4 w-4" />
+                      <span className="text-sm">View Analytics</span>
+                    </button>
+                    <button
                       onClick={() => handleEdit(profile)}
-                      className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center space-x-1"
+                      className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center"
                     >
                       <PencilIcon className="h-4 w-4" />
-                      <span className="text-sm">Edit</span>
                     </button>
                     <button
                       onClick={() => setConfirmDelete(profile.id)}
-                      className="flex-1 px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center justify-center space-x-1"
+                      className="px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center justify-center"
                     >
                       <TrashIcon className="h-4 w-4" />
-                      <span className="text-sm">Delete</span>
                     </button>
                   </div>
                 )}

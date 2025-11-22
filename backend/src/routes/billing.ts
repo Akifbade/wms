@@ -25,8 +25,9 @@ router.get('/settings', authenticateToken, async (req: AuthRequest, res) => {
       settings = await prisma.billingSettings.create({
         data: {
           companyId,
-          storageRateType: 'PER_DAY',
+          storageRateType: 'PER_BOX', // PER_BOX or PER_CUBIC_METER
           storageRatePerBox: 0.500,
+          storageRatePerCBM: 0.500, // NEW: CBM rate support
           taxRate: 5.0,
           currency: 'KWD',
           invoicePrefix: 'INV',
@@ -56,6 +57,7 @@ router.put('/settings', authenticateToken, authorizeRoles('ADMIN'), async (req: 
     const {
       storageRateType,
       storageRatePerBox,
+      storageRatePerCBM, // NEW: CBM rate support
       storageRatePerWeek,
       storageRatePerMonth,
       taxEnabled,
@@ -89,6 +91,7 @@ router.put('/settings', authenticateToken, authorizeRoles('ADMIN'), async (req: 
       update: {
         storageRateType,
         storageRatePerBox,
+        storageRatePerCBM, // NEW: Save CBM rate
         storageRatePerWeek,
         storageRatePerMonth,
         taxEnabled,
@@ -120,6 +123,7 @@ router.put('/settings', authenticateToken, authorizeRoles('ADMIN'), async (req: 
         companyId,
         storageRateType,
         storageRatePerBox,
+        storageRatePerCBM, // NEW: Save CBM rate on create
         storageRatePerWeek,
         storageRatePerMonth,
         taxEnabled,
@@ -417,12 +421,12 @@ router.get('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
           .filter((b: any) => b.rackId)
           .map((b: any) => b.rackId)
       )] as string[];
-      
+
       const racks = rackIds.length > 0 ? await prisma.rack.findMany({
         where: { id: { in: rackIds } },
         select: { code: true }
       }) : [];
-      
+
       const rackCodes = racks.map(r => r.code).join(', ');
       (invoice.shipment as any).rackLocations = rackCodes || null;
     }
@@ -455,7 +459,7 @@ router.post('/invoices', authenticateToken, authorizeRoles('ADMIN', 'MANAGER'), 
     });
 
     const invoicePrefix = settings?.invoicePrefix || 'INV';
-    
+
     // Get last invoice number
     const lastInvoice = await prisma.invoice.findFirst({
       where: { companyId },
@@ -621,7 +625,7 @@ router.post('/invoices/:id/payments', authenticateToken, authorizeRoles('ADMIN',
       });
     }
 
-    res.status(201).json({ 
+    res.status(201).json({
       payment,
       invoice: updatedInvoice,
       message: 'Payment recorded successfully'

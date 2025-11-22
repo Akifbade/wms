@@ -33,6 +33,20 @@ const createItemSchema = z.object({
 });
 
 const updateItemSchema = createItemSchema.partial();
+type ShipmentItemInput = z.infer<typeof createItemSchema>;
+
+const serializeItemInput = (input: ShipmentItemInput) => ({
+  itemName: input.itemName,
+  itemDescription: input.itemDescription ?? undefined,
+  category: input.category,
+  quantity: input.quantity,
+  weight: input.weight ?? null,
+  value: input.value ?? null,
+  barcode: input.barcode ?? undefined,
+  photos: input.photos ? JSON.stringify(input.photos) : null,
+  boxNumbers: input.boxNumbers ? JSON.stringify(input.boxNumbers) : null,
+  customAttributes: input.customAttributes ? JSON.stringify(input.customAttributes) : null,
+});
 
 // Get all items for a shipment
 router.get('/shipments/:shipmentId/items', async (req: AuthRequest, res: Response) => {
@@ -76,7 +90,7 @@ router.post('/shipments/:shipmentId/items', async (req: AuthRequest, res: Respon
     const companyId = req.user!.companyId;
 
     // Validate request body
-    const validatedData = createItemSchema.parse(req.body);
+    const validatedData: ShipmentItemInput = createItemSchema.parse(req.body);
 
     // Verify shipment belongs to company
     const shipment = await prisma.shipment.findFirst({
@@ -90,14 +104,9 @@ router.post('/shipments/:shipmentId/items', async (req: AuthRequest, res: Respon
     // Create item with JSON fields
     const item = await prisma.shipmentItem.create({
       data: {
-        ...validatedData,
-        shipmentId,
-        companyId,
-        photos: validatedData.photos ? JSON.stringify(validatedData.photos) : null,
-        boxNumbers: validatedData.boxNumbers ? JSON.stringify(validatedData.boxNumbers) : null,
-        customAttributes: validatedData.customAttributes
-          ? JSON.stringify(validatedData.customAttributes)
-          : null,
+        ...serializeItemInput(validatedData),
+        shipment: { connect: { id: shipmentId } },
+        company: { connect: { id: companyId } },
       },
     });
 
@@ -260,19 +269,16 @@ router.post('/shipments/:shipmentId/items/bulk', async (req: AuthRequest, res: R
     }
 
     // Validate all items
-    const validatedItems = items.map(item => createItemSchema.parse(item));
+    const validatedItems: ShipmentItemInput[] = items.map(item => createItemSchema.parse(item));
 
     // Create all items in a transaction
     const createdItems = await prisma.$transaction(
       validatedItems.map(item =>
         prisma.shipmentItem.create({
           data: {
-            ...item,
-            shipmentId,
-            companyId,
-            photos: item.photos ? JSON.stringify(item.photos) : null,
-            boxNumbers: item.boxNumbers ? JSON.stringify(item.boxNumbers) : null,
-            customAttributes: item.customAttributes ? JSON.stringify(item.customAttributes) : null,
+            ...serializeItemInput(item),
+            shipment: { connect: { id: shipmentId } },
+            company: { connect: { id: companyId } },
           },
         })
       )

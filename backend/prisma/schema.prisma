@@ -573,8 +573,9 @@ model BillingSettings {
   companyId String @unique
 
   // Storage Rates
-  storageRateType     String @default("PER_DAY") // PER_DAY, PER_WEEK, PER_MONTH, FLAT
-  storageRatePerBox   Float  @default(0.500)
+  storageRateType     String @default("PER_BOX") // PER_BOX, PER_CUBIC_METER
+  storageRatePerBox   Float  @default(0.500) // KWD per box per day
+  storageRatePerCBM   Float  @default(0.500) // KWD per cubic meter per day
   storageRatePerWeek  Float?
   storageRatePerMonth Float?
 

@@ -36,11 +36,15 @@ services:
       DATABASE_URL: mysql://${DB_USER:-wms_user}:${DB_PASSWORD:-wmspassword123}@database:3306/${DB_NAME:-warehouse_wms}
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
       PORT: 5000
+      BACKUP_DIR: /backups
+      FULL_BACKUP_DIR: /full-backups
     ports:
       - "${BACKEND_PORT:-5000}:5000"
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/app/logs
+      - C:/WMS_BACKUPS:/backups
+      - C:/WMS_FULL_BACKUPS:/full-backups
     depends_on:
       database:
         condition: service_healthy

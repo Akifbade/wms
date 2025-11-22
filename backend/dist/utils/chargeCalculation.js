@@ -7,6 +7,7 @@
  * - Company default billing settings (fallback)
  * - CBM-based or Box-based charging
  * - Grace periods and minimum charges
+ * - Custom charge types (handling, release, service fees)
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.calculateShipmentCharges = calculateShipmentCharges;
@@ -98,20 +99,125 @@ async function calculateShipmentCharges(prisma, shipmentId, companyId, upToDate)
         console.log(`📈 Applying minimum charge: ${billingSettings.minimumCharge} KWD (calculated: ${baseCharge})`);
         baseCharge = billingSettings.minimumCharge;
     }
-    // Calculate tax
+    // 🎯 BUILD LINE ITEMS for invoice generation
+    const lineItems = [];
+    // Storage charge line item
+    let storageDescription = '';
+    if (shipment.customRateEnabled && shipment.customRatePerCBMPerDay && shipment.cbm) {
+        storageDescription = `Storage charges (${chargeableDays} days × ${shipment.cbm.toFixed(3)} m³ × ${shipment.customRatePerCBMPerDay} KWD/m³/day)`;
+    }
+    else if (shipment.customRateEnabled && shipment.customRatePerBoxPerDay) {
+        storageDescription = `Storage charges (${chargeableDays} days × ${shipment.boxes.length} boxes × ${shipment.customRatePerBoxPerDay} KWD/box/day)`;
+    }
+    else {
+        storageDescription = `Storage charges (${chargeableDays} days × ${shipment.boxes.length} boxes × ${billingSettings.storageRatePerBox} KWD/box/day)`;
+    }
+    lineItems.push({
+        description: storageDescription,
+        category: 'STORAGE',
+        quantity: chargeableDays,
+        unitPrice: parseFloat((baseCharge / chargeableDays).toFixed(3)),
+        amount: parseFloat(baseCharge.toFixed(3)),
+        isTaxable: true
+    });
+    // 🎯 ADD CUSTOM CHARGE TYPES (handling fees, release fees, etc)
+    const chargeTypes = await prisma.chargeType.findMany({
+        where: {
+            companyId,
+            isActive: true,
+            applyOnStorage: true // Only storage-related charges for now
+        }
+    });
+    let additionalCharges = 0;
+    for (const chargeType of chargeTypes) {
+        let chargeAmount = 0;
+        // Calculate based on charge type calculation method
+        switch (chargeType.calculationType) {
+            case 'PER_BOX':
+                chargeAmount = shipment.boxes.length * chargeType.rate;
+                lineItems.push({
+                    description: chargeType.name,
+                    category: chargeType.category,
+                    quantity: shipment.boxes.length,
+                    unitPrice: chargeType.rate,
+                    amount: parseFloat(chargeAmount.toFixed(3)),
+                    chargeTypeId: chargeType.id,
+                    isTaxable: chargeType.isTaxable
+                });
+                break;
+            case 'PER_SHIPMENT':
+            case 'FLAT':
+                chargeAmount = chargeType.rate;
+                lineItems.push({
+                    description: chargeType.name,
+                    category: chargeType.category,
+                    quantity: 1,
+                    unitPrice: chargeType.rate,
+                    amount: parseFloat(chargeAmount.toFixed(3)),
+                    chargeTypeId: chargeType.id,
+                    isTaxable: chargeType.isTaxable
+                });
+                break;
+            case 'PER_CUBIC_M':
+                if (shipment.cbm && shipment.cbm > 0) {
+                    chargeAmount = shipment.cbm * chargeType.rate;
+                    lineItems.push({
+                        description: `${chargeType.name} (${shipment.cbm.toFixed(3)} m³)`,
+                        category: chargeType.category,
+                        quantity: parseFloat(shipment.cbm.toFixed(3)),
+                        unitPrice: chargeType.rate,
+                        amount: parseFloat(chargeAmount.toFixed(3)),
+                        chargeTypeId: chargeType.id,
+                        isTaxable: chargeType.isTaxable
+                    });
+                }
+                break;
+            case 'PER_KG':
+                if (shipment.weight && shipment.weight > 0) {
+                    chargeAmount = shipment.weight * chargeType.rate;
+                    lineItems.push({
+                        description: `${chargeType.name} (${shipment.weight} kg)`,
+                        category: chargeType.category,
+                        quantity: shipment.weight,
+                        unitPrice: chargeType.rate,
+                        amount: parseFloat(chargeAmount.toFixed(3)),
+                        chargeTypeId: chargeType.id,
+                        isTaxable: chargeType.isTaxable
+                    });
+                }
+                break;
+        }
+        // Apply min/max charge limits
+        if (chargeAmount > 0) {
+            if (chargeType.minCharge && chargeAmount < chargeType.minCharge) {
+                chargeAmount = chargeType.minCharge;
+            }
+            if (chargeType.maxCharge && chargeAmount > chargeType.maxCharge) {
+                chargeAmount = chargeType.maxCharge;
+            }
+            additionalCharges += chargeAmount;
+        }
+    }
+    // Calculate tax on total (base + additional charges)
+    const subtotal = baseCharge + additionalCharges;
     let taxAmount = 0;
     if (billingSettings.taxEnabled && billingSettings.taxRate) {
-        taxAmount = (baseCharge * billingSettings.taxRate) / 100;
+        // Tax only taxable items
+        const taxableAmount = lineItems
+            .filter(item => item.isTaxable)
+            .reduce((sum, item) => sum + item.amount, 0);
+        taxAmount = (taxableAmount * billingSettings.taxRate) / 100;
     }
-    const totalCharge = baseCharge + taxAmount;
+    const totalCharge = subtotal + taxAmount;
     return {
         totalCharge: parseFloat(totalCharge.toFixed(3)),
         breakdown: {
             baseCharge: parseFloat(baseCharge.toFixed(3)),
-            additionalCharges: 0, // Can extend for handling fees, etc.
+            additionalCharges: parseFloat(additionalCharges.toFixed(3)),
             taxAmount: parseFloat(taxAmount.toFixed(3)),
             currency: billingSettings.currency || 'KWD'
         },
+        lineItems, // ✅ Detailed breakdown for invoice
         rateUsed,
         daysCharged: chargeableDays,
         gracePeriodApplied

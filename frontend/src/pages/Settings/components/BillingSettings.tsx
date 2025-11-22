@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  CurrencyDollarIcon, 
-  DocumentTextIcon, 
+import {
+  CurrencyDollarIcon,
+  DocumentTextIcon,
   BanknotesIcon,
   PaintBrushIcon,
   PlusIcon,
@@ -31,6 +31,7 @@ interface ChargeType {
 interface BillingSettings {
   storageRateType: 'PER_BOX' | 'PER_CUBIC_M';
   storageRatePerBox?: number;
+  storageRatePerCBM?: number; // NEW: CBM rate field
   storageRatePerWeek?: number;
   storageRatePerMonth?: number;
   minimumStorageCharge?: number;
@@ -95,33 +96,33 @@ export const BillingSettings: React.FC = () => {
 
   const handleSaveSettings = async () => {
     if (!settings) return;
-    
+
     // Validation
     if (!settings.currency || settings.currency.trim() === '') {
       setMessage({ type: 'error', text: 'Currency is required' });
       return;
     }
-    
+
     if (!settings.invoicePrefix || settings.invoicePrefix.trim() === '') {
       setMessage({ type: 'error', text: 'Invoice prefix is required' });
       return;
     }
-    
+
     if (settings.taxRate !== undefined && (settings.taxRate < 0 || settings.taxRate > 100)) {
       setMessage({ type: 'error', text: 'Tax rate must be between 0 and 100' });
       return;
     }
-    
+
     if (settings.invoiceDueDays !== undefined && settings.invoiceDueDays < 0) {
       setMessage({ type: 'error', text: 'Invoice due days must be positive' });
       return;
     }
-    
+
     if (settings.gracePeriodDays !== undefined && settings.gracePeriodDays < 0) {
       setMessage({ type: 'error', text: 'Grace period days must be positive' });
       return;
     }
-    
+
     // Validate IBAN format if provided (basic validation)
     if (settings.iban && settings.iban.trim() !== '') {
       const ibanPattern = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}$/;
@@ -130,7 +131,7 @@ export const BillingSettings: React.FC = () => {
         return;
       }
     }
-    
+
     setSaving(true);
     try {
       await billingAPI.updateSettings(settings);
@@ -304,18 +305,35 @@ export const BillingSettings: React.FC = () => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Storage Rate Per Box</label>
-                <input
-                  type="number"
-                  step="0.001"
-                  value={settings.storageRatePerBox || ''}
-                  onChange={(e) => setSettings({ ...settings, storageRatePerBox: parseFloat(e.target.value) })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="0.500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Rate per box per day</p>
-              </div>
+              {settings.storageRateType === 'PER_BOX' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Storage Rate Per Box</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    value={settings.storageRatePerBox || ''}
+                    onChange={(e) => setSettings({ ...settings, storageRatePerBox: parseFloat(e.target.value) })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="0.500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Rate per box per day (KWD)</p>
+                </div>
+              )}
+
+              {settings.storageRateType === 'PER_CUBIC_M' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Storage Rate Per CBM</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    value={(settings as any).storageRatePerCBM || ''}
+                    onChange={(e) => setSettings({ ...settings, storageRatePerCBM: parseFloat(e.target.value) } as any)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="5.000"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Rate per cubic meter per day (KWD/m³/day)</p>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end pt-4">
@@ -608,12 +626,11 @@ export const BillingSettings: React.FC = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
                       <h4 className="font-semibold text-gray-900">{charge.name}</h4>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        charge.category === 'STORAGE' ? 'bg-blue-100 text-blue-700' :
-                        charge.category === 'RELEASE' ? 'bg-green-100 text-green-700' :
-                        charge.category === 'SERVICE' ? 'bg-purple-100 text-purple-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
+                      <span className={`px-2 py-1 text-xs rounded-full ${charge.category === 'STORAGE' ? 'bg-blue-100 text-blue-700' :
+                          charge.category === 'RELEASE' ? 'bg-green-100 text-green-700' :
+                            charge.category === 'SERVICE' ? 'bg-purple-100 text-purple-700' :
+                              'bg-gray-100 text-gray-700'
+                        }`}>
                         {charge.category}
                       </span>
                       {charge.isActive ? (

@@ -152,7 +152,7 @@ const shipmentSchema = zod_1.z.object({
 // Get all shipments
 router.get('/', async (req, res) => {
     try {
-        const { status, search, isWarehouseShipment, category, customerName, page = '1', limit = '50' } = req.query;
+        const { status, search, isWarehouseShipment, category, customerName, companyProfileId, page = '1', limit = '50' } = req.query;
         const companyId = req.user.companyId;
         const where = { companyId };
         if (status) {
@@ -168,6 +168,10 @@ router.get('/', async (req, res) => {
         // NEW: Customer name filter
         if (customerName) {
             where.customerName = { contains: customerName };
+        }
+        // NEW: Company profile filter (for company analytics page)
+        if (companyProfileId) {
+            where.companyProfileId = companyProfileId;
         }
         if (search) {
             where.OR = [
@@ -318,6 +322,15 @@ router.get('/:id', async (req, res) => {
                 },
                 withdrawals: {
                     orderBy: { withdrawalDate: 'desc' },
+                },
+                invoices: {
+                    include: {
+                        payments: {
+                            orderBy: { createdAt: 'desc' },
+                        },
+                        lineItems: true,
+                    },
+                    orderBy: { createdAt: 'desc' },
                 },
                 companyProfile: {
                     select: {
@@ -575,6 +588,11 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
             weight: data.weight !== undefined ? parseFloat(data.weight) : undefined,
             warehouseData: normalizedWarehouseData,
         };
+        // 🎯 AUTO-CALCULATE CBM if dimensions provided but CBM not set
+        if (createPayload.length && createPayload.width && createPayload.height && !createPayload.cbm) {
+            createPayload.cbm = (createPayload.length * createPayload.width * createPayload.height) / 1000000;
+            console.log(`✅ Auto-calculated CBM: ${createPayload.cbm.toFixed(3)} m³ (${createPayload.length}×${createPayload.width}×${createPayload.height} cm)`);
+        }
         const shipment = await prisma.shipment.create({
             data: createPayload,
             include: {
@@ -868,6 +886,17 @@ router.put('/:id', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, r
             updateData.cbm = parseFloat(cbm);
         if (weight !== undefined)
             updateData.weight = parseFloat(weight);
+        // 🎯 AUTO-CALCULATE CBM if dimensions changed but CBM not explicitly set
+        const hasNewDimensions = length !== undefined || width !== undefined || height !== undefined;
+        if (hasNewDimensions && cbm === undefined) {
+            const finalLength = length !== undefined ? parseFloat(length) : existing.length;
+            const finalWidth = width !== undefined ? parseFloat(width) : existing.width;
+            const finalHeight = height !== undefined ? parseFloat(height) : existing.height;
+            if (finalLength && finalWidth && finalHeight) {
+                updateData.cbm = (finalLength * finalWidth * finalHeight) / 1000000;
+                console.log(`✅ Auto-calculated CBM: ${updateData.cbm.toFixed(3)} m³ (${finalLength}×${finalWidth}×${finalHeight} cm)`);
+            }
+        }
         updateData.updatedAt = new Date();
         const shipment = await prisma.shipment.update({
             where: { id },

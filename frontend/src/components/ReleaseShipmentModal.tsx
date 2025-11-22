@@ -29,6 +29,7 @@ interface LineItem {
   amount: number;
   taxRate: number;
   taxAmount: number;
+  isTaxable: boolean;
 }
 
 interface ReleaseShipmentModalProps {
@@ -52,8 +53,6 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
   const [customQuantityType, setCustomQuantityType] = useState('');
   const [chargeTypes, setChargeTypes] = useState<ChargeType[]>([]);
   const [selectedCharges, setSelectedCharges] = useState<Set<string>>(new Set());
-  const [customCharge, setCustomCharge] = useState({ description: '', amount: 0 });
-  const [addingCustom, setAddingCustom] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -124,18 +123,44 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
     const chargeableDays = Math.max(0, daysStored - gracePeriod);
 
     if (chargeableDays > 0) {
-      const storageRate = settings?.storageRatePerBox || 0;
-      const storageAmount = chargeableDays * boxesToRelease * storageRate;
+      let storageAmount = 0;
+      let storageDescription = '';
+      let storageUnitPrice = 0;
+      let storageQuantity = 0;
+
+      // 🎯 SMART RATE SELECTION: Custom CBM > Custom Box > Company Default
+      if (shipment.customRateEnabled && shipment.cbm && shipment.cbm > 0 && shipment.customRatePerCBMPerDay) {
+        // ✅ Use Custom CBM Rate
+        storageAmount = chargeableDays * shipment.cbm * shipment.customRatePerCBMPerDay;
+        storageDescription = `Storage Fee (${chargeableDays} days × ${shipment.cbm.toFixed(3)} m³ × ${shipment.customRatePerCBMPerDay.toFixed(3)} ${settings.currency}/m³/day)`;
+        storageUnitPrice = shipment.customRatePerCBMPerDay;
+        storageQuantity = chargeableDays * shipment.cbm;
+      } else if (shipment.customRateEnabled && shipment.customRatePerBoxPerDay) {
+        // ✅ Use Custom Box Rate
+        storageAmount = chargeableDays * boxesToRelease * shipment.customRatePerBoxPerDay;
+        storageDescription = `Storage Fee (${chargeableDays} days × ${boxesToRelease} ${quantityLabel} × ${shipment.customRatePerBoxPerDay.toFixed(3)} ${settings.currency}/box/day) [Custom Rate]`;
+        storageUnitPrice = shipment.customRatePerBoxPerDay;
+        storageQuantity = chargeableDays * boxesToRelease;
+      } else {
+        // ✅ Use Company Default Box Rate
+        const storageRate = settings?.storageRatePerBox || 0;
+        storageAmount = chargeableDays * boxesToRelease * storageRate;
+        storageDescription = `Storage Fee (${chargeableDays} days × ${boxesToRelease} ${quantityLabel} × ${storageRate.toFixed(3)} ${settings.currency})`;
+        storageUnitPrice = storageRate;
+        storageQuantity = chargeableDays * boxesToRelease;
+      }
+
       const storageTax = (storageAmount * taxRate) / 100;
 
       items.push({
-        description: `Storage Fee (${chargeableDays} days × ${boxesToRelease} ${quantityLabel} × ${storageRate.toFixed(3)} ${settings.currency})`,
+        description: storageDescription,
         category: 'STORAGE',
-        quantity: chargeableDays * boxesToRelease,
-        unitPrice: storageRate,
+        quantity: storageQuantity,
+        unitPrice: storageUnitPrice,
         amount: storageAmount,
         taxRate,
         taxAmount: storageTax,
+        isTaxable: true,
       });
     }
 
@@ -196,22 +221,9 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
         amount,
         taxRate: charge.isTaxable ? taxRate : 0,
         taxAmount: chargeTax,
+        isTaxable: charge.isTaxable,
       });
     });
-
-    // Add custom charge if added
-    if (addingCustom && customCharge.amount > 0) {
-      const customTax = (customCharge.amount * taxRate) / 100;
-      items.push({
-        description: customCharge.description || 'Custom Charge',
-        category: 'OTHER',
-        quantity: 1,
-        unitPrice: customCharge.amount,
-        amount: customCharge.amount,
-        taxRate,
-        taxAmount: customTax,
-      });
-    }
 
     setLineItems(items);
   };
@@ -232,8 +244,8 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
 
     setGenerating(true);
     try {
-      const quantityLabel = quantityType === 'CUSTOM' && customQuantityType 
-        ? customQuantityType.toLowerCase() 
+      const quantityLabel = quantityType === 'CUSTOM' && customQuantityType
+        ? customQuantityType.toLowerCase()
         : quantityType.toLowerCase();
 
       const invoice = {
@@ -259,13 +271,13 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('authToken')}`
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             releaseAll: true,
             collectorID: collectorID || undefined,
             releasePhotos: releasePhotos.length > 0 ? releasePhotos : undefined
           })
         });
-        
+
         if (!releaseResponse.ok) {
           const errorData = await releaseResponse.json();
           console.error('Release API Error (Full):', errorData);
@@ -279,20 +291,20 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
         const boxesData = await boxesResponse.json();
         const inStorageBoxes = boxesData.boxes.filter((b: any) => b.status === 'IN_STORAGE');
         const boxNumbers = inStorageBoxes.slice(0, boxesToRelease).map((b: any) => b.boxNumber);
-        
+
         const releaseResponse = await fetch(`/api/shipments/${shipment.id}/release-boxes`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('authToken')}`
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             boxNumbers,
             collectorID: collectorID || undefined,
             releasePhotos: releasePhotos.length > 0 ? releasePhotos : undefined
           })
         });
-        
+
         if (!releaseResponse.ok) {
           const errorData = await releaseResponse.json();
           console.error('Release API Error (Partial):', errorData);
@@ -310,7 +322,7 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
         releaseType,
         boxesReleased: releaseType === 'FULL' ? shipment.currentBoxCount : boxesToRelease,
       };
-      
+
       setReleaseNoteData(releaseData);
       setShowReleaseNote(true);
 
@@ -387,10 +399,10 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
                       <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-blue-500 transition-all duration-300"
-                          style={{ 
-                            width: `${Math.min(100, ((shipment.rack.capacityUsed || 0) / (shipment.rack.capacityTotal || 1)) * 100)}%` 
+                          style={{
+                            width: `${Math.min(100, ((shipment.rack.capacityUsed || 0) / (shipment.rack.capacityTotal || 1)) * 100)}%`
                           }}
                         ></div>
                       </div>
@@ -415,11 +427,10 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                     setReleaseType('FULL');
                     setBoxesToRelease(shipment.currentBoxCount || 0);
                   }}
-                  className={`p-4 border-2 rounded-lg text-center transition-all ${
-                    releaseType === 'FULL'
+                  className={`p-4 border-2 rounded-lg text-center transition-all ${releaseType === 'FULL'
                       ? 'border-primary-500 bg-primary-50 text-primary-700'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="font-semibold">Full Release</div>
                   <div className="text-sm text-gray-600 mt-1">
@@ -428,11 +439,10 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                 </button>
                 <button
                   onClick={() => setReleaseType('PARTIAL')}
-                  className={`p-4 border-2 rounded-lg text-center transition-all ${
-                    releaseType === 'PARTIAL'
+                  className={`p-4 border-2 rounded-lg text-center transition-all ${releaseType === 'PARTIAL'
                       ? 'border-primary-500 bg-primary-50 text-primary-700'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="font-semibold">Partial Release</div>
                   <div className="text-sm text-gray-600 mt-1">Select box count</div>
@@ -450,17 +460,16 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                   <button
                     key={type}
                     onClick={() => setQuantityType(type)}
-                    className={`px-3 py-2 text-sm border rounded-lg transition-all ${
-                      quantityType === type
+                    className={`px-3 py-2 text-sm border rounded-lg transition-all ${quantityType === type
                         ? 'border-primary-500 bg-primary-50 text-primary-700 font-medium'
                         : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                    }`}
+                      }`}
                   >
                     {type.charAt(0) + type.slice(1).toLowerCase()}
                   </button>
                 ))}
               </div>
-              
+
               {/* Custom Quantity Type */}
               <div className="mt-3">
                 <label className="flex items-center text-sm text-gray-700">
@@ -563,17 +572,16 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
             {/* Charge Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                Additional Charges
+                Additional Charges (from Settings)
               </label>
               <div className="space-y-2">
                 {chargeTypes.map((charge) => (
                   <label
                     key={charge.id}
-                    className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${
-                      selectedCharges.has(charge.id)
+                    className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${selectedCharges.has(charge.id)
                         ? 'border-primary-500 bg-primary-50'
                         : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -611,68 +619,138 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
               </div>
             </div>
 
-            {/* Custom Charge */}
-            <div>
-              <button
-                onClick={() => setAddingCustom(!addingCustom)}
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-              >
-                {addingCustom ? '- Remove Custom Charge' : '+ Add Custom Charge'}
-              </button>
-
-              {addingCustom && (
-                <div className="mt-3 p-4 border border-gray-200 rounded-lg space-y-3">
-                  <input
-                    type="text"
-                    value={customCharge.description}
-                    onChange={(e) =>
-                      setCustomCharge({ ...customCharge, description: e.target.value })
-                    }
-                    placeholder="Description (e.g., Special handling)"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={customCharge.amount || ''}
-                    onChange={(e) =>
-                      setCustomCharge({ ...customCharge, amount: parseFloat(e.target.value) || 0 })
-                    }
-                    placeholder="Amount"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Invoice Preview */}
+            {/* Invoice Preview with Edit */}
             <div className="border-t border-gray-200 pt-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <DocumentTextIcon className="h-5 w-5" />
-                Invoice Preview
+                Invoice Preview - Editable
               </h3>
 
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                 {lineItems.map((item, index) => (
-                  <div key={index} className="flex justify-between text-sm">
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{item.description}</div>
-                      <div className="text-xs text-gray-500">
-                        {item.quantity} × {item.unitPrice.toFixed(3)} {settings.currency}
+                  <div key={index} className="border border-gray-200 bg-white rounded-lg p-3">
+                    {/* Editable Description */}
+                    <input
+                      type="text"
+                      value={item.description}
+                      onChange={(e) => {
+                        const updated = [...lineItems];
+                        updated[index].description = e.target.value;
+                        setLineItems(updated);
+                      }}
+                      className="w-full px-2 py-1 text-sm font-medium text-gray-900 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent mb-2"
+                    />
+
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      {/* Editable Quantity */}
+                      <div>
+                        <label className="text-xs text-gray-600">Qty</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const updated = [...lineItems];
+                            const newQty = parseFloat(e.target.value) || 0;
+                            updated[index].quantity = newQty;
+                            updated[index].amount = newQty * updated[index].unitPrice;
+                            updated[index].taxAmount = updated[index].isTaxable
+                              ? (updated[index].amount * (updated[index].taxRate / 100))
+                              : 0;
+                            setLineItems(updated);
+                          }}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
+
+                      {/* Editable Unit Price */}
+                      <div>
+                        <label className="text-xs text-gray-600">Unit Price</label>
+                        <input
+                          type="number"
+                          step="0.001"
+                          value={item.unitPrice}
+                          onChange={(e) => {
+                            const updated = [...lineItems];
+                            const newPrice = parseFloat(e.target.value) || 0;
+                            updated[index].unitPrice = newPrice;
+                            updated[index].amount = updated[index].quantity * newPrice;
+                            updated[index].taxAmount = updated[index].isTaxable
+                              ? (updated[index].amount * (updated[index].taxRate / 100))
+                              : 0;
+                            setLineItems(updated);
+                          }}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
+
+                      {/* Amount (Read-only, calculated) */}
+                      <div>
+                        <label className="text-xs text-gray-600">Amount</label>
+                        <div className="px-2 py-1 text-sm font-semibold text-gray-900 bg-gray-100 rounded border border-gray-300">
+                          {item.amount.toFixed(3)} {settings.currency}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-medium text-gray-900">
-                        {item.amount.toFixed(3)} {settings.currency}
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center text-xs text-gray-600">
+                          <input
+                            type="checkbox"
+                            checked={item.isTaxable}
+                            onChange={(e) => {
+                              const updated = [...lineItems];
+                              updated[index].isTaxable = e.target.checked;
+                              updated[index].taxAmount = e.target.checked
+                                ? (updated[index].amount * (updated[index].taxRate / 100))
+                                : 0;
+                              setLineItems(updated);
+                            }}
+                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 mr-1"
+                          />
+                          Taxable
+                        </label>
+                        {item.taxAmount > 0 && (
+                          <span className="text-xs text-gray-500">
+                            Tax: +{item.taxAmount.toFixed(3)} {settings.currency}
+                          </span>
+                        )}
                       </div>
-                      {item.taxAmount > 0 && (
-                        <div className="text-xs text-gray-500">
-                          +{item.taxAmount.toFixed(3)} tax
-                        </div>
-                      )}
+
+                      {/* Delete Line Item */}
+                      <button
+                        onClick={() => {
+                          const updated = lineItems.filter((_, i) => i !== index);
+                          setLineItems(updated);
+                        }}
+                        className="text-xs text-red-600 hover:text-red-700 font-medium"
+                      >
+                        🗑️ Remove
+                      </button>
                     </div>
                   </div>
                 ))}
+
+                {/* Add Manual Line Item Button */}
+                <button
+                  onClick={() => {
+                    const newItem: LineItem = {
+                      description: 'Manual Charge',
+                      category: 'OTHER',
+                      quantity: 1,
+                      unitPrice: 0,
+                      amount: 0,
+                      taxRate: settings?.taxRate || 0,
+                      taxAmount: 0,
+                      isTaxable: true,
+                    };
+                    setLineItems([...lineItems, newItem]);
+                  }}
+                  className="w-full py-2 px-4 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:border-primary-500 hover:text-primary-600 font-medium transition-all"
+                >
+                  + Add Manual Charge
+                </button>
 
                 {lineItems.length === 0 && (
                   <div className="text-center py-4 text-gray-500 text-sm">
@@ -721,8 +799,8 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
               <button
                 onClick={handleGenerateInvoice}
                 disabled={
-                  generating || 
-                  lineItems.length === 0 || 
+                  generating ||
+                  lineItems.length === 0 ||
                   (settings?.requireIDVerification && !collectorID.trim()) ||
                   (settings?.requireReleasePhotos && releasePhotos.length === 0)
                 }

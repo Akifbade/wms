@@ -4,6 +4,7 @@ import path from 'path';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import { Server } from 'http';
 import { APP_VERSION, getVersionInfo, logVersionInfo } from './config/version';
 
 // Import routes
@@ -37,6 +38,8 @@ import workerDashboardRoutes from './routes/worker-dashboard';
 import categoriesRoutes from './routes/categories'; // NEW: Category management
 import companiesRoutes from './routes/companies'; // NEW: Company profiles management
 import backupsRoutes from './routes/backups'; // NEW: Backup management
+import systemPatchesRoutes from './routes/system-patches';
+import { loadPatches } from './patches/engine';
 
 // Load environment variables FIRST (but allow env vars to override .env)
 dotenv.config({ override: false });
@@ -45,6 +48,7 @@ dotenv.config({ override: false });
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
+let server: Server;
 
 // Middleware - Allow mobile/network access
 app.use(cors({
@@ -160,17 +164,18 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/plugins', pluginsRoutes);
 app.use('/api/job-files', jobFilesRoutes); // NEW: Job file management
 app.use('/api/categories', categoriesRoutes); // NEW: Category management
-app.use('/api/company-profiles', companiesRoutes); // NEW: Company profiles (DIOR, JAZEERA, etc)
+app.use('/api/companies', companiesRoutes); // NEW: Company profiles (DIOR, JAZEERA, etc) - matches frontend /api/companies/:profileId/analytics
+app.use('/api/company-profiles', companiesRoutes); // Legacy alias for older frontend calls
 app.use('/api/backups', backupsRoutes); // NEW: Backup management system
+app.use('/api/system-patches', systemPatchesRoutes);
+
+// Plugin routes will be added dynamically by patch system
+// These are registered in patches/modules/* via app.get/post/etc
+
 // NEW: Enhanced warehouse routes
 app.use('/api', shipmentItemsRoutes); // Handles /api/shipments/:id/items
 app.use('/api', customerMaterialsRoutes); // Handles /api/customers/*
 app.use('/api', workerDashboardRoutes); // Handles /api/worker/*
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -181,26 +186,43 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Start server
-const server = app.listen(PORT, () => {
-  logVersionInfo();
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}`);
-  console.log(`🚛 Fleet Management: ${process.env.FLEET_ENABLED === 'true' ? '✅ ENABLED' : '❌ DISABLED'}`);
+const startServer = async () => {
+  try {
+    await loadPatches(app, prisma);
+
+    // 404 handler - registered AFTER plugins so their routes work
+    app.use((req, res) => {
+      res.status(404).json({ error: 'Route not found' });
+    });
+  } catch (error) {
+    console.error('⚠️  Patch engine failed to initialize; continuing without patches.', error);
+  }
+
+  server = app.listen(PORT, () => {
+    logVersionInfo();
+    console.log(`🚀 Server is running on http://localhost:${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV}`);
+    console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}`);
+    console.log(`🚛 Fleet Management: ${process.env.FLEET_ENABLED === 'true' ? '✅ ENABLED' : '❌ DISABLED'}`);
+  });
+};
+
+startServer().catch((error) => {
+  console.error('❌ Failed to start server', error);
+  process.exit(1);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, closing server...');
-  server.close();
+  server?.close();
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('\nSIGINT received, closing server...');
-  server.close();
+  server?.close();
   await prisma.$disconnect();
   process.exit(0);
 });

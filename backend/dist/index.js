@@ -41,12 +41,15 @@ const worker_dashboard_1 = __importDefault(require("./routes/worker-dashboard"))
 const categories_1 = __importDefault(require("./routes/categories")); // NEW: Category management
 const companies_1 = __importDefault(require("./routes/companies")); // NEW: Company profiles management
 const backups_1 = __importDefault(require("./routes/backups")); // NEW: Backup management
+const system_patches_1 = __importDefault(require("./routes/system-patches"));
+const engine_1 = require("./patches/engine");
 // Load environment variables FIRST (but allow env vars to override .env)
 dotenv_1.default.config({ override: false });
 // Initialize Express app
 const app = (0, express_1.default)();
 const prisma = new client_1.PrismaClient();
 const PORT = process.env.PORT || 5000;
+let server;
 // Middleware - Allow mobile/network access
 app.use((0, cors_1.default)({
     origin: true, // Allow all origins for mobile access
@@ -151,8 +154,10 @@ app.use('/api/reports', reports_1.default);
 app.use('/api/plugins', plugins_1.default);
 app.use('/api/job-files', job_files_1.default); // NEW: Job file management
 app.use('/api/categories', categories_1.default); // NEW: Category management
-app.use('/api/company-profiles', companies_1.default); // NEW: Company profiles (DIOR, JAZEERA, etc)
+app.use('/api/companies', companies_1.default); // NEW: Company profiles (DIOR, JAZEERA, etc) - matches frontend /api/companies/:profileId/analytics
+app.use('/api/company-profiles', companies_1.default); // Legacy alias for older frontend calls
 app.use('/api/backups', backups_1.default); // NEW: Backup management system
+app.use('/api/system-patches', system_patches_1.default);
 // NEW: Enhanced warehouse routes
 app.use('/api', shipment_items_1.default); // Handles /api/shipments/:id/items
 app.use('/api', customer_materials_1.default); // Handles /api/customers/*
@@ -169,24 +174,35 @@ app.use((err, req, res, next) => {
         message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
     });
 });
-// Start server
-const server = app.listen(PORT, () => {
-    (0, version_1.logVersionInfo)();
-    console.log(`🚀 Server is running on http://localhost:${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-    console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}`);
-    console.log(`🚛 Fleet Management: ${process.env.FLEET_ENABLED === 'true' ? '✅ ENABLED' : '❌ DISABLED'}`);
+const startServer = async () => {
+    try {
+        await (0, engine_1.loadPatches)(app, prisma);
+    }
+    catch (error) {
+        console.error('⚠️  Patch engine failed to initialize; continuing without patches.', error);
+    }
+    server = app.listen(PORT, () => {
+        (0, version_1.logVersionInfo)();
+        console.log(`🚀 Server is running on http://localhost:${PORT}`);
+        console.log(`📊 Environment: ${process.env.NODE_ENV}`);
+        console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}`);
+        console.log(`🚛 Fleet Management: ${process.env.FLEET_ENABLED === 'true' ? '✅ ENABLED' : '❌ DISABLED'}`);
+    });
+};
+startServer().catch((error) => {
+    console.error('❌ Failed to start server', error);
+    process.exit(1);
 });
 // Graceful shutdown
 process.on('SIGTERM', async () => {
     console.log('SIGTERM received, closing server...');
-    server.close();
+    server?.close();
     await prisma.$disconnect();
     process.exit(0);
 });
 process.on('SIGINT', async () => {
     console.log('\nSIGINT received, closing server...');
-    server.close();
+    server?.close();
     await prisma.$disconnect();
     process.exit(0);
 });

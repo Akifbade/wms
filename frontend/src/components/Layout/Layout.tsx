@@ -16,7 +16,8 @@ import {
   ArrowRightOnRectangleIcon,
   ChartBarIcon,
   ExclamationTriangleIcon,
-  ServerStackIcon
+  ServerStackIcon,
+  BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 import { VersionBadgeHeader } from '../VersionBadgeHeader';
 
@@ -34,6 +35,8 @@ const navigationConfig = {
     { name: 'Expenses', href: '/expenses', icon: BanknotesIcon },
     { name: 'Scanner', href: '/scanner', icon: QrCodeIcon },
     { name: 'Backups', href: '/backups', icon: ServerStackIcon },
+    { name: '🔧 Patch Manager', href: '/patch-manager', icon: Cog6ToothIcon },
+    { name: '⚙️ Plugin Settings', href: '/plugin-settings', icon: Cog6ToothIcon },
     { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
   ],
   MANAGER: [
@@ -58,23 +61,33 @@ const navigationConfig = {
 export const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [debugInfo, setDebugInfo] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     const user = localStorage.getItem('user');
+    console.log('📋 Layout useEffect - user from localStorage:', user);
     if (user) {
       try {
         const userData = JSON.parse(user);
+        console.log('✅ Parsed user data:', userData);
         setCurrentUser(userData);
+        const roleInfo = `Role: ${userData.role || 'NO_ROLE'}`;
+        setDebugInfo(roleInfo);
+        console.log('🔍 SIDEBAR DEBUG:', roleInfo, userData);
 
         // Redirect worker from dashboard to scanner
         if (userData.role === 'WORKER' && location.pathname === '/dashboard') {
           navigate('/scanner', { replace: true });
         }
       } catch (error) {
-        console.error('Failed to parse user data');
+        console.error('❌ Failed to parse user data', error);
+        setDebugInfo('Parse error');
       }
+    } else {
+      console.warn('⚠️ No user in localStorage');
+      setDebugInfo('No user in localStorage');
     }
   }, [location.pathname, navigate]);
 
@@ -123,29 +136,42 @@ export const Layout: React.FC = () => {
 
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-          {/* Role-based Navigation */}
-          {currentUser?.role && navigationConfig[currentUser.role as keyof typeof navigationConfig]?.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
+          {/* Debug: Show role at top of menu */}
+          {currentUser?.role === 'ADMIN' && (
+            <div className="px-4 py-2 text-xs bg-green-50 text-green-700 rounded mb-2 font-mono">
+              Admin Mode ✓
+            </div>
+          )}
 
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`
-                  flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors
-                  ${active
-                    ? 'bg-primary-50 text-primary-700 border-l-4 border-primary-600'
-                    : 'text-gray-700 hover:bg-gray-100'
-                  }
-                `}
-                onClick={() => setSidebarOpen(false)}
-              >
-                <Icon className={`mr-3 h-5 w-5 ${active ? 'text-primary-600' : 'text-gray-400'}`} />
-                {item.name}
-              </Link>
-            );
-          })}
+          {/* Role-based Navigation */}
+          {currentUser?.role ? (
+            navigationConfig[currentUser.role as keyof typeof navigationConfig]?.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
+
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={`
+                    flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors
+                    ${active
+                      ? 'bg-primary-50 text-primary-700 border-l-4 border-primary-600'
+                      : 'text-gray-700 hover:bg-gray-100'
+                    }
+                  `}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <Icon className={`mr-3 h-5 w-5 ${active ? 'text-primary-600' : 'text-gray-400'}`} />
+                  {item.name}
+                </Link>
+              );
+            })
+          ) : (
+            <div className="px-4 py-2 text-xs text-gray-500">
+              Loading menu...
+            </div>
+          )}
         </nav>
 
         {/* User Profile & Logout */}

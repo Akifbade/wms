@@ -183,6 +183,47 @@
         "kind": "build",
         "isDefault": true
       }
+    },
+    {
+      "label": "💾 Create Complete Plug-and-Play Backup",
+      "type": "shell",
+      "command": "$timestamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'; $backupName = \"WMS_FULL_SYSTEM_$timestamp\"; $backupPath = \"C:\\WMS_FULL_BACKUPS\\$backupName\"; Write-Host ''; Write-Host '================================================' -ForegroundColor Cyan; Write-Host ' WMS COMPLETE PLUG-AND-PLAY SYSTEM BACKUP' -ForegroundColor Cyan; Write-Host '================================================' -ForegroundColor Cyan; Write-Host ''; Write-Host \"Creating: $backupName\" -ForegroundColor Yellow; Write-Host ''; New-Item -ItemType Directory -Path \"$backupPath\\database\" -Force | Out-Null; New-Item -ItemType Directory -Path \"$backupPath\\backend\" -Force | Out-Null; New-Item -ItemType Directory -Path \"$backupPath\\frontend\" -Force | Out-Null; Write-Host '[1/5] Backing up database...' -ForegroundColor Cyan; docker exec wms-database mysqldump -u wms_user -pwmspassword123 --single-transaction --routines --triggers warehouse_wms 2>$null > \"$backupPath\\database\\database.sql\"; Write-Host '  Database backed up' -ForegroundColor Green; Write-Host '[2/5] Backing up backend source...' -ForegroundColor Cyan; Copy-Item -Path 'backend\\*' -Destination \"$backupPath\\backend\\\" -Recurse -Exclude @('node_modules','dist','uploads') -Force; Write-Host '  Backend source backed up' -ForegroundColor Green; Write-Host '[3/5] Backing up uploads...' -ForegroundColor Cyan; if (Test-Path 'backend\\uploads') { Copy-Item -Path 'backend\\uploads' -Destination \"$backupPath\\backend\\\" -Recurse -Force; Write-Host '  Uploads backed up' -ForegroundColor Green } else { Write-Host '  No uploads folder' -ForegroundColor Yellow }; Write-Host '[4/5] Backing up frontend source...' -ForegroundColor Cyan; Copy-Item -Path 'frontend\\*' -Destination \"$backupPath\\frontend\\\" -Recurse -Exclude @('node_modules','dist') -Force; Write-Host '  Frontend source backed up' -ForegroundColor Green; Write-Host '[5/5] Backing up configs...' -ForegroundColor Cyan; Copy-Item -Path 'docker-compose*.yml' -Destination $backupPath -Force -ErrorAction SilentlyContinue; Copy-Item -Path '.env*' -Destination $backupPath -Force -ErrorAction SilentlyContinue; Write-Host '  Configs backed up' -ForegroundColor Green; Write-Host ''; Write-Host 'Compressing to ZIP...' -ForegroundColor Cyan; Compress-Archive -Path \"$backupPath\\*\" -DestinationPath \"$backupPath.zip\" -CompressionLevel Optimal -Force; Remove-Item -Path $backupPath -Recurse -Force; $size = [math]::Round((Get-Item \"$backupPath.zip\").Length / 1MB, 2); Write-Host ''; Write-Host '================================================' -ForegroundColor Green; Write-Host ' COMPLETE BACKUP CREATED SUCCESSFULLY!' -ForegroundColor Green; Write-Host '================================================' -ForegroundColor Green; Write-Host ''; Write-Host \"Location: $backupPath.zip\" -ForegroundColor Cyan; Write-Host \"Size: $size MB\" -ForegroundColor Cyan; Write-Host ''; Write-Host 'This backup includes:' -ForegroundColor Yellow; Write-Host '  - Complete backend + frontend source code' -ForegroundColor White; Write-Host '  - Full database with all data' -ForegroundColor White; Write-Host '  - All uploads and user files' -ForegroundColor White; Write-Host '  - Docker configurations' -ForegroundColor White; Write-Host ''; Write-Host 'To restore: Extract ZIP and run docker-compose up -d --build' -ForegroundColor Green; Write-Host ''",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "🔢 AUTO-VERSION: Increment Version Number",
+      "type": "shell",
+      "command": ".vscode\\auto-version.ps1",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "🚀 AUTO-VERSION: Build & Deploy (Quick)",
+      "type": "shell",
+      "command": "Write-Host '🔢 Auto-incrementing version...' -ForegroundColor Cyan; .vscode\\auto-version.ps1; Write-Host '🔨 Building frontend...' -ForegroundColor Cyan; cd frontend; npm run build; cd ..; Write-Host '📦 Deploying to Docker...' -ForegroundColor Cyan; docker cp frontend/dist/. wms-frontend:/usr/share/nginx/html/; docker exec wms-frontend nginx -s reload; Write-Host '✅ Deploy complete! Press Ctrl+Shift+R in browser to see changes.' -ForegroundColor Green; Write-Host ''; (Get-Content frontend/src/config/version.ts | Select-String 'APP_VERSION') -replace \".*'(.*)'.*\", 'New version: $1' | Write-Host -ForegroundColor Yellow",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "🔄 AUTO-VERSION: Rebuild Docker (Full)",
+      "type": "shell",
+      "command": "Write-Host '🔢 Auto-incrementing version...' -ForegroundColor Cyan; .vscode\\auto-version.ps1; Write-Host '🔨 Rebuilding Docker container...' -ForegroundColor Cyan; docker-compose build --no-cache frontend; docker-compose up -d frontend; Start-Sleep -Seconds 5; Write-Host '✅ Full rebuild complete! Press Ctrl+Shift+R in browser.' -ForegroundColor Green; Write-Host ''; (Get-Content frontend/src/config/version.ts | Select-String 'APP_VERSION') -replace \".*'(.*)'.*\", 'New version: $1' | Write-Host -ForegroundColor Yellow",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
     }
   ]
 }

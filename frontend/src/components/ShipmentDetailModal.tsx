@@ -1,5 +1,29 @@
 import { useState, useEffect } from 'react';
 import { shipmentsAPI } from '../services/api';
+import LiveChargesPreview from './LiveChargesPreview';
+import { ShipmentPhoto } from './ShipmentPhoto';
+
+// Wrapper component for safe rendering
+function SafeLiveCharges({ shipmentId }: { shipmentId: string }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <p className="text-yellow-700 text-sm">
+          ⚠️ Live charges preview temporarily unavailable. Contact support if this persists.
+        </p>
+      </div>
+    );
+  }
+
+  try {
+    return <LiveChargesPreview shipmentId={shipmentId} />;
+  } catch (error) {
+    setHasError(true);
+    return null;
+  }
+}
 
 interface ShipmentDetailModalProps {
   isOpen: boolean;
@@ -9,10 +33,11 @@ interface ShipmentDetailModalProps {
 
 interface BoxDistributionProps {
   shipmentId: string;
+  shipmentStatus?: string; // Pass status from parent
 }
 
 // Box Distribution Component
-function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
+function BoxDistributionSection({ shipmentId, shipmentStatus }: BoxDistributionProps) {
   const [boxes, setBoxes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [rackDistribution, setRackDistribution] = useState<Record<string, any[]>>({});
@@ -184,16 +209,25 @@ function BoxDistributionSection({ shipmentId }: BoxDistributionProps) {
         })}
       </div>
 
-      {/* Photo Gallery */}
+      {/* Photo Gallery with RELEASED stamp */}
       {photoUrls.length > 0 && (
         <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
-          <p className="text-sm font-semibold text-gray-700 mb-2">Photos ({photoUrls.length})</p>
+          <p className="text-sm font-semibold text-gray-700 mb-2">
+            Photos ({photoUrls.length})
+            {shipmentStatus === 'RELEASED' && (
+              <span className="ml-2 text-red-600 text-xs font-bold">● RELEASED</span>
+            )}
+          </p>
           <div className="grid grid-cols-4 gap-2">
             {photoUrls.map((url, idx) => (
-              <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="group relative block aspect-square rounded-lg overflow-hidden border-2 border-blue-200 hover:border-blue-500 transition-all">
-                <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors"></div>
-              </a>
+              <ShipmentPhoto
+                key={idx}
+                photoUrl={url}
+                index={idx}
+                status={shipmentStatus as 'RELEASED' | 'ACTIVE' | 'PARTIAL' | 'IN_STORAGE' | undefined}
+                showStamp={true}
+                className="aspect-square"
+              />
             ))}
           </div>
         </div>
@@ -560,7 +594,14 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
               )}
 
               {/* Box Distribution Tree - NEW ENHANCED SECTION */}
-              <BoxDistributionSection shipmentId={shipmentId} />
+              <BoxDistributionSection shipmentId={shipmentId} shipmentStatus={shipment.status} />
+
+              {/* Live Charges Preview - NEW */}
+              {shipment.status !== 'RELEASED' && (
+                <div className="mt-6">
+                  <SafeLiveCharges shipmentId={shipmentId} />
+                </div>
+              )}
 
               {/* Description & Notes */}
               {(shipment.description || shipment.notes) && (

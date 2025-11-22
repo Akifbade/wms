@@ -654,19 +654,19 @@ const backupsAPI = {
       method: 'GET',
     });
   },
-  
+
   create: async () => {
     return apiCall<{ success: boolean; message: string; backup: any }>('/backups/create', {
       method: 'POST',
     });
   },
-  
+
   delete: async (filename: string) => {
     return apiCall<{ success: boolean; message: string }>(`/backups/${filename}`, {
       method: 'DELETE',
     });
   },
-  
+
   download: async (filename: string) => {
     // Note: Download is handled via fetch in component for blob handling
     return `/api/backups/download/${filename}`;

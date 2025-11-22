@@ -1532,8 +1532,8 @@ export const Racks: React.FC = () => {
                       onClick={() => handleToggleRack(rack.id)}
                       className={`
                         relative bg-white border-2 rounded-xl p-4 text-center cursor-pointer transition-all
-                        ${isSelected 
-                          ? 'border-purple-600 shadow-lg ring-2 ring-purple-300' 
+                        ${isSelected
+                          ? 'border-purple-600 shadow-lg ring-2 ring-purple-300'
                           : 'border-gray-200 hover:border-purple-400 hover:shadow-md'
                         }
                       `}
@@ -1541,8 +1541,8 @@ export const Racks: React.FC = () => {
                       {/* Checkbox Indicator */}
                       <div className={`
                         absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all
-                        ${isSelected 
-                          ? 'bg-purple-600 border-purple-600' 
+                        ${isSelected
+                          ? 'bg-purple-600 border-purple-600'
                           : 'bg-white border-gray-300'
                         }
                       `}>

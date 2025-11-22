@@ -12,6 +12,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { dashboardAPI } from '../../services/api';
 import MovingJobsManager from '../../components/moving-jobs/MovingJobsManager';
+import { usePatchEnabled } from '../../contexts/PatchContext';
 
 export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<any>(null);
@@ -22,6 +23,7 @@ export const Dashboard: React.FC = () => {
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const analyticsEnabled = usePatchEnabled('dashboard-safe-analytics');
 
   useEffect(() => {
     loadDashboardData();
@@ -67,64 +69,64 @@ export const Dashboard: React.FC = () => {
   }
 
   const statsCards = [
-    { 
-      name: 'Total Revenue', 
-      value: `${stats?.invoiceRevenue?.total?.toFixed(2) || '0.00'} KWD`, 
+    {
+      name: 'Total Revenue',
+      value: `${stats?.invoiceRevenue?.total?.toFixed(2) || '0.00'} KWD`,
       subtitle: `${stats?.invoiceRevenue?.count || 0} invoices`,
-      icon: CurrencyDollarIcon, 
-      color: 'bg-blue-500' 
+      icon: CurrencyDollarIcon,
+      color: 'bg-blue-500'
     },
-    { 
-      name: 'Paid Amount', 
-      value: `${stats?.invoiceRevenue?.paid?.toFixed(2) || '0.00'} KWD`, 
+    {
+      name: 'Paid Amount',
+      value: `${stats?.invoiceRevenue?.paid?.toFixed(2) || '0.00'} KWD`,
       subtitle: `${stats?.invoiceRevenue?.paidCount || 0} paid invoices`,
-      icon: BanknotesIcon, 
-      color: 'bg-green-500' 
+      icon: BanknotesIcon,
+      color: 'bg-green-500'
     },
-    { 
-      name: 'Outstanding', 
-      value: `${stats?.invoiceRevenue?.outstanding?.toFixed(2) || '0.00'} KWD`, 
+    {
+      name: 'Outstanding',
+      value: `${stats?.invoiceRevenue?.outstanding?.toFixed(2) || '0.00'} KWD`,
       subtitle: 'Pending payments',
-      icon: ArrowTrendingUpIcon, 
-      color: 'bg-yellow-500' 
+      icon: ArrowTrendingUpIcon,
+      color: 'bg-yellow-500'
     },
-    { 
-      name: 'This Month', 
-      value: `${stats?.thisMonthRevenue?.amount?.toFixed(2) || '0.00'} KWD`, 
+    {
+      name: 'This Month',
+      value: `${stats?.thisMonthRevenue?.amount?.toFixed(2) || '0.00'} KWD`,
       subtitle: 'Current month revenue',
-      icon: ChartBarIcon, 
-      color: 'bg-purple-500' 
+      icon: ChartBarIcon,
+      color: 'bg-purple-500'
     },
   ];
 
   const quickStats = [
-    { 
-      name: 'Active Shipments', 
-      value: stats?.shipments?.active || 0, 
+    {
+      name: 'Active Shipments',
+      value: stats?.shipments?.active || 0,
       total: stats?.shipments?.total || 0,
-      icon: CubeIcon, 
-      color: 'text-blue-600' 
+      icon: CubeIcon,
+      color: 'text-blue-600'
     },
-    { 
-      name: 'Rack Utilization', 
-      value: `${stats?.racks?.utilization || 0}%`, 
+    {
+      name: 'Rack Utilization',
+      value: `${stats?.racks?.utilization || 0}%`,
       total: `${stats?.racks?.active || 0} active`,
-      icon: UserGroupIcon, 
-      color: 'text-green-600' 
+      icon: UserGroupIcon,
+      color: 'text-green-600'
     },
-    { 
-      name: 'Jobs In Progress', 
-      value: stats?.jobs?.inProgress || 0, 
+    {
+      name: 'Jobs In Progress',
+      value: stats?.jobs?.inProgress || 0,
       total: `${stats?.jobs?.scheduled || 0} scheduled`,
-      icon: TruckIcon, 
-      color: 'text-yellow-600' 
+      icon: TruckIcon,
+      color: 'text-yellow-600'
     },
-    { 
-      name: 'Withdrawals (Month)', 
-      value: stats?.withdrawals?.thisMonth || 0, 
+    {
+      name: 'Withdrawals (Month)',
+      value: stats?.withdrawals?.thisMonth || 0,
       total: `${stats?.withdrawals?.total || 0} total`,
-      icon: ArrowPathIcon, 
-      color: 'text-purple-600' 
+      icon: ArrowPathIcon,
+      color: 'text-purple-600'
     },
   ];
 
@@ -152,27 +154,36 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statsCards.map((stat: any) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.name} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-500">{stat.name}</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
-                  <p className="text-sm text-gray-600 mt-2">
-                    {stat.subtitle}
-                  </p>
-                </div>
-                <div className={`${stat.color} p-3 rounded-lg`}>
-                  <Icon className="h-6 w-6 text-white" />
+      {analyticsEnabled ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {statsCards.map((stat: any) => {
+            const Icon = stat.icon;
+            return (
+              <div key={stat.name} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-500">{stat.name}</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
+                    <p className="text-sm text-gray-600 mt-2">
+                      {stat.subtitle}
+                    </p>
+                  </div>
+                  <div className={`${stat.color} p-3 rounded-lg`}>
+                    <Icon className="h-6 w-6 text-white" />
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-yellow-900">Analytics temporarily disabled</h3>
+          <p className="text-yellow-800 mt-2 text-sm">
+            We turned off dashboard revenue widgets because the <span className="font-semibold">dashboard-safe-analytics</span> patch is inactive. Core operations continue normally.
+          </p>
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -194,68 +205,70 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Shipment Status Breakdown */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <CubeIcon className="h-6 w-6 mr-2 text-blue-600" />
-          📊 Shipment Status Breakdown
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-gray-400">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600">Total Shipments</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{stats?.shipmentStatusBreakdown?.total || 0}</p>
+      {analyticsEnabled && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <CubeIcon className="h-6 w-6 mr-2 text-blue-600" />
+            📊 Shipment Status Breakdown
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-gray-400">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-gray-600">Total Shipments</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">{stats?.shipmentStatusBreakdown?.total || 0}</p>
+                </div>
+                <div className="text-4xl">📦</div>
               </div>
-              <div className="text-4xl">📦</div>
             </div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-yellow-500">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600">Pending</p>
-                <p className="text-3xl font-bold text-yellow-600 mt-1">{stats?.shipmentStatusBreakdown?.pending || 0}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {stats?.shipmentStatusBreakdown?.total > 0 
-                    ? Math.round((stats?.shipmentStatusBreakdown?.pending / stats?.shipmentStatusBreakdown?.total) * 100)
-                    : 0}% of total
-                </p>
-              </div>
-              <div className="text-4xl">🟡</div>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600">In Storage</p>
-                <p className="text-3xl font-bold text-green-600 mt-1">{stats?.shipmentStatusBreakdown?.inStorage || 0}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {stats?.shipmentStatusBreakdown?.total > 0 
-                    ? Math.round((stats?.shipmentStatusBreakdown?.inStorage / stats?.shipmentStatusBreakdown?.total) * 100)
-                    : 0}% of total
-                </p>
+            <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-yellow-500">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-gray-600">Pending</p>
+                  <p className="text-3xl font-bold text-yellow-600 mt-1">{stats?.shipmentStatusBreakdown?.pending || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {stats?.shipmentStatusBreakdown?.total > 0
+                      ? Math.round((stats?.shipmentStatusBreakdown?.pending / stats?.shipmentStatusBreakdown?.total) * 100)
+                      : 0}% of total
+                  </p>
+                </div>
+                <div className="text-4xl">🟡</div>
               </div>
-              <div className="text-4xl">🟢</div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600">Released</p>
-                <p className="text-3xl font-bold text-blue-600 mt-1">{stats?.shipmentStatusBreakdown?.released || 0}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {stats?.shipmentStatusBreakdown?.total > 0 
-                    ? Math.round((stats?.shipmentStatusBreakdown?.released / stats?.shipmentStatusBreakdown?.total) * 100)
-                    : 0}% of total
-                </p>
+            <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-gray-600">In Storage</p>
+                  <p className="text-3xl font-bold text-green-600 mt-1">{stats?.shipmentStatusBreakdown?.inStorage || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {stats?.shipmentStatusBreakdown?.total > 0
+                      ? Math.round((stats?.shipmentStatusBreakdown?.inStorage / stats?.shipmentStatusBreakdown?.total) * 100)
+                      : 0}% of total
+                  </p>
+                </div>
+                <div className="text-4xl">🟢</div>
               </div>
-              <div className="text-4xl">🔵</div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-gray-600">Released</p>
+                  <p className="text-3xl font-bold text-blue-600 mt-1">{stats?.shipmentStatusBreakdown?.released || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {stats?.shipmentStatusBreakdown?.total > 0
+                      ? Math.round((stats?.shipmentStatusBreakdown?.released / stats?.shipmentStatusBreakdown?.total) * 100)
+                      : 0}% of total
+                  </p>
+                </div>
+                <div className="text-4xl">🔵</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -279,7 +292,7 @@ export const Dashboard: React.FC = () => {
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Pie>
-                <Tooltip 
+                <Tooltip
                   formatter={(value: any, _name: any, props: any) => [
                     `${value} / ${props.payload.total} (${props.payload.utilization}%)`,
                     'Capacity Used'
@@ -327,7 +340,7 @@ export const Dashboard: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Recent Activities</h3>
-          <button 
+          <button
             onClick={loadDashboardData}
             className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
           >
@@ -382,9 +395,8 @@ export const Dashboard: React.FC = () => {
                     <div className="text-sm text-gray-500">{shipment.clientName} • {shipment.currentBoxCount} boxes</div>
                   </div>
                   <div className="text-right">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      shipment.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${shipment.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>
                       {shipment.status}
                     </span>
                   </div>
@@ -409,9 +421,8 @@ export const Dashboard: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <div className="text-sm text-gray-500">{new Date(job.scheduledDate).toLocaleDateString()}</div>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      job.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${job.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
                       {job.status.replace('_', ' ')}
                     </span>
                   </div>

@@ -52,6 +52,15 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
     shipperPhone: '',
     consigneePhone: '',
     warehouseNotes: '',
+    // Dimensions & Pricing fields
+    length: 0,  // cm
+    width: 0,   // cm
+    height: 0,  // cm
+    weight: 0,  // kg
+    customRateEnabled: false,
+    customRatePerCBMPerDay: 0,
+    customRatePerBoxPerDay: 0,
+    customRateNotes: '',
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -97,6 +106,15 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
         shipperPhone: '',
         consigneePhone: '',
         warehouseNotes: '',
+        // Dimensions & Pricing fields
+        length: 0,
+        width: 0,
+        height: 0,
+        weight: 0,
+        customRateEnabled: false,
+        customRatePerCBMPerDay: 0,
+        customRatePerBoxPerDay: 0,
+        customRateNotes: '',
       });
       setCustomFieldValues({});
       setError('');
@@ -144,7 +162,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
 
   const renderCustomField = (field: CustomField) => {
     const value = customFieldValues[field.id] || '';
-    
+
     switch (field.fieldType) {
       case 'TEXT':
         return (
@@ -158,7 +176,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
             required={field.isRequired}
           />
         );
-      
+
       case 'NUMBER':
         return (
           <input
@@ -171,7 +189,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
             required={field.isRequired}
           />
         );
-      
+
       case 'DATE':
         return (
           <input
@@ -183,7 +201,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
             required={field.isRequired}
           />
         );
-      
+
       case 'DROPDOWN':
         return (
           <select
@@ -199,7 +217,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
             ))}
           </select>
         );
-      
+
       case 'CHECKBOX':
         return (
           <div className="flex items-center">
@@ -215,7 +233,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
             </label>
           </div>
         );
-      
+
       default:
         return (
           <input
@@ -235,8 +253,16 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name.includes('Count') || name === 'estimatedValue' ? Number(value) : value
+      [name]: name.includes('Count') || name === 'estimatedValue' || name === 'length' || name === 'width' || name === 'height' || name === 'weight' || name.includes('Rate') ? Number(value) : value
     }));
+  };
+
+  // Calculate CBM from dimensions
+  const calculateCBM = () => {
+    if (formData.length > 0 && formData.width > 0 && formData.height > 0) {
+      return ((formData.length * formData.width * formData.height) / 1000000).toFixed(3);
+    }
+    return '0.000';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -267,12 +293,26 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
         }
       }
 
+      // Validate custom pricing
+      if (formData.customRateEnabled && !formData.customRatePerCBMPerDay && !formData.customRatePerBoxPerDay) {
+        throw new Error('Please set at least one custom rate (CBM or Box)');
+      }
+
       // Set currentBoxCount = totalBoxCount if not specified
       const dataToSubmit = {
         ...formData,
         currentBoxCount: formData.currentBoxCount > 0 ? formData.currentBoxCount : formData.totalBoxCount,
         status: formData.rackId ? 'IN_STORAGE' : 'PENDING', // PENDING if no rack assigned yet
         rackId: formData.rackId || undefined, // Optional rack assignment
+        // Dimensions & Pricing (only include if set)
+        length: formData.length > 0 ? formData.length : undefined,
+        width: formData.width > 0 ? formData.width : undefined,
+        height: formData.height > 0 ? formData.height : undefined,
+        weight: formData.weight > 0 ? formData.weight : undefined,
+        customRateEnabled: formData.customRateEnabled,
+        customRatePerCBMPerDay: formData.customRateEnabled && formData.customRatePerCBMPerDay > 0 ? formData.customRatePerCBMPerDay : undefined,
+        customRatePerBoxPerDay: formData.customRateEnabled && formData.customRatePerBoxPerDay > 0 ? formData.customRatePerBoxPerDay : undefined,
+        customRateNotes: formData.customRateEnabled && formData.customRateNotes ? formData.customRateNotes : undefined,
         // Include warehouse data if it's a warehouse shipment
         warehouseData: formData.isWarehouseShipment ? JSON.stringify({
           shipper: formData.shipper,
@@ -300,9 +340,9 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${localStorage.getItem('authToken')}`
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               rackId: formData.rackId,
-              boxNumbers 
+              boxNumbers
             })
           });
         } catch (err) {
@@ -334,7 +374,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
           }
         }
       }
-      
+
       if (formData.rackId && formData.assignBoxCount > 0) {
         setSuccess(`✅ Shipment created! ${formData.assignBoxCount} boxes assigned to rack!`);
       } else if (formData.rackId) {
@@ -342,7 +382,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
       } else {
         setSuccess('Shipment created! Worker can scan to assign boxes. 📦');
       }
-      
+
       setTimeout(() => {
         onSuccess();
         onClose();
@@ -630,10 +670,182 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
             </div>
           </div>
 
+          {/* Dimensions & CBM Pricing */}
+          <div className="border-b pb-4">
+            <h3 className="text-lg font-semibold mb-2 text-gray-700">📏 Dimensions & Pricing</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Enter dimensions for CBM-based pricing or leave empty for box-based pricing
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Length (cm)
+                </label>
+                <input
+                  type="number"
+                  name="length"
+                  value={formData.length || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="120"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Width (cm)
+                </label>
+                <input
+                  type="number"
+                  name="width"
+                  value={formData.width || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="80"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Height (cm)
+                </label>
+                <input
+                  type="number"
+                  name="height"
+                  value={formData.height || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="100"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Weight (kg)
+                </label>
+                <input
+                  type="number"
+                  name="weight"
+                  value={formData.weight || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="50"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+            </div>
+
+            {/* Auto-calculated CBM Display */}
+            {formData.length > 0 && formData.width > 0 && formData.height > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-green-800 font-medium">
+                      📦 Auto-calculated CBM (Cubic Meters):
+                    </p>
+                    <p className="text-xs text-green-700 mt-1">
+                      ({formData.length} × {formData.width} × {formData.height}) ÷ 1,000,000
+                    </p>
+                  </div>
+                  <p className="text-2xl font-bold text-green-700">
+                    {calculateCBM()} m³
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Custom Pricing */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="customRateEnabled"
+                  name="customRateEnabled"
+                  checked={formData.customRateEnabled}
+                  onChange={(e) => setFormData(prev => ({ ...prev, customRateEnabled: e.target.checked }))}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="customRateEnabled" className="text-sm font-medium text-gray-700">
+                  💰 Enable Custom Pricing (Different rate for this customer/shipment)
+                </label>
+              </div>
+
+              {formData.customRateEnabled && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
+                  <p className="text-sm text-yellow-800 font-medium">
+                    Set custom rate (overrides company default):
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Rate per CBM per Day (KWD)
+                      </label>
+                      <input
+                        type="number"
+                        name="customRatePerCBMPerDay"
+                        value={formData.customRatePerCBMPerDay || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        placeholder="5.000"
+                        min="0"
+                        step="0.001"
+                      />
+                      <p className="text-xs text-gray-600 mt-1">
+                        Used if dimensions provided
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Rate per Box per Day (KWD)
+                      </label>
+                      <input
+                        type="number"
+                        name="customRatePerBoxPerDay"
+                        value={formData.customRatePerBoxPerDay || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        placeholder="0.500"
+                        min="0"
+                        step="0.001"
+                      />
+                      <p className="text-xs text-gray-600 mt-1">
+                        Fallback if no dimensions
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Custom Rate Notes
+                    </label>
+                    <textarea
+                      name="customRateNotes"
+                      value={formData.customRateNotes}
+                      onChange={handleChange}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                      placeholder="VIP customer special rate, bulk discount, etc."
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Rack Assignment */}
           <div className="border-b pb-4">
             <h3 className="text-lg font-semibold mb-4 text-gray-700">Rack Assignment (Optional)</h3>
-            
+
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
               <p className="text-sm text-blue-800">
                 💡 <strong>Tip:</strong> You can skip rack assignment now. Workers can scan QR codes to assign racks later using the Scanner.

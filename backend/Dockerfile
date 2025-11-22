@@ -4,8 +4,8 @@ FROM node:18-slim
 
 WORKDIR /app
 
-# Install OpenSSL for Prisma
-RUN apt-get update -y && apt-get install -y openssl
+# Install OpenSSL for Prisma and MySQL client for backups
+RUN apt-get update -y && apt-get install -y openssl default-mysql-client && rm -rf /var/lib/apt/lists/*
 
 # Clean any existing node_modules and dist folder
 RUN rm -rf node_modules package-lock.json dist 2>/dev/null || true

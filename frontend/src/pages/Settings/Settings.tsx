@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { 
-  CogIcon, 
-  BuildingOfficeIcon, 
-  UserGroupIcon, 
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import {
+  CogIcon,
+  BuildingOfficeIcon,
+  UserGroupIcon,
   DocumentTextIcon,
   CurrencyDollarIcon,
   DevicePhoneMobileIcon,
@@ -107,7 +107,30 @@ const settingsNavigation: SettingsNavItem[] = [
 ];
 
 export const Settings: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeSection, setActiveSection] = useState('company');
+
+  // Extract section from URL path (e.g., /settings/company-profiles -> company-profiles)
+  useEffect(() => {
+    const path = location.pathname;
+    const match = path.match(/\/settings\/([^/]+)/);
+    if (match) {
+      const section = match[1];
+      setActiveSection(section);
+    } else if (path === '/settings') {
+      setActiveSection('company');
+    }
+  }, [location.pathname]);
+
+  const handleSectionClick = (id: string) => {
+    setActiveSection(id);
+    if (id === 'company') {
+      navigate('/settings');
+    } else {
+      navigate(`/settings/${id}`);
+    }
+  };
 
   return (
     <div className="flex h-full bg-gray-50">
@@ -129,32 +152,29 @@ export const Settings: React.FC = () => {
           {settingsNavigation.map((item) => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;
-            
+
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveSection(item.id)}
+                onClick={() => handleSectionClick(item.id)}
                 className={`
                   w-full text-left p-4 rounded-lg transition-all duration-200
-                  ${isActive 
-                    ? 'bg-primary-50 border border-primary-200 text-primary-700' 
+                  ${isActive
+                    ? 'bg-primary-50 border border-primary-200 text-primary-700'
                     : 'hover:bg-gray-50 text-gray-700 border border-transparent'
                   }
                 `}
               >
                 <div className="flex items-start space-x-3">
-                  <Icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
-                    isActive ? 'text-primary-600' : 'text-gray-400'
-                  }`} />
+                  <Icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${isActive ? 'text-primary-600' : 'text-gray-400'
+                    }`} />
                   <div className="flex-1 min-w-0">
-                    <p className={`font-medium ${
-                      isActive ? 'text-primary-900' : 'text-gray-900'
-                    }`}>
+                    <p className={`font-medium ${isActive ? 'text-primary-900' : 'text-gray-900'
+                      }`}>
                       {item.name}
                     </p>
-                    <p className={`text-sm mt-1 ${
-                      isActive ? 'text-primary-600' : 'text-gray-500'
-                    }`}>
+                    <p className={`text-sm mt-1 ${isActive ? 'text-primary-600' : 'text-gray-500'
+                      }`}>
                       {item.description}
                     </p>
                   </div>

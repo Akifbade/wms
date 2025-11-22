@@ -32,7 +32,7 @@ const damagePhotoUpload = multer({
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
-    
+
     if (mimetype && extname) {
       cb(null, true);
     } else {
@@ -51,7 +51,7 @@ const damagePhotoUpload = multer({
 router.get("/categories", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
-    
+
     const categories = await prisma.materialCategory.findMany({
       where: { companyId },
       include: {
@@ -64,7 +64,7 @@ router.get("/categories", authenticateToken as any, async (req: AuthRequest, res
       },
       orderBy: { name: "asc" },
     });
-    
+
     res.json(categories);
   } catch (error) {
     console.error("Error fetching categories:", error);
@@ -101,6 +101,81 @@ router.post("/categories", authenticateToken as any, async (req: AuthRequest, re
   }
 });
 
+/**
+ * PUT /api/materials/categories/:id
+ * Update a material category
+ */
+router.put("/categories/:id", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    const { id } = req.params;
+    const { name, description, parentId } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: "Category name is required" });
+    }
+
+    const category = await prisma.materialCategory.update({
+      where: { id, companyId },
+      data: {
+        name,
+        description,
+        parentId: parentId || null,
+      },
+    });
+
+    res.json(category);
+  } catch (error: any) {
+    console.error("Error updating category:", error);
+    res.status(500).json({ error: "Failed to update category" });
+  }
+});
+
+/**
+ * DELETE /api/materials/categories/:id
+ * Delete a material category
+ */
+router.delete("/categories/:id", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId, role } = req.user!;
+    const { id } = req.params;
+
+    if (role !== 'ADMIN') {
+      return res.status(403).json({ error: "Only admins can delete categories" });
+    }
+
+    // Check if category has materials
+    const category = await prisma.materialCategory.findUnique({
+      where: { id, companyId },
+      include: {
+        _count: { select: { materials: true } },
+        children: { select: { id: true } } // Check for subcategories too
+      }
+    });
+
+    if (!category) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+
+    if (category._count.materials > 0) {
+      return res.status(400).json({ error: "Cannot delete category containing materials" });
+    }
+
+    if (category.children.length > 0) {
+      return res.status(400).json({ error: "Cannot delete category containing subcategories" });
+    }
+
+    await prisma.materialCategory.delete({
+      where: { id },
+    });
+
+    res.json({ message: "Category deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting category:", error);
+    res.status(500).json({ error: "Failed to delete category" });
+  }
+});
+
 // ==================== PACKING MATERIALS ====================
 
 /**
@@ -110,7 +185,7 @@ router.post("/categories", authenticateToken as any, async (req: AuthRequest, re
 router.get("/", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
-    
+
     if (!companyId) {
       return res.status(400).json({ error: "Company not found" });
     }
@@ -125,7 +200,7 @@ router.get("/", authenticateToken as any, async (req: AuthRequest, res) => {
           }
         },
         stockBatches: {
-          select: { 
+          select: {
             id: true,
             quantityRemaining: true,
             unitCost: true,
@@ -183,13 +258,13 @@ router.get("/job-materials/:jobId", authenticateToken as any, async (req: AuthRe
 router.get("/available-racks", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
-    
+
     if (!companyId) {
       return res.status(400).json({ error: "Company not found" });
     }
 
     const racks = await prisma.rack.findMany({
-      where: { 
+      where: {
         companyId,
         status: "ACTIVE"
       },
@@ -258,6 +333,97 @@ router.post("/", authenticateToken as any, async (req: AuthRequest, res) => {
   }
 });
 
+/**
+ * PUT /api/materials/:id
+ * Update a packing material
+ */
+router.put("/:id", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    const { id } = req.params;
+    const { sku, name, description, unit, categoryId, minStockLevel, unitCost, sellingPrice, isActive } = req.body;
+
+    if (!sku || !name) {
+      return res.status(400).json({ error: "SKU and Name are required" });
+    }
+
+    const material = await prisma.packingMaterial.update({
+      where: { id, companyId },
+      data: {
+        sku,
+        name,
+        description,
+        unit,
+        categoryId,
+        minStockLevel,
+        unitCost,
+        sellingPrice,
+        isActive
+      },
+    });
+
+    res.json(material);
+  } catch (error: any) {
+    console.error("Error updating material:", error);
+    if (error.code === "P2002") {
+      return res.status(400).json({ error: "SKU already exists for this company" });
+    }
+    res.status(500).json({ error: "Failed to update material" });
+  }
+});
+
+/**
+ * DELETE /api/materials/:id
+ * Delete a packing material
+ */
+router.delete("/:id", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId, role } = req.user!;
+    const { id } = req.params;
+
+    if (role !== 'ADMIN') {
+      return res.status(403).json({ error: "Only admins can delete materials" });
+    }
+
+    const material = await prisma.packingMaterial.findUnique({
+      where: { id, companyId },
+    });
+
+    if (!material) {
+      return res.status(404).json({ error: "Material not found" });
+    }
+
+    if (material.totalQuantity > 0) {
+      return res.status(400).json({ error: "Cannot delete material with existing stock" });
+    }
+
+    // Check if material has been used in transactions (optional but good practice)
+    // For now, we just check stock as requested.
+    // But we should probably check if there are any related records that would violate foreign keys.
+    // Prisma might throw an error if we delete and there are related records.
+    // Let's try to delete and catch the error.
+
+    try {
+      await prisma.packingMaterial.delete({
+        where: { id },
+      });
+      res.json({ message: "Material deleted successfully" });
+    } catch (deleteError: any) {
+      if (deleteError.code === 'P2003') { // Foreign key constraint failed
+        // If we can't delete, maybe we should just deactivate it?
+        // But the user asked for delete.
+        // If it's used in history, we can't delete it.
+        return res.status(400).json({ error: "Cannot delete material because it has transaction history. Try deactivating it instead." });
+      }
+      throw deleteError;
+    }
+
+  } catch (error: any) {
+    console.error("Error deleting material:", error);
+    res.status(500).json({ error: "Failed to delete material" });
+  }
+});
+
 // ==================== STOCK BATCHES ====================
 
 /**
@@ -307,10 +473,10 @@ router.post("/stock", authenticateToken as any, async (req: AuthRequest, res) =>
         companyId,
         purchaseDate: new Date(),
       },
-      include: { 
-        material: { 
-          select: { sku: true, name: true, unit: true } 
-        } 
+      include: {
+        material: {
+          select: { sku: true, name: true, unit: true }
+        }
       },
     });
 
@@ -442,7 +608,7 @@ router.post("/issues", authenticateToken as any, async (req: AuthRequest, res) =
         notes,
         companyId,
       },
-      include: { 
+      include: {
         material: true,
         rack: {
           select: { id: true, code: true, location: true }
@@ -500,7 +666,7 @@ router.post("/returns", authenticateToken as any, async (req: AuthRequest, res) 
         notes,
         companyId,
       },
-      include: { 
+      include: {
         material: true,
         rack: {
           select: { id: true, code: true, location: true }
@@ -692,11 +858,11 @@ router.get("/reports/stock-summary", authenticateToken as any, async (req: AuthR
       unit: material.unit,
       totalQuantity: material.totalQuantity,
       minStockLevel: material.minStockLevel,
-      stockStatus: material.totalQuantity < material.minStockLevel ? 'LOW' : 
-                   material.totalQuantity === 0 ? 'OUT_OF_STOCK' : 'ADEQUATE',
+      stockStatus: material.totalQuantity < material.minStockLevel ? 'LOW' :
+        material.totalQuantity === 0 ? 'OUT_OF_STOCK' : 'ADEQUATE',
       activeBatches: material.stockBatches.length,
-      avgUnitCost: material.stockBatches.length > 0 
-        ? material.stockBatches.reduce((sum, b) => sum + b.unitCost, 0) / material.stockBatches.length 
+      avgUnitCost: material.stockBatches.length > 0
+        ? material.stockBatches.reduce((sum, b) => sum + b.unitCost, 0) / material.stockBatches.length
         : material.unitCost || 0,
       totalValue: material.totalQuantity * (material.unitCost || 0)
     }));
@@ -725,8 +891,8 @@ router.get("/reports/low-stock", authenticateToken as any, async (req: AuthReque
     const { companyId } = req.user!;
 
     const lowStockMaterials = await prisma.packingMaterial.findMany({
-      where: { 
-        companyId, 
+      where: {
+        companyId,
         isActive: true,
         totalQuantity: {
           lt: prisma.packingMaterial.fields.minStockLevel
@@ -773,14 +939,14 @@ router.get("/reports/consumption", authenticateToken as any, async (req: AuthReq
     const { startDate, endDate, materialId } = req.query;
 
     const where: any = { companyId };
-    
+
     if (startDate && endDate) {
       where.usedAt = {
         gte: new Date(startDate as string),
         lte: new Date(endDate as string)
       };
     }
-    
+
     if (materialId) {
       where.materialId = materialId;
     }
@@ -838,14 +1004,14 @@ router.get("/reports/purchase-history", authenticateToken as any, async (req: Au
     const { startDate, endDate, vendorId } = req.query;
 
     const where: any = { companyId };
-    
+
     if (startDate && endDate) {
       where.purchaseDate = {
         gte: new Date(startDate as string),
         lte: new Date(endDate as string)
       };
     }
-    
+
     if (vendorId) {
       where.vendorId = vendorId;
     }
@@ -931,14 +1097,14 @@ router.get("/reports/movement", authenticateToken as any, async (req: AuthReques
     const { startDate, endDate, materialId } = req.query;
 
     const where: any = { companyId };
-    
+
     if (startDate && endDate) {
       where.requestedAt = {
         gte: new Date(startDate as string),
         lte: new Date(endDate as string)
       };
     }
-    
+
     if (materialId) {
       where.materialId = materialId;
     }
@@ -989,10 +1155,10 @@ router.get("/reports/valuation", authenticateToken as any, async (req: AuthReque
     });
 
     const valuation = materials.map(material => {
-      const fifoValue = material.stockBatches.reduce((sum, batch) => 
+      const fifoValue = material.stockBatches.reduce((sum, batch) =>
         sum + (batch.quantityRemaining * batch.unitCost), 0
       );
-      
+
       return {
         id: material.id,
         sku: material.sku,
@@ -1013,8 +1179,8 @@ router.get("/reports/valuation", authenticateToken as any, async (req: AuthReque
 
     const totalValuation = valuation.reduce((sum, v) => sum + v.fifoValue, 0);
 
-    res.json({ 
-      valuation, 
+    res.json({
+      valuation,
       totalValue: totalValuation,
       valuationMethod: 'FIFO'
     });
@@ -1054,14 +1220,14 @@ router.post("/issue", authenticateToken as any, async (req: AuthRequest, res) =>
 
     // Check if enough stock is available
     if (material.totalQuantity < quantity) {
-      return res.status(400).json({ 
-        error: `Insufficient stock. Available: ${material.totalQuantity} ${material.unit}` 
+      return res.status(400).json({
+        error: `Insufficient stock. Available: ${material.totalQuantity} ${material.unit}`
       });
     }
 
     // Get the most recent stock batch for cost calculation
     const latestBatch = await prisma.stockBatch.findFirst({
-      where: { 
+      where: {
         materialId,
         quantityRemaining: { gt: 0 }
       },
@@ -1116,7 +1282,7 @@ router.post("/issue", authenticateToken as any, async (req: AuthRequest, res) =>
       if (remainingToDeduct <= 0) break;
 
       const deductFromBatch = Math.min(batch.quantityRemaining, remainingToDeduct);
-      
+
       await prisma.stockBatch.update({
         where: { id: batch.id },
         data: {
@@ -1149,11 +1315,11 @@ router.post("/issue", authenticateToken as any, async (req: AuthRequest, res) =>
 router.post("/return", authenticateToken as any, damagePhotoUpload.array('photos', 10), async (req: AuthRequest, res) => {
   try {
     const { companyId, id: userId } = req.user!;
-    const { 
-      jobId, 
-      issueId, 
-      damageReason, 
-      notes 
+    const {
+      jobId,
+      issueId,
+      damageReason,
+      notes
     } = req.body;
 
     // Parse numeric values from FormData (they come as strings)
@@ -1178,14 +1344,14 @@ router.post("/return", authenticateToken as any, damagePhotoUpload.array('photos
     // Validate quantities - simple check that returned + damaged doesn't exceed issued
     const totalReturn = quantityGood + quantityDamaged;
     if (totalReturn > issue.quantity) {
-      return res.status(400).json({ 
-        error: `Total returned (${totalReturn}) cannot exceed issued quantity (${issue.quantity})` 
+      return res.status(400).json({
+        error: `Total returned (${totalReturn}) cannot exceed issued quantity (${issue.quantity})`
       });
     }
 
     if (quantityDamaged > 0 && !damageReason) {
-      return res.status(400).json({ 
-        error: "Damage reason is required when damaged quantity > 0" 
+      return res.status(400).json({
+        error: "Damage reason is required when damaged quantity > 0"
       });
     }
 

@@ -23,8 +23,9 @@ router.get('/settings', auth_1.authenticateToken, async (req, res) => {
             settings = await prisma.billingSettings.create({
                 data: {
                     companyId,
-                    storageRateType: 'PER_DAY',
+                    storageRateType: 'PER_BOX', // PER_BOX or PER_CUBIC_METER
                     storageRatePerBox: 0.500,
+                    storageRatePerCBM: 0.500, // NEW: CBM rate support
                     taxRate: 5.0,
                     currency: 'KWD',
                     invoicePrefix: 'INV',
@@ -50,12 +51,14 @@ router.get('/settings', auth_1.authenticateToken, async (req, res) => {
 router.put('/settings', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const companyId = req.user.companyId;
-        const { storageRateType, storageRatePerBox, storageRatePerWeek, storageRatePerMonth, taxEnabled, taxRate, currency, invoicePrefix, invoiceDueDays, gracePeriodDays, minimumCharge, logoUrl, logoPosition, primaryColor, secondaryColor, showCompanyDetails, showBankDetails, showTermsConditions, bankName, accountNumber, accountName, iban, swiftCode, invoiceFooterText, termsAndConditions, paymentInstructions, taxRegistrationNo, companyRegistrationNo, } = req.body;
+        const { storageRateType, storageRatePerBox, storageRatePerCBM, // NEW: CBM rate support
+        storageRatePerWeek, storageRatePerMonth, taxEnabled, taxRate, currency, invoicePrefix, invoiceDueDays, gracePeriodDays, minimumCharge, logoUrl, logoPosition, primaryColor, secondaryColor, showCompanyDetails, showBankDetails, showTermsConditions, bankName, accountNumber, accountName, iban, swiftCode, invoiceFooterText, termsAndConditions, paymentInstructions, taxRegistrationNo, companyRegistrationNo, } = req.body;
         const settings = await prisma.billingSettings.upsert({
             where: { companyId },
             update: {
                 storageRateType,
                 storageRatePerBox,
+                storageRatePerCBM, // NEW: Save CBM rate
                 storageRatePerWeek,
                 storageRatePerMonth,
                 taxEnabled,
@@ -87,6 +90,7 @@ router.put('/settings', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('AD
                 companyId,
                 storageRateType,
                 storageRatePerBox,
+                storageRatePerCBM, // NEW: Save CBM rate on create
                 storageRatePerWeek,
                 storageRatePerMonth,
                 taxEnabled,

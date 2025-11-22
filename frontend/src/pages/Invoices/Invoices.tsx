@@ -9,6 +9,13 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   BuildingStorefrontIcon,
+  ArrowDownTrayIcon,
+  PrinterIcon,
+  CalendarIcon,
+  UserIcon,
+  ChartBarIcon,
+  BanknotesIcon,
+  ReceiptPercentIcon,
 } from '@heroicons/react/24/outline';
 import { billingAPI } from '../../services/api';
 
@@ -19,11 +26,16 @@ export const Invoices: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [warehouseFilter, setWarehouseFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all'); // NEW: Date filter
   const [stats, setStats] = useState({
     total: 0,
     totalAmount: 0,
     paid: 0,
     outstanding: 0,
+    partial: 0,
+    overdue: 0,
+    avgInvoiceAmount: 0, // NEW
+    totalPaid: 0, // NEW
   });
 
   useEffect(() => {
@@ -45,7 +57,7 @@ export const Invoices: React.FC = () => {
       const response: any = await billingAPI.getInvoices(params);
       const invoiceList = Array.isArray(response) ? response : (response.invoices || []);
       setInvoices(invoiceList);
-      
+
       // Calculate stats
       calculateStats(invoiceList);
     } catch (err) {
@@ -58,23 +70,27 @@ export const Invoices: React.FC = () => {
   const calculateStats = (invoiceList: any[]) => {
     const total = invoiceList.length;
     const totalAmount = invoiceList.reduce((sum, inv) => sum + parseFloat(inv.totalAmount || 0), 0);
+    const totalPaid = invoiceList.reduce((sum, inv) => sum + parseFloat(inv.paidAmount || 0), 0);
     const paid = invoiceList.filter(inv => (inv.paymentStatus || inv.status) === 'PAID').length;
+    const partial = invoiceList.filter(inv => (inv.paymentStatus || inv.status) === 'PARTIAL').length;
+    const overdue = invoiceList.filter(inv => (inv.paymentStatus || inv.status) === 'OVERDUE').length;
     const outstanding = invoiceList
       .filter(inv => (inv.paymentStatus || inv.status) !== 'PAID')
       .reduce((sum, inv) => sum + parseFloat(inv.totalAmount || 0) - parseFloat(inv.paidAmount || 0), 0);
+    const avgInvoiceAmount = total > 0 ? totalAmount / total : 0;
 
-    setStats({ total, totalAmount, paid, outstanding });
+    setStats({ total, totalAmount, paid, outstanding, partial, overdue, avgInvoiceAmount, totalPaid });
   };
 
   const getStatusBadge = (status: string) => {
     const styles = {
-      PENDING: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-      PAID: 'bg-green-100 text-green-800 border-green-300',
-      PARTIAL: 'bg-blue-100 text-blue-800 border-blue-300',
-      OVERDUE: 'bg-red-100 text-red-800 border-red-300',
-      CANCELLED: 'bg-gray-100 text-gray-800 border-gray-300',
+      PENDING: 'bg-yellow-100 text-yellow-800 border border-yellow-300',
+      PAID: 'bg-green-100 text-green-800 border border-green-300',
+      PARTIAL: 'bg-blue-100 text-blue-800 border border-blue-300',
+      OVERDUE: 'bg-red-100 text-red-800 border border-red-300',
+      CANCELLED: 'bg-gray-100 text-gray-800 border border-gray-300',
     };
-    
+
     const icons = {
       PENDING: <ClockIcon className="h-4 w-4" />,
       PAID: <CheckCircleIcon className="h-4 w-4" />,
@@ -84,7 +100,7 @@ export const Invoices: React.FC = () => {
     };
 
     return (
-      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${styles[status as keyof typeof styles] || styles.PENDING}`}>
+      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${styles[status as keyof typeof styles] || styles.PENDING}`}>
         {icons[status as keyof typeof icons]}
         {status}
       </span>
@@ -92,85 +108,138 @@ export const Invoices: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50 p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
-          <p className="text-gray-600 mt-1">Manage billing and payment tracking</p>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <DocumentTextIcon className="h-8 w-8 text-gray-700" />
+            Invoices & Billing
+          </h1>
+          <p className="text-gray-600 mt-1">Comprehensive invoice management and payment tracking</p>
+        </div>
+        <div className="flex gap-3">
+          <button className="inline-flex items-center px-5 py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all font-semibold shadow-sm">
+            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+            Export to Excel
+          </button>
+          <button className="inline-flex items-center px-5 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all font-semibold shadow-sm">
+            <PrinterIcon className="h-5 w-5 mr-2" />
+            Print Report
+          </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Invoices</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</p>
+      {/* Enhanced Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-gray-100 rounded-lg">
+              <DocumentTextIcon className="h-7 w-7 text-gray-700" />
             </div>
-            <DocumentTextIcon className="h-10 w-10 text-blue-500" />
+            <ChartBarIcon className="h-5 w-5 text-gray-400" />
           </div>
+          <p className="text-sm font-medium text-gray-600 mb-1">Total Invoices</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
+          <p className="text-xs text-gray-500 mt-2">All time invoices</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Amount</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalAmount.toFixed(3)}</p>
-              <p className="text-xs text-gray-500 mt-1">KWD</p>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-gray-100 rounded-lg">
+              <CurrencyDollarIcon className="h-7 w-7 text-gray-700" />
             </div>
-            <CurrencyDollarIcon className="h-10 w-10 text-green-500" />
+            <BanknotesIcon className="h-5 w-5 text-gray-400" />
           </div>
+          <p className="text-sm font-medium text-gray-600 mb-1">Total Amount</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.totalAmount.toFixed(3)}</p>
+          <p className="text-xs text-gray-500 mt-2">KWD • Avg: {stats.avgInvoiceAmount.toFixed(3)}</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Paid</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">{stats.paid}</p>
-              <p className="text-xs text-gray-500 mt-1">Invoices</p>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-green-50 rounded-lg">
+              <CheckCircleIcon className="h-7 w-7 text-green-600" />
             </div>
-            <CheckCircleIcon className="h-10 w-10 text-green-500" />
+            <ReceiptPercentIcon className="h-5 w-5 text-gray-400" />
           </div>
+          <p className="text-sm font-medium text-gray-600 mb-1">Paid Amount</p>
+          <p className="text-3xl font-bold text-green-600">{stats.totalPaid.toFixed(3)}</p>
+          <p className="text-xs text-gray-500 mt-2">KWD • {stats.paid} invoices paid</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Outstanding</p>
-              <p className="text-3xl font-bold text-red-600 mt-2">{stats.outstanding.toFixed(3)}</p>
-              <p className="text-xs text-gray-500 mt-1">KWD</p>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-red-50 rounded-lg">
+              <ClockIcon className="h-7 w-7 text-red-600" />
             </div>
-            <ClockIcon className="h-10 w-10 text-red-500" />
+            <XCircleIcon className="h-5 w-5 text-gray-400" />
+          </div>
+          <p className="text-sm font-medium text-gray-600 mb-1">Outstanding</p>
+          <p className="text-3xl font-bold text-red-600">{stats.outstanding.toFixed(3)}</p>
+          <p className="text-xs text-gray-500 mt-2">KWD • Overdue: {stats.overdue}</p>
+        </div>
+      </div>
+
+      {/* Quick Stats Bar */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <ChartBarIcon className="h-5 w-5 text-gray-700" />
+            Quick Overview
+          </h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-2xl font-bold text-gray-900">{invoices.filter(i => (i.paymentStatus || i.status) === 'PENDING').length}</p>
+            <p className="text-xs text-gray-600 font-medium mt-1">⏳ Pending</p>
+          </div>
+          <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-2xl font-bold text-green-600">{stats.paid}</p>
+            <p className="text-xs text-gray-600 font-medium mt-1">✅ Paid</p>
+          </div>
+          <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-2xl font-bold text-blue-600">{stats.partial}</p>
+            <p className="text-xs text-gray-600 font-medium mt-1">💰 Partial</p>
+          </div>
+          <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
+            <p className="text-xs text-gray-600 font-medium mt-1">⚠️ Overdue</p>
+          </div>
+          <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-2xl font-bold text-gray-600">{invoices.filter(i => (i.paymentStatus || i.status) === 'CANCELLED').length}</p>
+            <p className="text-xs text-gray-600 font-medium mt-1">❌ Cancelled</p>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="flex flex-col md:flex-row gap-4">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <FunnelIcon className="h-5 w-5 text-gray-600" />
+          <h3 className="text-base font-bold text-gray-900">Filters & Search</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Search */}
-          <div className="flex-1">
+          <div className="lg:col-span-2">
             <div className="relative">
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by invoice number, client name..."
+                placeholder="Search invoice number, client name, phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 text-sm"
               />
             </div>
           </div>
 
           {/* Status Filter */}
-          <div className="flex items-center gap-2">
-            <FunnelIcon className="h-5 w-5 text-gray-400" />
+          <div className="relative">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 text-sm font-medium appearance-none bg-white"
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
@@ -182,12 +251,11 @@ export const Invoices: React.FC = () => {
           </div>
 
           {/* Warehouse Filter */}
-          <div className="flex items-center gap-2">
-            <BuildingStorefrontIcon className="h-5 w-5 text-gray-400" />
+          <div className="relative">
             <select
               value={warehouseFilter}
               onChange={(e) => setWarehouseFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 text-sm font-medium appearance-none bg-white"
             >
               <option value="all">All Types</option>
               <option value="regular">Regular Invoices</option>
@@ -195,39 +263,70 @@ export const Invoices: React.FC = () => {
             </select>
           </div>
         </div>
+
+        {/* Date Range Filter */}
+        <div className="mt-4 flex items-center gap-3">
+          <CalendarIcon className="h-5 w-5 text-gray-500" />
+          <div className="flex gap-2">
+            <button
+              onClick={() => setDateFilter('today')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${dateFilter === 'today' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setDateFilter('week')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${dateFilter === 'week' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              This Week
+            </button>
+            <button
+              onClick={() => setDateFilter('month')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${dateFilter === 'month' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              This Month
+            </button>
+            <button
+              onClick={() => setDateFilter('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${dateFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              All Time
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Invoices Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-800">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                   Invoice #
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                   Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                   Client
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                   Shipment
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount
+                <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                  Total Amount
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                   Paid
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                   Balance
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -236,41 +335,56 @@ export const Invoices: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={9} className="px-6 py-12 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-                    <p className="mt-2 text-gray-600">Loading invoices...</p>
+                    <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-300 border-t-gray-900 mx-auto"></div>
+                    <p className="mt-4 text-gray-600 font-medium">Loading invoices...</p>
                   </td>
                 </tr>
               ) : invoices.length > 0 ? (
-                invoices.map((invoice) => {
+                invoices.map((invoice, index) => {
                   const balance = parseFloat(invoice.totalAmount) - parseFloat(invoice.paidAmount || 0);
                   return (
-                    <tr key={invoice.id} className="hover:bg-gray-50">
+                    <tr key={invoice.id} className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <DocumentTextIcon className="h-5 w-5 text-gray-400 mr-2" />
-                          <span className="text-sm font-medium text-primary-600">{invoice.invoiceNumber}</span>
+                        <div className="flex items-center gap-2">
+                          <DocumentTextIcon className="h-5 w-5 text-gray-500" />
+                          <span className="text-sm font-bold text-gray-900">{invoice.invoiceNumber}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(invoice.invoiceDate).toLocaleDateString()}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-4 w-4 text-gray-400" />
+                          <span className="text-sm text-gray-700">
+                            {new Date(invoice.invoiceDate).toLocaleDateString()}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{invoice.clientName}</div>
-                        <div className="text-xs text-gray-500">{invoice.clientPhone}</div>
+                        <div className="flex items-center gap-2">
+                          <UserIcon className="h-4 w-4 text-gray-400" />
+                          <div>
+                            <div className="text-sm font-semibold text-gray-900">{invoice.clientName}</div>
+                            <div className="text-xs text-gray-500">{invoice.clientPhone}</div>
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {invoice.shipment?.referenceId || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                        {parseFloat(invoice.totalAmount).toFixed(3)} KWD
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
-                        {parseFloat(invoice.paidAmount || 0).toFixed(3)} KWD
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
-                        <span className={balance > 0 ? 'text-red-600' : 'text-green-600'}>
-                          {balance.toFixed(3)} KWD
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-lg text-xs font-semibold border border-gray-300">
+                          {invoice.shipment?.referenceId || 'N/A'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-bold text-gray-900">{parseFloat(invoice.totalAmount).toFixed(3)}</div>
+                        <div className="text-xs text-gray-500 font-medium">KWD</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-bold text-green-600">{parseFloat(invoice.paidAmount || 0).toFixed(3)}</div>
+                        <div className="text-xs text-gray-500 font-medium">KWD</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className={`text-sm font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {balance.toFixed(3)}
+                        </div>
+                        <div className="text-xs text-gray-500 font-medium">KWD</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(invoice.paymentStatus || invoice.status)}
@@ -278,7 +392,7 @@ export const Invoices: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <button
                           onClick={() => navigate(`/invoices/${invoice.id}`)}
-                          className="text-primary-600 hover:text-primary-900"
+                          className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all font-semibold text-xs"
                         >
                           View Details →
                         </button>
@@ -288,8 +402,10 @@ export const Invoices: React.FC = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
-                    No invoices found
+                  <td colSpan={9} className="px-6 py-12 text-center">
+                    <DocumentTextIcon className="h-16 w-16 text-gray-300 mx-auto mb-3" />
+                    <p className="text-lg font-bold text-gray-500">No invoices found</p>
+                    <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
                   </td>
                 </tr>
               )}
