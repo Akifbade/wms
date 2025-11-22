@@ -18,6 +18,13 @@ services:
       - ./backend/prisma/migrations:/docker-entrypoint-initdb.d
     networks:
       - wms-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1.2G
+        reservations:
+          memory: 600M
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
       interval: 10s
@@ -50,6 +57,13 @@ services:
         condition: service_healthy
     networks:
       - wms-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 800M
+        reservations:
+          memory: 400M
     command: sh -c "npx prisma migrate deploy && npx ts-node src/index.ts"
 
   # Frontend Service
@@ -71,6 +85,13 @@ services:
       - backend
     networks:
       - wms-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 300M
+        reservations:
+          memory: 150M
 
   # phpMyAdmin - Database Management UI
   phpmyadmin:

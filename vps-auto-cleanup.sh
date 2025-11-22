@@ -1,0 +1,48 @@
+#!/bin/bash
+# VPS Auto-Cleanup & Resource Monitor
+# Purpose: Prevent memory exhaustion and crashes
+# Run via cron: */30 * * * * /root/NEW\ START/vps-auto-cleanup.sh
+
+LOGFILE="/root/cleanup.log"
+MEMORY_THRESHOLD=85  # Alert if memory > 85%
+SWAP_THRESHOLD=50    # Alert if swap > 50%
+
+echo "=== Cleanup $(date) ===" >> $LOGFILE
+
+# 1. Check memory usage
+MEMORY_USED=$(free | grep Mem | awk '{print ($3/$2) * 100.0}' | cut -d. -f1)
+SWAP_USED=$(free | grep Swap | awk '{print ($3/$2) * 100.0}' | cut -d. -f1 2>/dev/null || echo 0)
+
+echo "Memory: ${MEMORY_USED}% | Swap: ${SWAP_USED}%" >> $LOGFILE
+
+# 2. Stop VS Code server if running (permanent block)
+if pgrep -f "vscode-server" > /dev/null; then
+    echo "VS Code detected - killing..." >> $LOGFILE
+    pkill -9 -f "vscode-server"
+    rm -rf ~/.vscode-server ~/.vscode-server-insiders /tmp/vscode-* 2>/dev/null
+fi
+
+# 3. Clean Docker cache if memory high
+if [ "$MEMORY_USED" -gt "$MEMORY_THRESHOLD" ]; then
+    echo "Memory HIGH (${MEMORY_USED}%) - cleaning Docker..." >> $LOGFILE
+    docker system prune -f >> $LOGFILE 2>&1
+fi
+
+# 4. Stop staging if running (production only mode)
+if docker ps | grep -q "wms-staging"; then
+    echo "Staging detected - stopping to save memory..." >> $LOGFILE
+    cd "/root/NEW START" && docker-compose -f docker-compose-staging-isolated.yml down >> $LOGFILE 2>&1
+fi
+
+# 5. Clean old logs (keep last 7 days)
+find /root/NEW\ START/backend/logs -name "*.log" -mtime +7 -delete 2>/dev/null
+find /tmp -name "*.tmp" -mtime +1 -delete 2>/dev/null
+
+# 6. Restart production if unhealthy
+if ! docker exec wms-backend wget -qO- http://localhost:5000/api/health > /dev/null 2>&1; then
+    echo "Backend unhealthy - restarting..." >> $LOGFILE
+    cd "/root/NEW START" && docker-compose restart backend >> $LOGFILE 2>&1
+fi
+
+echo "Cleanup complete" >> $LOGFILE
+echo "" >> $LOGFILE
