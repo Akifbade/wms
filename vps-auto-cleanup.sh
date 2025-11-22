@@ -22,10 +22,12 @@ if pgrep -f "vscode-server" > /dev/null; then
     rm -rf ~/.vscode-server ~/.vscode-server-insiders /tmp/vscode-* 2>/dev/null
 fi
 
-# 3. Clean Docker cache if memory high
+# 3. Clean Docker cache if memory high (SAFE - excludes volumes & running containers)
 if [ "$MEMORY_USED" -gt "$MEMORY_THRESHOLD" ]; then
     echo "Memory HIGH (${MEMORY_USED}%) - cleaning Docker..." >> $LOGFILE
-    docker system prune -f >> $LOGFILE 2>&1
+    # Only clean: stopped containers, unused networks, dangling images
+    # NEVER touches: volumes, running containers, named images
+    docker system prune -f --volumes=false >> $LOGFILE 2>&1
 fi
 
 # 4. Stop staging if running (production only mode)
@@ -34,9 +36,13 @@ if docker ps | grep -q "wms-staging"; then
     cd "/root/NEW START" && docker-compose -f docker-compose-staging-isolated.yml down >> $LOGFILE 2>&1
 fi
 
-# 5. Clean old logs (keep last 7 days)
+# 5. Clean old logs (keep last 7 days) - SAFE: only .log files, never database/uploads
 find /root/NEW\ START/backend/logs -name "*.log" -mtime +7 -delete 2>/dev/null
 find /tmp -name "*.tmp" -mtime +1 -delete 2>/dev/null
+# PROTECTION: Never touch uploads or database backups
+# /app/uploads - PROTECTED (user files)
+# mysql_data volume - PROTECTED (database)
+# /backups - PROTECTED (database backups)
 
 # 6. Restart production if unhealthy
 if ! docker exec wms-backend wget -qO- http://localhost:5000/api/health > /dev/null 2>&1; then
