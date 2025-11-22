@@ -30,6 +30,14 @@ if [ "$MEMORY_USED" -gt "$MEMORY_THRESHOLD" ]; then
     docker system prune -f --volumes=false >> $LOGFILE 2>&1
 fi
 
+# 3.5. CRITICAL: Remove node_modules from VPS (prevents 900MB context bloat during builds)
+# These get pulled via git but should NEVER exist on VPS (Docker uses .dockerignore)
+if [ -d "/root/NEW START/frontend/node_modules" ] || [ -d "/root/NEW START/backend/node_modules" ]; then
+    echo "Found node_modules on VPS - removing to prevent build context bloat..." >> $LOGFILE
+    rm -rf "/root/NEW START/frontend/node_modules" "/root/NEW START/backend/node_modules" 2>/dev/null
+    echo "Cleaned node_modules (saves 900MB in Docker build context)" >> $LOGFILE
+fi
+
 # 4. Stop staging if running (production only mode)
 # NOTE: Staging auto-starts during GitHub Actions deployment
 if docker ps | grep -q "wms-staging"; then

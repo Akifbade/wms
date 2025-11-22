@@ -154,7 +154,10 @@ jobs:
             # Stop staging first (in case auto-cleanup stopped it)
             docker-compose -f docker-compose-staging-isolated.yml down 2>/dev/null || true
             
-            # Build and start fresh staging containers
+            # CRITICAL: Remove old node_modules to prevent context bloat
+            rm -rf frontend/node_modules backend/node_modules 2>/dev/null || true
+            
+            # Build and start fresh staging containers (Docker will use .dockerignore)
             docker-compose -f docker-compose-staging-isolated.yml up -d --build
             
             echo "⏳ Waiting for containers to stabilize..."
@@ -322,7 +325,10 @@ jobs:
             cd "${{ env.VPS_PATH }}"
             echo "🔄 Deploying production containers..."
             
-            # Build and restart production with SSL config
+            # CRITICAL: Remove old node_modules to prevent context bloat
+            rm -rf frontend/node_modules backend/node_modules 2>/dev/null || true
+            
+            # Build and restart production with SSL config (Docker will use .dockerignore)
             docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d --build
             
             echo "⏳ Waiting for containers to stabilize..."

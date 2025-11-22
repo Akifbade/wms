@@ -31,7 +31,7 @@ services:
   # ===== STAGING BACKEND - ISOLATED FROM PRODUCTION =====
   staging-backend:
     build:
-      context: ./backend
+      context: ./backend  # Only backend folder (not entire project)
       dockerfile: Dockerfile
       args:
         - NODE_ENV=staging
@@ -70,7 +70,7 @@ services:
   # ===== STAGING FRONTEND - ISOLATED FROM PRODUCTION =====
   staging-frontend:
     build:
-      context: ./frontend
+      context: ./frontend  # Only frontend folder (not entire project)
       dockerfile: Dockerfile
       args:
         - REACT_APP_API_URL=http://staging-backend:5001
