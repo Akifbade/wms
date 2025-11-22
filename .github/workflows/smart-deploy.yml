@@ -207,7 +207,7 @@ jobs:
           MIGRATE_EOF
 
       - name: ⚡ HOT RELOAD Deploy (Fast)
-        if: needs.detect-changes.outputs.deploy_type == 'hot_reload'
+        if: needs.detect-changes.outputs.deploy_type == 'hot_reload' && inputs.force_rebuild != true
         run: |
           ssh root@${{ env.VPS_HOST }} << 'HOTRELOAD_EOF'
             cd "${{ env.VPS_PATH }}"
@@ -246,7 +246,7 @@ jobs:
           HOTRELOAD_EOF
 
       - name: 🔨 FULL REBUILD Deploy (Slow)
-        if: needs.detect-changes.outputs.deploy_type == 'full_rebuild'
+        if: needs.detect-changes.outputs.deploy_type == 'full_rebuild' || inputs.force_rebuild == true
         run: |
           ssh root@${{ env.VPS_HOST }} << 'REBUILD_EOF'
             cd "${{ env.VPS_PATH }}"
