@@ -224,6 +224,27 @@
         "reveal": "always",
         "panel": "shared"
       }
+    },
+    {
+      "label": "🚀 DEPLOY TO PRODUCTION (Local → VPS → GitHub)",
+      "type": "shell",
+      "command": ".vscode\\DEPLOY-TO-PRODUCTION.ps1",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      }
+    },
+    {
+      "label": "🔍 VERIFY: Production vs Localhost Match",
+      "type": "shell",
+      "command": ".\\verify-production.ps1",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
     }
   ]
 }

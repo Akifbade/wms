@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS rack_consumables (
+    id VARCHAR(191) PRIMARY KEY,
+    rackId VARCHAR(191) NOT NULL,
+    companyId VARCHAR(191) NOT NULL,
+    itemType VARCHAR(191) NOT NULL,
+    quantity DOUBLE NOT NULL DEFAULT 0,
+    unit VARCHAR(50) NOT NULL,
+    minThreshold DOUBLE DEFAULT 0,
+    lastRestocked DATETIME DEFAULT CURRENT_TIMESTAMP,
+    restokedBy VARCHAR(191),
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_rack (rackId),
+    INDEX idx_company (companyId)
+);

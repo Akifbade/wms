@@ -1020,21 +1020,32 @@ export const Racks: React.FC = () => {
 
                   {/* Status Badge */}
                   <div className="absolute -top-2 -right-2 z-10">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold shadow ${rack.status === 'ACTIVE'
-                      ? utilization >= 100
-                        ? 'bg-red-500 text-white'
-                        : utilization >= 90
-                          ? 'bg-yellow-500 text-white'
-                          : 'bg-green-500 text-white'
-                      : 'bg-gray-400 text-white'
-                      }`}>
-                      {rack.status === 'ACTIVE'
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold shadow ${
+                      (rack.status === 'ACTIVE' || rack.status === 'OCCUPIED')
+                        ? utilization >= 100
+                          ? 'bg-red-500 text-white'
+                          : utilization >= 90
+                            ? 'bg-orange-500 text-white'
+                            : utilization > 0
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-green-500 text-white'
+                        : rack.status === 'MAINTENANCE'
+                          ? 'bg-amber-600 text-white'
+                          : rack.status === 'RESERVED'
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-gray-400 text-white'
+                    }`}>
+                      {(rack.status === 'ACTIVE' || rack.status === 'OCCUPIED')
                         ? utilization >= 100
                           ? 'FULL'
                           : utilization >= 90
                             ? 'BUSY'
-                            : 'OK'
-                        : 'OFF'}
+                            : utilization > 0
+                              ? 'PARTIAL'
+                              : 'EMPTY'
+                        : rack.status === 'MAINTENANCE'
+                          ? 'MAINT'
+                          : rack.status || 'OFF'}
                     </span>
                   </div>
 
