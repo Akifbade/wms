@@ -25,27 +25,52 @@ yarn.lock
 .DS_Store
 Thumbs.db
 
-# Build
+# Build artifacts (HUGE - rebuilt in container)
 dist
+dist-*
+staging-dist
 build
 .cache
+frontend/dist
+frontend/node_modules
+backend/dist
+backend/node_modules
+*.tar.gz
+*.zip
+prod-deploy.zip
 
 # Logs
 logs
 *.log
+cleanup.log
+auto-backup.log
 
-# Database
+# Database backups (HUGE files!)
+*.sql
+backups/
+backups-staging/
+backups-production/
+database-backups/
+database-backups-staging/
 *.sqlite
 *.sqlite-journal
 *.db
 
-# Uploads (for development)
+# Uploads (mounted as volume)
 uploads/*
 !uploads/.gitkeep
+backend/uploads/*
 
 # Prisma
 prisma/*.db
 prisma/*.db-journal
+
+# Scripts and configs (not needed in build)
+scripts/
+*.sh
+*.ps1
+docs/
+ai-conversation-backups/
 
 # Docker
 Dockerfile*

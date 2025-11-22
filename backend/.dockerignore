@@ -1,9 +1,50 @@
+# Dependencies (will be installed fresh in container)
 node_modules
+npm-debug.log*
+yarn-debug.log*
+
+# Build outputs
 dist
+*.tsbuildinfo
+
+# Environment files (use container env vars)
 .env
+.env.*
+
+# Logs (generated at runtime)
 *.log
 logs/
+
+# Uploads (mounted as volume)
 uploads/
+
+# Git
 .git
 .gitignore
+
+# Documentation
 README.md
+*.md
+
+# Development files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testing
+coverage
+.nyc_output
+
+# Backups (huge files!)
+backups/
+backups-staging/
+backups-production/
+database-backups/
+database-backups-staging/
+*.sql
+*.tar.gz
+*.zip
+
+# Prisma (migrations copied separately)
+prisma/migrations/*.sql
