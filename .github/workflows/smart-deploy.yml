@@ -1,0 +1,349 @@
+name: 🧠 Smart Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deploy to'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      force_rebuild:
+        description: 'Force full rebuild (ignore smart detection)'
+        type: boolean
+        default: false
+
+env:
+  VPS_HOST: 148.230.107.155
+  VPS_PATH: /root/NEW START
+
+jobs:
+  detect-changes:
+    name: 🔍 Detect What Changed
+    runs-on: ubuntu-latest
+    outputs:
+      needs_backend_rebuild: ${{ steps.detect.outputs.backend_rebuild }}
+      needs_frontend_rebuild: ${{ steps.detect.outputs.frontend_rebuild }}
+      needs_migration: ${{ steps.detect.outputs.migration }}
+      deploy_type: ${{ steps.detect.outputs.deploy_type }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need 2 commits to compare
+
+      - name: 🔍 Detect Changes
+        id: detect
+        run: |
+          echo "Checking what files changed..."
+          
+          # Get changed files since last commit
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Check if backend needs rebuild
+          BACKEND_REBUILD="false"
+          if echo "$CHANGED_FILES" | grep -qE "^backend/(package\.json|Dockerfile|prisma/schema\.prisma)"; then
+            echo "🔨 Backend dependencies/schema changed - FULL REBUILD needed"
+            BACKEND_REBUILD="true"
+          elif echo "$CHANGED_FILES" | grep -qE "^backend/"; then
+            echo "📝 Backend code changed - HOT RELOAD possible"
+            BACKEND_REBUILD="false"
+          fi
+          
+          # Check if frontend needs rebuild
+          FRONTEND_REBUILD="false"
+          if echo "$CHANGED_FILES" | grep -qE "^frontend/(package\.json|Dockerfile|vite\.config)"; then
+            echo "🔨 Frontend dependencies changed - FULL REBUILD needed"
+            FRONTEND_REBUILD="true"
+          elif echo "$CHANGED_FILES" | grep -qE "^frontend/"; then
+            echo "📝 Frontend code changed - BUILD + COPY needed"
+            FRONTEND_REBUILD="false"
+          fi
+          
+          # Check if migrations exist
+          MIGRATION="false"
+          if echo "$CHANGED_FILES" | grep -qE "^backend/prisma/migrations/"; then
+            echo "🗄️ Database migrations detected"
+            MIGRATION="true"
+          fi
+          
+          # Force rebuild if requested
+          if [ "${{ inputs.force_rebuild }}" == "true" ]; then
+            echo "⚠️ FORCE REBUILD requested by user"
+            BACKEND_REBUILD="true"
+            FRONTEND_REBUILD="true"
+          fi
+          
+          # Determine deploy type
+          if [ "$BACKEND_REBUILD" == "true" ] || [ "$FRONTEND_REBUILD" == "true" ]; then
+            DEPLOY_TYPE="full_rebuild"
+          else
+            DEPLOY_TYPE="hot_reload"
+          fi
+          
+          echo "backend_rebuild=$BACKEND_REBUILD" >> $GITHUB_OUTPUT
+          echo "frontend_rebuild=$FRONTEND_REBUILD" >> $GITHUB_OUTPUT
+          echo "migration=$MIGRATION" >> $GITHUB_OUTPUT
+          echo "deploy_type=$DEPLOY_TYPE" >> $GITHUB_OUTPUT
+
+  deploy-smart:
+    name: 🚀 Smart Deploy
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.STAGING_VPS_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 💾 Backup Database (Safety First)
+        run: |
+          ssh root@${{ env.VPS_HOST }} << 'BACKUP_EOF'
+            cd "${{ env.VPS_PATH }}"
+            
+            TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
+            
+            # Determine which environment
+            if [ "${{ inputs.environment }}" == "staging" ]; then
+              BACKUP_DIR="backups-staging"
+              DB_CONTAINER="wms-staging-db"
+              DB_USER="staging_user"
+              DB_PASS="staging_pass_12345"
+              DB_NAME="warehouse_staging"
+              BACKUP_PREFIX="staging_backup"
+            else
+              BACKUP_DIR="backups-production"
+              DB_CONTAINER="wms-database"
+              DB_USER="wms_user"
+              DB_PASS="wmspassword123"
+              DB_NAME="warehouse_wms"
+              BACKUP_PREFIX="production_backup"
+            fi
+            
+            echo "💾 Creating ${{ inputs.environment }} database backup..."
+            mkdir -p "$BACKUP_DIR"
+            
+            # Create backup with compression
+            docker exec $DB_CONTAINER mysqldump \
+              -u$DB_USER \
+              -p$DB_PASS \
+              --single-transaction \
+              --routines \
+              --triggers \
+              --add-drop-table \
+              $DB_NAME | gzip > "$BACKUP_DIR/${BACKUP_PREFIX}_${TIMESTAMP}.sql.gz"
+            
+            # Verify backup created
+            if [ -f "$BACKUP_DIR/${BACKUP_PREFIX}_${TIMESTAMP}.sql.gz" ]; then
+              BACKUP_SIZE=$(du -h "$BACKUP_DIR/${BACKUP_PREFIX}_${TIMESTAMP}.sql.gz" | cut -f1)
+              echo "✅ Backup created: ${BACKUP_PREFIX}_${TIMESTAMP}.sql.gz ($BACKUP_SIZE)"
+            else
+              echo "❌ Backup failed!"
+              exit 1
+            fi
+            
+            # Keep only last 2 backups (safety + space optimization)
+            echo "🧹 Cleaning old backups (keeping last 2)..."
+            cd "$BACKUP_DIR"
+            ls -t ${BACKUP_PREFIX}_*.sql.gz | tail -n +3 | xargs -r rm -v
+            
+            echo "📊 Current backups:"
+            ls -lh ${BACKUP_PREFIX}_*.sql.gz 2>/dev/null || echo "No backups found"
+            
+            echo "✅ Backup complete and old backups cleaned"
+          BACKUP_EOF
+
+      - name: 📸 Create Container Snapshot (Rollback Ready)
+        if: inputs.environment == 'production'
+        run: |
+          ssh root@${{ env.VPS_HOST }} << 'SNAPSHOT_EOF'
+            cd "${{ env.VPS_PATH }}"
+            
+            echo "📸 Creating production container snapshot for rollback..."
+            
+            # Save current container IDs
+            docker ps --filter "name=wms-frontend" --format "{{.ID}}" > /tmp/prod_frontend_id.txt
+            docker ps --filter "name=wms-backend" --format "{{.ID}}" > /tmp/prod_backend_id.txt
+            
+            # Save current image tags
+            docker images --filter "reference=wms-frontend" --format "{{.ID}}" > /tmp/prod_frontend_image.txt
+            docker images --filter "reference=wms-backend" --format "{{.ID}}" > /tmp/prod_backend_image.txt
+            
+            echo "✅ Production snapshot saved (rollback ready)"
+          SNAPSHOT_EOF
+
+      - name: 🗄️ Apply Migrations (if needed)
+        if: needs.detect-changes.outputs.needs_migration == 'true'
+        run: |
+          ssh root@${{ env.VPS_HOST }} << 'MIGRATE_EOF'
+            cd "${{ env.VPS_PATH }}"
+            echo "🔄 Applying Prisma migrations..."
+            
+            CONTAINER_NAME="wms-backend"
+            if [ "${{ inputs.environment }}" == "staging" ]; then
+              CONTAINER_NAME="wms-staging-backend"
+            fi
+            
+            docker exec $CONTAINER_NAME npx prisma migrate deploy || {
+              echo "⚠️ Migration failed, using db push..."
+              docker exec $CONTAINER_NAME npx prisma db push --accept-data-loss
+            }
+            
+            echo "✅ Migrations applied"
+          MIGRATE_EOF
+
+      - name: ⚡ HOT RELOAD Deploy (Fast)
+        if: needs.detect-changes.outputs.deploy_type == 'hot_reload'
+        run: |
+          ssh root@${{ env.VPS_HOST }} << 'HOTRELOAD_EOF'
+            cd "${{ env.VPS_PATH }}"
+            
+            echo "⚡ SMART DEPLOY: Hot reload (no rebuild needed)"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            # Pull latest code
+            git fetch origin
+            git reset --hard origin/stable/prisma-mysql-production
+            
+            # Determine container names
+            if [ "${{ inputs.environment }}" == "staging" ]; then
+              FRONTEND_CONTAINER="wms-staging-frontend"
+              BACKEND_CONTAINER="wms-staging-backend"
+            else
+              FRONTEND_CONTAINER="wms-frontend"
+              BACKEND_CONTAINER="wms-backend"
+            fi
+            
+            # Hot reload frontend (build + copy)
+            echo "🔨 Building frontend..."
+            cd frontend
+            npm run build
+            
+            echo "📦 Copying to container..."
+            docker cp dist/. $FRONTEND_CONTAINER:/usr/share/nginx/html/
+            docker exec $FRONTEND_CONTAINER nginx -s reload
+            
+            # Hot reload backend (just restart)
+            echo "🔄 Restarting backend..."
+            docker restart $BACKEND_CONTAINER
+            
+            echo "✅ Hot reload complete in ~30 seconds!"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          HOTRELOAD_EOF
+
+      - name: 🔨 FULL REBUILD Deploy (Slow)
+        if: needs.detect-changes.outputs.deploy_type == 'full_rebuild'
+        run: |
+          ssh root@${{ env.VPS_HOST }} << 'REBUILD_EOF'
+            cd "${{ env.VPS_PATH }}"
+            
+            echo "🔨 FULL REBUILD: Dependencies/Dockerfile changed"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            # Pull latest code
+            git fetch origin
+            git reset --hard origin/stable/prisma-mysql-production
+            
+            # Remove node_modules (prevent context bloat)
+            rm -rf frontend/node_modules backend/node_modules
+            
+            # Full rebuild
+            if [ "${{ inputs.environment }}" == "staging" ]; then
+              docker-compose -f docker-compose-staging-isolated.yml down
+              docker-compose -f docker-compose-staging-isolated.yml up -d --build
+            else
+              docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d --build
+            fi
+            
+            sleep 20
+            echo "✅ Full rebuild complete in ~5-7 minutes"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          REBUILD_EOF
+
+      - name: 🏥 Health Check
+        run: |
+          if [ "${{ inputs.environment }}" == "staging" ]; then
+            URL="http://${{ env.VPS_HOST }}:5001/api/health"
+          else
+            URL="https://qgocargo.cloud/api/health"
+          fi
+          
+          echo "🔍 Checking $URL"
+          for i in {1..10}; do
+            if curl -f $URL; then
+              echo "✅ Deployment successful!"
+              exit 0
+            fi
+            echo "⏳ Waiting... ($i/10)"
+            sleep 5
+          done
+          
+          echo "❌ Health check failed"
+          exit 1
+
+      - name: 🔄 Auto-Rollback (Production Only)
+        if: failure() && inputs.environment == 'production'
+        run: |
+          echo "❌ Deployment failed! Rolling back production..."
+          
+          ssh root@${{ env.VPS_HOST }} << 'ROLLBACK_EOF'
+            cd "${{ env.VPS_PATH }}"
+            
+            echo "🔄 Restoring production containers from snapshot..."
+            
+            # Get previous container/image IDs
+            PREV_FRONTEND=$(cat /tmp/prod_frontend_id.txt 2>/dev/null || echo "")
+            PREV_BACKEND=$(cat /tmp/prod_backend_id.txt 2>/dev/null || echo "")
+            
+            if [ -n "$PREV_FRONTEND" ] && [ -n "$PREV_BACKEND" ]; then
+              # Restart old containers
+              docker start $PREV_FRONTEND $PREV_BACKEND 2>/dev/null || {
+                # If containers deleted, restore from previous image
+                echo "⚠️ Containers deleted, rebuilding from git..."
+                git reset --hard HEAD~1
+                docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+              }
+              
+              echo "✅ Production rolled back to previous version"
+            else
+              echo "⚠️ No snapshot found, manual intervention required"
+            fi
+          ROLLBACK_EOF
+
+      - name: 📊 Deployment Summary
+        if: success()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ SMART DEPLOYMENT SUCCESSFUL"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📦 Deploy Type: ${{ needs.detect-changes.outputs.deploy_type }}"
+          echo "🔨 Backend Rebuild: ${{ needs.detect-changes.outputs.needs_backend_rebuild }}"
+          echo "🎨 Frontend Rebuild: ${{ needs.detect-changes.outputs.needs_frontend_rebuild }}"
+          echo "🗄️ Migrations: ${{ needs.detect-changes.outputs.needs_migration }}"
+          echo "💾 Database Backup: ✅ Automatic (last 2 kept)"
+          echo ""
+          if [ "${{ needs.detect-changes.outputs.deploy_type }}" == "hot_reload" ]; then
+            echo "⚡ Time saved: ~5 minutes (hot reload vs full rebuild)"
+          fi
+          echo ""
+          echo "🔒 Safety Features Active:"
+          echo "  ✅ Automatic database backup before deployment"
+          echo "  ✅ Only last 2 backups kept (space optimization)"
+          echo "  ✅ Production snapshot (rollback ready)"
+          echo "  ✅ Health checks (automatic verification)"
+          echo "  ✅ Auto-rollback on failure (production only)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
