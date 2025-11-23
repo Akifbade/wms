@@ -4,7 +4,7 @@
     {
       "label": "� LOCALHOST: Rebuild & Start All Containers",
       "type": "shell",
-      "command": "Write-Host '🔄 Rebuilding all containers with latest code...' -ForegroundColor Cyan; docker-compose down; docker-compose up -d --build; Write-Host '✅ Waiting for containers to start...' -ForegroundColor Green; Start-Sleep -Seconds 10; docker ps; Write-Host ''; Write-Host '✅ Localhost is ready!' -ForegroundColor Green; Write-Host 'Frontend: http://localhost:80' -ForegroundColor Yellow; Write-Host 'Backend: http://localhost:5000/api/health' -ForegroundColor Yellow",
+      "command": ".vscode\\auto-version-and-commit.ps1; Write-Host '🔄 Rebuilding all containers with latest code...' -ForegroundColor Cyan; docker-compose down; docker-compose up -d --build; Write-Host '✅ Waiting for containers to start...' -ForegroundColor Green; Start-Sleep -Seconds 10; docker ps; Write-Host ''; Write-Host '✅ Localhost is ready!' -ForegroundColor Green; Write-Host 'Frontend: http://localhost:80' -ForegroundColor Yellow; Write-Host 'Backend: http://localhost:5000/api/health' -ForegroundColor Yellow",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -36,7 +36,7 @@
     {
       "label": "🏗️ Build Frontend",
       "type": "shell",
-      "command": "npm run build",
+      "command": "../.vscode/auto-version-and-commit.ps1; npm run build",
       "options": {
         "cwd": "${workspaceFolder}/frontend"
       },
@@ -174,7 +174,7 @@
     {
       "label": "⚡ QUICK: Rebuild Localhost After Changes",
       "type": "shell",
-      "command": "Write-Host '🔨 Rebuilding localhost...' -ForegroundColor Cyan; cd frontend; npm run build; cd ..; docker cp frontend/dist/. wms-frontend:/usr/share/nginx/html/; docker exec wms-frontend nginx -s reload; docker-compose restart wms-backend; Start-Sleep -Seconds 3; (Invoke-WebRequest -Uri 'http://localhost:5000/api/health' -ErrorAction SilentlyContinue).Content | ConvertFrom-Json | ForEach-Object { Write-Host \"✅ Localhost updated: v$($_.version)\" -ForegroundColor Green }",
+      "command": ".vscode\\auto-version-and-commit.ps1; Write-Host '🔨 Rebuilding localhost...' -ForegroundColor Cyan; cd frontend; npm run build; cd ..; docker cp frontend/dist/. wms-frontend:/usr/share/nginx/html/; docker exec wms-frontend nginx -s reload; docker-compose restart wms-backend; Start-Sleep -Seconds 3; (Invoke-WebRequest -Uri 'http://localhost:5000/api/health' -ErrorAction SilentlyContinue).Content | ConvertFrom-Json | ForEach-Object { Write-Host \"✅ Localhost updated: v$($_.version)\" -ForegroundColor Green }",
       "presentation": {
         "reveal": "always",
         "panel": "shared"
@@ -197,7 +197,7 @@
     {
       "label": "🔢 AUTO-VERSION: Increment Version Number",
       "type": "shell",
-      "command": ".vscode\\auto-version.ps1",
+      "command": ".vscode\\auto-version-and-commit.ps1",
       "presentation": {
         "reveal": "always",
         "panel": "shared"
@@ -206,7 +206,7 @@
     {
       "label": "🚀 AUTO-VERSION: Build & Deploy (Quick)",
       "type": "shell",
-      "command": "Write-Host '🔢 Auto-incrementing version...' -ForegroundColor Cyan; .vscode\\auto-version.ps1; Write-Host '🔨 Building frontend...' -ForegroundColor Cyan; cd frontend; npm run build; cd ..; Write-Host '📦 Deploying to Docker...' -ForegroundColor Cyan; docker cp frontend/dist/. wms-frontend:/usr/share/nginx/html/; docker exec wms-frontend nginx -s reload; Write-Host '✅ Deploy complete! Press Ctrl+Shift+R in browser to see changes.' -ForegroundColor Green; Write-Host ''; (Get-Content frontend/src/config/version.ts | Select-String 'APP_VERSION') -replace \".*'(.*)'.*\", 'New version: $1' | Write-Host -ForegroundColor Yellow",
+      "command": "Write-Host '🔢 Auto-incrementing version...' -ForegroundColor Cyan; .vscode\\auto-version-and-commit.ps1; Write-Host '🔨 Building frontend...' -ForegroundColor Cyan; cd frontend; npm run build; cd ..; Write-Host '📦 Deploying to Docker...' -ForegroundColor Cyan; docker cp frontend/dist/. wms-frontend:/usr/share/nginx/html/; docker exec wms-frontend nginx -s reload; Write-Host '✅ Deploy complete! Press Ctrl+Shift+R in browser to see changes.' -ForegroundColor Green; Write-Host ''; (Get-Content frontend/src/config/version.ts | Select-String 'APP_VERSION') -replace \".*'(.*)'.*\", 'New version: $1' | Write-Host -ForegroundColor Yellow",
       "presentation": {
         "reveal": "always",
         "panel": "shared"
@@ -219,7 +219,7 @@
     {
       "label": "🔄 AUTO-VERSION: Rebuild Docker (Full)",
       "type": "shell",
-      "command": "Write-Host '🔢 Auto-incrementing version...' -ForegroundColor Cyan; .vscode\\auto-version.ps1; Write-Host '🔨 Rebuilding Docker container...' -ForegroundColor Cyan; docker-compose build --no-cache frontend; docker-compose up -d frontend; Start-Sleep -Seconds 5; Write-Host '✅ Full rebuild complete! Press Ctrl+Shift+R in browser.' -ForegroundColor Green; Write-Host ''; (Get-Content frontend/src/config/version.ts | Select-String 'APP_VERSION') -replace \".*'(.*)'.*\", 'New version: $1' | Write-Host -ForegroundColor Yellow",
+      "command": "Write-Host '🔢 Auto-incrementing version...' -ForegroundColor Cyan; .vscode\\auto-version-and-commit.ps1; Write-Host '🔨 Rebuilding Docker container...' -ForegroundColor Cyan; docker-compose build --no-cache frontend; docker-compose up -d frontend; Start-Sleep -Seconds 5; Write-Host '✅ Full rebuild complete! Press Ctrl+Shift+R in browser.' -ForegroundColor Green; Write-Host ''; (Get-Content frontend/src/config/version.ts | Select-String 'APP_VERSION') -replace \".*'(.*)'.*\", 'New version: $1' | Write-Host -ForegroundColor Yellow",
       "presentation": {
         "reveal": "always",
         "panel": "shared"

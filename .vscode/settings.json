@@ -115,5 +115,18 @@
     "ai.rule5": "Staging is ISOLATED (separate DB, network, containers)",
     "ai.rule6": "Use GitHub Actions for all deployments",
     "ai.rule7": "Staging password is admin@demo.com / demo123",
-    "ai.documentation": "Read THREE-STAGE-DEPLOYMENT-GUIDE.md for full details"
+    "ai.documentation": "Read THREE-STAGE-DEPLOYMENT-GUIDE.md for full details",
+    
+    // =============================================================================
+    // 🔄 AUTO-VERSION & AUTO-COMMIT SYSTEM
+    // =============================================================================
+    "git.enabled": true,
+    "git.autofetch": true,
+    "git.confirmSync": false,
+    "git.enableSmartCommit": true,
+    "git.postCommitCommand": "none",
+    "autoversion.enabled": true,
+    "autoversion.script": ".vscode/auto-version-and-commit.ps1",
+    "autoversion.description": "Every rebuild auto-increments version and commits to git for safety",
+    "autoversion.format": "🔄 Auto-increment version to vX.X.X (rebuild safety)"
 }
