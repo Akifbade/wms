@@ -95,6 +95,71 @@ router.post("/categories", auth_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: "Failed to create category" });
     }
 });
+/**
+ * PUT /api/materials/categories/:id
+ * Update a material category
+ */
+router.put("/categories/:id", auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { companyId } = req.user;
+        const { id } = req.params;
+        const { name, description, parentId } = req.body;
+        if (!name) {
+            return res.status(400).json({ error: "Category name is required" });
+        }
+        const category = await prisma.materialCategory.update({
+            where: { id, companyId },
+            data: {
+                name,
+                description,
+                parentId: parentId || null,
+            },
+        });
+        res.json(category);
+    }
+    catch (error) {
+        console.error("Error updating category:", error);
+        res.status(500).json({ error: "Failed to update category" });
+    }
+});
+/**
+ * DELETE /api/materials/categories/:id
+ * Delete a material category
+ */
+router.delete("/categories/:id", auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { companyId, role } = req.user;
+        const { id } = req.params;
+        if (role !== 'ADMIN') {
+            return res.status(403).json({ error: "Only admins can delete categories" });
+        }
+        // Check if category has materials
+        const category = await prisma.materialCategory.findUnique({
+            where: { id, companyId },
+            include: {
+                _count: { select: { materials: true } },
+                children: { select: { id: true } } // Check for subcategories too
+            }
+        });
+        if (!category) {
+            return res.status(404).json({ error: "Category not found" });
+        }
+        if (category._count.materials > 0) {
+            return res.status(400).json({ error: "Cannot delete category containing materials" });
+        }
+        if (category.children.length > 0) {
+            return res.status(400).json({ error: "Cannot delete category containing subcategories" });
+        }
+        await prisma.materialCategory.delete({
+            where: { id },
+        });
+        res.json({ message: "Category deleted successfully" });
+    }
+    catch (error) {
+        console.error("Error deleting category:", error);
+        res.status(500).json({ error: "Failed to delete category" });
+    }
+});
 // ==================== PACKING MATERIALS ====================
 /**
  * GET /api/materials
@@ -237,6 +302,88 @@ router.post("/", auth_1.authenticateToken, async (req, res) => {
             return res.status(400).json({ error: "SKU already exists for this company" });
         }
         res.status(500).json({ error: "Failed to create material" });
+    }
+});
+/**
+ * PUT /api/materials/:id
+ * Update a packing material
+ */
+router.put("/:id", auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { companyId } = req.user;
+        const { id } = req.params;
+        const { sku, name, description, unit, categoryId, minStockLevel, unitCost, sellingPrice, isActive } = req.body;
+        if (!sku || !name) {
+            return res.status(400).json({ error: "SKU and Name are required" });
+        }
+        const material = await prisma.packingMaterial.update({
+            where: { id, companyId },
+            data: {
+                sku,
+                name,
+                description,
+                unit,
+                categoryId,
+                minStockLevel,
+                unitCost,
+                sellingPrice,
+                isActive
+            },
+        });
+        res.json(material);
+    }
+    catch (error) {
+        console.error("Error updating material:", error);
+        if (error.code === "P2002") {
+            return res.status(400).json({ error: "SKU already exists for this company" });
+        }
+        res.status(500).json({ error: "Failed to update material" });
+    }
+});
+/**
+ * DELETE /api/materials/:id
+ * Delete a packing material
+ */
+router.delete("/:id", auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { companyId, role } = req.user;
+        const { id } = req.params;
+        if (role !== 'ADMIN') {
+            return res.status(403).json({ error: "Only admins can delete materials" });
+        }
+        const material = await prisma.packingMaterial.findUnique({
+            where: { id, companyId },
+        });
+        if (!material) {
+            return res.status(404).json({ error: "Material not found" });
+        }
+        if (material.totalQuantity > 0) {
+            return res.status(400).json({ error: "Cannot delete material with existing stock" });
+        }
+        // Check if material has been used in transactions (optional but good practice)
+        // For now, we just check stock as requested.
+        // But we should probably check if there are any related records that would violate foreign keys.
+        // Prisma might throw an error if we delete and there are related records.
+        // Let's try to delete and catch the error.
+        try {
+            await prisma.packingMaterial.delete({
+                where: { id },
+            });
+            res.json({ message: "Material deleted successfully" });
+        }
+        catch (deleteError) {
+            if (deleteError.code === 'P2003') { // Foreign key constraint failed
+                // If we can't delete, maybe we should just deactivate it?
+                // But the user asked for delete.
+                // If it's used in history, we can't delete it.
+                return res.status(400).json({ error: "Cannot delete material because it has transaction history. Try deactivating it instead." });
+            }
+            throw deleteError;
+        }
+    }
+    catch (error) {
+        console.error("Error deleting material:", error);
+        res.status(500).json({ error: "Failed to delete material" });
     }
 });
 // ==================== STOCK BATCHES ====================

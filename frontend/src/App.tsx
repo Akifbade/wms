@@ -25,10 +25,13 @@ import PluginSystemManager from './components/moving-jobs/PluginSystemManager';
 import ApprovalManager from './components/moving-jobs/ApprovalManager';
 import { MaterialsManagement } from './pages/Materials';
 import MaterialReports from './pages/Materials/MaterialReports';
+import MaterialsDashboard from './pages/Materials/MaterialsDashboard';
+import MaterialsHub from './pages/Materials/MaterialsHub';
 import { DamageReport } from './components/reports/DamageReport';
 import { DebugLogin } from './pages/DebugLogin';
 import BackupManagement from './pages/BackupManagement/BackupManagement';
 import PluginSettings from './pages/Settings/PluginSettings';
+import SystemMonitorEnhanced from './pages/Admin/SystemMonitorEnhanced';
 
 import { getAuthToken } from './services/api';
 import { PermissionProvider } from './contexts/PermissionContext';
@@ -113,7 +116,7 @@ function App() {
               } />
               <Route path="materials" element={
                 <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
-                  <MaterialsManagement />
+                  <MaterialsHub />
                 </ProtectedRoute>
               } />
               <Route path="material-reports" element={
@@ -206,6 +209,11 @@ function App() {
               <Route path="backups" element={
                 <ProtectedRoute allowedRoles={['ADMIN']}>
                   <BackupManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="system-monitor" element={
+                <ProtectedRoute allowedRoles={['ADMIN']}>
+                  <SystemMonitorEnhanced />
                 </ProtectedRoute>
               } />
 

@@ -25,6 +25,20 @@ router.get("/", authenticateToken as any, async (req: AuthRequest, res) => {
             },
           },
         },
+        materialIssues: {
+          select: {
+            id: true,
+            quantity: true,
+            totalCost: true,
+          }
+        },
+        materialReturns: {
+          select: {
+            id: true,
+            quantityGood: true,
+            quantityDamaged: true
+          }
+        }
       },
       orderBy: {
         createdAt: "desc",
@@ -180,12 +194,12 @@ router.delete("/:jobId", authenticateToken as any, async (req: AuthRequest, res)
     }
 
     // Check if any materials are still pending/active
-    const activeMaterials = existingJob.materialIssues.filter((m: any) => 
+    const activeMaterials = existingJob.materialIssues.filter((m: any) =>
       m.status !== 'RETURNED' && m.status !== 'CANCELLED'
     );
 
     if (activeMaterials.length > 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: `Cannot delete job: ${activeMaterials.length} active material issue(s) still pending. Return or cancel them first.`,
         activeMaterialsCount: activeMaterials.length
       });
@@ -195,7 +209,7 @@ router.delete("/:jobId", authenticateToken as any, async (req: AuthRequest, res)
     // This preserves all material history and audit trails
     const deletedJob = await prisma.movingJob.update({
       where: { id: jobId },
-      data: { 
+      data: {
         deletedAt: new Date(),
         status: 'CANCELLED' // Mark status as cancelled for clarity
       },
@@ -208,7 +222,7 @@ router.delete("/:jobId", authenticateToken as any, async (req: AuthRequest, res)
 
     console.log(`Job ${jobId} soft deleted by user ${userId} - all material history preserved`);
 
-    res.json({ 
+    res.json({
       message: "Job deleted successfully (archived with full history preserved)",
       job: {
         id: deletedJob.id,

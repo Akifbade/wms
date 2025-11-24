@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { authenticateToken, authorizeRoles, AuthRequest } from '../middleware/auth';
+import { logUserActivity } from '../utils/auditLog';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -157,6 +158,9 @@ router.put('/profile/me', async (req: AuthRequest, res: Response) => {
       },
     });
 
+    // Log activity
+    await logUserActivity(userId, 'UPDATE_PROFILE', 'USER', userId, 'User updated their profile', req);
+
     res.json({
       success: true,
       message: 'Profile updated successfully',
@@ -225,6 +229,9 @@ router.put('/profile/password', async (req: AuthRequest, res: Response) => {
       data: { password: hashedPassword },
     });
 
+    // Log activity
+    await logUserActivity(userId, 'CHANGE_PASSWORD', 'USER', userId, 'User changed their password', req);
+
     res.json({
       success: true,
       message: 'Password changed successfully'
@@ -278,6 +285,9 @@ router.put('/profile/avatar', async (req: AuthRequest, res: Response) => {
         avatar: true,
       },
     });
+
+    // Log activity
+    await logUserActivity(userId, 'UPDATE_AVATAR', 'USER', userId, 'User updated their avatar', req);
 
     res.json({
       success: true,
@@ -453,6 +463,9 @@ router.post('/', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Response
       },
     });
 
+    // Log activity
+    await logUserActivity(req.user!.id, 'CREATE_USER', 'USER', user.id, `Created user ${user.email} with role ${user.role}`, req);
+
     res.status(201).json({ user, message: 'User created successfully' });
   } catch (error) {
     console.error('Error creating user:', error);
@@ -526,6 +539,9 @@ router.put('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Respon
       },
     });
 
+    // Log activity
+    await logUserActivity(req.user!.id, 'UPDATE_USER', 'USER', user.id, `Updated user ${user.email}`, req);
+
     res.json({ user, message: 'User updated successfully' });
   } catch (error) {
     console.error('Error updating user:', error);
@@ -558,6 +574,9 @@ router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Res
     await prisma.user.delete({
       where: { id },
     });
+
+    // Log activity
+    await logUserActivity(currentUserId, 'DELETE_USER', 'USER', id, `Deleted user ${user.email}`, req);
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
@@ -601,6 +620,9 @@ router.patch('/:id/toggle', authorizeRoles('ADMIN'), async (req: AuthRequest, re
         updatedAt: true,
       },
     });
+
+    // Log activity
+    await logUserActivity(currentUserId, 'TOGGLE_USER_STATUS', 'USER', id, `User ${updatedUser.isActive ? 'activated' : 'deactivated'}`, req);
 
     res.json({ user: updatedUser, message: `User ${updatedUser.isActive ? 'activated' : 'deactivated'} successfully` });
   } catch (error) {
@@ -647,6 +669,9 @@ router.patch('/:id/permissions', authorizeRoles('ADMIN'), async (req: AuthReques
         updatedAt: true,
       },
     });
+
+    // Log activity
+    await logUserActivity(req.user!.id, 'UPDATE_PERMISSIONS', 'USER', id, 'Updated user permissions', req);
 
     res.json({
       user: {

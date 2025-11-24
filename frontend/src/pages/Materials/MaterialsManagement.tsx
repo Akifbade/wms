@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Package, FolderTree, Archive, AlertCircle, Search, Edit, Trash2, Save, X, History } from 'lucide-react';
 import { MaterialTransactionHistory } from '../../components/MaterialTransactionHistory';
+import { apiFetch } from '../../services/api';
 
 interface MaterialCategory {
   id: string;
@@ -25,14 +26,17 @@ interface Material {
   isActive: boolean;
 }
 
-interface StockBatch {
+interface StockPurchase {
   id: string;
   materialId: string;
-  batchNumber: string;
+  orderNumber: string;
+  invoiceNumber: string;
+  vendorName: string;
   quantityReceived: number;
   quantityRemaining: number;
   unitCost: number;
   sellingPrice: number;
+  orderDate: string;
   receivedDate: string;
 }
 
@@ -40,7 +44,7 @@ const MaterialsManagement = () => {
   const [activeTab, setActiveTab] = useState<'categories' | 'materials' | 'stock'>('materials');
   const [categories, setCategories] = useState<MaterialCategory[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [stockBatches, setStockBatches] = useState<StockBatch[]>([]);
+  const [stockPurchases, setStockPurchases] = useState<StockPurchase[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [userRole, setUserRole] = useState<string>('');
@@ -76,11 +80,16 @@ const MaterialsManagement = () => {
   // Stock Form
   const [showStockForm, setShowStockForm] = useState(false);
   const [stockForm, setStockForm] = useState({
+    orderNumber: '',
+    invoiceNumber: '',
+    vendorName: '',
     materialId: '',
-    batchNumber: '',
-    quantityReceived: 0,
+    quantity: 0,
     unitCost: 0,
-    sellingPrice: 0,
+    orderDate: new Date().toISOString().split('T')[0],
+    receivedDate: '',
+    status: 'PENDING',
+    notes: '',
   });
 
   useEffect(() => {
@@ -126,7 +135,7 @@ const MaterialsManagement = () => {
         return;
       }
 
-      const response = await fetch('/api/materials/categories', { headers });
+      const response = await apiFetch('/materials/categories', { headers });
 
       if (response.status === 401 || response.status === 403) {
         console.error('Authentication failed - invalid or expired token');
@@ -156,7 +165,7 @@ const MaterialsManagement = () => {
         return;
       }
 
-      const response = await fetch('/api/materials', { headers });
+      const response = await apiFetch('/materials', { headers });
 
       if (response.status === 401 || response.status === 403) {
         console.error('Authentication failed - invalid or expired token');
@@ -179,20 +188,20 @@ const MaterialsManagement = () => {
     }
   };
 
-  const fetchStockBatches = async (materialId?: string) => {
+  const fetchStockPurchases = async (materialId?: string) => {
     try {
       const url = materialId
-        ? `/api/materials/${materialId}/stock`
-        : '/api/materials/stock/all';
+        ? `/api/materials/${materialId}/purchase-orders`
+        : '/api/materials/purchase-orders';
       const response = await fetch(url, {
         headers: getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
-        setStockBatches(data);
+        setStockPurchases(data);
       }
     } catch (error) {
-      console.error('Failed to fetch stock:', error);
+      console.error('Failed to fetch stock purchases:', error);
     }
   };
 
@@ -375,7 +384,7 @@ const MaterialsManagement = () => {
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/materials/stock', {
+      const response = await apiFetch('/materials/purchase-orders', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(stockForm)
@@ -385,14 +394,19 @@ const MaterialsManagement = () => {
         alert('Stock added successfully!');
         setShowStockForm(false);
         setStockForm({
+          orderNumber: '',
+          invoiceNumber: '',
+          vendorName: '',
           materialId: '',
-          batchNumber: '',
-          quantityReceived: 0,
+          quantity: 0,
           unitCost: 0,
-          sellingPrice: 0,
+          orderDate: new Date().toISOString().split('T')[0],
+          receivedDate: '',
+          status: 'PENDING',
+          notes: '',
         });
         fetchMaterials();
-        fetchStockBatches();
+        fetchStockPurchases();
       } else {
         const error = await response.json();
         alert(error.error || 'Failed to add stock');
@@ -457,8 +471,8 @@ const MaterialsManagement = () => {
         <button
           onClick={() => setActiveTab('categories')}
           className={`px-6 py-3 font-semibold transition ${activeTab === 'categories'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-600 hover:text-gray-800'
+            ? 'border-b-2 border-blue-600 text-blue-600'
+            : 'text-gray-600 hover:text-gray-800'
             }`}
         >
           <FolderTree className="w-5 h-5 inline mr-2" />
@@ -467,8 +481,8 @@ const MaterialsManagement = () => {
         <button
           onClick={() => setActiveTab('materials')}
           className={`px-6 py-3 font-semibold transition ${activeTab === 'materials'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-600 hover:text-gray-800'
+            ? 'border-b-2 border-blue-600 text-blue-600'
+            : 'text-gray-600 hover:text-gray-800'
             }`}
         >
           <Package className="w-5 h-5 inline mr-2" />
@@ -477,15 +491,15 @@ const MaterialsManagement = () => {
         <button
           onClick={() => {
             setActiveTab('stock');
-            fetchStockBatches();
+            fetchStockPurchases();
           }}
           className={`px-6 py-3 font-semibold transition ${activeTab === 'stock'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-600 hover:text-gray-800'
+            ? 'border-b-2 border-blue-600 text-blue-600'
+            : 'text-gray-600 hover:text-gray-800'
             }`}
         >
           <Archive className="w-5 h-5 inline mr-2" />
-          Stock Batches
+          Stock Purchases
         </button>
       </div>
 
@@ -841,73 +855,155 @@ const MaterialsManagement = () => {
           </div>
 
           {showStockForm && (
-            <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <div className="bg-gray-50 rounded-lg p-6 border border-gray-200 mb-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold">Add Stock Batch</h3>
+                <h3 className="text-lg font-bold text-gray-900">Add Stock Purchase</h3>
                 <button onClick={() => setShowStockForm(false)}>
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5 text-gray-500 hover:text-gray-700" />
                 </button>
               </div>
-              <form onSubmit={handleAddStock} className="grid grid-cols-2 gap-4">
+
+              <form onSubmit={handleAddStock} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">PO Number *</label>
+                    <input
+                      type="text"
+                      required
+                      value={stockForm.orderNumber}
+                      onChange={(e) => setStockForm({ ...stockForm, orderNumber: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="PO-2024-001"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number *</label>
+                    <input
+                      type="text"
+                      required
+                      value={stockForm.invoiceNumber}
+                      onChange={(e) => setStockForm({ ...stockForm, invoiceNumber: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="INV-123456"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Vendor Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={stockForm.vendorName}
+                      onChange={(e) => setStockForm({ ...stockForm, vendorName: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., Acme Supplies"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Material *</label>
+                    <select
+                      required
+                      value={stockForm.materialId}
+                      onChange={(e) => setStockForm({ ...stockForm, materialId: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select material</option>
+                      {materials.map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.sku} - {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={stockForm.quantity}
+                      onChange={(e) => setStockForm({ ...stockForm, quantity: parseInt(e.target.value) || 0 })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Cost (KWD) *</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.01"
+                      value={stockForm.unitCost}
+                      onChange={(e) => setStockForm({ ...stockForm, unitCost: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Order Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={stockForm.orderDate}
+                      onChange={(e) => setStockForm({ ...stockForm, orderDate: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Received Date</label>
+                    <input
+                      type="date"
+                      value={stockForm.receivedDate}
+                      onChange={(e) => setStockForm({ ...stockForm, receivedDate: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-sm font-medium mb-1">Material *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select
-                    required
-                    value={stockForm.materialId}
-                    onChange={(e) => setStockForm({ ...stockForm, materialId: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2"
+                    value={stockForm.status}
+                    onChange={(e) => setStockForm({ ...stockForm, status: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="">-- Select Material --</option>
-                    {materials.map(mat => (
-                      <option key={mat.id} value={mat.id}>{mat.sku} - {mat.name}</option>
-                    ))}
+                    <option value="PENDING">Pending</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="ORDERED">Ordered</option>
+                    <option value="RECEIVED">Received</option>
+                    <option value="CANCELLED">Cancelled</option>
                   </select>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium mb-1">Batch Number *</label>
-                  <input
-                    type="text"
-                    required
-                    value={stockForm.batchNumber}
-                    onChange={(e) => setStockForm({ ...stockForm, batchNumber: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2"
-                    placeholder="BATCH-001"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={stockForm.notes}
+                    onChange={(e) => setStockForm({ ...stockForm, notes: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    rows={3}
+                    placeholder="Additional purchase details..."
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Quantity *</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={stockForm.quantityReceived}
-                    onChange={(e) => setStockForm({
-                      ...stockForm,
-                      quantityReceived: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
-                    })}
-                    className="w-full border rounded-lg px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Unit Cost (KWD)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={stockForm.unitCost}
-                    onChange={(e) => setStockForm({
-                      ...stockForm,
-                      unitCost: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
-                    })}
-                    className="w-full border rounded-lg px-3 py-2"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 w-full">
-                    <Save className="w-4 h-4 inline mr-2" />
-                    Add Stock
-                  </button>
-                </div>
+
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors w-full justify-center"
+                >
+                  <Save className="w-4 h-4" />
+                  Add Stock Purchase
+                </button>
               </form>
             </div>
           )}
@@ -916,37 +1012,54 @@ const MaterialsManagement = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Batch #</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order #</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Received</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remaining</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Cost</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Unit Cost</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Cost</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order Date</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {stockBatches.length === 0 ? (
+                {stockPurchases.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                      No stock batches found.
+                    <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
+                      No stock purchases found.
                     </td>
                   </tr>
                 ) : (
-                  stockBatches.map(batch => (
-                    <tr key={batch.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{batch.batchNumber}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {batch.material?.name || materials.find(m => m.id === batch.materialId)?.name || 'Unknown'}
+                  stockPurchases.map((purchase: any, idx: number) => (
+                    <tr key={purchase.id} className={`hover:bg-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-semibold text-gray-900">{purchase.orderNumber}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{purchase.invoiceNumber || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{purchase.vendorName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {purchase.material?.name || materials.find(m => m.id === purchase.materialId)?.name || 'Unknown'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">{batch.quantityPurchased || 0}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={batch.quantityRemaining === 0 ? 'text-red-600' : 'text-green-600'}>
-                          {batch.quantityRemaining}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900">{purchase.quantity}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-600">{purchase.unitCost.toFixed(3)} KWD</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-gray-900">
+                        {(purchase.quantity * purchase.unitCost).toFixed(3)} KWD
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${purchase.status === 'RECEIVED'
+                            ? 'bg-green-100 text-green-700'
+                            : purchase.status === 'ORDERED'
+                              ? 'bg-blue-100 text-blue-700'
+                              : purchase.status === 'APPROVED'
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : purchase.status === 'PENDING'
+                                  ? 'bg-gray-100 text-gray-700'
+                                  : 'bg-red-100 text-red-700'
+                          }`}>
+                          {purchase.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">{batch.unitCost.toFixed(2)} KWD</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {new Date(batch.purchaseDate).toLocaleDateString()}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {new Date(purchase.orderDate).toLocaleDateString()}
                       </td>
                     </tr>
                   ))

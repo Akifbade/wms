@@ -1020,8 +1020,7 @@ export const Racks: React.FC = () => {
 
                   {/* Status Badge */}
                   <div className="absolute -top-2 -right-2 z-10">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold shadow ${
-                      (rack.status === 'ACTIVE' || rack.status === 'OCCUPIED')
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold shadow ${(rack.status === 'ACTIVE' || rack.status === 'OCCUPIED')
                         ? utilization >= 100
                           ? 'bg-red-500 text-white'
                           : utilization >= 90
@@ -1034,7 +1033,7 @@ export const Racks: React.FC = () => {
                           : rack.status === 'RESERVED'
                             ? 'bg-purple-500 text-white'
                             : 'bg-gray-400 text-white'
-                    }`}>
+                      }`}>
                       {(rack.status === 'ACTIVE' || rack.status === 'OCCUPIED')
                         ? utilization >= 100
                           ? 'FULL'

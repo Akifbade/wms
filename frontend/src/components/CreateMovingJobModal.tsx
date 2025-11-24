@@ -31,7 +31,7 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [materials, setMaterials] = useState<any[]>([]);
-  const [selectedMaterials, setSelectedMaterials] = useState<Array<{materialId: string; quantity: number}>>([]);
+  const [selectedMaterials, setSelectedMaterials] = useState<Array<{ materialId: string; quantity: number }>>([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -152,7 +152,7 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
         const validMaterials = selectedMaterials.filter(m => m.materialId && m.quantity > 0);
         for (const material of validMaterials) {
           try {
-            await fetch('/api/materials/issue', {
+            await fetch('/api/materials/issues', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -194,7 +194,7 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
           }
         }
       }
-      
+
       setSuccess('Moving job created successfully! ✅');
       setTimeout(() => {
         onSuccess();
@@ -390,7 +390,7 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
             <p className="text-sm text-gray-500 mb-4">
               Select materials needed for this job. Stock will be deducted automatically.
             </p>
-            
+
             <div className="space-y-3">
               {selectedMaterials.map((item, index) => {
                 const material = materials.find(m => m.id === item.materialId);
@@ -412,7 +412,7 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
                         </option>
                       ))}
                     </select>
-                    
+
                     <input
                       type="number"
                       min="1"
@@ -426,7 +426,7 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
                       className="w-24 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                       placeholder="Qty"
                     />
-                    
+
                     <button
                       type="button"
                       onClick={() => {
@@ -439,7 +439,7 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
                   </div>
                 );
               })}
-              
+
               <button
                 type="button"
                 onClick={() => {
@@ -463,7 +463,7 @@ export default function CreateMovingJobModal({ isOpen, onClose, onSuccess }: Cre
                       {field.fieldName}
                       {field.isRequired && <span className="text-red-500 ml-1">*</span>}
                     </label>
-                    
+
                     {field.fieldType === 'TEXT' && (
                       <input
                         type="text"

@@ -238,23 +238,122 @@ const MaterialsManager: React.FC = () => {
       {/* Issues Tab */}
       {activeTab === 'issues' && (
         <div>
-          <h5 style={{ marginBottom: '20px' }}>Material Issues (Allocations to Jobs)</h5>
+          <h5 style={{ marginBottom: '20px' }}>Material Issues (Allocations)</h5>
+
+          {/* Issue Form */}
+          <div style={{ backgroundColor: '#f8f9fa', padding: '20px', borderRadius: '4px', marginBottom: '20px' }}>
+            <h6>New Issue</h6>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.target as HTMLFormElement;
+              const formData = new FormData(form);
+              const data = {
+                materialId: formData.get('materialId'),
+                quantity: Number(formData.get('quantity')),
+                issueType: formData.get('issueType'),
+                jobId: formData.get('jobId'),
+                reference: formData.get('reference'),
+              };
+
+              try {
+                const response = await fetch('/api/materials/issues', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                  },
+                  body: JSON.stringify(data),
+                });
+                if (response.ok) {
+                  fetchIssues();
+                  form.reset();
+                }
+              } catch (error) {
+                console.error('Failed to issue material:', error);
+              }
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px' }}>Material</label>
+                  <select name="materialId" required style={{ width: '100%', padding: '8px' }}>
+                    <option value="">Select Material</option>
+                    {materials.map(m => <option key={m.id} value={m.id}>{m.name} ({m.sku})</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px' }}>Quantity</label>
+                  <input type="number" name="quantity" required min="1" style={{ width: '100%', padding: '8px' }} />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Issue Type</label>
+                <select
+                  name="issueType"
+                  style={{ width: '100%', padding: '8px' }}
+                  onChange={(e) => {
+                    const jobInput = document.getElementById('jobIdInput');
+                    const refInput = document.getElementById('refInput');
+                    if (e.target.value === 'JOB') {
+                      if (jobInput) jobInput.style.display = 'block';
+                      if (refInput) refInput.style.display = 'none';
+                    } else {
+                      if (jobInput) jobInput.style.display = 'none';
+                      if (refInput) refInput.style.display = 'block';
+                    }
+                  }}
+                >
+                  <option value="JOB">Job Allocation</option>
+                  <option value="INTERNAL">Internal Use</option>
+                  <option value="MAINTENANCE">Maintenance</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              <div id="jobIdInput" style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Job ID</label>
+                <input type="text" name="jobId" style={{ width: '100%', padding: '8px' }} />
+              </div>
+
+              <div id="refInput" style={{ marginBottom: '15px', display: 'none' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Reference / Department</label>
+                <input type="text" name="reference" placeholder="e.g. Office Kitchen, Truck 1" style={{ width: '100%', padding: '8px' }} />
+              </div>
+
+              <button type="submit" style={{ padding: '8px 16px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                Issue Material
+              </button>
+            </form>
+          </div>
+
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
                 <th style={{ padding: '12px', textAlign: 'left' }}>Material</th>
+                <th style={{ padding: '12px', textAlign: 'left' }}>Type</th>
                 <th style={{ padding: '12px', textAlign: 'left' }}>Quantity</th>
                 <th style={{ padding: '12px', textAlign: 'left' }}>Total Cost</th>
-                <th style={{ padding: '12px', textAlign: 'left' }}>Job ID</th>
+                <th style={{ padding: '12px', textAlign: 'left' }}>Reference / Job</th>
               </tr>
             </thead>
             <tbody>
-              {issues.map((issue) => (
+              {issues.map((issue: any) => (
                 <tr key={issue.id} style={{ borderBottom: '1px solid #dee2e6' }}>
                   <td style={{ padding: '12px' }}>{issue.material?.name}</td>
+                  <td style={{ padding: '12px' }}>
+                    <span style={{
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: issue.issueType === 'JOB' ? '#e3f2fd' : '#fff3cd',
+                      color: issue.issueType === 'JOB' ? '#0d47a1' : '#856404',
+                      fontSize: '0.85em'
+                    }}>
+                      {issue.issueType || 'JOB'}
+                    </span>
+                  </td>
                   <td style={{ padding: '12px' }}>{issue.quantity}</td>
                   <td style={{ padding: '12px' }}>{issue.totalCost.toFixed(2)} KWD</td>
-                  <td style={{ padding: '12px' }}>{issue.jobId}</td>
+                  <td style={{ padding: '12px' }}>{issue.jobId || issue.reference || '-'}</td>
                 </tr>
               ))}
             </tbody>

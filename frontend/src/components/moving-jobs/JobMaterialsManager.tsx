@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   Package, Plus, X, Save, ArrowLeftRight, Camera, Trash2
 } from 'lucide-react';
 
@@ -52,14 +52,16 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
   const [activeTab, setActiveTab] = useState<'issued' | 'return'>('issued');
   const [materials, setMaterials] = useState<Material[]>([]);
   const [racks, setRacks] = useState<Rack[]>([]);
+  const [stockPurchases, setStockPurchases] = useState<any[]>([]);
   const [issuedMaterials, setIssuedMaterials] = useState<IssuedMaterial[]>([]);
-  
+
   // Issue Material State
   const [showIssueForm, setShowIssueForm] = useState(false);
   const [issueForm, setIssueForm] = useState({
     materialId: '',
     quantity: 0,
     rackId: '',
+    stockPurchaseId: '',
     notes: ''
   });
 
@@ -84,7 +86,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
 
   const loadData = async () => {
     const token = localStorage.getItem('authToken');
-    const headers = { 
+    const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     };
@@ -93,17 +95,23 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
       // Load materials list
       const materialsRes = await fetch('/api/materials', { headers });
       const materialsData = await materialsRes.json();
-      setMaterials(materialsData);
+      // Ensure materials is always an array
+      setMaterials(Array.isArray(materialsData) ? materialsData : []);
+
+      // Load stock purchases
+      const purchasesRes = await fetch('/api/materials/purchase-orders', { headers });
+      const purchasesData = await purchasesRes.json();
+      setStockPurchases(Array.isArray(purchasesData) ? purchasesData : []);
 
       // Load racks
       const racksRes = await fetch('/api/materials/available-racks', { headers });
       const racksData = await racksRes.json();
-      setRacks(racksData);
+      setRacks(Array.isArray(racksData) ? racksData : []);
 
       // Load issued materials for this job
       const issuedRes = await fetch(`/api/materials/job-materials/${jobId}`, { headers });
       const issuedData = await issuedRes.json();
-      setIssuedMaterials(issuedData);
+      setIssuedMaterials(Array.isArray(issuedData) ? issuedData : []);
     } catch (error) {
       console.error('Failed to load data:', error);
     }
@@ -115,7 +123,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
 
     const token = localStorage.getItem('authToken');
     try {
-      const response = await fetch('/api/materials/issue', {
+      const response = await fetch('/api/materials/issues', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -133,7 +141,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
       if (response.ok) {
         alert('Material issued successfully! Stock updated.');
         setShowIssueForm(false);
-        setIssueForm({ materialId: '', quantity: 0, rackId: '', notes: '' });
+        setIssueForm({ materialId: '', quantity: 0, rackId: '', stockPurchaseId: '', notes: '' });
         loadData();
         onUpdate?.();
       } else {
@@ -154,22 +162,24 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
 
     const token = localStorage.getItem('authToken');
     const formData = new FormData();
-    
+
     formData.append('jobId', jobId);
+    formData.append('materialId', selectedIssue?.material.id || '');
     formData.append('issueId', returnForm.issueId);
-    formData.append('quantityUsed', returnForm.quantityUsed.toString());
     formData.append('quantityGood', returnForm.quantityGood.toString());
     formData.append('quantityDamaged', returnForm.quantityDamaged.toString());
-    formData.append('damageReason', returnForm.damageReason);
     formData.append('notes', returnForm.notes);
-    
+    if (returnForm.damageReason) {
+      formData.append('damageReason', returnForm.damageReason);
+    }
+
     // Add photos
     returnForm.photos.forEach((photo) => {
       formData.append(`photos`, photo);
     });
 
     try {
-      const response = await fetch('/api/materials/return', {
+      const response = await fetch('/api/materials/returns', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -180,12 +190,12 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
       if (response.ok) {
         alert('Material return recorded! Stock updated.');
         setShowReturnForm(false);
-        setReturnForm({ 
-          issueId: '', 
-          quantityUsed: 0, 
-          quantityGood: 0, 
-          quantityDamaged: 0, 
-          damageReason: '', 
+        setReturnForm({
+          issueId: '',
+          quantityUsed: 0,
+          quantityGood: 0,
+          quantityDamaged: 0,
+          damageReason: '',
           notes: '',
           photos: []
         });
@@ -250,7 +260,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
             Track materials issued and returned for this job
           </p>
         </div>
-        
+
         <div className="flex gap-4">
           <div className="text-right">
             <p className="text-sm text-gray-500">Total Cost</p>
@@ -267,21 +277,19 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
       <div className="flex gap-2 mb-6 border-b">
         <button
           onClick={() => setActiveTab('issued')}
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'issued'
+          className={`px-4 py-2 font-medium ${activeTab === 'issued'
               ? 'border-b-2 border-blue-600 text-blue-600'
               : 'text-gray-500'
-          }`}
+            }`}
         >
           Issued Materials ({issuedMaterials.length})
         </button>
         <button
           onClick={() => setActiveTab('return')}
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'return'
+          className={`px-4 py-2 font-medium ${activeTab === 'return'
               ? 'border-b-2 border-blue-600 text-blue-600'
               : 'text-gray-500'
-          }`}
+            }`}
         >
           Returns & Damages
         </button>
@@ -335,9 +343,9 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                     required
                     min="1"
                     value={issueForm.quantity}
-                    onChange={(e) => setIssueForm({ 
-                      ...issueForm, 
-                      quantity: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 
+                    onChange={(e) => setIssueForm({
+                      ...issueForm,
+                      quantity: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
                     })}
                     className="w-full border rounded px-3 py-2"
                   />
@@ -356,6 +364,24 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                         {rack.code} - {rack.location}
                       </option>
                     ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Stock Purchase (Optional)</label>
+                  <select
+                    value={issueForm.stockPurchaseId}
+                    onChange={(e) => setIssueForm({ ...issueForm, stockPurchaseId: e.target.value })}
+                    className="w-full border rounded px-3 py-2"
+                  >
+                    <option value="">-- Any Available Purchase --</option>
+                    {stockPurchases
+                      .filter((p: any) => p.materialId === issueForm.materialId && p.quantityRemaining > 0)
+                      .map((purchase: any) => (
+                        <option key={purchase.id} value={purchase.id}>
+                          PO: {purchase.orderNumber || 'N/A'} | {purchase.quantityRemaining} {materials.find(m => m.id === purchase.materialId)?.unit || ''} @ {purchase.unitCost} KWD
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -473,8 +499,8 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                     value={returnForm.quantityUsed}
                     onChange={(e) => {
                       const used = parseInt(e.target.value) || 0;
-                      setReturnForm({ 
-                        ...returnForm, 
+                      setReturnForm({
+                        ...returnForm,
                         quantityUsed: used
                       });
                     }}
@@ -489,9 +515,9 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                     required
                     min="0"
                     value={returnForm.quantityGood}
-                    onChange={(e) => setReturnForm({ 
-                      ...returnForm, 
-                      quantityGood: parseInt(e.target.value) || 0 
+                    onChange={(e) => setReturnForm({
+                      ...returnForm,
+                      quantityGood: parseInt(e.target.value) || 0
                     })}
                     className="w-full border rounded px-3 py-2"
                   />
@@ -504,9 +530,9 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                     required
                     min="0"
                     value={returnForm.quantityDamaged}
-                    onChange={(e) => setReturnForm({ 
-                      ...returnForm, 
-                      quantityDamaged: parseInt(e.target.value) || 0 
+                    onChange={(e) => setReturnForm({
+                      ...returnForm,
+                      quantityDamaged: parseInt(e.target.value) || 0
                     })}
                     className="w-full border rounded px-3 py-2"
                   />

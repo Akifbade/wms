@@ -52,7 +52,7 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
         // Filter only materials without returns
         const pending = data.filter((m: any) => !m.returns || m.returns.length === 0);
         setIssuedMaterials(pending);
-        
+
         // Initialize return data
         const initialReturns = new Map();
         pending.forEach((material: IssuedMaterial) => {
@@ -153,13 +153,13 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
         formData.append('quantityDamaged', String(Number(returnData.quantityDamaged)));
         formData.append('damageReason', returnData.damageReason);
         formData.append('notes', returnData.notes);
-        
+
         returnData.photos.forEach(photo => {
           formData.append('photos', photo);
         });
 
         // Submit
-        const response = await fetch('/api/materials/return', {
+        const response = await fetch('/api/materials/returns', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('authToken')}`
@@ -175,7 +175,7 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
 
       // Call onSuccess FIRST to update job status and reload data
       await onSuccess();
-      
+
       // Then show success message and close modal
       alert('✅ Material returns recorded successfully! Stock updated.');
       onClose();

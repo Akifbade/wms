@@ -1,0 +1,21 @@
+{
+  "apps": [
+    {
+      "serverURL": "http://parse:1337/parse",
+      "appId": "WMS_WAREHOUSE_APP",
+      "masterKey": "wms-master-key-change-in-production",
+      "appName": "WMS Warehouse",
+      "iconName": "warehouse.png",
+      "supportedPushLocales": ["en"]
+    }
+  ],
+  "users": [
+    {
+      "user": "admin",
+      "pass": "admin123"
+    }
+  ],
+  "useEncryptedPasswords": false,
+  "trustProxy": 1,
+  "allowInsecureHTTP": true
+}

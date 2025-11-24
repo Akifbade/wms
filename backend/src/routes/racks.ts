@@ -167,7 +167,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
           : 0,
         // Pass original DB status instead of overriding it
         // Frontend handles 'FULL' display based on utilization
-        status: rack.status, 
+        status: rack.status,
       };
     });
 

@@ -98,6 +98,16 @@ npm run dev
 - Job scheduling and planning
 - Material tracking (out/return)
 - Team assignment optimization
+  
+### 📦 Material Reports & Damage Handling
+- Issue packing materials to jobs from the job sidebar or while creating a job (Create Job -> select materials)
+- Record returns and damaged items with photo proof from the Job Details -> Materials tab or via the Complete Job flow
+- View job-level material reports via the Job View (Report button) or global material reports via Materials -> Reports
+- Backend API endpoints:
+	- POST /api/materials/issues — Record materials issued to a job
+	- POST /api/materials/returns — Record material returns (supports photo uploads)
+	- GET /api/materials/job-materials/:jobId — Fetch materials assigned to a job
+	- GET /api/reports/damages — Global damage report with photos and job details
 
 ### 💰 Financial Management
 - Billing in Kuwaiti Dinars
@@ -240,3 +250,15 @@ For setup issues or questions, refer to the master plan document in `/docs/maste
 ---
 
 **Ready to revolutionize warehouse management! 🚀📦**
+
+## ✅ How to Verify Material & Damage Workflow Locally
+
+1. Start the app: `npm run dev` from the repository root.
+2. Create a moving job via UI and optionally select materials while creating the job.
+3. Issue materials to the job from Job Details -> Materials tab or during job creation.
+4. When the job is complete, open Return Materials modal and record returned good and damaged quantities; attach photos for damaged items.
+5. Go to Materials -> Reports and select the 'Damages' tab to view a consolidated damage report with thumbnails, reasons, job codes and estimated losses.
+6. Open any job and click 'Report' to view job-level material usage, returns, and damage breakdown.
+7. Use the CSV / Print buttons in the UI to export or print reports for audits.
+
+If you find issues, check the backend logs and ensure the endpoints `/api/materials/issues` and `/api/materials/returns` are being called successfully.

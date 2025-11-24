@@ -10,6 +10,7 @@ const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const client_1 = require("@prisma/client");
 const version_1 = require("./config/version");
+const activityTracker_1 = require("./middleware/activityTracker");
 // Import routes
 const auth_1 = __importDefault(require("./routes/auth"));
 const shipments_1 = __importDefault(require("./routes/shipments"));
@@ -41,8 +42,9 @@ const worker_dashboard_1 = __importDefault(require("./routes/worker-dashboard"))
 const categories_1 = __importDefault(require("./routes/categories")); // NEW: Category management
 const companies_1 = __importDefault(require("./routes/companies")); // NEW: Company profiles management
 const backups_1 = __importDefault(require("./routes/backups")); // NEW: Backup management
-const system_patches_1 = __importDefault(require("./routes/system-patches"));
-const engine_1 = require("./patches/engine");
+const system_1 = __importDefault(require("./routes/system")); // NEW: System monitoring
+const consumables_1 = __importDefault(require("./routes/consumables"));
+const inventory_config_1 = __importDefault(require("./routes/inventory-config"));
 // Load environment variables FIRST (but allow env vars to override .env)
 dotenv_1.default.config({ override: false });
 // Initialize Express app
@@ -65,6 +67,8 @@ app.use((req, res, next) => {
     res.setHeader('Surrogate-Control', 'no-store');
     next();
 });
+// Track user activity for all authenticated requests
+app.use('/api', activityTracker_1.activityTrackerMiddleware);
 // Smart static handler for company logos (fallback between legacy/new filenames)
 app.get('/uploads/company-logos/:name', (req, res, next) => {
     try {
@@ -157,15 +161,15 @@ app.use('/api/categories', categories_1.default); // NEW: Category management
 app.use('/api/companies', companies_1.default); // NEW: Company profiles (DIOR, JAZEERA, etc) - matches frontend /api/companies/:profileId/analytics
 app.use('/api/company-profiles', companies_1.default); // Legacy alias for older frontend calls
 app.use('/api/backups', backups_1.default); // NEW: Backup management system
-app.use('/api/system-patches', system_patches_1.default);
+app.use('/api/system', system_1.default); // NEW: System monitoring
+app.use('/api/consumables', consumables_1.default);
+app.use('/api/inventory-config', inventory_config_1.default);
+// Plugin routes will be added dynamically by patch system
+// These are registered in patches/modules/* via app.get/post/etc
 // NEW: Enhanced warehouse routes
 app.use('/api', shipment_items_1.default); // Handles /api/shipments/:id/items
 app.use('/api', customer_materials_1.default); // Handles /api/customers/*
 app.use('/api', worker_dashboard_1.default); // Handles /api/worker/*
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ error: 'Route not found' });
-});
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);
@@ -176,10 +180,13 @@ app.use((err, req, res, next) => {
 });
 const startServer = async () => {
     try {
-        await (0, engine_1.loadPatches)(app, prisma);
+        // 404 handler - registered AFTER plugins so their routes work
+        app.use((req, res) => {
+            res.status(404).json({ error: 'Route not found' });
+        });
     }
     catch (error) {
-        console.error('⚠️  Patch engine failed to initialize; continuing without patches.', error);
+        console.error('⚠️  Server initialization error:', error);
     }
     server = app.listen(PORT, () => {
         (0, version_1.logVersionInfo)();

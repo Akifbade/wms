@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { Server } from 'http';
 import { APP_VERSION, getVersionInfo, logVersionInfo } from './config/version';
+import { activityTrackerMiddleware } from './middleware/activityTracker';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -38,6 +39,7 @@ import workerDashboardRoutes from './routes/worker-dashboard';
 import categoriesRoutes from './routes/categories'; // NEW: Category management
 import companiesRoutes from './routes/companies'; // NEW: Company profiles management
 import backupsRoutes from './routes/backups'; // NEW: Backup management
+import systemRoutes from './routes/system'; // NEW: System monitoring
 
 // Load environment variables FIRST (but allow env vars to override .env)
 dotenv.config({ override: false });
@@ -64,6 +66,9 @@ app.use((req, res, next) => {
   res.setHeader('Surrogate-Control', 'no-store');
   next();
 });
+
+// Track user activity for all authenticated requests
+app.use('/api', activityTrackerMiddleware);
 
 // Smart static handler for company logos (fallback between legacy/new filenames)
 app.get('/uploads/company-logos/:name', (req, res, next) => {
@@ -165,6 +170,7 @@ app.use('/api/categories', categoriesRoutes); // NEW: Category management
 app.use('/api/companies', companiesRoutes); // NEW: Company profiles (DIOR, JAZEERA, etc) - matches frontend /api/companies/:profileId/analytics
 app.use('/api/company-profiles', companiesRoutes); // Legacy alias for older frontend calls
 app.use('/api/backups', backupsRoutes); // NEW: Backup management system
+app.use('/api/system', systemRoutes); // NEW: System monitoring
 
 // Plugin routes will be added dynamically by patch system
 // These are registered in patches/modules/* via app.get/post/etc

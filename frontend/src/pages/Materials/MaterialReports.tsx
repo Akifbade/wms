@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, Package, AlertTriangle,
   DollarSign, ShoppingCart, Users, Activity,
   Download, Calendar, Filter
 } from 'lucide-react';
+import { apiFetch } from '../../services/api';
 
 interface StockSummary {
   summary: any[];
@@ -23,7 +24,7 @@ const MaterialReports: React.FC = () => {
   const [activeReport, setActiveReport] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
-  
+
   // Report Data States
   const [stockSummary, setStockSummary] = useState<StockSummary | null>(null);
   const [lowStockAlerts, setLowStockAlerts] = useState<any[]>([]);
@@ -31,6 +32,8 @@ const MaterialReports: React.FC = () => {
   const [purchaseHistory, setPurchaseHistory] = useState<any>(null);
   const [vendorPerformance, setVendorPerformance] = useState<any[]>([]);
   const [valuation, setValuation] = useState<any>(null);
+  const [damageReport, setDamageReport] = useState<any | null>(null);
+  const [completeTracking, setCompleteTracking] = useState<any>(null);
 
   useEffect(() => {
     loadReportData();
@@ -39,7 +42,7 @@ const MaterialReports: React.FC = () => {
   const loadReportData = async () => {
     setLoading(true);
     const token = localStorage.getItem('authToken');
-    const headers = { 
+    const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     };
@@ -48,41 +51,54 @@ const MaterialReports: React.FC = () => {
       switch (activeReport) {
         case 'overview':
         case 'stock':
-          const stockRes = await fetch('/api/materials/reports/stock-summary', { headers });
+          const stockRes = await apiFetch('/materials/reports/stock-summary', { headers });
           const stockData = await stockRes.json();
           setStockSummary(stockData);
           break;
 
         case 'low-stock':
-          const lowStockRes = await fetch('/api/materials/reports/low-stock', { headers });
+          const lowStockRes = await apiFetch('/materials/reports/low-stock', { headers });
           const lowStockData = await lowStockRes.json();
           setLowStockAlerts(lowStockData.lowStockAlerts || []);
           break;
 
         case 'consumption':
-          const consumptionUrl = `/api/materials/reports/consumption?startDate=${dateRange.start}&endDate=${dateRange.end}`;
-          const consumptionRes = await fetch(consumptionUrl, { headers });
+          const consumptionUrl = `/materials/reports/consumption?startDate=${dateRange.start}&endDate=${dateRange.end}`;
+          const consumptionRes = await apiFetch(consumptionUrl, { headers });
           const consumptionData = await consumptionRes.json();
           setConsumptionData(consumptionData);
           break;
 
         case 'purchases':
-          const purchaseUrl = `/api/materials/reports/purchase-history?startDate=${dateRange.start}&endDate=${dateRange.end}`;
-          const purchaseRes = await fetch(purchaseUrl, { headers });
+          const purchaseUrl = `/materials/reports/purchase-history?startDate=${dateRange.start}&endDate=${dateRange.end}`;
+          const purchaseRes = await apiFetch(purchaseUrl, { headers });
           const purchaseData = await purchaseRes.json();
           setPurchaseHistory(purchaseData);
           break;
 
         case 'vendors':
-          const vendorRes = await fetch('/api/materials/reports/vendor-performance', { headers });
+          const vendorRes = await apiFetch('/materials/reports/vendor-performance', { headers });
           const vendorData = await vendorRes.json();
           setVendorPerformance(vendorData.vendors || []);
           break;
 
         case 'valuation':
-          const valuationRes = await fetch('/api/materials/reports/valuation', { headers });
+          const valuationRes = await apiFetch('/materials/reports/valuation', { headers });
           const valuationData = await valuationRes.json();
           setValuation(valuationData);
+          break;
+        case 'damages':
+          const damagesUrl = `/reports/damages?startDate=${dateRange.start}&endDate=${dateRange.end}`;
+          const damagesRes = await apiFetch(damagesUrl, { headers });
+          const damagesData = await damagesRes.json();
+          setDamageReport(damagesData);
+          break;
+
+        case 'tracking':
+          const trackingUrl = `/materials/reports/complete-tracking?startDate=${dateRange.start}&endDate=${dateRange.end}`;
+          const trackingRes = await apiFetch(trackingUrl, { headers });
+          const trackingData = await trackingRes.json();
+          setCompleteTracking(trackingData);
           break;
       }
     } catch (error) {
@@ -97,7 +113,7 @@ const MaterialReports: React.FC = () => {
       Object.keys(data[0]).join(','),
       ...data.map(row => Object.values(row).join(','))
     ].join('\n');
-    
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -141,19 +157,20 @@ const MaterialReports: React.FC = () => {
           { id: 'overview', label: 'Overview', icon: Activity },
           { id: 'stock', label: 'Stock Summary', icon: Package },
           { id: 'low-stock', label: 'Low Stock Alerts', icon: AlertTriangle },
+          { id: 'damages', label: 'Damage Report', icon: AlertTriangle },
           { id: 'consumption', label: 'Consumption', icon: TrendingDown },
           { id: 'purchases', label: 'Purchase History', icon: ShoppingCart },
+          { id: 'tracking', label: 'Complete Tracking', icon: Activity },
           { id: 'vendors', label: 'Vendor Performance', icon: Users },
           { id: 'valuation', label: 'Stock Valuation', icon: DollarSign }
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveReport(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
-              activeReport === tab.id
+            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${activeReport === tab.id
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 hover:bg-gray-200'
-            }`}
+              }`}
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
@@ -296,11 +313,10 @@ const MaterialReports: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm">{item.totalQuantity} {item.unit}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">{item.minStockLevel}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            item.stockStatus === 'ADEQUATE' ? 'bg-green-100 text-green-800' :
-                            item.stockStatus === 'LOW' ? 'bg-orange-100 text-orange-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
+                          <span className={`px-2 py-1 text-xs rounded-full ${item.stockStatus === 'ADEQUATE' ? 'bg-green-100 text-green-800' :
+                              item.stockStatus === 'LOW' ? 'bg-orange-100 text-orange-800' :
+                                'bg-red-100 text-red-800'
+                            }`}>
                             {item.stockStatus}
                           </span>
                         </td>
@@ -416,6 +432,64 @@ const MaterialReports: React.FC = () => {
             </div>
           )}
 
+          {activeReport === 'damages' && damageReport && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Damage Report</h2>
+                <div className="text-sm text-gray-600">Total Items: {damageReport.summary?.totalItems || 0} • Total Value: {damageReport.summary?.totalValue?.toFixed(2) || '0.00'} KWD</div>
+              </div>
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="border p-4 rounded">
+                  <p className="text-gray-500 text-sm">Most Damaged Material</p>
+                  <p className="text-2xl font-bold">{damageReport.summary?.mostDamagedMaterial}</p>
+                </div>
+                <div className="border p-4 rounded">
+                  <p className="text-gray-500 text-sm">Recent Damage</p>
+                  <p className="text-2xl font-bold">{new Date(damageReport.summary?.recentDamageDate).toLocaleDateString()}</p>
+                </div>
+                <div className="border p-4 rounded">
+                  <p className="text-gray-500 text-sm">Total Value (Est.)</p>
+                  <p className="text-2xl font-bold">{damageReport.summary?.totalValue?.toFixed(2) || '0.00'} KWD</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Photos</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recorded By</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {damageReport.damages.map((d: any) => (
+                      <tr key={d.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">{new Date(d.recordedAt).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">{d.job?.jobCode}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">{d.material?.name} ({d.material?.sku})</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">{d.quantity} {d.material?.unit}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">{d.reason}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="flex gap-2">
+                            {d.photoUrls?.map((url: string, idx: number) => (
+                              <img key={idx} src={url} alt={`Damage ${idx + 1}`} className="w-12 h-12 object-cover rounded" />
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">{d.recordedBy?.name || 'System'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {activeReport === 'valuation' && valuation && (
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-center mb-4">
@@ -426,6 +500,95 @@ const MaterialReports: React.FC = () => {
                 </div>
               </div>
               {/* Add valuation details here */}
+            </div>
+          )}
+
+          {/* Complete Tracking Report */}
+          {activeReport === 'tracking' && completeTracking && (
+            <div className="space-y-6">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-5 gap-4">
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <p className="text-gray-500 text-xs">Total Materials</p>
+                  <p className="text-xl font-bold">{completeTracking.totals.materialsTracked}</p>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <p className="text-gray-500 text-xs">Total Purchased</p>
+                  <p className="text-xl font-bold">{completeTracking.totals.totalPurchased}</p>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <p className="text-gray-500 text-xs">Total Used</p>
+                  <p className="text-xl font-bold text-orange-600">{completeTracking.totals.totalUsed}</p>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <p className="text-gray-500 text-xs">Total Returned</p>
+                  <p className="text-xl font-bold text-green-600">{completeTracking.totals.totalReturned}</p>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <p className="text-gray-500 text-xs">Total Damaged</p>
+                  <p className="text-xl font-bold text-red-600">{completeTracking.totals.totalDamaged}</p>
+                </div>
+              </div>
+
+              {/* Detailed Tracking */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-bold mb-4">Material Flow Tracking</h3>
+                {completeTracking.tracking.map((materialTracking: any) => (
+                  <div key={materialTracking.material.id} className="mb-6 p-4 border rounded-lg">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="font-bold text-lg">{materialTracking.material.name}</h4>
+                        <p className="text-gray-500 text-sm">SKU: {materialTracking.material.sku}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-gray-500 text-xs">Current Stock</p>
+                        <p className="text-2xl font-bold text-blue-600">{materialTracking.currentStock}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      {/* Purchases */}
+                      <div className="bg-blue-50 p-4 rounded">
+                        <h5 className="font-semibold text-blue-900 mb-2">📦 Purchases</h5>
+                        {materialTracking.purchases.map((p: any, idx: number) => (
+                          <div key={idx} className="text-sm mb-2 pb-2 border-b last:border-0">
+                            <p><span className="font-semibold">{p.orderNumber}</span> - {p.quantity} units @ {p.unitCost} KWD</p>
+                            <p className="text-gray-600">From: {p.vendor} | Status: {p.status}</p>
+                          </div>
+                        ))}
+                        <div className="font-bold text-blue-900 mt-2">Total: {materialTracking.totalPurchased}</div>
+                      </div>
+
+                      {/* Usage */}
+                      <div className="bg-orange-50 p-4 rounded">
+                        <h5 className="font-semibold text-orange-900 mb-2">🚚 Job Usage</h5>
+                        {materialTracking.usage.map((u: any, idx: number) => (
+                          <div key={idx} className="text-sm mb-2 pb-2 border-b last:border-0">
+                            <p><span className="font-semibold">{u.jobCode}</span> - Consumed: {u.quantityConsumed}, Returned: {u.quantityReturned}</p>
+                            <p className="text-gray-600">{u.jobTitle}</p>
+                          </div>
+                        ))}
+                        <div className="font-bold text-orange-900 mt-2">Total Used: {materialTracking.totalUsed}</div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="bg-green-50 p-2 rounded text-center">
+                        <p className="text-green-600 font-bold">{materialTracking.totalReturned}</p>
+                        <p className="text-green-700">Returned</p>
+                      </div>
+                      <div className="bg-red-50 p-2 rounded text-center">
+                        <p className="text-red-600 font-bold">{materialTracking.totalDamaged}</p>
+                        <p className="text-red-700">Damaged</p>
+                      </div>
+                      <div className="bg-blue-50 p-2 rounded text-center">
+                        <p className="text-blue-600 font-bold">{materialTracking.currentStock}</p>
+                        <p className="text-blue-700">Stock Now</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </>

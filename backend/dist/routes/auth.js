@@ -8,6 +8,8 @@ const client_1 = require("@prisma/client");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const zod_1 = require("zod");
+const auditLog_1 = require("../utils/auditLog");
+const userActivityTracker_1 = require("../services/userActivityTracker");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 // Validation schemas
@@ -43,10 +45,22 @@ router.post('/login', async (req, res) => {
         if (!isPasswordValid) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
+        // Update last login time
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { lastLoginAt: new Date() },
+        });
+        // Log activity
+        await (0, auditLog_1.logUserActivity)(user.id, 'LOGIN', 'USER', user.id, 'User logged in', req);
+        // Track user activity in real-time
+        const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+        const userAgent = req.headers['user-agent'] || 'unknown';
+        (0, userActivityTracker_1.trackUserActivity)(user.id, user.name, user.email, user.role, '/login', ipAddress, userAgent, new Date());
         // Generate JWT token
         const token = jsonwebtoken_1.default.sign({
             id: user.id,
             email: user.email,
+            name: user.name,
             role: user.role,
             companyId: user.companyId,
         }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -104,6 +118,7 @@ router.post('/register', async (req, res) => {
         const token = jsonwebtoken_1.default.sign({
             id: user.id,
             email: user.email,
+            name: user.name,
             role: user.role,
             companyId: user.companyId,
         }, process.env.JWT_SECRET, { expiresIn: '7d' });

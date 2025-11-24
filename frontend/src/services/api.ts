@@ -11,6 +11,13 @@ export const getBackendUrl = (): string => {
   return ''; // Use relative path in production (nginx handles routing)
 };
 
+// Wrapper function for fetch calls to handle backend URL routing
+export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Response> => {
+  const backendUrl = getBackendUrl();
+  const url = `${backendUrl}/api${endpoint}`;
+  return fetch(url, options);
+};
+
 // Helper to get auth token
 export const getAuthToken = (): string | null => {
   const storedToken = localStorage.getItem('authToken') || localStorage.getItem('token');
@@ -49,7 +56,8 @@ async function apiCall<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const backendUrl = getBackendUrl();
+  const url = `${backendUrl}/api${endpoint}`;
 
   const config: RequestInit = {
     ...options,

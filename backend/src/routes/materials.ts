@@ -101,122 +101,40 @@ router.post("/categories", authenticateToken as any, async (req: AuthRequest, re
   }
 });
 
-/**
- * PUT /api/materials/categories/:id
- * Update a material category
- */
-router.put("/categories/:id", authenticateToken as any, async (req: AuthRequest, res) => {
-  try {
-    const { companyId } = req.user!;
-    const { id } = req.params;
-    const { name, description, parentId } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ error: "Category name is required" });
-    }
-
-    const category = await prisma.materialCategory.update({
-      where: { id, companyId },
-      data: {
-        name,
-        description,
-        parentId: parentId || null,
-      },
-    });
-
-    res.json(category);
-  } catch (error: any) {
-    console.error("Error updating category:", error);
-    res.status(500).json({ error: "Failed to update category" });
-  }
-});
-
-/**
- * DELETE /api/materials/categories/:id
- * Delete a material category
- */
-router.delete("/categories/:id", authenticateToken as any, async (req: AuthRequest, res) => {
-  try {
-    const { companyId, role } = req.user!;
-    const { id } = req.params;
-
-    if (role !== 'ADMIN') {
-      return res.status(403).json({ error: "Only admins can delete categories" });
-    }
-
-    // Check if category has materials
-    const category = await prisma.materialCategory.findUnique({
-      where: { id, companyId },
-      include: {
-        _count: { select: { materials: true } },
-        children: { select: { id: true } } // Check for subcategories too
-      }
-    });
-
-    if (!category) {
-      return res.status(404).json({ error: "Category not found" });
-    }
-
-    if (category._count.materials > 0) {
-      return res.status(400).json({ error: "Cannot delete category containing materials" });
-    }
-
-    if (category.children.length > 0) {
-      return res.status(400).json({ error: "Cannot delete category containing subcategories" });
-    }
-
-    await prisma.materialCategory.delete({
-      where: { id },
-    });
-
-    res.json({ message: "Category deleted successfully" });
-  } catch (error: any) {
-    console.error("Error deleting category:", error);
-    res.status(500).json({ error: "Failed to delete category" });
-  }
-});
-
-// ==================== PACKING MATERIALS ====================
+// ==================== MATERIALS LIST ====================
 
 /**
  * GET /api/materials
- * List all packing materials for the company with stock info
+ * Get all materials for the company
  */
 router.get("/", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
 
-    if (!companyId) {
-      return res.status(400).json({ error: "Company not found" });
-    }
-
     const materials = await prisma.packingMaterial.findMany({
-      where: { companyId, isActive: true },
+      where: {
+        companyId,
+        isActive: true
+      },
       include: {
         materialCategory: {
           select: {
             id: true,
-            name: true,
+            name: true
           }
-        },
-        stockBatches: {
-          select: {
-            id: true,
-            quantityRemaining: true,
-            unitCost: true,
-            sellingPrice: true,
-          },
-          where: { quantityRemaining: { gt: 0 } }
-        },
+        }
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { name: "asc" },
     });
+
     res.json(materials);
   } catch (error) {
     console.error("Error fetching materials:", error);
     res.status(500).json({ error: "Failed to fetch materials" });
   }
 });
+
+// Old route removed. Using handleCreateReturn with multer middleware via alias routes.
 
 /**
  * GET /api/materials/job-materials/:jobId
@@ -563,22 +481,26 @@ router.post("/batches", authenticateToken as any, async (req: AuthRequest, res) 
 
 /**
  * POST /api/materials/issues
+ * POST /api/materials/issue (compat alias)
  * Issue materials from stock to a job with rack selection
  */
-router.post("/issues", authenticateToken as any, async (req: AuthRequest, res) => {
+async function handleCreateIssue(req: AuthRequest, res: any) {
   try {
     const { companyId } = req.user!;
-    const { jobId, materialId, stockBatchId, quantity, rackId, notes } = req.body;
+    const { jobId, materialId, stockBatchId, quantity, rackId, notes, issueType = 'JOB', reference } = req.body;
 
-    if (!jobId || !materialId || !quantity) {
+    if (!materialId || !quantity) {
       return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Validate Job ID if issue type is JOB
+    if (issueType === 'JOB' && !jobId) {
+      return res.status(400).json({ error: "Job ID is required for Job issues" });
     }
 
     // Validate rack exists
     if (rackId) {
-      const rack = await prisma.rack.findUnique({
-        where: { id: rackId },
-      });
+      const rack = await prisma.rack.findUnique({ where: { id: rackId } });
       if (!rack) {
         return res.status(404).json({ error: "Rack not found" });
       }
@@ -597,45 +519,66 @@ router.post("/issues", authenticateToken as any, async (req: AuthRequest, res) =
 
     const issue = await prisma.materialIssue.create({
       data: {
-        jobId,
+        jobId: jobId || null,
+        issueType,
+        reference,
         materialId,
         stockBatchId,
         quantity,
         unitCost,
         totalCost,
-        rackId, // Store material in specified rack
+        rackId,
         issuedById: req.user!.id,
         notes,
         companyId,
       },
       include: {
         material: true,
-        rack: {
-          select: { id: true, code: true, location: true }
-        }
+        rack: { select: { id: true, code: true, location: true } },
       },
     });
 
     // Deduct from remaining quantity if batch specified
     if (batch) {
-      await prisma.stockBatch.update({
-        where: { id: stockBatchId },
-        data: { quantityRemaining: Math.max(0, batch.quantityRemaining - quantity) },
-      });
+      await prisma.stockBatch.update({ where: { id: stockBatchId }, data: { quantityRemaining: Math.max(0, batch.quantityRemaining - quantity) } });
     }
 
     // Update material total quantity
-    await prisma.packingMaterial.update({
-      where: { id: materialId },
-      data: {
-        totalQuantity: Math.max(0, (material.totalQuantity || 0) - quantity)
-      }
-    });
+    await prisma.packingMaterial.update({ where: { id: materialId }, data: { totalQuantity: Math.max(0, (material.totalQuantity || 0) - quantity) } });
 
     res.status(201).json(issue);
   } catch (error) {
     console.error("Error creating material issue:", error);
     res.status(500).json({ error: "Failed to issue material" });
+  }
+}
+
+router.post("/issues", authenticateToken as any, handleCreateIssue);
+
+/**
+ * GET /api/materials/issues
+ * Get all material issues for the company
+ */
+router.get("/issues", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const issues = await prisma.materialIssue.findMany({
+      where: { companyId },
+      include: {
+        material: true,
+        job: true
+      },
+      orderBy: { issuedAt: 'desc' }
+    });
+
+    res.json(issues);
+  } catch (error) {
+    console.error("Error fetching material issues:", error);
+    res.status(500).json({ error: "Failed to fetch material issues" });
   }
 });
 
@@ -643,9 +586,10 @@ router.post("/issues", authenticateToken as any, async (req: AuthRequest, res) =
 
 /**
  * POST /api/materials/returns
+ * POST /api/materials/return (compat alias)
  * Record material return after job completion with rack allocation
  */
-router.post("/returns", authenticateToken as any, async (req: AuthRequest, res) => {
+async function handleCreateReturn(req: AuthRequest, res: any) {
   try {
     const { companyId } = req.user!;
     const { jobId, materialId, issueId, quantityGood, quantityDamaged, rackId, notes } = req.body;
@@ -661,16 +605,14 @@ router.post("/returns", authenticateToken as any, async (req: AuthRequest, res) 
         issueId,
         quantityGood: quantityGood || 0,
         quantityDamaged: quantityDamaged || 0,
-        rackId, // Rack to store returned good materials
+        rackId,
         recordedById: req.user!.id,
         notes,
         companyId,
       },
       include: {
         material: true,
-        rack: {
-          select: { id: true, code: true, location: true }
-        }
+        rack: { select: { id: true, code: true, location: true } }
       },
     });
 
@@ -678,38 +620,24 @@ router.post("/returns", authenticateToken as any, async (req: AuthRequest, res) 
     if (quantityGood > 0 && rackId) {
       const uniqueBatchId = `RETURN-${return_.id}`;
       await prisma.rackStockLevel.upsert({
-        where: {
-          materialId_rackId_stockBatchId: { materialId, rackId, stockBatchId: uniqueBatchId },
-        },
-        create: {
-          materialId,
-          rackId,
-          quantity: quantityGood,
-          companyId,
-          stockBatchId: uniqueBatchId,
-        },
-        update: {
-          quantity: { increment: quantityGood },
-        },
+        where: { materialId_rackId_stockBatchId: { materialId, rackId, stockBatchId: uniqueBatchId } },
+        create: { materialId, rackId, quantity: quantityGood, companyId, stockBatchId: uniqueBatchId },
+        update: { quantity: { increment: quantityGood } },
       });
 
-      // Update material total quantity
       const material = await prisma.packingMaterial.findUnique({ where: { id: materialId } });
-      await prisma.packingMaterial.update({
-        where: { id: materialId },
-        data: {
-          totalQuantity: (material?.totalQuantity || 0) + quantityGood
-        }
-      });
+      await prisma.packingMaterial.update({ where: { id: materialId }, data: { totalQuantity: (material?.totalQuantity || 0) + quantityGood } });
 
-      // Mark as restocked
-      await prisma.materialReturn.update({
-        where: { id: return_.id },
-        data: { restocked: true, restockedAt: new Date() },
-      });
+      await prisma.materialReturn.update({ where: { id: return_.id }, data: { restocked: true, restockedAt: new Date() } });
     }
 
-    // Create damage record if any damaged items
+    // Handle any uploaded files for damaged items
+    let photoUrls: string[] = [];
+    const files = (req as any).files as Express.Multer.File[] | undefined;
+    if (files && Array.isArray(files)) {
+      photoUrls = files.map(f => `/uploads/damages/${f.filename}`);
+    }
+
     if (quantityDamaged > 0) {
       await prisma.materialDamage.create({
         data: {
@@ -717,9 +645,10 @@ router.post("/returns", authenticateToken as any, async (req: AuthRequest, res) 
           materialId,
           quantity: quantityDamaged,
           recordedById: req.user!.id,
-          status: "PENDING", // Requires approval
+          status: "PENDING",
+          photoUrls: photoUrls.length > 0 ? photoUrls.join(',') : null,
           companyId,
-        },
+        }
       });
     }
 
@@ -728,7 +657,9 @@ router.post("/returns", authenticateToken as any, async (req: AuthRequest, res) 
     console.error("Error creating material return:", error);
     res.status(500).json({ error: "Failed to record material return" });
   }
-});
+}
+
+router.post("/returns", authenticateToken as any, damagePhotoUpload.array('photos', 10), handleCreateReturn);
 
 // ==================== MATERIAL APPROVALS ====================
 
@@ -843,10 +774,7 @@ router.get("/reports/stock-summary", authenticateToken as any, async (req: AuthR
     const materials = await prisma.packingMaterial.findMany({
       where: { companyId, isActive: true },
       include: {
-        materialCategory: true,
-        stockBatches: {
-          where: { quantityRemaining: { gt: 0 } }
-        }
+        materialCategory: true
       }
     });
 
@@ -860,10 +788,8 @@ router.get("/reports/stock-summary", authenticateToken as any, async (req: AuthR
       minStockLevel: material.minStockLevel,
       stockStatus: material.totalQuantity < material.minStockLevel ? 'LOW' :
         material.totalQuantity === 0 ? 'OUT_OF_STOCK' : 'ADEQUATE',
-      activeBatches: material.stockBatches.length,
-      avgUnitCost: material.stockBatches.length > 0
-        ? material.stockBatches.reduce((sum, b) => sum + b.unitCost, 0) / material.stockBatches.length
-        : material.unitCost || 0,
+      activeBatches: 0, // Deprecated
+      avgUnitCost: material.unitCost || 0,
       totalValue: material.totalQuantity * (material.unitCost || 0)
     }));
 
@@ -893,23 +819,18 @@ router.get("/reports/low-stock", authenticateToken as any, async (req: AuthReque
     const lowStockMaterials = await prisma.packingMaterial.findMany({
       where: {
         companyId,
-        isActive: true,
-        totalQuantity: {
-          lt: prisma.packingMaterial.fields.minStockLevel
-        }
+        isActive: true
       },
       include: {
-        materialCategory: true,
-        stockBatches: {
-          where: { quantityRemaining: { gt: 0 } },
-          orderBy: { purchaseDate: 'desc' },
-          take: 1
-        }
+        materialCategory: true
       },
       orderBy: { totalQuantity: 'asc' }
     });
 
-    const alerts = lowStockMaterials.map(material => ({
+    // Filter for low stock items
+    const filtered = lowStockMaterials.filter(m => m.totalQuantity < m.minStockLevel);
+
+    const alerts = filtered.map(material => ({
       id: material.id,
       sku: material.sku,
       name: material.name,
@@ -918,7 +839,7 @@ router.get("/reports/low-stock", authenticateToken as any, async (req: AuthReque
       minStock: material.minStockLevel,
       shortfall: material.minStockLevel - material.totalQuantity,
       unit: material.unit,
-      lastPurchaseDate: material.stockBatches[0]?.purchaseDate || null,
+      unitCost: material.unitCost || 0,
       suggestedReorderQty: Math.max(material.minStockLevel * 2 - material.totalQuantity, 0)
     }));
 
@@ -931,17 +852,18 @@ router.get("/reports/low-stock", authenticateToken as any, async (req: AuthReque
 
 /**
  * GET /api/materials/reports/consumption
- * Get material consumption/usage report
+ * Get material consumption/usage report (from moving jobs)
  */
 router.get("/reports/consumption", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
     const { startDate, endDate, materialId } = req.query;
 
+    // Query material issues that went to jobs (consumption)
     const where: any = { companyId };
 
     if (startDate && endDate) {
-      where.usedAt = {
+      where.issuedAt = {
         gte: new Date(startDate as string),
         lte: new Date(endDate as string)
       };
@@ -951,42 +873,87 @@ router.get("/reports/consumption", authenticateToken as any, async (req: AuthReq
       where.materialId = materialId;
     }
 
-    const usages = await prisma.materialUsage.findMany({
+    // Get all material issues (these represent consumption for moving jobs)
+    const issues = await prisma.materialIssue.findMany({
       where,
       include: {
         material: {
-          select: { sku: true, name: true, unit: true }
+          select: { id: true, sku: true, name: true, unit: true, unitCost: true }
         },
-        shipment: {
-          select: { name: true, referenceId: true }
+        job: {
+          select: { id: true, jobCode: true, jobTitle: true }
         },
-        usedBy: {
-          select: { name: true }
+        issuedBy: {
+          select: { id: true, name: true }
+        },
+        returns: {
+          select: { quantityUsed: true, quantityDamaged: true, quantityGood: true }
         }
       },
-      orderBy: { usedAt: 'desc' }
+      orderBy: { issuedAt: 'desc' }
     });
 
-    const summary = usages.reduce((acc: any, usage) => {
-      const key = usage.materialId;
-      if (!acc[key]) {
-        acc[key] = {
-          material: usage.material,
-          totalQuantityUsed: 0,
-          totalCost: 0,
-          usageCount: 0
+    // Calculate consumption per material
+    const summary: any = {};
+    const consumptionRecords: any[] = [];
+
+    for (const issue of issues) {
+      const key = issue.materialId;
+      
+      // Calculate consumed quantity (issued - returned good)
+      const totalReturned = issue.returns.reduce((sum: number, ret: any) => sum + (ret.quantityGood || 0), 0);
+      const consumed = issue.quantity - totalReturned;
+      const consumptionCost = consumed * issue.unitCost;
+
+      if (!summary[key]) {
+        summary[key] = {
+          material: issue.material,
+          totalQuantityConsumed: 0,
+          totalConsumptionCost: 0,
+          consumptionCount: 0,
+          jobsAffected: new Set()
         };
       }
-      acc[key].totalQuantityUsed += usage.quantityUsed;
-      acc[key].totalCost += usage.totalCost;
-      acc[key].usageCount += 1;
-      return acc;
-    }, {});
+      summary[key].totalQuantityConsumed += consumed;
+      summary[key].totalConsumptionCost += consumptionCost;
+      summary[key].consumptionCount += 1;
+      summary[key].jobsAffected.add(issue.jobId);
+
+      // Add detailed record
+      consumptionRecords.push({
+        id: issue.id,
+        materialSku: issue.material.sku,
+        materialName: issue.material.name,
+        materialId: issue.materialId,
+        jobCode: issue.job?.jobCode || 'N/A',
+        jobTitle: issue.job?.jobTitle || 'Unknown',
+        quantityIssued: issue.quantity,
+        quantityReturned: totalReturned,
+        quantityConsumed: consumed,
+        unitCost: issue.unitCost,
+        consumptionCost,
+        issuedDate: issue.issuedAt,
+        issuedBy: issue.issuedBy?.name || 'Unknown'
+      });
+    }
+
+    // Convert summary
+    const summaryArray = Object.values(summary).map((item: any) => ({
+      material: item.material,
+      totalQuantityConsumed: item.totalQuantityConsumed,
+      totalConsumptionCost: item.totalConsumptionCost,
+      consumptionCount: item.consumptionCount,
+      jobsAffected: item.jobsAffected.size
+    }));
 
     res.json({
-      usages,
-      summary: Object.values(summary),
-      totalRecords: usages.length
+      consumptions: consumptionRecords,
+      summary: summaryArray,
+      totals: {
+        totalMaterials: Object.keys(summary).length,
+        totalQuantityConsumed: consumptionRecords.reduce((sum: number, r: any) => sum + r.quantityConsumed, 0),
+        totalCost: consumptionRecords.reduce((sum: number, r: any) => sum + r.consumptionCost, 0)
+      }
     });
   } catch (error) {
     console.error("Error fetching consumption report:", error);
@@ -1016,26 +983,55 @@ router.get("/reports/purchase-history", authenticateToken as any, async (req: Au
       where.vendorId = vendorId;
     }
 
-    const purchases = await prisma.stockBatch.findMany({
-      where,
+    const purchases = await prisma.purchaseOrder.findMany({
+      where: {
+        companyId,
+        ...(startDate && endDate ? {
+          orderDate: {
+            gte: new Date(startDate as string),
+            lte: new Date(endDate as string)
+          }
+        } : {}),
+        ...(vendorId ? { vendorId: vendorId as string } : {})
+      },
       include: {
-        material: {
-          select: { sku: true, name: true, unit: true }
-        },
         vendor: {
           select: { name: true, phone: true }
+        },
+        items: {
+          include: {
+            material: {
+              select: { sku: true, name: true, unit: true }
+            }
+          }
         }
       },
-      orderBy: { purchaseDate: 'desc' }
+      orderBy: { orderDate: 'desc' }
     });
+
+    // Flatten items for the report
+    const flattenedPurchases = purchases.flatMap(po =>
+      po.items.map(item => ({
+        id: item.id,
+        orderNumber: po.orderNumber,
+        purchaseDate: po.orderDate,
+        vendorName: po.vendorName || po.vendor?.name || 'Unknown',
+        materialName: item.material.name,
+        sku: item.material.sku,
+        quantityPurchased: item.quantity,
+        unitCost: item.unitCost,
+        totalCost: item.totalCost,
+        status: po.status
+      }))
+    );
 
     const summary = {
       totalPurchases: purchases.length,
-      totalQuantity: purchases.reduce((sum, p) => sum + p.quantityPurchased, 0),
-      totalAmount: purchases.reduce((sum, p) => sum + (p.quantityPurchased * p.unitCost), 0)
+      totalQuantity: flattenedPurchases.reduce((sum, p) => sum + p.quantityPurchased, 0),
+      totalAmount: flattenedPurchases.reduce((sum, p) => sum + p.totalCost, 0)
     };
 
-    res.json({ purchases, summary });
+    res.json({ purchases: flattenedPurchases, summary });
   } catch (error) {
     console.error("Error fetching purchase history:", error);
     res.status(500).json({ error: "Failed to fetch purchase history" });
@@ -1053,32 +1049,34 @@ router.get("/reports/vendor-performance", authenticateToken as any, async (req: 
     const vendors = await prisma.vendor.findMany({
       where: { companyId },
       include: {
-        stockBatches: {
+        purchaseOrders: {
           include: {
-            material: {
-              select: { name: true, unit: true }
-            }
+            items: true
           }
         }
       }
     });
 
-    const performance = vendors.map(vendor => ({
-      id: vendor.id,
-      name: vendor.name,
-      phone: vendor.phone,
-      email: vendor.email,
-      rating: vendor.rating || 0,
-      totalPurchases: vendor.stockBatches.length,
-      totalQuantitySupplied: vendor.stockBatches.reduce((sum, b) => sum + b.quantityPurchased, 0),
-      totalAmount: vendor.stockBatches.reduce((sum, b) => sum + (b.quantityPurchased * b.unitCost), 0),
-      avgUnitCost: vendor.stockBatches.length > 0
-        ? vendor.stockBatches.reduce((sum, b) => sum + b.unitCost, 0) / vendor.stockBatches.length
-        : 0,
-      lastPurchaseDate: vendor.stockBatches.length > 0
-        ? vendor.stockBatches.sort((a, b) => b.purchaseDate.getTime() - a.purchaseDate.getTime())[0].purchaseDate
-        : null
-    }));
+    const performance = vendors.map(vendor => {
+      const allItems = vendor.purchaseOrders.flatMap(po => po.items);
+
+      return {
+        id: vendor.id,
+        name: vendor.name,
+        phone: vendor.phone,
+        email: vendor.email,
+        rating: vendor.rating || 0,
+        totalPurchases: vendor.purchaseOrders.length,
+        totalQuantitySupplied: allItems.reduce((sum, item) => sum + item.quantity, 0),
+        totalAmount: allItems.reduce((sum, item) => sum + item.totalCost, 0),
+        avgUnitCost: allItems.length > 0
+          ? allItems.reduce((sum, item) => sum + item.unitCost, 0) / allItems.length
+          : 0,
+        lastPurchaseDate: vendor.purchaseOrders.length > 0
+          ? vendor.purchaseOrders.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime())[0].orderDate
+          : null
+      };
+    });
 
     res.json({ vendors: performance });
   } catch (error) {
@@ -1190,244 +1188,131 @@ router.get("/reports/valuation", authenticateToken as any, async (req: AuthReque
   }
 });
 
-// ==================== MOVING JOBS MATERIAL INTEGRATION ====================
+// ==================== MATERIAL TRACKING REPORTS ====================
 
 /**
- * POST /api/materials/issue
- * Issue material to a moving job
+ * GET /api/materials/reports/complete-tracking
+ * Get complete tracking for all materials: WHERE they came from → WHERE they went
  */
-router.post("/issue", authenticateToken as any, async (req: AuthRequest, res) => {
+router.get("/reports/complete-tracking", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
-    const { companyId, id: userId } = req.user!;
-    const { jobId, materialId, quantity, rackId, notes } = req.body;
+    const { companyId } = req.user!;
+    const { startDate, endDate, materialId } = req.query;
 
-    if (!jobId || !materialId || !quantity) {
-      return res.status(400).json({ error: "jobId, materialId, and quantity are required" });
-    }
+    const dateFilter = startDate && endDate ? {
+      gte: new Date(startDate as string),
+      lte: new Date(endDate as string)
+    } : undefined;
 
-    if (quantity <= 0) {
-      return res.status(400).json({ error: "Quantity must be greater than 0" });
-    }
-
-    // Get material details
-    const material = await prisma.packingMaterial.findUnique({
-      where: { id: materialId, companyId }
-    });
-
-    if (!material) {
-      return res.status(404).json({ error: "Material not found" });
-    }
-
-    // Check if enough stock is available
-    if (material.totalQuantity < quantity) {
-      return res.status(400).json({
-        error: `Insufficient stock. Available: ${material.totalQuantity} ${material.unit}`
-      });
-    }
-
-    // Get the most recent stock batch for cost calculation
-    const latestBatch = await prisma.stockBatch.findFirst({
-      where: {
-        materialId,
-        quantityRemaining: { gt: 0 }
-      },
-      orderBy: { purchaseDate: 'desc' }
-    });
-
-    const unitCost = latestBatch?.unitCost || 0;
-    const totalCost = unitCost * quantity;
-
-    // Create material issue record
-    const issue = await prisma.materialIssue.create({
-      data: {
-        companyId,
-        materialId,
-        jobId,
-        quantity,
-        unitCost,
-        totalCost,
-        rackId: rackId || null,
-        notes,
-        issuedById: userId,
-        issuedAt: new Date()
-      },
+    // Get all purchases
+    const purchases = await prisma.purchaseOrder.findMany({
+      where: { companyId, ...(dateFilter ? { orderDate: dateFilter } : {}) },
       include: {
-        material: {
-          select: {
-            sku: true,
-            name: true,
-            unit: true
-          }
+        items: {
+          include: { material: true }
         },
-        rack: {
-          select: {
-            code: true,
-            location: true
-          }
+        vendor: true
+      }
+    });
+
+    // Get all issues
+    const issues = await prisma.materialIssue.findMany({
+      where: { companyId, ...(dateFilter ? { issuedAt: dateFilter } : {}) },
+      include: {
+        material: true,
+        job: true,
+        issuedBy: true,
+        returns: true
+      }
+    });
+
+    // Build complete tracking map
+    const trackingMap: any = {};
+
+    // Step 1: Add purchases
+    for (const po of purchases) {
+      for (const item of po.items) {
+        if (materialId && item.materialId !== materialId) continue;
+        
+        const key = item.materialId;
+        if (!trackingMap[key]) {
+          trackingMap[key] = {
+            material: item.material,
+            purchases: [],
+            usage: [],
+            totalPurchased: 0,
+            totalUsed: 0,
+            totalReturned: 0,
+            totalDamaged: 0,
+            currentStock: item.material.totalQuantity
+          };
         }
-      }
-    });
-
-    // Deduct from stock batches (FIFO)
-    let remainingToDeduct = quantity;
-    const batches = await prisma.stockBatch.findMany({
-      where: {
-        materialId,
-        quantityRemaining: { gt: 0 }
-      },
-      orderBy: { purchaseDate: 'asc' }
-    });
-
-    for (const batch of batches) {
-      if (remainingToDeduct <= 0) break;
-
-      const deductFromBatch = Math.min(batch.quantityRemaining, remainingToDeduct);
-
-      await prisma.stockBatch.update({
-        where: { id: batch.id },
-        data: {
-          quantityRemaining: batch.quantityRemaining - deductFromBatch
-        }
-      });
-
-      remainingToDeduct -= deductFromBatch;
-    }
-
-    // Update total quantity in material
-    await prisma.packingMaterial.update({
-      where: { id: materialId },
-      data: {
-        totalQuantity: material.totalQuantity - quantity
-      }
-    });
-
-    res.status(201).json(issue);
-  } catch (error) {
-    console.error("Error issuing material:", error);
-    res.status(500).json({ error: "Failed to issue material" });
-  }
-});
-
-/**
- * POST /api/materials/return
- * Record material return from a job
- */
-router.post("/return", authenticateToken as any, damagePhotoUpload.array('photos', 10), async (req: AuthRequest, res) => {
-  try {
-    const { companyId, id: userId } = req.user!;
-    const {
-      jobId,
-      issueId,
-      damageReason,
-      notes
-    } = req.body;
-
-    // Parse numeric values from FormData (they come as strings)
-    const quantityUsed = parseInt(req.body.quantityUsed) || 0;
-    const quantityGood = parseInt(req.body.quantityGood) || 0;
-    const quantityDamaged = parseInt(req.body.quantityDamaged) || 0;
-
-    if (!jobId || !issueId) {
-      return res.status(400).json({ error: "jobId and issueId are required" });
-    }
-
-    // Get the issue record
-    const issue = await prisma.materialIssue.findUnique({
-      where: { id: issueId, companyId },
-      include: { material: true }
-    });
-
-    if (!issue) {
-      return res.status(404).json({ error: "Material issue record not found" });
-    }
-
-    // Validate quantities - simple check that returned + damaged doesn't exceed issued
-    const totalReturn = quantityGood + quantityDamaged;
-    if (totalReturn > issue.quantity) {
-      return res.status(400).json({
-        error: `Total returned (${totalReturn}) cannot exceed issued quantity (${issue.quantity})`
-      });
-    }
-
-    if (quantityDamaged > 0 && !damageReason) {
-      return res.status(400).json({
-        error: "Damage reason is required when damaged quantity > 0"
-      });
-    }
-
-    // Handle photo uploads
-    let photoUrls: string[] = [];
-    if (req.files && Array.isArray(req.files)) {
-      photoUrls = req.files.map((file: any) => `/uploads/damages/${file.filename}`);
-    }
-
-    // Create material return record
-    const returnRecord = await prisma.materialReturn.create({
-      data: {
-        companyId,
-        materialId: issue.materialId,
-        jobId,
-        issueId,
-        quantityUsed,
-        quantityGood,
-        quantityDamaged,
-        notes,
-        recordedById: userId,
-        recordedAt: new Date()
-      }
-    });
-
-    // Add good quantity back to stock
-    if (quantityGood > 0) {
-      // Find most recent batch to add back to
-      const latestBatch = await prisma.stockBatch.findFirst({
-        where: { materialId: issue.materialId },
-        orderBy: { purchaseDate: 'desc' }
-      });
-
-      if (latestBatch) {
-        await prisma.stockBatch.update({
-          where: { id: latestBatch.id },
-          data: {
-            quantityRemaining: latestBatch.quantityRemaining + quantityGood
-          }
+        trackingMap[key].purchases.push({
+          type: 'PURCHASE',
+          orderNumber: po.orderNumber,
+          vendor: po.vendorName || po.vendor?.name,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          totalCost: item.totalCost,
+          status: po.status,
+          date: po.orderDate
         });
+        trackingMap[key].totalPurchased += item.quantity;
       }
-
-      // Update total quantity
-      await prisma.packingMaterial.update({
-        where: { id: issue.materialId },
-        data: {
-          totalQuantity: issue.material.totalQuantity + quantityGood
-        }
-      });
     }
 
-    // Record damaged materials
-    if (quantityDamaged > 0) {
-      await prisma.materialDamage.create({
-        data: {
-          companyId,
-          returnId: returnRecord.id,
-          materialId: issue.materialId,
-          quantity: quantityDamaged,
-          reason: damageReason || '',
-          photoUrls: photoUrls.join(','),
-          recordedById: userId,
-          recordedAt: new Date()
-        }
+    // Step 2: Add issues (consumption)
+    for (const issue of issues) {
+      if (materialId && issue.materialId !== materialId) continue;
+      
+      const key = issue.materialId;
+      if (!trackingMap[key]) {
+        trackingMap[key] = {
+          material: issue.material,
+          purchases: [],
+          usage: [],
+          totalPurchased: 0,
+          totalUsed: 0,
+          totalReturned: 0,
+          totalDamaged: 0,
+          currentStock: issue.material.totalQuantity
+        };
+      }
+      
+      const totalReturned = issue.returns.reduce((sum: number, r: any) => sum + (r.quantityGood || 0), 0);
+      const totalDamaged = issue.returns.reduce((sum: number, r: any) => sum + (r.quantityDamaged || 0), 0);
+      const consumed = issue.quantity - totalReturned;
+
+      trackingMap[key].usage.push({
+        type: 'USAGE',
+        jobCode: issue.job?.jobCode || 'N/A',
+        jobTitle: issue.job?.jobTitle || 'Unknown',
+        quantityIssued: issue.quantity,
+        quantityConsumed: consumed,
+        quantityReturned: totalReturned,
+        quantityDamaged: totalDamaged,
+        unitCost: issue.unitCost,
+        issuedDate: issue.issuedAt,
+        issuedBy: issue.issuedBy?.name || 'Unknown'
       });
+      trackingMap[key].totalUsed += consumed;
+      trackingMap[key].totalReturned += totalReturned;
+      trackingMap[key].totalDamaged += totalDamaged;
     }
 
-    res.status(201).json({
-      message: 'Material return recorded successfully',
-      return: returnRecord,
-      stockUpdated: quantityGood > 0,
-      damageRecorded: quantityDamaged > 0
+    res.json({
+      tracking: Object.values(trackingMap),
+      totals: {
+        materialsTracked: Object.keys(trackingMap).length,
+        totalPurchased: Object.values(trackingMap).reduce((sum: number, m: any) => sum + m.totalPurchased, 0),
+        totalUsed: Object.values(trackingMap).reduce((sum: number, m: any) => sum + m.totalUsed, 0),
+        totalReturned: Object.values(trackingMap).reduce((sum: number, m: any) => sum + m.totalReturned, 0),
+        totalDamaged: Object.values(trackingMap).reduce((sum: number, m: any) => sum + m.totalDamaged, 0)
+      }
     });
   } catch (error) {
-    console.error("Error recording material return:", error);
-    res.status(500).json({ error: "Failed to record material return" });
+    console.error("Error fetching complete tracking:", error);
+    res.status(500).json({ error: "Failed to fetch complete tracking" });
   }
 });
 
@@ -1559,5 +1444,163 @@ router.get("/:materialId/history", authenticateToken as any, async (req: AuthReq
   }
 });
 
+// ==================== PURCHASE ORDERS ====================
+
+/**
+ * GET /api/purchase-orders
+ * Get all purchase orders for the company
+ */
+router.get("/purchase-orders", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const purchases = await prisma.purchaseOrder.findMany({
+      where: { companyId },
+      include: {
+        items: {
+          include: {
+            material: true
+          }
+        },
+        vendor: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Flatten the response to include item details
+    const flattened = purchases.flatMap(po =>
+      po.items.map(item => ({
+        id: item.id,
+        orderNumber: po.orderNumber,
+        invoiceNumber: po.orderNumber, // Using orderNumber as invoice for now
+        vendorName: po.vendorName || po.vendor?.name || 'Unknown',
+        vendorId: po.vendorId,
+        materialId: item.materialId,
+        quantity: item.quantity,
+        unitCost: item.unitCost,
+        totalCost: item.totalCost,
+        orderDate: po.orderDate,
+        receivedDate: po.receivedDate,
+        status: po.status,
+        notes: po.notes
+      }))
+    );
+
+    res.json(flattened);
+  } catch (error) {
+    console.error("Error fetching purchase orders:", error);
+    res.status(500).json({ error: "Failed to fetch purchase orders" });
+  }
+});
+
+/**
+ * POST /api/purchase-orders
+ * Create a new purchase order
+ */
+router.post("/purchase-orders", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.companyId;
+    const userId = req.user?.id;
+
+    if (!companyId || !userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const {
+      orderNumber,
+      invoiceNumber,
+      vendorName,
+      vendorId,
+      materialId,
+      quantity,
+      unitCost,
+      orderDate,
+      receivedDate,
+      status,
+      notes
+    } = req.body;
+
+    if (!orderNumber || !vendorName || !materialId || !quantity || unitCost === undefined) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const totalCost = quantity * unitCost;
+
+    // Use a transaction to ensure data consistency
+    const result = await prisma.$transaction(async (prisma) => {
+      // Create purchase order
+      const purchaseOrder = await prisma.purchaseOrder.create({
+        data: {
+          orderNumber,
+          vendorName,
+          vendorId: vendorId || null,
+          orderDate: orderDate ? new Date(orderDate) : new Date(),
+          receivedDate: receivedDate ? new Date(receivedDate) : null,
+          status: status || 'PENDING',
+          notes: notes || null,
+          totalAmount: totalCost,
+          createdById: userId,
+          companyId
+        }
+      });
+
+      // Create purchase order item
+      const item = await prisma.purchaseOrderItem.create({
+        data: {
+          purchaseOrderId: purchaseOrder.id,
+          materialId,
+          quantity,
+          unitCost,
+          totalCost,
+          companyId
+        },
+        include: {
+          material: true,
+          purchaseOrder: true
+        }
+      });
+
+      // If status is RECEIVED, update material stock
+      if (status === 'RECEIVED') {
+        await prisma.packingMaterial.update({
+          where: { id: materialId },
+          data: {
+            totalQuantity: {
+              increment: quantity
+            },
+            // Update unit cost to the latest cost
+            unitCost: unitCost
+          }
+        });
+      }
+
+      return {
+        id: item.id,
+        orderNumber: purchaseOrder.orderNumber,
+        invoiceNumber: invoiceNumber || orderNumber,
+        vendorName,
+        vendorId,
+        materialId,
+        quantity,
+        unitCost,
+        totalCost,
+        orderDate: purchaseOrder.orderDate,
+        receivedDate: purchaseOrder.receivedDate,
+        status: purchaseOrder.status,
+        notes
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error creating purchase order:", error);
+    res.status(500).json({ error: "Failed to create purchase order" });
+  }
+});
+
 export default router;
+
 

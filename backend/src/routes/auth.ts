@@ -3,6 +3,8 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
+import { logUserActivity } from '../utils/auditLog';
+import { trackUserActivity } from '../services/userActivityTracker';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -46,6 +48,29 @@ router.post('/login', async (req: Request, res: Response) => {
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    // Update last login time
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Log activity
+    await logUserActivity(user.id, 'LOGIN', 'USER', user.id, 'User logged in', req);
+
+    // Track user activity in real-time
+    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    trackUserActivity(
+      user.id,
+      user.name,
+      user.email,
+      user.role,
+      '/login',
+      ipAddress,
+      userAgent,
+      new Date()
+    );
 
     // Generate JWT token
     const token = jwt.sign(

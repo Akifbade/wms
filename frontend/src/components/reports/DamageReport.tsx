@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAuthToken } from '../../services/api';
 import { AlertTriangle, Calendar, Package, MapPin, Camera, FileText, Download, Printer } from 'lucide-react';
 
 interface DamageRecord {
@@ -35,6 +36,7 @@ export const DamageReport: React.FC = () => {
   const [summary, setSummary] = useState<DamageSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [authRequired, setAuthRequired] = useState<string | null>(null);
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -53,9 +55,19 @@ export const DamageReport: React.FC = () => {
       if (filters.endDate) params.append('endDate', filters.endDate);
       if (filters.materialId) params.append('materialId', filters.materialId);
 
+      const token = getAuthToken();
+      if (!token) {
+        console.warn('No auth token present - please login to view damage reports');
+        setAuthRequired('Please login to view damage reports');
+        setDamages([]);
+        setSummary(null);
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch(`/api/reports/damages?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -124,6 +136,12 @@ export const DamageReport: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {authRequired && (
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
+          {authRequired}
+        </div>
+      )}
 
       {/* Summary Cards */}
       {summary && (

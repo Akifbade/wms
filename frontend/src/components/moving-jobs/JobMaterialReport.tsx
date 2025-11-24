@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Printer, Download } from 'lucide-react';
 
 interface JobMaterialReportProps {
@@ -23,6 +23,12 @@ interface MaterialIssue {
     quantityGood: number;
     quantityDamaged: number;
     recordedAt: string;
+    damages?: Array<{
+      id: string;
+      quantity: number;
+      reason?: string;
+      photoUrls?: string | null;
+    }>;
   }>;
   damages: Array<{
     quantity: number;
@@ -55,7 +61,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
     setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      
+
       // Load job details
       const jobResponse = await fetch(`/api/moving-jobs/${jobId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -102,7 +108,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
   const handleDownload = () => {
     const totals = calculateTotals();
     let csv = 'Material SKU,Material Name,Issued Qty,Used Qty,Returned Good,Damaged,Unit Cost,Total Cost,Status\n';
-    
+
     materials.forEach(material => {
       const returned = material.returns?.[0];
       const status = returned ? 'Returned' : 'Pending';
@@ -187,9 +193,8 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                     <div>
                       <p><strong>Client:</strong> {job?.clientName}</p>
                       <p><strong>Date:</strong> {new Date(job?.jobDate || '').toLocaleDateString()}</p>
-                      <p><strong>Status:</strong> <span className={`px-2 py-1 rounded text-xs ${
-                        job?.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                      }`}>{job?.status}</span></p>
+                      <p><strong>Status:</strong> <span className={`px-2 py-1 rounded text-xs ${job?.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                        }`}>{job?.status}</span></p>
                     </div>
                   </div>
                 </div>
@@ -247,9 +252,8 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                           <td className="border px-4 py-2 text-right">{material.unitCost.toFixed(2)} KWD</td>
                           <td className="border px-4 py-2 text-right font-bold">{material.totalCost.toFixed(2)} KWD</td>
                           <td className="border px-4 py-2 text-center">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              returned ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
-                            }`}>
+                            <span className={`px-2 py-1 rounded text-xs ${returned ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                              }`}>
                               {returned ? 'Returned' : 'Pending'}
                             </span>
                           </td>
@@ -276,7 +280,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                     {materials
                       .filter(m => m.returns?.[0]?.quantityDamaged > 0)
                       .map(material => {
-                        const damage = material.damages?.[0];
+                        const damage = material.returns?.[0]?.damages?.[0];
                         return (
                           <div key={material.id} className="border rounded p-4 mb-3">
                             <p className="font-bold">{material.material.name}</p>
@@ -286,7 +290,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                                 <p className="text-sm mt-2"><strong>Reason:</strong> {damage.reason}</p>
                                 {damage.photoUrls && (
                                   <div className="flex gap-2 mt-2">
-                                    {damage.photoUrls.split(',').map((url, idx) => (
+                                    {((Array.isArray(damage.photoUrls) ? damage.photoUrls : damage.photoUrls.split(','))).map((url: string, idx: number) => (
                                       <img key={idx} src={url} alt={`Damage ${idx + 1}`} className="w-20 h-20 object-cover rounded" />
                                     ))}
                                   </div>

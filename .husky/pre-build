@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Auto-increment version before every build
+powershell.exe -ExecutionPolicy Bypass -File .vscode/auto-version-and-commit.ps1

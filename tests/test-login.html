@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS Login Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .status.loading { background: #fff3cd; color: #856404; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .info-box {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .info-item:last-child { border-bottom: none; }
+        .info-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        .info-value {
+            color: #28a745;
+            font-family: 'Courier New', monospace;
+        }
+        .info-value.fail {
+            color: #dc3545;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .log {
+            background: #212529;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .log-line {
+            margin-bottom: 5px;
+        }
+        .log-error { color: #ff6b6b; }
+        .log-success { color: #51cf66; }
+        .log-info { color: #74c0fc; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏭 WMS Login Tester</h1>
+        <p class="subtitle">Testing your Warehouse Management System connection...</p>
+        
+        <div id="status" class="status loading">
+            🔄 Checking system status...
+        </div>
+
+        <div class="info-box">
+            <div class="info-item">
+                <span class="info-label">Backend Server:</span>
+                <span id="backend-status" class="info-value">Checking...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Frontend Server:</span>
+                <span id="frontend-status" class="info-value">Checking...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Login API:</span>
+                <span id="login-status" class="info-value">Not tested</span>
+            </div>
+        </div>
+
+        <button id="test-btn" onclick="runFullTest()">
+            🚀 Run Full System Test
+        </button>
+
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        const TEST_EMAIL = 'admin@demo.com';
+        const TEST_PASSWORD = 'admin123';
+
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const line = document.createElement('div');
+            line.className = `log-line log-${type}`;
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEl.appendChild(line);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${type}`;
+            statusEl.textContent = message;
+        }
+
+        async function checkBackend() {
+            log('Testing backend server (http://localhost:5000)...');
+            try {
+                const response = await fetch(`${API_BASE}/health`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('backend-status').textContent = '✅ Online';
+                    document.getElementById('backend-status').classList.remove('fail');
+                    log(`✅ Backend is running: ${data.message}`, 'success');
+                    return true;
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (err) {
+                document.getElementById('backend-status').textContent = '❌ Offline';
+                document.getElementById('backend-status').classList.add('fail');
+                log(`❌ Backend check failed: ${err.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function checkFrontend() {
+            log('Testing frontend server (http://localhost:3000)...');
+            try {
+                const response = await fetch('http://localhost:3000', {
+                    method: 'HEAD',
+                    mode: 'no-cors'
+                });
+                document.getElementById('frontend-status').textContent = '✅ Online';
+                document.getElementById('frontend-status').classList.remove('fail');
+                log('✅ Frontend is accessible', 'success');
+                return true;
+            } catch (err) {
+                document.getElementById('frontend-status').textContent = '❌ Offline';
+                document.getElementById('frontend-status').classList.add('fail');
+                log(`❌ Frontend check failed: ${err.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testLogin() {
+            log(`Attempting login as ${TEST_EMAIL}...`);
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: TEST_EMAIL,
+                        password: TEST_PASSWORD
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.token) {
+                    document.getElementById('login-status').textContent = '✅ Success';
+                    document.getElementById('login-status').classList.remove('fail');
+                    log(`✅ Login successful!`, 'success');
+                    log(`   User: ${data.user.email} (${data.user.role})`, 'success');
+                    log(`   Token: ${data.token.substring(0, 30)}...`, 'info');
+                    
+                    // Test authenticated endpoint
+                    await testAuthenticatedAPI(data.token);
+                    return true;
+                } else {
+                    throw new Error(data.message || data.error || 'Login failed');
+                }
+            } catch (err) {
+                document.getElementById('login-status').textContent = '❌ Failed';
+                document.getElementById('login-status').classList.add('fail');
+                log(`❌ Login failed: ${err.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testAuthenticatedAPI(token) {
+            log('Testing authenticated API call...');
+            try {
+                const response = await fetch(`${API_BASE}/shipments`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Authenticated API works! Found ${data.pagination.total} shipments`, 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (err) {
+                log(`⚠️  Authenticated API test failed: ${err.message}`, 'error');
+            }
+        }
+
+        async function runFullTest() {
+            const btn = document.getElementById('test-btn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Testing...';
+            
+            document.getElementById('log').innerHTML = '';
+            updateStatus('🔄 Running system tests...', 'loading');
+
+            log('=== STARTING SYSTEM TEST ===', 'info');
+            log('');
+
+            const backendOk = await checkBackend();
+            await new Promise(r => setTimeout(r, 500));
+            
+            const frontendOk = await checkFrontend();
+            await new Promise(r => setTimeout(r, 500));
+
+            if (backendOk) {
+                const loginOk = await testLogin();
+                await new Promise(r => setTimeout(r, 500));
+
+                if (loginOk) {
+                    log('');
+                    log('=== ✅ ALL TESTS PASSED ===', 'success');
+                    log('Your system is working perfectly!', 'success');
+                    log('');
+                    log('👉 You can now login at: http://localhost:3000', 'info');
+                    log(`📧 Email: ${TEST_EMAIL}`, 'info');
+                    log(`🔑 Password: ${TEST_PASSWORD}`, 'info');
+                    updateStatus('✅ System is fully operational!', 'success');
+                } else {
+                    log('');
+                    log('=== ⚠️  LOGIN ISSUE DETECTED ===', 'error');
+                    updateStatus('⚠️ Login test failed', 'error');
+                }
+            } else {
+                log('');
+                log('=== ❌ BACKEND IS NOT RESPONDING ===', 'error');
+                log('Please start the backend server:', 'error');
+                log('cd backend && npm run dev', 'info');
+                updateStatus('❌ Backend server is not running', 'error');
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔄 Run Test Again';
+        }
+
+        // Auto-run test on page load
+        window.addEventListener('load', () => {
+            setTimeout(runFullTest, 500);
+        });
+    </script>
+</body>
+</html>

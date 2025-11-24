@@ -17,7 +17,8 @@ import {
   ChartBarIcon,
   ExclamationTriangleIcon,
   ServerStackIcon,
-  BuildingOfficeIcon
+  BuildingOfficeIcon,
+  CpuChipIcon
 } from '@heroicons/react/24/outline';
 import { VersionBadgeHeader } from '../VersionBadgeHeader';
 
@@ -35,6 +36,7 @@ const navigationConfig = {
     { name: 'Expenses', href: '/expenses', icon: BanknotesIcon },
     { name: 'Scanner', href: '/scanner', icon: QrCodeIcon },
     { name: 'Backups', href: '/backups', icon: ServerStackIcon },
+    { name: 'System Monitor', href: '/system-monitor', icon: CpuChipIcon },
     { name: '⚙️ Plugin Settings', href: '/plugin-settings', icon: Cog6ToothIcon },
     { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
   ],

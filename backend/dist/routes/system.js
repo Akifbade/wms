@@ -1,0 +1,247 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_1 = require("../middleware/auth");
+const os_1 = __importDefault(require("os"));
+const child_process_1 = require("child_process");
+const util_1 = __importDefault(require("util"));
+const client_1 = require("@prisma/client");
+const userActivityTracker_1 = require("../services/userActivityTracker");
+const router = (0, express_1.Router)();
+const execAsync = util_1.default.promisify(child_process_1.exec);
+const prisma = new client_1.PrismaClient();
+// Apply authentication and admin only access
+router.use(auth_1.authenticateToken);
+router.use((0, auth_1.authorizeRoles)('ADMIN'));
+router.get('/stats', async (req, res) => {
+    try {
+        // 1. CPU Usage & Load
+        const cpus = os_1.default.cpus();
+        const loadAvg = os_1.default.loadavg(); // [1, 5, 15] min load averages
+        const coreCount = cpus.length;
+        // Calculate ACTUAL CPU usage from /proc/stat (Linux) or top (fallback)
+        let cpuUsagePercent = 0;
+        try {
+            if (os_1.default.platform() === 'linux') {
+                // Get CPU usage from /proc/stat (more accurate)
+                const { stdout: stat1 } = await execAsync("cat /proc/stat | grep '^cpu '");
+                await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+                const { stdout: stat2 } = await execAsync("cat /proc/stat | grep '^cpu '");
+                const parseStat = (line) => {
+                    const values = line.split(/\s+/).slice(1, 8).map(Number);
+                    return {
+                        user: values[0],
+                        nice: values[1],
+                        system: values[2],
+                        idle: values[3],
+                        iowait: values[4],
+                        irq: values[5],
+                        softirq: values[6]
+                    };
+                };
+                const stat1Data = parseStat(stat1);
+                const stat2Data = parseStat(stat2);
+                const idle1 = stat1Data.idle + stat1Data.iowait;
+                const idle2 = stat2Data.idle + stat2Data.iowait;
+                const total1 = Object.values(stat1Data).reduce((a, b) => a + b, 0);
+                const total2 = Object.values(stat2Data).reduce((a, b) => a + b, 0);
+                const totalDiff = total2 - total1;
+                const idleDiff = idle2 - idle1;
+                cpuUsagePercent = totalDiff > 0 ? ((totalDiff - idleDiff) / totalDiff) * 100 : 0;
+                cpuUsagePercent = Math.min(100, Math.max(0, cpuUsagePercent));
+            }
+            else {
+                // Fallback: use load average (less accurate but works on all platforms)
+                cpuUsagePercent = Math.min(100, (loadAvg[0] / coreCount) * 100);
+            }
+        }
+        catch (e) {
+            console.error('CPU calculation error:', e);
+            // Fallback if calculation fails
+            cpuUsagePercent = Math.min(100, (loadAvg[0] / coreCount) * 100);
+        }
+        // 2. Memory Usage
+        const totalMem = os_1.default.totalmem();
+        const freeMem = os_1.default.freemem();
+        const usedMem = totalMem - freeMem;
+        const memUsagePercent = (usedMem / totalMem) * 100;
+        // 3. Uptime
+        const uptime = os_1.default.uptime();
+        // 4. Disk Usage (Linux/Mac specific, fallback for Windows)
+        let diskSpace = [];
+        try {
+            const { stdout } = await execAsync('df -h /');
+            // Parse df output
+            // Filesystem      Size  Used Avail Use% Mounted on
+            // overlay          60G   30G   30G  50% /
+            const lines = stdout.trim().split('\n');
+            if (lines.length >= 2) {
+                const parts = lines[1].split(/\s+/);
+                if (parts.length >= 5) {
+                    diskSpace.push({
+                        filesystem: parts[0],
+                        size: parts[1],
+                        used: parts[2],
+                        available: parts[3],
+                        usePercent: parts[4],
+                        mount: parts[5]
+                    });
+                }
+            }
+        }
+        catch (e) {
+            // Windows fallback for Disk Space
+            if (os_1.default.platform() === 'win32') {
+                try {
+                    const { stdout } = await execAsync('wmic logicaldisk get size,freespace,caption');
+                    const lines = stdout.trim().split('\n').slice(1);
+                    for (const line of lines) {
+                        const parts = line.trim().split(/\s+/);
+                        if (parts.length >= 3) {
+                            const caption = parts[0];
+                            const free = parseInt(parts[1]);
+                            const size = parseInt(parts[2]);
+                            const used = size - free;
+                            const percent = Math.round((used / size) * 100);
+                            diskSpace.push({
+                                filesystem: caption,
+                                size: (size / (1024 * 1024 * 1024)).toFixed(1) + 'G',
+                                used: (used / (1024 * 1024 * 1024)).toFixed(1) + 'G',
+                                available: (free / (1024 * 1024 * 1024)).toFixed(1) + 'G',
+                                usePercent: percent + '%',
+                                mount: caption
+                            });
+                        }
+                    }
+                }
+                catch (winErr) {
+                    console.error('Windows disk check failed:', winErr);
+                }
+            }
+            else {
+                console.error('Disk space check failed:', e);
+            }
+        }
+        // 5. Top Processes (Linux specific)
+        let processes = [];
+        try {
+            // Get top 10 processes by CPU
+            const { stdout } = await execAsync('ps -eo pid,user,pcpu,pmem,comm --sort=-%cpu | head -11');
+            const lines = stdout.trim().split('\n');
+            // Skip header
+            for (let i = 1; i < lines.length; i++) {
+                const parts = lines[i].trim().split(/\s+/);
+                if (parts.length >= 5) {
+                    processes.push({
+                        pid: parts[0],
+                        user: parts[1],
+                        cpu: parseFloat(parts[2]),
+                        memory: parseFloat(parts[3]),
+                        command: parts.slice(4).join(' ')
+                    });
+                }
+            }
+        }
+        catch (e) {
+            // Windows fallback for Processes
+            if (os_1.default.platform() === 'win32') {
+                try {
+                    const { stdout } = await execAsync('tasklist /fo csv /nh');
+                    // "Image Name","PID","Session Name","Session#","Mem Usage"
+                    const lines = stdout.trim().split('\n').slice(0, 10); // Just take top 10 arbitrarily as sorting by CPU is hard with tasklist
+                    processes = lines.map(line => {
+                        const parts = line.split('","').map(p => p.replace(/"/g, ''));
+                        return {
+                            pid: parts[1],
+                            user: 'System', // Tasklist doesn't easily show user without /v which is slow
+                            cpu: 0, // Not easily available via tasklist
+                            memory: 0, // Parsing "12,345 K" is annoying but possible, skipping for now
+                            command: parts[0]
+                        };
+                    });
+                }
+                catch (winErr) {
+                    console.error('Windows process check failed:', winErr);
+                }
+            }
+            else {
+                console.error('Process check failed:', e);
+            }
+        }
+        // 6. Active Users & User Statistics
+        const activeUsersData = (0, userActivityTracker_1.getActiveUsers)();
+        const userStats = await (0, userActivityTracker_1.getUserStats)();
+        // 7. Database Connections
+        let dbConnections = 0;
+        try {
+            const result = await prisma.$queryRaw `
+        SELECT COUNT(*) as connections FROM information_schema.PROCESSLIST WHERE db = DATABASE()
+      `;
+            dbConnections = Number(result[0]?.connections) || 0;
+        }
+        catch (e) {
+            console.error('DB connection check failed:', e);
+        }
+        // 8. Resource Usage by Container (if in Docker)
+        let containerStats = [];
+        try {
+            const { stdout } = await execAsync('docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}" 2>/dev/null || echo ""');
+            if (stdout.trim()) {
+                const lines = stdout.trim().split('\n');
+                for (const line of lines) {
+                    const [name, cpu, mem, net, block] = line.split('\t');
+                    if (name) {
+                        containerStats.push({
+                            name,
+                            cpu: cpu || '0%',
+                            memory: mem || '0B',
+                            network: net || '0B / 0B',
+                            diskIO: block || '0B / 0B'
+                        });
+                    }
+                }
+            }
+        }
+        catch (e) {
+            // Docker not available or not in container
+        }
+        res.json({
+            system: {
+                platform: os_1.default.platform(),
+                arch: os_1.default.arch(),
+                hostname: os_1.default.hostname(),
+                uptime,
+                cpu: {
+                    cores: coreCount,
+                    model: cpus[0].model,
+                    loadAvg,
+                    usagePercent: parseFloat(cpuUsagePercent.toFixed(1))
+                },
+                memory: {
+                    total: totalMem,
+                    free: freeMem,
+                    used: usedMem,
+                    usagePercent: parseFloat(memUsagePercent.toFixed(1))
+                },
+                disk: diskSpace,
+            },
+            processes,
+            database: {
+                activeConnections: dbConnections
+            },
+            containers: containerStats,
+            users: {
+                active: activeUsersData,
+                statistics: userStats
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error fetching system stats:', error);
+        res.status(500).json({ error: 'Failed to fetch system stats' });
+    }
+});
+exports.default = router;

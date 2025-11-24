@@ -143,21 +143,15 @@ router.get('/', async (req, res) => {
         // Calculate utilization based on pallet usage rather than raw boxes
         const racksWithStats = racks.map((rack) => {
             const palletUsage = (0, rackCapacity_1.calculatePalletUsage)(rack.boxes || []);
-            // Determine status: FULL if at capacity, ACTIVE if has boxes, otherwise use stored status
-            let derivedStatus = 'ACTIVE';
-            if (palletUsage >= rack.capacityTotal) {
-                derivedStatus = 'FULL';
-            }
-            else if (palletUsage === 0 && rack.status === 'INACTIVE') {
-                derivedStatus = 'INACTIVE';
-            }
             return {
                 ...rack,
                 capacityUsed: palletUsage,
                 utilization: rack.capacityTotal > 0
                     ? Math.round((palletUsage / rack.capacityTotal) * 100)
                     : 0,
-                status: derivedStatus,
+                // Pass original DB status instead of overriding it
+                // Frontend handles 'FULL' display based on utilization
+                status: rack.status,
             };
         });
         res.json({ racks: racksWithStats });

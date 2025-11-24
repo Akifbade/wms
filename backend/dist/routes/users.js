@@ -7,6 +7,7 @@ const express_1 = require("express");
 const client_1 = require("@prisma/client");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const auth_1 = require("../middleware/auth");
+const auditLog_1 = require("../utils/auditLog");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 // Apply authentication to all routes
@@ -148,6 +149,8 @@ router.put('/profile/me', async (req, res) => {
                 updatedAt: true,
             },
         });
+        // Log activity
+        await (0, auditLog_1.logUserActivity)(userId, 'UPDATE_PROFILE', 'USER', userId, 'User updated their profile', req);
         res.json({
             success: true,
             message: 'Profile updated successfully',
@@ -208,6 +211,8 @@ router.put('/profile/password', async (req, res) => {
             where: { id: userId },
             data: { password: hashedPassword },
         });
+        // Log activity
+        await (0, auditLog_1.logUserActivity)(userId, 'CHANGE_PASSWORD', 'USER', userId, 'User changed their password', req);
         res.json({
             success: true,
             message: 'Password changed successfully'
@@ -257,6 +262,8 @@ router.put('/profile/avatar', async (req, res) => {
                 avatar: true,
             },
         });
+        // Log activity
+        await (0, auditLog_1.logUserActivity)(userId, 'UPDATE_AVATAR', 'USER', userId, 'User updated their avatar', req);
         res.json({
             success: true,
             message: 'Avatar updated successfully',
@@ -409,6 +416,8 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
                 updatedAt: true,
             },
         });
+        // Log activity
+        await (0, auditLog_1.logUserActivity)(req.user.id, 'CREATE_USER', 'USER', user.id, `Created user ${user.email} with role ${user.role}`, req);
         res.status(201).json({ user, message: 'User created successfully' });
     }
     catch (error) {
@@ -476,6 +485,8 @@ router.put('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
                 updatedAt: true,
             },
         });
+        // Log activity
+        await (0, auditLog_1.logUserActivity)(req.user.id, 'UPDATE_USER', 'USER', user.id, `Updated user ${user.email}`, req);
         res.json({ user, message: 'User updated successfully' });
     }
     catch (error) {
@@ -504,6 +515,8 @@ router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
         await prisma.user.delete({
             where: { id },
         });
+        // Log activity
+        await (0, auditLog_1.logUserActivity)(currentUserId, 'DELETE_USER', 'USER', id, `Deleted user ${user.email}`, req);
         res.json({ message: 'User deleted successfully' });
     }
     catch (error) {
@@ -542,6 +555,8 @@ router.patch('/:id/toggle', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res
                 updatedAt: true,
             },
         });
+        // Log activity
+        await (0, auditLog_1.logUserActivity)(currentUserId, 'TOGGLE_USER_STATUS', 'USER', id, `User ${updatedUser.isActive ? 'activated' : 'deactivated'}`, req);
         res.json({ user: updatedUser, message: `User ${updatedUser.isActive ? 'activated' : 'deactivated'} successfully` });
     }
     catch (error) {
@@ -583,6 +598,8 @@ router.patch('/:id/permissions', (0, auth_1.authorizeRoles)('ADMIN'), async (req
                 updatedAt: true,
             },
         });
+        // Log activity
+        await (0, auditLog_1.logUserActivity)(req.user.id, 'UPDATE_PERMISSIONS', 'USER', id, 'Updated user permissions', req);
         res.json({
             user: {
                 ...updatedUser,
