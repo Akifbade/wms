@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Package, Plus, X, Save, ArrowLeftRight, Camera, Trash2
+  Package, Plus, X, Save, ArrowLeftRight, Camera, Trash2, Edit2
 } from 'lucide-react';
 
 interface JobMaterialsManagerProps {
@@ -35,6 +35,7 @@ interface IssuedMaterial {
   unitCost: number;
   totalCost: number;
   issuedAt: string;
+  notes?: string;
   rack?: {
     code: string;
     location: string;
@@ -64,6 +65,20 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
     stockPurchaseId: '',
     notes: ''
   });
+
+  // Edit Material State
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingIssue, setEditingIssue] = useState<IssuedMaterial | null>(null);
+  const [editForm, setEditForm] = useState({
+    quantity: 0,
+    notes: '',
+    reason: ''
+  });
+
+  // Delete Material State
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingIssue, setDeletingIssue] = useState<IssuedMaterial | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
 
   // Return Material State
   const [showReturnForm, setShowReturnForm] = useState(false);
@@ -246,6 +261,101 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
 
   const getPendingReturns = () => {
     return issuedMaterials.filter(item => !item.returns || item.returns.length === 0).length;
+  };
+
+  // Open Edit Form
+  const openEditForm = (issue: IssuedMaterial) => {
+    setEditingIssue(issue);
+    setEditForm({
+      quantity: issue.quantity,
+      notes: issue.notes || '',
+      reason: ''
+    });
+    setShowEditForm(true);
+  };
+
+  // Handle Edit Material Issue
+  const handleEditIssue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingIssue) return;
+    
+    setLoading(true);
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const response = await fetch(`/api/materials/issues/${editingIssue.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          quantity: editForm.quantity,
+          notes: editForm.notes,
+          reason: editForm.reason
+        })
+      });
+
+      if (response.ok) {
+        alert('Material issue updated successfully!');
+        setShowEditForm(false);
+        setEditingIssue(null);
+        loadData();
+        onUpdate?.();
+      } else {
+        const error = await response.json();
+        alert(`Failed to update: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to update material issue:', error);
+      alert('Failed to update material issue');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Open Delete Confirmation
+  const openDeleteConfirm = (issue: IssuedMaterial) => {
+    setDeletingIssue(issue);
+    setDeleteReason('');
+    setShowDeleteConfirm(true);
+  };
+
+  // Handle Delete Material Issue
+  const handleDeleteIssue = async () => {
+    if (!deletingIssue) return;
+    
+    setLoading(true);
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const response = await fetch(`/api/materials/issues/${deletingIssue.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          reason: deleteReason || 'No reason provided'
+        })
+      });
+
+      if (response.ok) {
+        alert('Material issue deleted and stock restored!');
+        setShowDeleteConfirm(false);
+        setDeletingIssue(null);
+        loadData();
+        onUpdate?.();
+      } else {
+        const error = await response.json();
+        alert(`Failed to delete: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to delete material issue:', error);
+      alert('Failed to delete material issue');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -451,20 +561,167 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {(!issue.returns || issue.returns.length === 0) && jobStatus === 'COMPLETED' && (
-                        <button
-                          onClick={() => openReturnForm(issue)}
-                          className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                        >
-                          <ArrowLeftRight className="w-4 h-4" />
-                          Record Return
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {/* Edit/Delete only if not returned */}
+                        {(!issue.returns || issue.returns.length === 0) && (
+                          <>
+                            <button
+                              onClick={() => openEditForm(issue)}
+                              className="text-blue-600 hover:text-blue-800 p-1"
+                              title="Edit Issue"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => openDeleteConfirm(issue)}
+                              className="text-red-600 hover:text-red-800 p-1"
+                              title="Delete Issue"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        {/* Record Return - only for completed jobs */}
+                        {(!issue.returns || issue.returns.length === 0) && jobStatus === 'COMPLETED' && (
+                          <button
+                            onClick={() => openReturnForm(issue)}
+                            className="text-green-600 hover:text-green-800 flex items-center gap-1"
+                            title="Record Return"
+                          >
+                            <ArrowLeftRight className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Material Issue Modal */}
+      {showEditForm && editingIssue && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">✏️ Edit Material Issue</h3>
+              <button onClick={() => setShowEditForm(false)}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-blue-50 p-4 rounded mb-4">
+              <p className="font-medium">{editingIssue.material.name}</p>
+              <p className="text-sm text-gray-600">SKU: {editingIssue.material.sku}</p>
+              <p className="text-sm text-gray-600">Current Qty: {editingIssue.quantity} {editingIssue.material.unit}</p>
+            </div>
+
+            <form onSubmit={handleEditIssue} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">New Quantity *</label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  value={editForm.quantity}
+                  onChange={(e) => setEditForm({ ...editForm, quantity: parseInt(e.target.value) || 0 })}
+                  className="w-full border rounded px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Notes</label>
+                <input
+                  type="text"
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Reason for Change *</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.reason}
+                  onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="e.g., Correction, quantity adjustment..."
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditForm(false)}
+                  className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                >
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && deletingIssue && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-red-600">🗑️ Delete Material Issue</h3>
+              <button onClick={() => setShowDeleteConfirm(false)}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-red-50 p-4 rounded mb-4">
+              <p className="font-medium">{deletingIssue.material.name}</p>
+              <p className="text-sm text-gray-600">Quantity: {deletingIssue.quantity} {deletingIssue.material.unit}</p>
+              <p className="text-sm text-gray-600">Cost: {deletingIssue.totalCost.toFixed(2)} KWD</p>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              ⚠️ This will restore the material back to stock. This action is recorded in history.
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Reason for Deletion *</label>
+              <input
+                type="text"
+                required
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                className="w-full border rounded px-3 py-2"
+                placeholder="e.g., Wrong material, duplicate entry..."
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteIssue}
+                disabled={loading || !deleteReason.trim()}
+                className="flex-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:bg-gray-400"
+              >
+                {loading ? 'Deleting...' : 'Delete & Restore Stock'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -91,6 +91,7 @@ model Company {
   stockBatches      StockBatch[]
   rackLevels        RackStockLevel[]
   materialIssues    MaterialIssue[]
+  materialIssueHistory MaterialIssueHistory[]
   materialReturns   MaterialReturn[]
   materialDamages   MaterialDamage[]
   materialApprovals MaterialApproval[]
@@ -143,6 +144,7 @@ model User {
   movingJobsLead          MovingJob[]        @relation("MovingJobTeamLead")
   stockBatchesReceived    StockBatch[]       @relation("StockBatchReceivedBy")
   materialIssuesCreated   MaterialIssue[]    @relation("MaterialIssuedBy")
+  materialIssueHistory    MaterialIssueHistory[] @relation("MaterialIssueHistoryBy")
   materialReturnsRecorded MaterialReturn[]   @relation("MaterialReturnRecordedBy")
   damagesRecorded         MaterialDamage[]   @relation("DamageRecordedBy")
   damagesApproved         MaterialDamage[]   @relation("DamageApprovedBy")
@@ -1190,6 +1192,7 @@ model PackingMaterial {
   stockBatches     StockBatch[]
   rackLevels       RackStockLevel[]
   materialIssues   MaterialIssue[]
+  materialIssueHistory MaterialIssueHistory[]
   materialReturns  MaterialReturn[]
   materialDamages  MaterialDamage[]
   materialUsages   MaterialUsage[]      // NEW: Track material consumption
@@ -1295,8 +1298,38 @@ model MaterialIssue {
   issuedBy   User?            @relation("MaterialIssuedBy", fields: [issuedById], references: [id])
   company    Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   returns    MaterialReturn[]
+  history    MaterialIssueHistory[]
 
   @@map("material_issues")
+}
+
+// Track all edits and deletions for material issues
+model MaterialIssueHistory {
+  id            String   @id @default(cuid())
+  issueId       String?  // Null if deleted
+  action        String   // CREATED, EDITED, DELETED
+  jobId         String?
+  materialId    String
+  materialName  String
+  materialSku   String
+  quantity      Int
+  previousQty   Int?     // For edits
+  unitCost      Float
+  totalCost     Float
+  rackId        String?
+  rackCode      String?
+  notes         String?
+  reason        String?  // Reason for edit/delete
+  performedById String
+  performedAt   DateTime @default(now())
+  companyId     String
+
+  issue       MaterialIssue?  @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  material    PackingMaterial @relation(fields: [materialId], references: [id])
+  performedBy User            @relation("MaterialIssueHistoryBy", fields: [performedById], references: [id])
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("material_issue_history")
 }
 
 model MaterialReturn {

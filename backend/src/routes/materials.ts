@@ -669,6 +669,205 @@ router.get("/issues", authenticateToken as any, async (req: AuthRequest, res) =>
   }
 });
 
+/**
+ * PUT /api/materials/issues/:id
+ * Edit a material issue (only if not returned)
+ */
+router.put("/issues/:id", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId, id: userId } = req.user!;
+    const { id } = req.params;
+    const { quantity, notes, reason } = req.body;
+
+    // Get the existing issue with material info
+    const existingIssue = await prisma.materialIssue.findFirst({
+      where: { id, companyId },
+      include: { 
+        material: true, 
+        rack: true,
+        returns: true 
+      }
+    });
+
+    if (!existingIssue) {
+      return res.status(404).json({ error: "Material issue not found" });
+    }
+
+    // Check if already returned
+    if (existingIssue.returns && existingIssue.returns.length > 0) {
+      return res.status(400).json({ error: "Cannot edit - material has already been returned" });
+    }
+
+    const previousQty = existingIssue.quantity;
+    const newQuantity = quantity || previousQty;
+    const qtyDifference = newQuantity - previousQty;
+
+    // Calculate new total cost
+    const newTotalCost = newQuantity * existingIssue.unitCost;
+
+    // Update material stock (restore old quantity, deduct new quantity)
+    const material = await prisma.packingMaterial.findUnique({ where: { id: existingIssue.materialId } });
+    if (material) {
+      const newStock = (material.totalQuantity || 0) + previousQty - newQuantity;
+      if (newStock < 0) {
+        return res.status(400).json({ error: `Insufficient stock. Available: ${(material.totalQuantity || 0) + previousQty}` });
+      }
+      await prisma.packingMaterial.update({
+        where: { id: existingIssue.materialId },
+        data: { totalQuantity: newStock }
+      });
+    }
+
+    // Create history record for the edit
+    await prisma.materialIssueHistory.create({
+      data: {
+        issueId: id,
+        action: 'EDITED',
+        jobId: existingIssue.jobId,
+        materialId: existingIssue.materialId,
+        materialName: existingIssue.material.name,
+        materialSku: existingIssue.material.sku,
+        quantity: newQuantity,
+        previousQty: previousQty,
+        unitCost: existingIssue.unitCost,
+        totalCost: newTotalCost,
+        rackId: existingIssue.rackId,
+        rackCode: existingIssue.rack?.code || null,
+        notes: notes || existingIssue.notes,
+        reason: reason || 'Quantity updated',
+        performedById: userId,
+        companyId
+      }
+    });
+
+    // Update the issue
+    const updatedIssue = await prisma.materialIssue.update({
+      where: { id },
+      data: {
+        quantity: newQuantity,
+        totalCost: newTotalCost,
+        notes: notes || existingIssue.notes
+      },
+      include: {
+        material: true,
+        rack: true
+      }
+    });
+
+    res.json(updatedIssue);
+  } catch (error) {
+    console.error("Error updating material issue:", error);
+    res.status(500).json({ error: "Failed to update material issue" });
+  }
+});
+
+/**
+ * DELETE /api/materials/issues/:id
+ * Delete a material issue (restores stock, keeps history)
+ */
+router.delete("/issues/:id", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId, id: userId } = req.user!;
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    // Get the existing issue with material info
+    const existingIssue = await prisma.materialIssue.findFirst({
+      where: { id, companyId },
+      include: { 
+        material: true, 
+        rack: true,
+        returns: true 
+      }
+    });
+
+    if (!existingIssue) {
+      return res.status(404).json({ error: "Material issue not found" });
+    }
+
+    // Check if already returned
+    if (existingIssue.returns && existingIssue.returns.length > 0) {
+      return res.status(400).json({ error: "Cannot delete - material has already been returned" });
+    }
+
+    // Create history record BEFORE deletion
+    await prisma.materialIssueHistory.create({
+      data: {
+        issueId: null, // Will be null after deletion
+        action: 'DELETED',
+        jobId: existingIssue.jobId,
+        materialId: existingIssue.materialId,
+        materialName: existingIssue.material.name,
+        materialSku: existingIssue.material.sku,
+        quantity: existingIssue.quantity,
+        previousQty: null,
+        unitCost: existingIssue.unitCost,
+        totalCost: existingIssue.totalCost,
+        rackId: existingIssue.rackId,
+        rackCode: existingIssue.rack?.code || null,
+        notes: existingIssue.notes,
+        reason: reason || 'Issue deleted',
+        performedById: userId,
+        companyId
+      }
+    });
+
+    // Restore the material stock
+    const material = await prisma.packingMaterial.findUnique({ where: { id: existingIssue.materialId } });
+    if (material) {
+      await prisma.packingMaterial.update({
+        where: { id: existingIssue.materialId },
+        data: { totalQuantity: (material.totalQuantity || 0) + existingIssue.quantity }
+      });
+    }
+
+    // Delete the issue
+    await prisma.materialIssue.delete({ where: { id } });
+
+    res.json({ success: true, message: "Material issue deleted and stock restored" });
+  } catch (error) {
+    console.error("Error deleting material issue:", error);
+    res.status(500).json({ error: "Failed to delete material issue" });
+  }
+});
+
+/**
+ * GET /api/materials/issues/history
+ * Get material issue history (edits and deletions)
+ */
+router.get("/issues/history", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { startDate, endDate } = req.query;
+
+    const whereClause: any = { companyId };
+    if (startDate && endDate) {
+      whereClause.performedAt = {
+        gte: new Date(startDate as string),
+        lte: new Date(endDate as string)
+      };
+    }
+
+    const history = await prisma.materialIssueHistory.findMany({
+      where: whereClause,
+      include: {
+        material: { select: { name: true, sku: true, unit: true } },
+        performedBy: { select: { name: true, email: true } }
+      },
+      orderBy: { performedAt: 'desc' }
+    });
+
+    res.json(history);
+  } catch (error) {
+    console.error("Error fetching material issue history:", error);
+    res.status(500).json({ error: "Failed to fetch history" });
+  }
+});
+
 // ==================== MATERIAL RETURNS ====================
 
 /**
