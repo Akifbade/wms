@@ -55,9 +55,9 @@ const CustomChargesModal: React.FC<CustomChargesModalProps> = ({
 
     const loadCurrentCharges = async () => {
         try {
-            const response = await fetch(`http://localhost:5000/api/shipments/${shipmentId}/charges-calculation`, {
+            const response = await fetch(`/api/shipments/${shipmentId}/charges-calculation`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                 }
             });
             const data = await response.json();
@@ -100,11 +100,11 @@ const CustomChargesModal: React.FC<CustomChargesModalProps> = ({
         setError('');
 
         try {
-            const response = await fetch(`http://localhost:5000/api/shipments/${shipmentId}/charges-preview`, {
+            const response = await fetch(`/api/shipments/${shipmentId}/charges-preview`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                 },
                 body: JSON.stringify({
                     customRateEnabled,
@@ -137,11 +137,11 @@ const CustomChargesModal: React.FC<CustomChargesModalProps> = ({
         setError('');
 
         try {
-            const response = await fetch(`http://localhost:5000/api/shipments/${shipmentId}/custom-charges`, {
+            const response = await fetch(`/api/shipments/${shipmentId}/custom-charges`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                 },
                 body: JSON.stringify({
                     customRateEnabled,

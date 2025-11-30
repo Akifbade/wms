@@ -172,8 +172,11 @@ export const BillingSettings: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Billing Settings</h2>
-        <p className="text-gray-600">Configure storage charges, invoice customization, and payment details</p>
+        <h2 className="text-2xl font-bold text-gray-900">💰 Pricing & Billing</h2>
+        <p className="text-gray-600">Configure storage rates, charge types, invoices, and bank details</p>
+        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+          <strong>📍 All pricing is centralized here.</strong> Storage rates configured here are used for all invoice calculations.
+        </div>
       </div>
 
       {/* Message Banner */}
@@ -627,9 +630,9 @@ export const BillingSettings: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <h4 className="font-semibold text-gray-900">{charge.name}</h4>
                       <span className={`px-2 py-1 text-xs rounded-full ${charge.category === 'STORAGE' ? 'bg-blue-100 text-blue-700' :
-                          charge.category === 'RELEASE' ? 'bg-green-100 text-green-700' :
-                            charge.category === 'SERVICE' ? 'bg-purple-100 text-purple-700' :
-                              'bg-gray-100 text-gray-700'
+                        charge.category === 'RELEASE' ? 'bg-green-100 text-green-700' :
+                          charge.category === 'SERVICE' ? 'bg-purple-100 text-purple-700' :
+                            'bg-gray-100 text-gray-700'
                         }`}>
                         {charge.category}
                       </span>

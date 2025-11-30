@@ -278,7 +278,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
   const handleEditIssue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingIssue) return;
-    
+
     setLoading(true);
     const token = localStorage.getItem('authToken');
 
@@ -324,7 +324,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
   // Handle Delete Material Issue
   const handleDeleteIssue = async () => {
     if (!deletingIssue) return;
-    
+
     setLoading(true);
     const token = localStorage.getItem('authToken');
 
@@ -388,8 +388,8 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
         <button
           onClick={() => setActiveTab('issued')}
           className={`px-4 py-2 font-medium ${activeTab === 'issued'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-500'
+            ? 'border-b-2 border-blue-600 text-blue-600'
+            : 'text-gray-500'
             }`}
         >
           Issued Materials ({issuedMaterials.length})
@@ -397,8 +397,8 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
         <button
           onClick={() => setActiveTab('return')}
           className={`px-4 py-2 font-medium ${activeTab === 'return'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-500'
+            ? 'border-b-2 border-blue-600 text-blue-600'
+            : 'text-gray-500'
             }`}
         >
           Returns & Damages

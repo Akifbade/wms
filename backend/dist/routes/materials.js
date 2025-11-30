@@ -599,11 +599,17 @@ router.get("/issues/history", auth_1.authenticateToken, async (req, res) => {
         const { startDate, endDate } = req.query;
         const whereClause = { companyId };
         if (startDate && endDate) {
+            // Parse range as UTC to avoid timezone shifts. Use lt (less-than) with next day start to avoid inclusive/exclusive datetime issues
+            const start = new Date(`${startDate}T00:00:00.000Z`);
+            const endNextDay = new Date(`${endDate}T00:00:00.000Z`);
+            endNextDay.setUTCDate(endNextDay.getUTCDate() + 1);
             whereClause.performedAt = {
-                gte: new Date(startDate),
-                lte: new Date(endDate)
+                gte: start,
+                lt: endNextDay
             };
         }
+        console.log(`Getting history for company ${companyId} - startDate: ${startDate}, endDate: ${endDate}`);
+        console.log('Where clause:', JSON.stringify(whereClause));
         const history = await prisma.materialIssueHistory.findMany({
             where: whereClause,
             include: {
@@ -612,11 +618,33 @@ router.get("/issues/history", auth_1.authenticateToken, async (req, res) => {
             },
             orderBy: { performedAt: 'desc' }
         });
+        console.log(`Found ${history.length} history entries for company ${companyId}`);
         res.json(history);
     }
     catch (error) {
         console.error("Error fetching material issue history:", error);
         res.status(500).json({ error: "Failed to fetch history" });
+    }
+});
+// Debug route (DO NOT expose in production) - allow fetching history by companyId supplied in query for debugging purposes
+router.get("/issues/debug/company", async (req, res) => {
+    try {
+        const { companyId, startDate, endDate } = req.query;
+        if (!companyId)
+            return res.status(400).json({ error: 'companyId is required' });
+        const whereClause = { companyId };
+        if (startDate && endDate) {
+            const start = new Date(`${startDate}T00:00:00.000Z`);
+            const endNextDay = new Date(`${endDate}T00:00:00.000Z`);
+            endNextDay.setUTCDate(endNextDay.getUTCDate() + 1);
+            whereClause.performedAt = { gte: start, lt: endNextDay };
+        }
+        const history = await prisma.materialIssueHistory.findMany({ where: whereClause, orderBy: { performedAt: 'desc' } });
+        res.json(history);
+    }
+    catch (error) {
+        console.error('Debug history error', error);
+        res.status(500).json({ error: 'Failed to fetch debug history' });
     }
 });
 /**

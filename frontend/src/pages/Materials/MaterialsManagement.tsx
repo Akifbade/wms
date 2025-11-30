@@ -1055,11 +1055,10 @@ const MaterialsManagement = () => {
                   stockPurchases.map((purchase: any, idx: number) => (
                     <tr key={purchase.id} className={`hover:bg-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          purchase.source === 'stock_batch' 
-                            ? 'bg-purple-100 text-purple-700' 
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${purchase.source === 'stock_batch'
+                            ? 'bg-purple-100 text-purple-700'
                             : 'bg-blue-100 text-blue-700'
-                        }`}>
+                          }`}>
                           {purchase.source === 'stock_batch' ? 'Batch' : 'PO'}
                         </span>
                       </td>

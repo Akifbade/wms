@@ -1,6 +1,7 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { exec } from 'child_process';
+import { authenticateToken, authorizeRoles, AuthRequest } from '../middleware/auth';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
@@ -28,7 +29,7 @@ async function ensureBackupDir() {
  * GET /api/backups
  * List all available backups (both quick and full system)
  */
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
     try {
         await ensureBackupDir();
 
@@ -106,7 +107,7 @@ router.get('/', async (req, res) => {
  * POST /api/backups/create
  * Create a new backup
  */
-router.post('/create', async (req, res) => {
+router.post('/create', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
     try {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const backupName = `WMS_BACKUP_${timestamp}`;
@@ -282,7 +283,7 @@ router.get('/download/:filename', async (req, res) => {
  * DELETE /api/backups/:filename
  * Delete a backup file (from either quick or full backup directory)
  */
-router.delete('/:filename', async (req, res) => {
+router.delete('/:filename', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
     try {
         const { filename } = req.params;
 
@@ -334,7 +335,7 @@ router.delete('/:filename', async (req, res) => {
  * Returns instructions for creating a complete system backup from the host
  * (Cannot be done from Docker as it needs access to source code on host)
  */
-router.post('/create-full-system', async (req, res) => {
+router.post('/create-full-system', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
     try {
         console.log('🚀 Starting complete system backup from WMS...');
 

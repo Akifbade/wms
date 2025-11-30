@@ -61,12 +61,13 @@ export default function LiveChargesPreview({ shipmentId }: LiveChargesProps) {
 
             const data = await response.json();
 
-            // Validate response structure
-            if (!data || typeof data.totalCharge === 'undefined') {
+            // Validate response structure - backend returns { success, shipmentId, calculation }
+            const chargeData = data.calculation || data;
+            if (!chargeData || typeof chargeData.totalCharge === 'undefined') {
                 throw new Error('Invalid charge data received from server');
             }
 
-            setCharges(data);
+            setCharges(chargeData);
             setError('');
         } catch (err: any) {
             console.error('Load charges error:', err);

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { authenticateToken, authorizeRoles, AuthRequest } from '../middleware/auth';
 import multer from 'multer';
 
 const router = Router();
@@ -59,7 +59,7 @@ router.get('/detail/:categoryId', async (req: AuthRequest, res: Response) => {
 });
 
 // Create category
-router.post('/', upload.single('logo'), async (req: AuthRequest, res: Response) => {
+router.post('/', authorizeRoles('ADMIN', 'MANAGER'), upload.single('logo'), async (req: AuthRequest, res: Response) => {
   try {
     const { companyId, name, description, color, icon } = req.body;
 
@@ -103,7 +103,7 @@ router.post('/', upload.single('logo'), async (req: AuthRequest, res: Response) 
 });
 
 // Update category
-router.put('/:categoryId', upload.single('logo'), async (req: AuthRequest, res: Response) => {
+router.put('/:categoryId', authorizeRoles('ADMIN', 'MANAGER'), upload.single('logo'), async (req: AuthRequest, res: Response) => {
   try {
     const { categoryId } = req.params;
     const { name, description, color, icon, isActive } = req.body;
@@ -139,7 +139,7 @@ router.put('/:categoryId', upload.single('logo'), async (req: AuthRequest, res: 
 });
 
 // Delete category
-router.delete('/:categoryId', async (req: AuthRequest, res: Response) => {
+router.delete('/:categoryId', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { categoryId } = req.params;
 

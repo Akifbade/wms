@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
-import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { authenticateToken, authorizeRoles, AuthRequest } from "../middleware/auth";
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -170,7 +170,7 @@ router.patch("/:jobId", authenticateToken as any, async (req: AuthRequest, res) 
  * DELETE /api/moving-jobs/:jobId
  * Delete a moving job (soft delete - preserves history and material records)
  */
-router.delete("/:jobId", authenticateToken as any, async (req: AuthRequest, res) => {
+router.delete("/:jobId", authenticateToken as any, authorizeRoles('ADMIN'), async (req: AuthRequest, res) => {
   try {
     const { jobId } = req.params;
     const { companyId } = req.user!;

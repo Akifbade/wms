@@ -1,6 +1,6 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { authenticateToken, authorizeRoles, AuthRequest } from "../middleware/auth";
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -255,7 +255,7 @@ router.post("/", authenticateToken as any, async (req: AuthRequest, res) => {
  * PUT /api/materials/:id
  * Update a packing material
  */
-router.put("/:id", authenticateToken as any, async (req: AuthRequest, res) => {
+router.put("/:id", authenticateToken as any, authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
     const { id } = req.params;
@@ -294,14 +294,10 @@ router.put("/:id", authenticateToken as any, async (req: AuthRequest, res) => {
  * DELETE /api/materials/:id
  * Delete a packing material
  */
-router.delete("/:id", authenticateToken as any, async (req: AuthRequest, res) => {
+router.delete("/:id", authenticateToken as any, authorizeRoles('ADMIN'), async (req: AuthRequest, res) => {
   try {
-    const { companyId, role } = req.user!;
+    const { companyId } = req.user!;
     const { id } = req.params;
-
-    if (role !== 'ADMIN') {
-      return res.status(403).json({ error: "Only admins can delete materials" });
-    }
 
     const material = await prisma.packingMaterial.findUnique({
       where: { id, companyId },
@@ -352,7 +348,7 @@ router.delete("/:id", authenticateToken as any, async (req: AuthRequest, res) =>
 router.get("/stock/unified", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
-    
+
     // Get stock batches (old data)
     const batches = await prisma.stockBatch.findMany({
       where: { companyId },
@@ -361,7 +357,7 @@ router.get("/stock/unified", authenticateToken as any, async (req: AuthRequest, 
       },
       orderBy: { purchaseDate: "desc" },
     });
-    
+
     // Get purchase order items (new data)
     const purchaseOrders = await prisma.purchaseOrder.findMany({
       where: { companyId },
@@ -375,7 +371,7 @@ router.get("/stock/unified", authenticateToken as any, async (req: AuthRequest, 
       },
       orderBy: { createdAt: 'desc' }
     });
-    
+
     // Normalize stock batches to unified format
     const normalizedBatches = batches.map(batch => ({
       id: batch.id,
@@ -397,7 +393,7 @@ router.get("/stock/unified", authenticateToken as any, async (req: AuthRequest, 
       notes: batch.notes,
       createdAt: batch.createdAt
     }));
-    
+
     // Normalize purchase order items to unified format
     const normalizedPurchases = purchaseOrders.flatMap(po =>
       po.items.map(item => ({
@@ -421,11 +417,11 @@ router.get("/stock/unified", authenticateToken as any, async (req: AuthRequest, 
         createdAt: po.createdAt
       }))
     );
-    
+
     // Combine and sort by date (newest first)
     const unified = [...normalizedBatches, ...normalizedPurchases]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    
+
     res.json(unified);
   } catch (error) {
     console.error("Error fetching unified stock:", error);
@@ -658,12 +654,18 @@ router.get("/issues/history", authenticateToken as any, async (req: AuthRequest,
 
     const whereClause: any = { companyId };
     if (startDate && endDate) {
+      // Parse range as UTC to avoid timezone shifts. Use lt (less-than) with next day start to avoid inclusive/exclusive datetime issues
+      const start = new Date(`${startDate}T00:00:00.000Z`);
+      const endNextDay = new Date(`${endDate}T00:00:00.000Z`);
+      endNextDay.setUTCDate(endNextDay.getUTCDate() + 1);
       whereClause.performedAt = {
-        gte: new Date(startDate as string),
-        lte: new Date(endDate as string)
+        gte: start,
+        lt: endNextDay
       };
     }
 
+    console.log(`Getting history for company ${companyId} - startDate: ${startDate}, endDate: ${endDate}`);
+    console.log('Where clause:', JSON.stringify(whereClause));
     const history = await prisma.materialIssueHistory.findMany({
       where: whereClause,
       include: {
@@ -673,10 +675,33 @@ router.get("/issues/history", authenticateToken as any, async (req: AuthRequest,
       orderBy: { performedAt: 'desc' }
     });
 
+    console.log(`Found ${history.length} history entries for company ${companyId}`);
     res.json(history);
   } catch (error) {
     console.error("Error fetching material issue history:", error);
     res.status(500).json({ error: "Failed to fetch history" });
+  }
+});
+
+// Debug route (DO NOT expose in production) - allow fetching history by companyId supplied in query for debugging purposes
+router.get("/issues/debug/company", async (req: Request, res: Response) => {
+  try {
+    const { companyId, startDate, endDate } = req.query as any;
+    if (!companyId) return res.status(400).json({ error: 'companyId is required' });
+
+    const whereClause: any = { companyId };
+    if (startDate && endDate) {
+      const start = new Date(`${startDate}T00:00:00.000Z`);
+      const endNextDay = new Date(`${endDate}T00:00:00.000Z`);
+      endNextDay.setUTCDate(endNextDay.getUTCDate() + 1);
+      whereClause.performedAt = { gte: start, lt: endNextDay };
+    }
+
+    const history = await prisma.materialIssueHistory.findMany({ where: whereClause, orderBy: { performedAt: 'desc' } });
+    res.json(history);
+  } catch (error) {
+    console.error('Debug history error', error);
+    res.status(500).json({ error: 'Failed to fetch debug history' });
   }
 });
 
@@ -711,7 +736,7 @@ router.get("/issues", authenticateToken as any, async (req: AuthRequest, res) =>
  * PUT /api/materials/issues/:id
  * Edit a material issue (only if not returned)
  */
-router.put("/issues/:id", authenticateToken as any, async (req: AuthRequest, res) => {
+router.put("/issues/:id", authenticateToken as any, authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
   try {
     const { companyId, id: userId } = req.user!;
     const { id } = req.params;
@@ -720,10 +745,10 @@ router.put("/issues/:id", authenticateToken as any, async (req: AuthRequest, res
     // Get the existing issue with material info
     const existingIssue = await prisma.materialIssue.findFirst({
       where: { id, companyId },
-      include: { 
-        material: true, 
+      include: {
+        material: true,
         rack: true,
-        returns: true 
+        returns: true
       }
     });
 
@@ -803,7 +828,7 @@ router.put("/issues/:id", authenticateToken as any, async (req: AuthRequest, res
  * DELETE /api/materials/issues/:id
  * Delete a material issue (restores stock, keeps history)
  */
-router.delete("/issues/:id", authenticateToken as any, async (req: AuthRequest, res) => {
+router.delete("/issues/:id", authenticateToken as any, authorizeRoles('ADMIN'), async (req: AuthRequest, res) => {
   try {
     const { companyId, id: userId } = req.user!;
     const { id } = req.params;
@@ -812,10 +837,10 @@ router.delete("/issues/:id", authenticateToken as any, async (req: AuthRequest, 
     // Get the existing issue with material info
     const existingIssue = await prisma.materialIssue.findFirst({
       where: { id, companyId },
-      include: { 
-        material: true, 
+      include: {
+        material: true,
         rack: true,
-        returns: true 
+        returns: true
       }
     });
 

@@ -19,7 +19,7 @@ interface ShipmentSettings {
   requirePhotos: boolean;
   autoGenerateQR: boolean;
   qrCodePrefix: string;
-  
+
   // 🚀 Intake Form Field Visibility
   showClientAddress?: boolean;
   requireClientAddress?: boolean;
@@ -43,7 +43,7 @@ interface ShipmentSettings {
   showEstimatedDays?: boolean;
   requireEstimatedDays?: boolean;
   defaultEstimatedDays?: number;
-  
+
   // Storage Settings
   defaultStorageType: string;
   allowMultipleRacks: boolean;
@@ -51,7 +51,7 @@ interface ShipmentSettings {
   autoAssignRack: boolean;
   notifyOnLowCapacity: boolean;
   lowCapacityThreshold: number;
-  
+
   // Release Settings
   requireReleaseApproval: boolean;
   releaseApproverRole: string;
@@ -59,7 +59,7 @@ interface ShipmentSettings {
   requireIDVerification: boolean;
   generateReleaseInvoice: boolean;
   autoSendInvoiceEmail: boolean;
-  
+
   // Pricing
   storageRatePerDay: number;
   storageRatePerBox: number;
@@ -68,21 +68,21 @@ interface ShipmentSettings {
   releaseHandlingFee: number;
   releasePerBoxFee: number;
   releaseTransportFee: number;
-  
+
   // Notifications
   notifyClientOnIntake: boolean;
   notifyClientOnRelease: boolean;
   notifyOnStorageAlert: boolean;
   storageAlertDays: number;
-  
+
   // Custom Fields
   enableCustomFields: boolean;
-  
+
   // Partial Release
   allowPartialRelease: boolean;
   partialReleaseMinBoxes: number;
   requirePartialApproval: boolean;
-  
+
   // Documentation
   requireReleaseSignature: boolean;
   requireCollectorID: boolean;
@@ -763,98 +763,20 @@ const ShipmentConfiguration: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Pricing Configuration */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center gap-3 mb-4">
+      {/* 4. Pricing - Redirect Notice */}
+      <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-6">
+        <div className="flex items-start gap-4">
           <div className="p-2 bg-yellow-100 rounded-lg">
             <BanknotesIcon className="h-6 w-6 text-yellow-600" />
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Pricing Configuration</h3>
-            <p className="text-sm text-gray-600">Configure storage and release charges</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-3 border border-gray-200 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Storage Rate per Day (KWD)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={settings.storageRatePerDay}
-              onChange={(e) => updateSetting('storageRatePerDay', parseFloat(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="p-3 border border-gray-200 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Storage Rate per Box (KWD)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={settings.storageRatePerBox}
-              onChange={(e) => updateSetting('storageRatePerBox', parseFloat(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <label className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-            <span className="text-gray-700">Charge Partial Day</span>
-            <input
-              type="checkbox"
-              checked={settings.chargePartialDay}
-              onChange={(e) => updateSetting('chargePartialDay', e.target.checked)}
-              className="h-5 w-5 text-blue-600 rounded"
-            />
-          </label>
-
-          <div className="p-3 border border-gray-200 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Minimum Charge Days</label>
-            <input
-              type="number"
-              min="0"
-              value={settings.minimumChargeDays}
-              onChange={(e) => updateSetting('minimumChargeDays', parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="p-3 border border-gray-200 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Release Handling Fee (KWD)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={settings.releaseHandlingFee}
-              onChange={(e) => updateSetting('releaseHandlingFee', parseFloat(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="p-3 border border-gray-200 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Release Per-Box Fee (KWD)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={settings.releasePerBoxFee}
-              onChange={(e) => updateSetting('releasePerBoxFee', parseFloat(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="p-3 border border-gray-200 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Release Transport Fee (KWD)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={settings.releaseTransportFee}
-              onChange={(e) => updateSetting('releaseTransportFee', parseFloat(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-gray-900">💰 Pricing Configuration</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Storage rates, charge types, and billing settings have been consolidated.
+            </p>
+            <p className="text-sm text-yellow-700 mt-2">
+              👉 Go to <strong>Settings → Pricing & Billing</strong> to configure all rates and charges.
+            </p>
           </div>
         </div>
       </div>

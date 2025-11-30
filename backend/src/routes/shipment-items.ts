@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { authenticateToken, authorizeRoles, AuthRequest } from '../middleware/auth';
 import { z } from 'zod';
 
 const router = Router();
@@ -84,7 +84,7 @@ router.get('/shipments/:shipmentId/items', async (req: AuthRequest, res: Respons
 });
 
 // Add item to shipment
-router.post('/shipments/:shipmentId/items', async (req: AuthRequest, res: Response) => {
+router.post('/shipments/:shipmentId/items', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
   try {
     const { shipmentId } = req.params;
     const companyId = req.user!.companyId;
@@ -129,7 +129,7 @@ router.post('/shipments/:shipmentId/items', async (req: AuthRequest, res: Respon
 });
 
 // Update item
-router.put('/items/:itemId', async (req: AuthRequest, res: Response) => {
+router.put('/items/:itemId', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
   try {
     const { itemId } = req.params;
     const companyId = req.user!.companyId;
@@ -178,7 +178,7 @@ router.put('/items/:itemId', async (req: AuthRequest, res: Response) => {
 });
 
 // Delete item
-router.delete('/items/:itemId', async (req: AuthRequest, res: Response) => {
+router.delete('/items/:itemId', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { itemId } = req.params;
     const companyId = req.user!.companyId;
@@ -249,7 +249,7 @@ router.get('/shipments/:shipmentId/items/summary', async (req: AuthRequest, res:
 });
 
 // Bulk add items
-router.post('/shipments/:shipmentId/items/bulk', async (req: AuthRequest, res: Response) => {
+router.post('/shipments/:shipmentId/items/bulk', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
   try {
     const { shipmentId } = req.params;
     const companyId = req.user!.companyId;

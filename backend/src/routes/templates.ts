@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { authenticateToken, authorizeRoles, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -79,7 +79,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/template-settings - Update settings
-router.put('/', async (req: AuthRequest, res: Response) => {
+router.put('/', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const companyId = req.user!.companyId;
     const settingsData = req.body;
@@ -107,7 +107,7 @@ router.put('/', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/template-settings/reset - Reset to defaults
-router.post('/reset', async (req: AuthRequest, res: Response) => {
+router.post('/reset', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const companyId = req.user!.companyId;
 

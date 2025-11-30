@@ -4,7 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, authorizeRoles } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -154,7 +154,7 @@ router.get('/:jobId', authenticateToken as any, async (req: AuthRequest, res) =>
  * DELETE /api/job-files/:fileId
  * Delete a file
  */
-router.delete('/:fileId', authenticateToken as any, async (req: AuthRequest, res) => {
+router.delete('/:fileId', authenticateToken as any, authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
   try {
     const { fileId } = req.params;
 

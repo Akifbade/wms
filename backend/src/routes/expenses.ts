@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { authenticateToken, authorizeRoles, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -99,7 +99,7 @@ router.get('/:id', async (req: AuthRequest, res) => {
 });
 
 // Create expense
-router.post('/', async (req: AuthRequest, res) => {
+router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
   try {
     const companyId = req.user!.companyId;
     const {
@@ -141,7 +141,7 @@ router.post('/', async (req: AuthRequest, res) => {
 });
 
 // Update expense
-router.put('/:id', async (req: AuthRequest, res) => {
+router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const companyId = req.user!.companyId;
@@ -194,16 +194,10 @@ router.put('/:id', async (req: AuthRequest, res) => {
 });
 
 // Delete expense
-router.delete('/:id', async (req: AuthRequest, res) => {
+router.delete('/:id', authorizeRoles('ADMIN'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const companyId = req.user!.companyId;
-    const userRole = req.user!.role;
-
-    // Only ADMIN can delete expenses
-    if (userRole !== 'ADMIN') {
-      return res.status(403).json({ error: 'Only admins can delete expenses' });
-    }
 
     const existing = await prisma.expense.findFirst({
       where: { id, companyId },

@@ -4,7 +4,6 @@ import {
   CogIcon,
   BuildingOfficeIcon,
   UserGroupIcon,
-  DocumentTextIcon,
   CurrencyDollarIcon,
   DevicePhoneMobileIcon,
   ChartBarIcon,
@@ -17,7 +16,6 @@ import {
 import { CompanySettings } from './components/CompanySettings';
 import { CompanyProfiles } from './components/CompanyProfiles';
 import { UserManagement } from './components/UserManagement';
-import { InvoiceSettings } from './components/InvoiceSettings';
 import { BillingSettings } from './components/BillingSettings';
 import { IntegrationSettings } from './components/IntegrationSettings';
 import { SystemSettings } from './components/SystemSettings';
@@ -39,14 +37,14 @@ const settingsNavigation: SettingsNavItem[] = [
     name: 'Company & Branding',
     icon: BuildingOfficeIcon,
     path: 'company',
-    description: 'Company details, logo, colors, and branding settings'
+    description: 'Company details, logo, colors, and branding'
   },
   {
     id: 'company-profiles',
     name: 'Company Profiles',
     icon: UserGroupIcon,
     path: 'company-profiles',
-    description: 'Manage customer/vendor profiles (DIOR, JAZEERA, etc.)'
+    description: 'Manage customer profiles (DIOR, JAZEERA, etc.)'
   },
   {
     id: 'users',
@@ -56,53 +54,46 @@ const settingsNavigation: SettingsNavItem[] = [
     description: 'Manage team members, roles, and permissions'
   },
   {
-    id: 'invoice',
-    name: 'Invoice & Templates',
-    icon: DocumentTextIcon,
-    path: 'invoice',
-    description: 'Customize invoice templates, branding, and layouts'
-  },
-  {
     id: 'billing',
-    name: 'Billing & Rates',
+    name: 'Pricing & Billing',
     icon: CurrencyDollarIcon,
     path: 'billing',
-    description: 'Storage rates, payment methods, and subscription'
+    description: 'Storage rates, charge types, invoices, bank details'
+  },
+  {
+    id: 'shipment',
+    name: 'Shipment Workflow',
+    icon: TruckIcon,
+    path: 'shipment',
+    description: 'Intake, storage, and release workflow settings'
   },
   {
     id: 'integrations',
     name: 'Integrations',
     icon: DevicePhoneMobileIcon,
     path: 'integrations',
-    description: 'WhatsApp, SMS, email, and third-party connections'
-  },
-  {
-    id: 'shipment',
-    name: 'Shipment Configuration',
-    icon: TruckIcon,
-    path: 'shipment',
-    description: 'Configure shipment intake, storage, release workflows, and pricing'
+    description: 'WhatsApp, SMS, email connections'
   },
   {
     id: 'system',
-    name: 'System Configuration',
+    name: 'Warehouse Setup',
     icon: ChartBarIcon,
     path: 'system',
-    description: 'Racks setup, custom fields, and operational settings'
+    description: 'Racks, zones, custom fields'
   },
   {
     id: 'security',
     name: 'Security & Access',
     icon: ShieldCheckIcon,
     path: 'security',
-    description: 'Authentication, permissions, and security policies'
+    description: 'Authentication and permissions'
   },
   {
     id: 'notifications',
     name: 'Notifications',
     icon: BellIcon,
     path: 'notifications',
-    description: 'Alert preferences, email notifications, and messaging'
+    description: 'Alert preferences and messaging'
   }
 ];
 
@@ -211,7 +202,6 @@ export const Settings: React.FC = () => {
           {activeSection === 'company' && <CompanySettings />}
           {activeSection === 'company-profiles' && <CompanyProfiles />}
           {activeSection === 'users' && <UserManagement />}
-          {activeSection === 'invoice' && <InvoiceSettings />}
           {activeSection === 'billing' && <BillingSettings />}
           {activeSection === 'integrations' && <IntegrationSettings />}
           {activeSection === 'shipment' && <ShipmentConfiguration />}
