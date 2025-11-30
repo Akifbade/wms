@@ -586,6 +586,40 @@ async function handleCreateIssue(req, res) {
 }
 router.post("/issues", auth_1.authenticateToken, handleCreateIssue);
 /**
+ * GET /api/materials/issues/history
+ * Get material issue history (edits and deletions)
+ * NOTE: This route MUST come before /issues/:id to prevent 'history' being treated as an ID
+ */
+router.get("/issues/history", auth_1.authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        if (!companyId) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        const { startDate, endDate } = req.query;
+        const whereClause = { companyId };
+        if (startDate && endDate) {
+            whereClause.performedAt = {
+                gte: new Date(startDate),
+                lte: new Date(endDate)
+            };
+        }
+        const history = await prisma.materialIssueHistory.findMany({
+            where: whereClause,
+            include: {
+                material: { select: { name: true, sku: true, unit: true } },
+                performedBy: { select: { name: true, email: true } }
+            },
+            orderBy: { performedAt: 'desc' }
+        });
+        res.json(history);
+    }
+    catch (error) {
+        console.error("Error fetching material issue history:", error);
+        res.status(500).json({ error: "Failed to fetch history" });
+    }
+});
+/**
  * GET /api/materials/issues
  * Get all material issues for the company
  */
@@ -754,39 +788,6 @@ router.delete("/issues/:id", auth_1.authenticateToken, async (req, res) => {
     catch (error) {
         console.error("Error deleting material issue:", error);
         res.status(500).json({ error: "Failed to delete material issue" });
-    }
-});
-/**
- * GET /api/materials/issues/history
- * Get material issue history (edits and deletions)
- */
-router.get("/issues/history", auth_1.authenticateToken, async (req, res) => {
-    try {
-        const companyId = req.user?.companyId;
-        if (!companyId) {
-            return res.status(401).json({ error: "Unauthorized" });
-        }
-        const { startDate, endDate } = req.query;
-        const whereClause = { companyId };
-        if (startDate && endDate) {
-            whereClause.performedAt = {
-                gte: new Date(startDate),
-                lte: new Date(endDate)
-            };
-        }
-        const history = await prisma.materialIssueHistory.findMany({
-            where: whereClause,
-            include: {
-                material: { select: { name: true, sku: true, unit: true } },
-                performedBy: { select: { name: true, email: true } }
-            },
-            orderBy: { performedAt: 'desc' }
-        });
-        res.json(history);
-    }
-    catch (error) {
-        console.error("Error fetching material issue history:", error);
-        res.status(500).json({ error: "Failed to fetch history" });
     }
 });
 // ==================== MATERIAL RETURNS ====================
