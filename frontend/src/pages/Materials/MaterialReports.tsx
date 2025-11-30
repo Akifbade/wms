@@ -124,7 +124,13 @@ const MaterialReports: React.FC = () => {
   const loadIssueHistory = async () => {
     setHistoryLoading(true);
     try {
-      const response = await apiFetch(`/materials/issues/history?startDate=${dateRange.start}&endDate=${dateRange.end}`);
+      const token = localStorage.getItem('authToken');
+      const response = await apiFetch(`/materials/issues/history?startDate=${dateRange.start}&endDate=${dateRange.end}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       const data = await response.json();
       setIssueHistory(data || []);
     } catch (error) {
