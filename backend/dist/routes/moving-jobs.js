@@ -25,6 +25,20 @@ router.get("/", auth_1.authenticateToken, async (req, res) => {
                         },
                     },
                 },
+                materialIssues: {
+                    select: {
+                        id: true,
+                        quantity: true,
+                        totalCost: true,
+                    }
+                },
+                materialReturns: {
+                    select: {
+                        id: true,
+                        quantityGood: true,
+                        quantityDamaged: true
+                    }
+                }
             },
             orderBy: {
                 createdAt: "desc",

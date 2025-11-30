@@ -60,7 +60,6 @@ router.post('/login', async (req, res) => {
         const token = jsonwebtoken_1.default.sign({
             id: user.id,
             email: user.email,
-            name: user.name,
             role: user.role,
             companyId: user.companyId,
         }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -118,7 +117,6 @@ router.post('/register', async (req, res) => {
         const token = jsonwebtoken_1.default.sign({
             id: user.id,
             email: user.email,
-            name: user.name,
             role: user.role,
             companyId: user.companyId,
         }, process.env.JWT_SECRET, { expiresIn: '7d' });

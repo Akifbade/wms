@@ -345,6 +345,95 @@ router.delete("/:id", authenticateToken as any, async (req: AuthRequest, res) =>
 // ==================== STOCK BATCHES ====================
 
 /**
+ * GET /api/materials/stock/unified
+ * Get ALL stock purchases from BOTH stock_batches AND purchase_order_items combined
+ * This is the unified view that shows everything in one list
+ */
+router.get("/stock/unified", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    
+    // Get stock batches (old data)
+    const batches = await prisma.stockBatch.findMany({
+      where: { companyId },
+      include: {
+        material: { select: { id: true, sku: true, name: true, unit: true } },
+      },
+      orderBy: { purchaseDate: "desc" },
+    });
+    
+    // Get purchase order items (new data)
+    const purchaseOrders = await prisma.purchaseOrder.findMany({
+      where: { companyId },
+      include: {
+        items: {
+          include: {
+            material: { select: { id: true, sku: true, name: true, unit: true } }
+          }
+        },
+        vendor: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    // Normalize stock batches to unified format
+    const normalizedBatches = batches.map(batch => ({
+      id: batch.id,
+      source: 'stock_batch' as const,
+      orderNumber: batch.batchNumber || batch.purchaseOrder || 'N/A',
+      invoiceNumber: batch.purchaseOrder || batch.batchNumber || 'N/A',
+      vendorName: batch.vendorName || 'Unknown',
+      materialId: batch.materialId,
+      materialName: batch.material?.name || 'Unknown',
+      materialSku: batch.material?.sku || '',
+      materialUnit: batch.material?.unit || 'PCS',
+      quantity: batch.quantityPurchased,
+      quantityRemaining: batch.quantityRemaining,
+      unitCost: batch.unitCost,
+      sellingPrice: batch.sellingPrice,
+      orderDate: batch.purchaseDate,
+      receivedDate: batch.purchaseDate,
+      status: 'RECEIVED',
+      notes: batch.notes,
+      createdAt: batch.createdAt
+    }));
+    
+    // Normalize purchase order items to unified format
+    const normalizedPurchases = purchaseOrders.flatMap(po =>
+      po.items.map(item => ({
+        id: item.id,
+        source: 'purchase_order' as const,
+        orderNumber: po.orderNumber,
+        invoiceNumber: po.orderNumber,
+        vendorName: po.vendorName || po.vendor?.name || 'Unknown',
+        materialId: item.materialId,
+        materialName: item.material?.name || 'Unknown',
+        materialSku: item.material?.sku || '',
+        materialUnit: item.material?.unit || 'PCS',
+        quantity: item.quantity,
+        quantityRemaining: item.quantity,
+        unitCost: item.unitCost,
+        sellingPrice: item.unitCost * 1.2, // Default markup
+        orderDate: po.orderDate,
+        receivedDate: po.receivedDate,
+        status: po.status,
+        notes: po.notes,
+        createdAt: po.createdAt
+      }))
+    );
+    
+    // Combine and sort by date (newest first)
+    const unified = [...normalizedBatches, ...normalizedPurchases]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    res.json(unified);
+  } catch (error) {
+    console.error("Error fetching unified stock:", error);
+    res.status(500).json({ error: "Failed to fetch unified stock" });
+  }
+});
+
+/**
  * GET /api/materials/stock/all
  * Get all stock batches (simplified endpoint)
  */
@@ -520,8 +609,6 @@ async function handleCreateIssue(req: AuthRequest, res: any) {
     const issue = await prisma.materialIssue.create({
       data: {
         jobId: jobId || null,
-        issueType,
-        reference,
         materialId,
         stockBatchId,
         quantity,
@@ -899,7 +986,7 @@ router.get("/reports/consumption", authenticateToken as any, async (req: AuthReq
 
     for (const issue of issues) {
       const key = issue.materialId;
-      
+
       // Calculate consumed quantity (issued - returned good)
       const totalReturned = issue.returns.reduce((sum: number, ret: any) => sum + (ret.quantityGood || 0), 0);
       const consumed = issue.quantity - totalReturned;
@@ -1233,7 +1320,7 @@ router.get("/reports/complete-tracking", authenticateToken as any, async (req: A
     for (const po of purchases) {
       for (const item of po.items) {
         if (materialId && item.materialId !== materialId) continue;
-        
+
         const key = item.materialId;
         if (!trackingMap[key]) {
           trackingMap[key] = {
@@ -1264,7 +1351,7 @@ router.get("/reports/complete-tracking", authenticateToken as any, async (req: A
     // Step 2: Add issues (consumption)
     for (const issue of issues) {
       if (materialId && issue.materialId !== materialId) continue;
-      
+
       const key = issue.materialId;
       if (!trackingMap[key]) {
         trackingMap[key] = {
@@ -1278,7 +1365,7 @@ router.get("/reports/complete-tracking", authenticateToken as any, async (req: A
           currentStock: issue.material.totalQuantity
         };
       }
-      
+
       const totalReturned = issue.returns.reduce((sum: number, r: any) => sum + (r.quantityGood || 0), 0);
       const totalDamaged = issue.returns.reduce((sum: number, r: any) => sum + (r.quantityDamaged || 0), 0);
       const consumed = issue.quantity - totalReturned;
@@ -1598,6 +1685,314 @@ router.post("/purchase-orders", authenticateToken as any, async (req: AuthReques
   } catch (error) {
     console.error("Error creating purchase order:", error);
     res.status(500).json({ error: "Failed to create purchase order" });
+  }
+});
+
+// ==================== MATERIAL STATEMENT (COMPREHENSIVE REPORT) ====================
+
+/**
+ * GET /api/materials/reports/material-statement
+ * Get complete material statement like a bank statement
+ * Shows all transactions: purchases, issues, returns, damages with running balance
+ */
+router.get("/reports/material-statement", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    const { startDate, endDate, materialId } = req.query;
+
+    // Build date filter
+    const dateFilter = startDate && endDate ? {
+      gte: new Date(startDate as string),
+      lte: new Date(endDate as string)
+    } : undefined;
+
+    // Get all materials
+    const materialsWhere: any = { companyId, isActive: true };
+    if (materialId) {
+      materialsWhere.id = materialId as string;
+    }
+
+    const materials = await prisma.packingMaterial.findMany({
+      where: materialsWhere,
+      include: { materialCategory: true }
+    });
+
+    // Build statement for each material
+    const statements = [];
+
+    for (const material of materials) {
+      const transactions: any[] = [];
+
+      // 1a. Get all PURCHASES from Purchase Orders (Stock IN)
+      const purchaseItems = await prisma.purchaseOrderItem.findMany({
+        where: {
+          materialId: material.id,
+          companyId,
+          ...(dateFilter ? { purchaseOrder: { orderDate: dateFilter } } : {})
+        },
+        include: {
+          purchaseOrder: {
+            include: { vendor: true }
+          }
+        },
+        orderBy: { purchaseOrder: { orderDate: 'asc' } }
+      });
+
+      for (const item of purchaseItems) {
+        if (item.purchaseOrder.status === 'RECEIVED') {
+          transactions.push({
+            id: item.id,
+            date: item.purchaseOrder.orderDate,
+            type: 'PURCHASE',
+            description: `Purchased from ${item.purchaseOrder.vendorName || item.purchaseOrder.vendor?.name || 'Unknown Vendor'}`,
+            reference: item.purchaseOrder.orderNumber,
+            referenceType: 'purchase_order',
+            referenceId: item.purchaseOrder.id,
+            stockIn: item.quantity,
+            stockOut: 0,
+            unitCost: item.unitCost,
+            totalCost: item.totalCost
+          });
+        }
+      }
+
+      // 1b. Get all PURCHASES from Stock Batches (Stock IN)
+      const stockBatches = await prisma.stockBatch.findMany({
+        where: {
+          materialId: material.id,
+          companyId,
+          ...(dateFilter ? { purchaseDate: dateFilter } : {})
+        },
+        include: {
+          vendor: true
+        },
+        orderBy: { purchaseDate: 'asc' }
+      });
+
+      for (const batch of stockBatches) {
+        transactions.push({
+          id: batch.id,
+          date: batch.purchaseDate,
+          type: 'PURCHASE',
+          description: `Stock: ${batch.batchNumber || 'Batch'} - ${batch.vendorName || batch.vendor?.name || 'Direct Entry'}`,
+          reference: batch.batchNumber || batch.purchaseOrder || 'BATCH',
+          referenceType: 'stock_batch',
+          referenceId: batch.id,
+          stockIn: batch.quantityPurchased,
+          stockOut: 0,
+          unitCost: batch.unitCost || 0,
+          totalCost: (batch.quantityPurchased * (batch.unitCost || 0))
+        });
+      }
+
+      // 2. Get all ISSUES (Stock OUT to jobs)
+      const issues = await prisma.materialIssue.findMany({
+        where: {
+          materialId: material.id,
+          companyId,
+          ...(dateFilter ? { issuedAt: dateFilter } : {})
+        },
+        include: {
+          job: true,
+          issuedBy: true
+        },
+        orderBy: { issuedAt: 'asc' }
+      });
+
+      for (const issue of issues) {
+        transactions.push({
+          id: issue.id,
+          date: issue.issuedAt,
+          type: 'ISSUE',
+          description: `Issued to Job: ${issue.job?.jobCode || 'N/A'} - ${issue.job?.jobTitle || 'Unknown'}`,
+          reference: issue.job?.jobCode || issue.reference || 'N/A',
+          referenceType: 'moving_job',
+          referenceId: issue.jobId,
+          stockIn: 0,
+          stockOut: issue.quantity,
+          unitCost: issue.unitCost,
+          totalCost: issue.totalCost,
+          issuedBy: issue.issuedBy?.name || 'Unknown'
+        });
+      }
+
+      // 3. Get all RETURNS (Stock IN from jobs - good condition only)
+      const returns = await prisma.materialReturn.findMany({
+        where: {
+          materialId: material.id,
+          companyId,
+          quantityGood: { gt: 0 },
+          ...(dateFilter ? { recordedAt: dateFilter } : {})
+        },
+        include: {
+          issue: { include: { job: true } },
+          recordedBy: true
+        },
+        orderBy: { recordedAt: 'asc' }
+      });
+
+      for (const ret of returns) {
+        if (ret.quantityGood > 0) {
+          transactions.push({
+            id: ret.id,
+            date: ret.recordedAt,
+            type: 'RETURN',
+            description: `Returned from Job: ${ret.issue?.job?.jobCode || 'N/A'} (Good condition)`,
+            reference: ret.issue?.job?.jobCode || 'N/A',
+            referenceType: 'moving_job',
+            referenceId: ret.issue?.jobId,
+            stockIn: ret.quantityGood,
+            stockOut: 0,
+            unitCost: ret.issue?.unitCost || 0,
+            totalCost: ret.quantityGood * (ret.issue?.unitCost || 0),
+            recordedBy: ret.recordedBy?.name || 'Unknown'
+          });
+        }
+      }
+
+      // 4. Get all DAMAGES (Stock loss)
+      const damages = await prisma.materialDamage.findMany({
+        where: {
+          materialId: material.id,
+          companyId,
+          ...(dateFilter ? { recordedAt: dateFilter } : {})
+        },
+        include: {
+          return: { include: { issue: { include: { job: true } } } },
+          recordedBy: true
+        },
+        orderBy: { recordedAt: 'asc' }
+      });
+
+      for (const damage of damages) {
+        transactions.push({
+          id: damage.id,
+          date: damage.recordedAt,
+          type: 'DAMAGE',
+          description: `Damaged: ${damage.reason || 'No reason provided'}`,
+          reference: damage.return?.issue?.job?.jobCode || 'N/A',
+          referenceType: 'damage_report',
+          referenceId: damage.id,
+          stockIn: 0,
+          stockOut: damage.quantity,
+          unitCost: damage.return?.issue?.unitCost || material.unitCost || 0,
+          totalCost: damage.quantity * (damage.return?.issue?.unitCost || material.unitCost || 0),
+          recordedBy: damage.recordedBy?.name || 'Unknown',
+          photoUrls: damage.photoUrls
+        });
+      }
+
+      // Sort all transactions by date
+      transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      // Calculate OPENING STOCK (transactions BEFORE the date range)
+      let openingStock = 0;
+      if (dateFilter && dateFilter.gte) {
+        // Get all purchases from purchase_order_items before start date
+        const priorPurchases = await prisma.purchaseOrderItem.findMany({
+          where: {
+            materialId: material.id,
+            companyId,
+            purchaseOrder: {
+              orderDate: { lt: dateFilter.gte },
+              status: 'RECEIVED'
+            }
+          }
+        });
+        openingStock += priorPurchases.reduce((sum, p) => sum + p.quantity, 0);
+
+        // Get all stock batches before start date
+        const priorBatches = await prisma.stockBatch.findMany({
+          where: {
+            materialId: material.id,
+            companyId,
+            purchaseDate: { lt: dateFilter.gte }
+          }
+        });
+        openingStock += priorBatches.reduce((sum, b) => sum + b.quantityPurchased, 0);
+
+        // Subtract issues before start date
+        const priorIssues = await prisma.materialIssue.findMany({
+          where: {
+            materialId: material.id,
+            companyId,
+            issuedAt: { lt: dateFilter.gte }
+          }
+        });
+        openingStock -= priorIssues.reduce((sum, i) => sum + i.quantity, 0);
+
+        // Add returns before start date
+        const priorReturns = await prisma.materialReturn.findMany({
+          where: {
+            materialId: material.id,
+            companyId,
+            recordedAt: { lt: dateFilter.gte }
+          }
+        });
+        openingStock += priorReturns.reduce((sum, r) => sum + r.quantityGood, 0);
+
+        // Subtract damages before start date
+        const priorDamages = await prisma.materialDamage.findMany({
+          where: {
+            materialId: material.id,
+            companyId,
+            recordedAt: { lt: dateFilter.gte }
+          }
+        });
+        openingStock -= priorDamages.reduce((sum, d) => sum + d.quantity, 0);
+      }
+
+      // Calculate running balance starting from opening stock
+      let runningBalance = openingStock;
+      for (const txn of transactions) {
+        runningBalance += txn.stockIn - txn.stockOut;
+        txn.balance = runningBalance;
+      }
+
+      // Calculate totals
+      const totals = {
+        openingStock: openingStock,
+        totalPurchased: transactions.filter(t => t.type === 'PURCHASE').reduce((sum, t) => sum + t.stockIn, 0),
+        totalIssued: transactions.filter(t => t.type === 'ISSUE').reduce((sum, t) => sum + t.stockOut, 0),
+        totalReturned: transactions.filter(t => t.type === 'RETURN').reduce((sum, t) => sum + t.stockIn, 0),
+        totalDamaged: transactions.filter(t => t.type === 'DAMAGE').reduce((sum, t) => sum + t.stockOut, 0),
+        closingBalance: runningBalance,
+        currentStock: material.totalQuantity,
+        totalValue: material.totalQuantity * (material.unitCost || 0)
+      };
+
+      statements.push({
+        material: {
+          id: material.id,
+          sku: material.sku,
+          name: material.name,
+          category: material.materialCategory?.name || material.category || 'Uncategorized',
+          unit: material.unit,
+          unitCost: material.unitCost || 0,
+          currentStock: material.totalQuantity,
+          minStockLevel: material.minStockLevel
+        },
+        transactions,
+        totals
+      });
+    }
+
+    // Overall summary
+    const overallSummary = {
+      totalMaterials: statements.length,
+      totalOpeningStock: statements.reduce((sum, s) => sum + s.totals.openingStock, 0),
+      totalPurchased: statements.reduce((sum, s) => sum + s.totals.totalPurchased, 0),
+      totalIssued: statements.reduce((sum, s) => sum + s.totals.totalIssued, 0),
+      totalReturned: statements.reduce((sum, s) => sum + s.totals.totalReturned, 0),
+      totalDamaged: statements.reduce((sum, s) => sum + s.totals.totalDamaged, 0),
+      totalClosingStock: statements.reduce((sum, s) => sum + s.totals.closingBalance, 0),
+      totalValue: statements.reduce((sum, s) => sum + s.totals.totalValue, 0)
+    };
+
+    res.json({ statements, summary: overallSummary });
+  } catch (error) {
+    console.error("Error generating material statement:", error);
+    res.status(500).json({ error: "Failed to generate material statement" });
   }
 });
 

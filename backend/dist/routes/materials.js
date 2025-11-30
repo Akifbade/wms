@@ -95,102 +95,28 @@ router.post("/categories", auth_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: "Failed to create category" });
     }
 });
-/**
- * PUT /api/materials/categories/:id
- * Update a material category
- */
-router.put("/categories/:id", auth_1.authenticateToken, async (req, res) => {
-    try {
-        const { companyId } = req.user;
-        const { id } = req.params;
-        const { name, description, parentId } = req.body;
-        if (!name) {
-            return res.status(400).json({ error: "Category name is required" });
-        }
-        const category = await prisma.materialCategory.update({
-            where: { id, companyId },
-            data: {
-                name,
-                description,
-                parentId: parentId || null,
-            },
-        });
-        res.json(category);
-    }
-    catch (error) {
-        console.error("Error updating category:", error);
-        res.status(500).json({ error: "Failed to update category" });
-    }
-});
-/**
- * DELETE /api/materials/categories/:id
- * Delete a material category
- */
-router.delete("/categories/:id", auth_1.authenticateToken, async (req, res) => {
-    try {
-        const { companyId, role } = req.user;
-        const { id } = req.params;
-        if (role !== 'ADMIN') {
-            return res.status(403).json({ error: "Only admins can delete categories" });
-        }
-        // Check if category has materials
-        const category = await prisma.materialCategory.findUnique({
-            where: { id, companyId },
-            include: {
-                _count: { select: { materials: true } },
-                children: { select: { id: true } } // Check for subcategories too
-            }
-        });
-        if (!category) {
-            return res.status(404).json({ error: "Category not found" });
-        }
-        if (category._count.materials > 0) {
-            return res.status(400).json({ error: "Cannot delete category containing materials" });
-        }
-        if (category.children.length > 0) {
-            return res.status(400).json({ error: "Cannot delete category containing subcategories" });
-        }
-        await prisma.materialCategory.delete({
-            where: { id },
-        });
-        res.json({ message: "Category deleted successfully" });
-    }
-    catch (error) {
-        console.error("Error deleting category:", error);
-        res.status(500).json({ error: "Failed to delete category" });
-    }
-});
-// ==================== PACKING MATERIALS ====================
+// ==================== MATERIALS LIST ====================
 /**
  * GET /api/materials
- * List all packing materials for the company with stock info
+ * Get all materials for the company
  */
 router.get("/", auth_1.authenticateToken, async (req, res) => {
     try {
         const { companyId } = req.user;
-        if (!companyId) {
-            return res.status(400).json({ error: "Company not found" });
-        }
         const materials = await prisma.packingMaterial.findMany({
-            where: { companyId, isActive: true },
+            where: {
+                companyId,
+                isActive: true
+            },
             include: {
                 materialCategory: {
                     select: {
                         id: true,
-                        name: true,
+                        name: true
                     }
-                },
-                stockBatches: {
-                    select: {
-                        id: true,
-                        quantityRemaining: true,
-                        unitCost: true,
-                        sellingPrice: true,
-                    },
-                    where: { quantityRemaining: { gt: 0 } }
-                },
+                }
             },
-            orderBy: { createdAt: "desc" },
+            orderBy: { name: "asc" },
         });
         res.json(materials);
     }
@@ -199,6 +125,7 @@ router.get("/", auth_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: "Failed to fetch materials" });
     }
 });
+// Old route removed. Using handleCreateReturn with multer middleware via alias routes.
 /**
  * GET /api/materials/job-materials/:jobId
  * Get all materials assigned to a specific job
@@ -388,6 +315,87 @@ router.delete("/:id", auth_1.authenticateToken, async (req, res) => {
 });
 // ==================== STOCK BATCHES ====================
 /**
+ * GET /api/materials/stock/unified
+ * Get ALL stock purchases from BOTH stock_batches AND purchase_order_items combined
+ * This is the unified view that shows everything in one list
+ */
+router.get("/stock/unified", auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { companyId } = req.user;
+        // Get stock batches (old data)
+        const batches = await prisma.stockBatch.findMany({
+            where: { companyId },
+            include: {
+                material: { select: { id: true, sku: true, name: true, unit: true } },
+            },
+            orderBy: { purchaseDate: "desc" },
+        });
+        // Get purchase order items (new data)
+        const purchaseOrders = await prisma.purchaseOrder.findMany({
+            where: { companyId },
+            include: {
+                items: {
+                    include: {
+                        material: { select: { id: true, sku: true, name: true, unit: true } }
+                    }
+                },
+                vendor: true
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+        // Normalize stock batches to unified format
+        const normalizedBatches = batches.map(batch => ({
+            id: batch.id,
+            source: 'stock_batch',
+            orderNumber: batch.batchNumber || batch.purchaseOrder || 'N/A',
+            invoiceNumber: batch.purchaseOrder || batch.batchNumber || 'N/A',
+            vendorName: batch.vendorName || 'Unknown',
+            materialId: batch.materialId,
+            materialName: batch.material?.name || 'Unknown',
+            materialSku: batch.material?.sku || '',
+            materialUnit: batch.material?.unit || 'PCS',
+            quantity: batch.quantityPurchased,
+            quantityRemaining: batch.quantityRemaining,
+            unitCost: batch.unitCost,
+            sellingPrice: batch.sellingPrice,
+            orderDate: batch.purchaseDate,
+            receivedDate: batch.purchaseDate,
+            status: 'RECEIVED',
+            notes: batch.notes,
+            createdAt: batch.createdAt
+        }));
+        // Normalize purchase order items to unified format
+        const normalizedPurchases = purchaseOrders.flatMap(po => po.items.map(item => ({
+            id: item.id,
+            source: 'purchase_order',
+            orderNumber: po.orderNumber,
+            invoiceNumber: po.orderNumber,
+            vendorName: po.vendorName || po.vendor?.name || 'Unknown',
+            materialId: item.materialId,
+            materialName: item.material?.name || 'Unknown',
+            materialSku: item.material?.sku || '',
+            materialUnit: item.material?.unit || 'PCS',
+            quantity: item.quantity,
+            quantityRemaining: item.quantity,
+            unitCost: item.unitCost,
+            sellingPrice: item.unitCost * 1.2, // Default markup
+            orderDate: po.orderDate,
+            receivedDate: po.receivedDate,
+            status: po.status,
+            notes: po.notes,
+            createdAt: po.createdAt
+        })));
+        // Combine and sort by date (newest first)
+        const unified = [...normalizedBatches, ...normalizedPurchases]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        res.json(unified);
+    }
+    catch (error) {
+        console.error("Error fetching unified stock:", error);
+        res.status(500).json({ error: "Failed to fetch unified stock" });
+    }
+});
+/**
  * GET /api/materials/stock/all
  * Get all stock batches (simplified endpoint)
  */
@@ -516,20 +524,23 @@ router.post("/batches", auth_1.authenticateToken, async (req, res) => {
 // ==================== MATERIAL ISSUES ====================
 /**
  * POST /api/materials/issues
+ * POST /api/materials/issue (compat alias)
  * Issue materials from stock to a job with rack selection
  */
-router.post("/issues", auth_1.authenticateToken, async (req, res) => {
+async function handleCreateIssue(req, res) {
     try {
         const { companyId } = req.user;
-        const { jobId, materialId, stockBatchId, quantity, rackId, notes } = req.body;
-        if (!jobId || !materialId || !quantity) {
+        const { jobId, materialId, stockBatchId, quantity, rackId, notes, issueType = 'JOB', reference } = req.body;
+        if (!materialId || !quantity) {
             return res.status(400).json({ error: "Missing required fields" });
+        }
+        // Validate Job ID if issue type is JOB
+        if (issueType === 'JOB' && !jobId) {
+            return res.status(400).json({ error: "Job ID is required for Job issues" });
         }
         // Validate rack exists
         if (rackId) {
-            const rack = await prisma.rack.findUnique({
-                where: { id: rackId },
-            });
+            const rack = await prisma.rack.findUnique({ where: { id: rackId } });
             if (!rack) {
                 return res.status(404).json({ error: "Rack not found" });
             }
@@ -544,51 +555,68 @@ router.post("/issues", auth_1.authenticateToken, async (req, res) => {
         const totalCost = quantity * unitCost;
         const issue = await prisma.materialIssue.create({
             data: {
-                jobId,
+                jobId: jobId || null,
                 materialId,
                 stockBatchId,
                 quantity,
                 unitCost,
                 totalCost,
-                rackId, // Store material in specified rack
+                rackId,
                 issuedById: req.user.id,
                 notes,
                 companyId,
             },
             include: {
                 material: true,
-                rack: {
-                    select: { id: true, code: true, location: true }
-                }
+                rack: { select: { id: true, code: true, location: true } },
             },
         });
         // Deduct from remaining quantity if batch specified
         if (batch) {
-            await prisma.stockBatch.update({
-                where: { id: stockBatchId },
-                data: { quantityRemaining: Math.max(0, batch.quantityRemaining - quantity) },
-            });
+            await prisma.stockBatch.update({ where: { id: stockBatchId }, data: { quantityRemaining: Math.max(0, batch.quantityRemaining - quantity) } });
         }
         // Update material total quantity
-        await prisma.packingMaterial.update({
-            where: { id: materialId },
-            data: {
-                totalQuantity: Math.max(0, (material.totalQuantity || 0) - quantity)
-            }
-        });
+        await prisma.packingMaterial.update({ where: { id: materialId }, data: { totalQuantity: Math.max(0, (material.totalQuantity || 0) - quantity) } });
         res.status(201).json(issue);
     }
     catch (error) {
         console.error("Error creating material issue:", error);
         res.status(500).json({ error: "Failed to issue material" });
     }
+}
+router.post("/issues", auth_1.authenticateToken, handleCreateIssue);
+/**
+ * GET /api/materials/issues
+ * Get all material issues for the company
+ */
+router.get("/issues", auth_1.authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        if (!companyId) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        const issues = await prisma.materialIssue.findMany({
+            where: { companyId },
+            include: {
+                material: true,
+                job: true
+            },
+            orderBy: { issuedAt: 'desc' }
+        });
+        res.json(issues);
+    }
+    catch (error) {
+        console.error("Error fetching material issues:", error);
+        res.status(500).json({ error: "Failed to fetch material issues" });
+    }
 });
 // ==================== MATERIAL RETURNS ====================
 /**
  * POST /api/materials/returns
+ * POST /api/materials/return (compat alias)
  * Record material return after job completion with rack allocation
  */
-router.post("/returns", auth_1.authenticateToken, async (req, res) => {
+async function handleCreateReturn(req, res) {
     try {
         const { companyId } = req.user;
         const { jobId, materialId, issueId, quantityGood, quantityDamaged, rackId, notes } = req.body;
@@ -602,51 +630,34 @@ router.post("/returns", auth_1.authenticateToken, async (req, res) => {
                 issueId,
                 quantityGood: quantityGood || 0,
                 quantityDamaged: quantityDamaged || 0,
-                rackId, // Rack to store returned good materials
+                rackId,
                 recordedById: req.user.id,
                 notes,
                 companyId,
             },
             include: {
                 material: true,
-                rack: {
-                    select: { id: true, code: true, location: true }
-                }
+                rack: { select: { id: true, code: true, location: true } }
             },
         });
         // Auto-restock good materials to specified rack
         if (quantityGood > 0 && rackId) {
             const uniqueBatchId = `RETURN-${return_.id}`;
             await prisma.rackStockLevel.upsert({
-                where: {
-                    materialId_rackId_stockBatchId: { materialId, rackId, stockBatchId: uniqueBatchId },
-                },
-                create: {
-                    materialId,
-                    rackId,
-                    quantity: quantityGood,
-                    companyId,
-                    stockBatchId: uniqueBatchId,
-                },
-                update: {
-                    quantity: { increment: quantityGood },
-                },
+                where: { materialId_rackId_stockBatchId: { materialId, rackId, stockBatchId: uniqueBatchId } },
+                create: { materialId, rackId, quantity: quantityGood, companyId, stockBatchId: uniqueBatchId },
+                update: { quantity: { increment: quantityGood } },
             });
-            // Update material total quantity
             const material = await prisma.packingMaterial.findUnique({ where: { id: materialId } });
-            await prisma.packingMaterial.update({
-                where: { id: materialId },
-                data: {
-                    totalQuantity: (material?.totalQuantity || 0) + quantityGood
-                }
-            });
-            // Mark as restocked
-            await prisma.materialReturn.update({
-                where: { id: return_.id },
-                data: { restocked: true, restockedAt: new Date() },
-            });
+            await prisma.packingMaterial.update({ where: { id: materialId }, data: { totalQuantity: (material?.totalQuantity || 0) + quantityGood } });
+            await prisma.materialReturn.update({ where: { id: return_.id }, data: { restocked: true, restockedAt: new Date() } });
         }
-        // Create damage record if any damaged items
+        // Handle any uploaded files for damaged items
+        let photoUrls = [];
+        const files = req.files;
+        if (files && Array.isArray(files)) {
+            photoUrls = files.map(f => `/uploads/damages/${f.filename}`);
+        }
         if (quantityDamaged > 0) {
             await prisma.materialDamage.create({
                 data: {
@@ -654,9 +665,10 @@ router.post("/returns", auth_1.authenticateToken, async (req, res) => {
                     materialId,
                     quantity: quantityDamaged,
                     recordedById: req.user.id,
-                    status: "PENDING", // Requires approval
+                    status: "PENDING",
+                    photoUrls: photoUrls.length > 0 ? photoUrls.join(',') : null,
                     companyId,
-                },
+                }
             });
         }
         res.status(201).json(return_);
@@ -665,7 +677,8 @@ router.post("/returns", auth_1.authenticateToken, async (req, res) => {
         console.error("Error creating material return:", error);
         res.status(500).json({ error: "Failed to record material return" });
     }
-});
+}
+router.post("/returns", auth_1.authenticateToken, damagePhotoUpload.array('photos', 10), handleCreateReturn);
 // ==================== MATERIAL APPROVALS ====================
 /**
  * GET /api/materials/approvals
@@ -769,10 +782,7 @@ router.get("/reports/stock-summary", auth_1.authenticateToken, async (req, res) 
         const materials = await prisma.packingMaterial.findMany({
             where: { companyId, isActive: true },
             include: {
-                materialCategory: true,
-                stockBatches: {
-                    where: { quantityRemaining: { gt: 0 } }
-                }
+                materialCategory: true
             }
         });
         const summary = materials.map(material => ({
@@ -785,10 +795,8 @@ router.get("/reports/stock-summary", auth_1.authenticateToken, async (req, res) 
             minStockLevel: material.minStockLevel,
             stockStatus: material.totalQuantity < material.minStockLevel ? 'LOW' :
                 material.totalQuantity === 0 ? 'OUT_OF_STOCK' : 'ADEQUATE',
-            activeBatches: material.stockBatches.length,
-            avgUnitCost: material.stockBatches.length > 0
-                ? material.stockBatches.reduce((sum, b) => sum + b.unitCost, 0) / material.stockBatches.length
-                : material.unitCost || 0,
+            activeBatches: 0, // Deprecated
+            avgUnitCost: material.unitCost || 0,
             totalValue: material.totalQuantity * (material.unitCost || 0)
         }));
         res.json({
@@ -816,22 +824,16 @@ router.get("/reports/low-stock", auth_1.authenticateToken, async (req, res) => {
         const lowStockMaterials = await prisma.packingMaterial.findMany({
             where: {
                 companyId,
-                isActive: true,
-                totalQuantity: {
-                    lt: prisma.packingMaterial.fields.minStockLevel
-                }
+                isActive: true
             },
             include: {
-                materialCategory: true,
-                stockBatches: {
-                    where: { quantityRemaining: { gt: 0 } },
-                    orderBy: { purchaseDate: 'desc' },
-                    take: 1
-                }
+                materialCategory: true
             },
             orderBy: { totalQuantity: 'asc' }
         });
-        const alerts = lowStockMaterials.map(material => ({
+        // Filter for low stock items
+        const filtered = lowStockMaterials.filter(m => m.totalQuantity < m.minStockLevel);
+        const alerts = filtered.map(material => ({
             id: material.id,
             sku: material.sku,
             name: material.name,
@@ -840,7 +842,7 @@ router.get("/reports/low-stock", auth_1.authenticateToken, async (req, res) => {
             minStock: material.minStockLevel,
             shortfall: material.minStockLevel - material.totalQuantity,
             unit: material.unit,
-            lastPurchaseDate: material.stockBatches[0]?.purchaseDate || null,
+            unitCost: material.unitCost || 0,
             suggestedReorderQty: Math.max(material.minStockLevel * 2 - material.totalQuantity, 0)
         }));
         res.json({ lowStockAlerts: alerts, totalAlerts: alerts.length });
@@ -852,15 +854,16 @@ router.get("/reports/low-stock", auth_1.authenticateToken, async (req, res) => {
 });
 /**
  * GET /api/materials/reports/consumption
- * Get material consumption/usage report
+ * Get material consumption/usage report (from moving jobs)
  */
 router.get("/reports/consumption", auth_1.authenticateToken, async (req, res) => {
     try {
         const { companyId } = req.user;
         const { startDate, endDate, materialId } = req.query;
+        // Query material issues that went to jobs (consumption)
         const where = { companyId };
         if (startDate && endDate) {
-            where.usedAt = {
+            where.issuedAt = {
                 gte: new Date(startDate),
                 lte: new Date(endDate)
             };
@@ -868,40 +871,80 @@ router.get("/reports/consumption", auth_1.authenticateToken, async (req, res) =>
         if (materialId) {
             where.materialId = materialId;
         }
-        const usages = await prisma.materialUsage.findMany({
+        // Get all material issues (these represent consumption for moving jobs)
+        const issues = await prisma.materialIssue.findMany({
             where,
             include: {
                 material: {
-                    select: { sku: true, name: true, unit: true }
+                    select: { id: true, sku: true, name: true, unit: true, unitCost: true }
                 },
-                shipment: {
-                    select: { name: true, referenceId: true }
+                job: {
+                    select: { id: true, jobCode: true, jobTitle: true }
                 },
-                usedBy: {
-                    select: { name: true }
+                issuedBy: {
+                    select: { id: true, name: true }
+                },
+                returns: {
+                    select: { quantityUsed: true, quantityDamaged: true, quantityGood: true }
                 }
             },
-            orderBy: { usedAt: 'desc' }
+            orderBy: { issuedAt: 'desc' }
         });
-        const summary = usages.reduce((acc, usage) => {
-            const key = usage.materialId;
-            if (!acc[key]) {
-                acc[key] = {
-                    material: usage.material,
-                    totalQuantityUsed: 0,
-                    totalCost: 0,
-                    usageCount: 0
+        // Calculate consumption per material
+        const summary = {};
+        const consumptionRecords = [];
+        for (const issue of issues) {
+            const key = issue.materialId;
+            // Calculate consumed quantity (issued - returned good)
+            const totalReturned = issue.returns.reduce((sum, ret) => sum + (ret.quantityGood || 0), 0);
+            const consumed = issue.quantity - totalReturned;
+            const consumptionCost = consumed * issue.unitCost;
+            if (!summary[key]) {
+                summary[key] = {
+                    material: issue.material,
+                    totalQuantityConsumed: 0,
+                    totalConsumptionCost: 0,
+                    consumptionCount: 0,
+                    jobsAffected: new Set()
                 };
             }
-            acc[key].totalQuantityUsed += usage.quantityUsed;
-            acc[key].totalCost += usage.totalCost;
-            acc[key].usageCount += 1;
-            return acc;
-        }, {});
+            summary[key].totalQuantityConsumed += consumed;
+            summary[key].totalConsumptionCost += consumptionCost;
+            summary[key].consumptionCount += 1;
+            summary[key].jobsAffected.add(issue.jobId);
+            // Add detailed record
+            consumptionRecords.push({
+                id: issue.id,
+                materialSku: issue.material.sku,
+                materialName: issue.material.name,
+                materialId: issue.materialId,
+                jobCode: issue.job?.jobCode || 'N/A',
+                jobTitle: issue.job?.jobTitle || 'Unknown',
+                quantityIssued: issue.quantity,
+                quantityReturned: totalReturned,
+                quantityConsumed: consumed,
+                unitCost: issue.unitCost,
+                consumptionCost,
+                issuedDate: issue.issuedAt,
+                issuedBy: issue.issuedBy?.name || 'Unknown'
+            });
+        }
+        // Convert summary
+        const summaryArray = Object.values(summary).map((item) => ({
+            material: item.material,
+            totalQuantityConsumed: item.totalQuantityConsumed,
+            totalConsumptionCost: item.totalConsumptionCost,
+            consumptionCount: item.consumptionCount,
+            jobsAffected: item.jobsAffected.size
+        }));
         res.json({
-            usages,
-            summary: Object.values(summary),
-            totalRecords: usages.length
+            consumptions: consumptionRecords,
+            summary: summaryArray,
+            totals: {
+                totalMaterials: Object.keys(summary).length,
+                totalQuantityConsumed: consumptionRecords.reduce((sum, r) => sum + r.quantityConsumed, 0),
+                totalCost: consumptionRecords.reduce((sum, r) => sum + r.consumptionCost, 0)
+            }
         });
     }
     catch (error) {
@@ -927,24 +970,50 @@ router.get("/reports/purchase-history", auth_1.authenticateToken, async (req, re
         if (vendorId) {
             where.vendorId = vendorId;
         }
-        const purchases = await prisma.stockBatch.findMany({
-            where,
+        const purchases = await prisma.purchaseOrder.findMany({
+            where: {
+                companyId,
+                ...(startDate && endDate ? {
+                    orderDate: {
+                        gte: new Date(startDate),
+                        lte: new Date(endDate)
+                    }
+                } : {}),
+                ...(vendorId ? { vendorId: vendorId } : {})
+            },
             include: {
-                material: {
-                    select: { sku: true, name: true, unit: true }
-                },
                 vendor: {
                     select: { name: true, phone: true }
+                },
+                items: {
+                    include: {
+                        material: {
+                            select: { sku: true, name: true, unit: true }
+                        }
+                    }
                 }
             },
-            orderBy: { purchaseDate: 'desc' }
+            orderBy: { orderDate: 'desc' }
         });
+        // Flatten items for the report
+        const flattenedPurchases = purchases.flatMap(po => po.items.map(item => ({
+            id: item.id,
+            orderNumber: po.orderNumber,
+            purchaseDate: po.orderDate,
+            vendorName: po.vendorName || po.vendor?.name || 'Unknown',
+            materialName: item.material.name,
+            sku: item.material.sku,
+            quantityPurchased: item.quantity,
+            unitCost: item.unitCost,
+            totalCost: item.totalCost,
+            status: po.status
+        })));
         const summary = {
             totalPurchases: purchases.length,
-            totalQuantity: purchases.reduce((sum, p) => sum + p.quantityPurchased, 0),
-            totalAmount: purchases.reduce((sum, p) => sum + (p.quantityPurchased * p.unitCost), 0)
+            totalQuantity: flattenedPurchases.reduce((sum, p) => sum + p.quantityPurchased, 0),
+            totalAmount: flattenedPurchases.reduce((sum, p) => sum + p.totalCost, 0)
         };
-        res.json({ purchases, summary });
+        res.json({ purchases: flattenedPurchases, summary });
     }
     catch (error) {
         console.error("Error fetching purchase history:", error);
@@ -961,31 +1030,32 @@ router.get("/reports/vendor-performance", auth_1.authenticateToken, async (req, 
         const vendors = await prisma.vendor.findMany({
             where: { companyId },
             include: {
-                stockBatches: {
+                purchaseOrders: {
                     include: {
-                        material: {
-                            select: { name: true, unit: true }
-                        }
+                        items: true
                     }
                 }
             }
         });
-        const performance = vendors.map(vendor => ({
-            id: vendor.id,
-            name: vendor.name,
-            phone: vendor.phone,
-            email: vendor.email,
-            rating: vendor.rating || 0,
-            totalPurchases: vendor.stockBatches.length,
-            totalQuantitySupplied: vendor.stockBatches.reduce((sum, b) => sum + b.quantityPurchased, 0),
-            totalAmount: vendor.stockBatches.reduce((sum, b) => sum + (b.quantityPurchased * b.unitCost), 0),
-            avgUnitCost: vendor.stockBatches.length > 0
-                ? vendor.stockBatches.reduce((sum, b) => sum + b.unitCost, 0) / vendor.stockBatches.length
-                : 0,
-            lastPurchaseDate: vendor.stockBatches.length > 0
-                ? vendor.stockBatches.sort((a, b) => b.purchaseDate.getTime() - a.purchaseDate.getTime())[0].purchaseDate
-                : null
-        }));
+        const performance = vendors.map(vendor => {
+            const allItems = vendor.purchaseOrders.flatMap(po => po.items);
+            return {
+                id: vendor.id,
+                name: vendor.name,
+                phone: vendor.phone,
+                email: vendor.email,
+                rating: vendor.rating || 0,
+                totalPurchases: vendor.purchaseOrders.length,
+                totalQuantitySupplied: allItems.reduce((sum, item) => sum + item.quantity, 0),
+                totalAmount: allItems.reduce((sum, item) => sum + item.totalCost, 0),
+                avgUnitCost: allItems.length > 0
+                    ? allItems.reduce((sum, item) => sum + item.unitCost, 0) / allItems.length
+                    : 0,
+                lastPurchaseDate: vendor.purchaseOrders.length > 0
+                    ? vendor.purchaseOrders.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime())[0].orderDate
+                    : null
+            };
+        });
         res.json({ vendors: performance });
     }
     catch (error) {
@@ -1084,212 +1154,122 @@ router.get("/reports/valuation", auth_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: "Failed to generate valuation report" });
     }
 });
-// ==================== MOVING JOBS MATERIAL INTEGRATION ====================
+// ==================== MATERIAL TRACKING REPORTS ====================
 /**
- * POST /api/materials/issue
- * Issue material to a moving job
+ * GET /api/materials/reports/complete-tracking
+ * Get complete tracking for all materials: WHERE they came from → WHERE they went
  */
-router.post("/issue", auth_1.authenticateToken, async (req, res) => {
+router.get("/reports/complete-tracking", auth_1.authenticateToken, async (req, res) => {
     try {
-        const { companyId, id: userId } = req.user;
-        const { jobId, materialId, quantity, rackId, notes } = req.body;
-        if (!jobId || !materialId || !quantity) {
-            return res.status(400).json({ error: "jobId, materialId, and quantity are required" });
-        }
-        if (quantity <= 0) {
-            return res.status(400).json({ error: "Quantity must be greater than 0" });
-        }
-        // Get material details
-        const material = await prisma.packingMaterial.findUnique({
-            where: { id: materialId, companyId }
-        });
-        if (!material) {
-            return res.status(404).json({ error: "Material not found" });
-        }
-        // Check if enough stock is available
-        if (material.totalQuantity < quantity) {
-            return res.status(400).json({
-                error: `Insufficient stock. Available: ${material.totalQuantity} ${material.unit}`
-            });
-        }
-        // Get the most recent stock batch for cost calculation
-        const latestBatch = await prisma.stockBatch.findFirst({
-            where: {
-                materialId,
-                quantityRemaining: { gt: 0 }
-            },
-            orderBy: { purchaseDate: 'desc' }
-        });
-        const unitCost = latestBatch?.unitCost || 0;
-        const totalCost = unitCost * quantity;
-        // Create material issue record
-        const issue = await prisma.materialIssue.create({
-            data: {
-                companyId,
-                materialId,
-                jobId,
-                quantity,
-                unitCost,
-                totalCost,
-                rackId: rackId || null,
-                notes,
-                issuedById: userId,
-                issuedAt: new Date()
-            },
+        const { companyId } = req.user;
+        const { startDate, endDate, materialId } = req.query;
+        const dateFilter = startDate && endDate ? {
+            gte: new Date(startDate),
+            lte: new Date(endDate)
+        } : undefined;
+        // Get all purchases
+        const purchases = await prisma.purchaseOrder.findMany({
+            where: { companyId, ...(dateFilter ? { orderDate: dateFilter } : {}) },
             include: {
-                material: {
-                    select: {
-                        sku: true,
-                        name: true,
-                        unit: true
-                    }
+                items: {
+                    include: { material: true }
                 },
-                rack: {
-                    select: {
-                        code: true,
-                        location: true
-                    }
+                vendor: true
+            }
+        });
+        // Get all issues
+        const issues = await prisma.materialIssue.findMany({
+            where: { companyId, ...(dateFilter ? { issuedAt: dateFilter } : {}) },
+            include: {
+                material: true,
+                job: true,
+                issuedBy: true,
+                returns: true
+            }
+        });
+        // Build complete tracking map
+        const trackingMap = {};
+        // Step 1: Add purchases
+        for (const po of purchases) {
+            for (const item of po.items) {
+                if (materialId && item.materialId !== materialId)
+                    continue;
+                const key = item.materialId;
+                if (!trackingMap[key]) {
+                    trackingMap[key] = {
+                        material: item.material,
+                        purchases: [],
+                        usage: [],
+                        totalPurchased: 0,
+                        totalUsed: 0,
+                        totalReturned: 0,
+                        totalDamaged: 0,
+                        currentStock: item.material.totalQuantity
+                    };
                 }
-            }
-        });
-        // Deduct from stock batches (FIFO)
-        let remainingToDeduct = quantity;
-        const batches = await prisma.stockBatch.findMany({
-            where: {
-                materialId,
-                quantityRemaining: { gt: 0 }
-            },
-            orderBy: { purchaseDate: 'asc' }
-        });
-        for (const batch of batches) {
-            if (remainingToDeduct <= 0)
-                break;
-            const deductFromBatch = Math.min(batch.quantityRemaining, remainingToDeduct);
-            await prisma.stockBatch.update({
-                where: { id: batch.id },
-                data: {
-                    quantityRemaining: batch.quantityRemaining - deductFromBatch
-                }
-            });
-            remainingToDeduct -= deductFromBatch;
-        }
-        // Update total quantity in material
-        await prisma.packingMaterial.update({
-            where: { id: materialId },
-            data: {
-                totalQuantity: material.totalQuantity - quantity
-            }
-        });
-        res.status(201).json(issue);
-    }
-    catch (error) {
-        console.error("Error issuing material:", error);
-        res.status(500).json({ error: "Failed to issue material" });
-    }
-});
-/**
- * POST /api/materials/return
- * Record material return from a job
- */
-router.post("/return", auth_1.authenticateToken, damagePhotoUpload.array('photos', 10), async (req, res) => {
-    try {
-        const { companyId, id: userId } = req.user;
-        const { jobId, issueId, damageReason, notes } = req.body;
-        // Parse numeric values from FormData (they come as strings)
-        const quantityUsed = parseInt(req.body.quantityUsed) || 0;
-        const quantityGood = parseInt(req.body.quantityGood) || 0;
-        const quantityDamaged = parseInt(req.body.quantityDamaged) || 0;
-        if (!jobId || !issueId) {
-            return res.status(400).json({ error: "jobId and issueId are required" });
-        }
-        // Get the issue record
-        const issue = await prisma.materialIssue.findUnique({
-            where: { id: issueId, companyId },
-            include: { material: true }
-        });
-        if (!issue) {
-            return res.status(404).json({ error: "Material issue record not found" });
-        }
-        // Validate quantities - simple check that returned + damaged doesn't exceed issued
-        const totalReturn = quantityGood + quantityDamaged;
-        if (totalReturn > issue.quantity) {
-            return res.status(400).json({
-                error: `Total returned (${totalReturn}) cannot exceed issued quantity (${issue.quantity})`
-            });
-        }
-        if (quantityDamaged > 0 && !damageReason) {
-            return res.status(400).json({
-                error: "Damage reason is required when damaged quantity > 0"
-            });
-        }
-        // Handle photo uploads
-        let photoUrls = [];
-        if (req.files && Array.isArray(req.files)) {
-            photoUrls = req.files.map((file) => `/uploads/damages/${file.filename}`);
-        }
-        // Create material return record
-        const returnRecord = await prisma.materialReturn.create({
-            data: {
-                companyId,
-                materialId: issue.materialId,
-                jobId,
-                issueId,
-                quantityUsed,
-                quantityGood,
-                quantityDamaged,
-                notes,
-                recordedById: userId,
-                recordedAt: new Date()
-            }
-        });
-        // Add good quantity back to stock
-        if (quantityGood > 0) {
-            // Find most recent batch to add back to
-            const latestBatch = await prisma.stockBatch.findFirst({
-                where: { materialId: issue.materialId },
-                orderBy: { purchaseDate: 'desc' }
-            });
-            if (latestBatch) {
-                await prisma.stockBatch.update({
-                    where: { id: latestBatch.id },
-                    data: {
-                        quantityRemaining: latestBatch.quantityRemaining + quantityGood
-                    }
+                trackingMap[key].purchases.push({
+                    type: 'PURCHASE',
+                    orderNumber: po.orderNumber,
+                    vendor: po.vendorName || po.vendor?.name,
+                    quantity: item.quantity,
+                    unitCost: item.unitCost,
+                    totalCost: item.totalCost,
+                    status: po.status,
+                    date: po.orderDate
                 });
+                trackingMap[key].totalPurchased += item.quantity;
             }
-            // Update total quantity
-            await prisma.packingMaterial.update({
-                where: { id: issue.materialId },
-                data: {
-                    totalQuantity: issue.material.totalQuantity + quantityGood
-                }
-            });
         }
-        // Record damaged materials
-        if (quantityDamaged > 0) {
-            await prisma.materialDamage.create({
-                data: {
-                    companyId,
-                    returnId: returnRecord.id,
-                    materialId: issue.materialId,
-                    quantity: quantityDamaged,
-                    reason: damageReason || '',
-                    photoUrls: photoUrls.join(','),
-                    recordedById: userId,
-                    recordedAt: new Date()
-                }
+        // Step 2: Add issues (consumption)
+        for (const issue of issues) {
+            if (materialId && issue.materialId !== materialId)
+                continue;
+            const key = issue.materialId;
+            if (!trackingMap[key]) {
+                trackingMap[key] = {
+                    material: issue.material,
+                    purchases: [],
+                    usage: [],
+                    totalPurchased: 0,
+                    totalUsed: 0,
+                    totalReturned: 0,
+                    totalDamaged: 0,
+                    currentStock: issue.material.totalQuantity
+                };
+            }
+            const totalReturned = issue.returns.reduce((sum, r) => sum + (r.quantityGood || 0), 0);
+            const totalDamaged = issue.returns.reduce((sum, r) => sum + (r.quantityDamaged || 0), 0);
+            const consumed = issue.quantity - totalReturned;
+            trackingMap[key].usage.push({
+                type: 'USAGE',
+                jobCode: issue.job?.jobCode || 'N/A',
+                jobTitle: issue.job?.jobTitle || 'Unknown',
+                quantityIssued: issue.quantity,
+                quantityConsumed: consumed,
+                quantityReturned: totalReturned,
+                quantityDamaged: totalDamaged,
+                unitCost: issue.unitCost,
+                issuedDate: issue.issuedAt,
+                issuedBy: issue.issuedBy?.name || 'Unknown'
             });
+            trackingMap[key].totalUsed += consumed;
+            trackingMap[key].totalReturned += totalReturned;
+            trackingMap[key].totalDamaged += totalDamaged;
         }
-        res.status(201).json({
-            message: 'Material return recorded successfully',
-            return: returnRecord,
-            stockUpdated: quantityGood > 0,
-            damageRecorded: quantityDamaged > 0
+        res.json({
+            tracking: Object.values(trackingMap),
+            totals: {
+                materialsTracked: Object.keys(trackingMap).length,
+                totalPurchased: Object.values(trackingMap).reduce((sum, m) => sum + m.totalPurchased, 0),
+                totalUsed: Object.values(trackingMap).reduce((sum, m) => sum + m.totalUsed, 0),
+                totalReturned: Object.values(trackingMap).reduce((sum, m) => sum + m.totalReturned, 0),
+                totalDamaged: Object.values(trackingMap).reduce((sum, m) => sum + m.totalDamaged, 0)
+            }
         });
     }
     catch (error) {
-        console.error("Error recording material return:", error);
-        res.status(500).json({ error: "Failed to record material return" });
+        console.error("Error fetching complete tracking:", error);
+        res.status(500).json({ error: "Failed to fetch complete tracking" });
     }
 });
 /**
@@ -1406,6 +1386,417 @@ router.get("/:materialId/history", auth_1.authenticateToken, async (req, res) =>
     catch (error) {
         console.error("Error fetching material history:", error);
         res.status(500).json({ error: "Failed to fetch material history" });
+    }
+});
+// ==================== PURCHASE ORDERS ====================
+/**
+ * GET /api/purchase-orders
+ * Get all purchase orders for the company
+ */
+router.get("/purchase-orders", auth_1.authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        if (!companyId) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        const purchases = await prisma.purchaseOrder.findMany({
+            where: { companyId },
+            include: {
+                items: {
+                    include: {
+                        material: true
+                    }
+                },
+                vendor: true
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+        // Flatten the response to include item details
+        const flattened = purchases.flatMap(po => po.items.map(item => ({
+            id: item.id,
+            orderNumber: po.orderNumber,
+            invoiceNumber: po.orderNumber, // Using orderNumber as invoice for now
+            vendorName: po.vendorName || po.vendor?.name || 'Unknown',
+            vendorId: po.vendorId,
+            materialId: item.materialId,
+            quantity: item.quantity,
+            unitCost: item.unitCost,
+            totalCost: item.totalCost,
+            orderDate: po.orderDate,
+            receivedDate: po.receivedDate,
+            status: po.status,
+            notes: po.notes
+        })));
+        res.json(flattened);
+    }
+    catch (error) {
+        console.error("Error fetching purchase orders:", error);
+        res.status(500).json({ error: "Failed to fetch purchase orders" });
+    }
+});
+/**
+ * POST /api/purchase-orders
+ * Create a new purchase order
+ */
+router.post("/purchase-orders", auth_1.authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const userId = req.user?.id;
+        if (!companyId || !userId) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        const { orderNumber, invoiceNumber, vendorName, vendorId, materialId, quantity, unitCost, orderDate, receivedDate, status, notes } = req.body;
+        if (!orderNumber || !vendorName || !materialId || !quantity || unitCost === undefined) {
+            return res.status(400).json({ error: "Missing required fields" });
+        }
+        const totalCost = quantity * unitCost;
+        // Use a transaction to ensure data consistency
+        const result = await prisma.$transaction(async (prisma) => {
+            // Create purchase order
+            const purchaseOrder = await prisma.purchaseOrder.create({
+                data: {
+                    orderNumber,
+                    vendorName,
+                    vendorId: vendorId || null,
+                    orderDate: orderDate ? new Date(orderDate) : new Date(),
+                    receivedDate: receivedDate ? new Date(receivedDate) : null,
+                    status: status || 'PENDING',
+                    notes: notes || null,
+                    totalAmount: totalCost,
+                    createdById: userId,
+                    companyId
+                }
+            });
+            // Create purchase order item
+            const item = await prisma.purchaseOrderItem.create({
+                data: {
+                    purchaseOrderId: purchaseOrder.id,
+                    materialId,
+                    quantity,
+                    unitCost,
+                    totalCost,
+                    companyId
+                },
+                include: {
+                    material: true,
+                    purchaseOrder: true
+                }
+            });
+            // If status is RECEIVED, update material stock
+            if (status === 'RECEIVED') {
+                await prisma.packingMaterial.update({
+                    where: { id: materialId },
+                    data: {
+                        totalQuantity: {
+                            increment: quantity
+                        },
+                        // Update unit cost to the latest cost
+                        unitCost: unitCost
+                    }
+                });
+            }
+            return {
+                id: item.id,
+                orderNumber: purchaseOrder.orderNumber,
+                invoiceNumber: invoiceNumber || orderNumber,
+                vendorName,
+                vendorId,
+                materialId,
+                quantity,
+                unitCost,
+                totalCost,
+                orderDate: purchaseOrder.orderDate,
+                receivedDate: purchaseOrder.receivedDate,
+                status: purchaseOrder.status,
+                notes
+            };
+        });
+        res.json(result);
+    }
+    catch (error) {
+        console.error("Error creating purchase order:", error);
+        res.status(500).json({ error: "Failed to create purchase order" });
+    }
+});
+// ==================== MATERIAL STATEMENT (COMPREHENSIVE REPORT) ====================
+/**
+ * GET /api/materials/reports/material-statement
+ * Get complete material statement like a bank statement
+ * Shows all transactions: purchases, issues, returns, damages with running balance
+ */
+router.get("/reports/material-statement", auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { companyId } = req.user;
+        const { startDate, endDate, materialId } = req.query;
+        // Build date filter
+        const dateFilter = startDate && endDate ? {
+            gte: new Date(startDate),
+            lte: new Date(endDate)
+        } : undefined;
+        // Get all materials
+        const materialsWhere = { companyId, isActive: true };
+        if (materialId) {
+            materialsWhere.id = materialId;
+        }
+        const materials = await prisma.packingMaterial.findMany({
+            where: materialsWhere,
+            include: { materialCategory: true }
+        });
+        // Build statement for each material
+        const statements = [];
+        for (const material of materials) {
+            const transactions = [];
+            // 1a. Get all PURCHASES from Purchase Orders (Stock IN)
+            const purchaseItems = await prisma.purchaseOrderItem.findMany({
+                where: {
+                    materialId: material.id,
+                    companyId,
+                    ...(dateFilter ? { purchaseOrder: { orderDate: dateFilter } } : {})
+                },
+                include: {
+                    purchaseOrder: {
+                        include: { vendor: true }
+                    }
+                },
+                orderBy: { purchaseOrder: { orderDate: 'asc' } }
+            });
+            for (const item of purchaseItems) {
+                if (item.purchaseOrder.status === 'RECEIVED') {
+                    transactions.push({
+                        id: item.id,
+                        date: item.purchaseOrder.orderDate,
+                        type: 'PURCHASE',
+                        description: `Purchased from ${item.purchaseOrder.vendorName || item.purchaseOrder.vendor?.name || 'Unknown Vendor'}`,
+                        reference: item.purchaseOrder.orderNumber,
+                        referenceType: 'purchase_order',
+                        referenceId: item.purchaseOrder.id,
+                        stockIn: item.quantity,
+                        stockOut: 0,
+                        unitCost: item.unitCost,
+                        totalCost: item.totalCost
+                    });
+                }
+            }
+            // 1b. Get all PURCHASES from Stock Batches (Stock IN)
+            const stockBatches = await prisma.stockBatch.findMany({
+                where: {
+                    materialId: material.id,
+                    companyId,
+                    ...(dateFilter ? { purchaseDate: dateFilter } : {})
+                },
+                include: {
+                    vendor: true
+                },
+                orderBy: { purchaseDate: 'asc' }
+            });
+            for (const batch of stockBatches) {
+                transactions.push({
+                    id: batch.id,
+                    date: batch.purchaseDate,
+                    type: 'PURCHASE',
+                    description: `Stock: ${batch.batchNumber || 'Batch'} - ${batch.vendorName || batch.vendor?.name || 'Direct Entry'}`,
+                    reference: batch.batchNumber || batch.purchaseOrder || 'BATCH',
+                    referenceType: 'stock_batch',
+                    referenceId: batch.id,
+                    stockIn: batch.quantityPurchased,
+                    stockOut: 0,
+                    unitCost: batch.unitCost || 0,
+                    totalCost: (batch.quantityPurchased * (batch.unitCost || 0))
+                });
+            }
+            // 2. Get all ISSUES (Stock OUT to jobs)
+            const issues = await prisma.materialIssue.findMany({
+                where: {
+                    materialId: material.id,
+                    companyId,
+                    ...(dateFilter ? { issuedAt: dateFilter } : {})
+                },
+                include: {
+                    job: true,
+                    issuedBy: true
+                },
+                orderBy: { issuedAt: 'asc' }
+            });
+            for (const issue of issues) {
+                transactions.push({
+                    id: issue.id,
+                    date: issue.issuedAt,
+                    type: 'ISSUE',
+                    description: `Issued to Job: ${issue.job?.jobCode || 'N/A'} - ${issue.job?.jobTitle || 'Unknown'}`,
+                    reference: issue.job?.jobCode || issue.reference || 'N/A',
+                    referenceType: 'moving_job',
+                    referenceId: issue.jobId,
+                    stockIn: 0,
+                    stockOut: issue.quantity,
+                    unitCost: issue.unitCost,
+                    totalCost: issue.totalCost,
+                    issuedBy: issue.issuedBy?.name || 'Unknown'
+                });
+            }
+            // 3. Get all RETURNS (Stock IN from jobs - good condition only)
+            const returns = await prisma.materialReturn.findMany({
+                where: {
+                    materialId: material.id,
+                    companyId,
+                    quantityGood: { gt: 0 },
+                    ...(dateFilter ? { recordedAt: dateFilter } : {})
+                },
+                include: {
+                    issue: { include: { job: true } },
+                    recordedBy: true
+                },
+                orderBy: { recordedAt: 'asc' }
+            });
+            for (const ret of returns) {
+                if (ret.quantityGood > 0) {
+                    transactions.push({
+                        id: ret.id,
+                        date: ret.recordedAt,
+                        type: 'RETURN',
+                        description: `Returned from Job: ${ret.issue?.job?.jobCode || 'N/A'} (Good condition)`,
+                        reference: ret.issue?.job?.jobCode || 'N/A',
+                        referenceType: 'moving_job',
+                        referenceId: ret.issue?.jobId,
+                        stockIn: ret.quantityGood,
+                        stockOut: 0,
+                        unitCost: ret.issue?.unitCost || 0,
+                        totalCost: ret.quantityGood * (ret.issue?.unitCost || 0),
+                        recordedBy: ret.recordedBy?.name || 'Unknown'
+                    });
+                }
+            }
+            // 4. Get all DAMAGES (Stock loss)
+            const damages = await prisma.materialDamage.findMany({
+                where: {
+                    materialId: material.id,
+                    companyId,
+                    ...(dateFilter ? { recordedAt: dateFilter } : {})
+                },
+                include: {
+                    return: { include: { issue: { include: { job: true } } } },
+                    recordedBy: true
+                },
+                orderBy: { recordedAt: 'asc' }
+            });
+            for (const damage of damages) {
+                transactions.push({
+                    id: damage.id,
+                    date: damage.recordedAt,
+                    type: 'DAMAGE',
+                    description: `Damaged: ${damage.reason || 'No reason provided'}`,
+                    reference: damage.return?.issue?.job?.jobCode || 'N/A',
+                    referenceType: 'damage_report',
+                    referenceId: damage.id,
+                    stockIn: 0,
+                    stockOut: damage.quantity,
+                    unitCost: damage.return?.issue?.unitCost || material.unitCost || 0,
+                    totalCost: damage.quantity * (damage.return?.issue?.unitCost || material.unitCost || 0),
+                    recordedBy: damage.recordedBy?.name || 'Unknown',
+                    photoUrls: damage.photoUrls
+                });
+            }
+            // Sort all transactions by date
+            transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            // Calculate OPENING STOCK (transactions BEFORE the date range)
+            let openingStock = 0;
+            if (dateFilter && dateFilter.gte) {
+                // Get all purchases from purchase_order_items before start date
+                const priorPurchases = await prisma.purchaseOrderItem.findMany({
+                    where: {
+                        materialId: material.id,
+                        companyId,
+                        purchaseOrder: {
+                            orderDate: { lt: dateFilter.gte },
+                            status: 'RECEIVED'
+                        }
+                    }
+                });
+                openingStock += priorPurchases.reduce((sum, p) => sum + p.quantity, 0);
+                // Get all stock batches before start date
+                const priorBatches = await prisma.stockBatch.findMany({
+                    where: {
+                        materialId: material.id,
+                        companyId,
+                        purchaseDate: { lt: dateFilter.gte }
+                    }
+                });
+                openingStock += priorBatches.reduce((sum, b) => sum + b.quantityPurchased, 0);
+                // Subtract issues before start date
+                const priorIssues = await prisma.materialIssue.findMany({
+                    where: {
+                        materialId: material.id,
+                        companyId,
+                        issuedAt: { lt: dateFilter.gte }
+                    }
+                });
+                openingStock -= priorIssues.reduce((sum, i) => sum + i.quantity, 0);
+                // Add returns before start date
+                const priorReturns = await prisma.materialReturn.findMany({
+                    where: {
+                        materialId: material.id,
+                        companyId,
+                        recordedAt: { lt: dateFilter.gte }
+                    }
+                });
+                openingStock += priorReturns.reduce((sum, r) => sum + r.quantityGood, 0);
+                // Subtract damages before start date
+                const priorDamages = await prisma.materialDamage.findMany({
+                    where: {
+                        materialId: material.id,
+                        companyId,
+                        recordedAt: { lt: dateFilter.gte }
+                    }
+                });
+                openingStock -= priorDamages.reduce((sum, d) => sum + d.quantity, 0);
+            }
+            // Calculate running balance starting from opening stock
+            let runningBalance = openingStock;
+            for (const txn of transactions) {
+                runningBalance += txn.stockIn - txn.stockOut;
+                txn.balance = runningBalance;
+            }
+            // Calculate totals
+            const totals = {
+                openingStock: openingStock,
+                totalPurchased: transactions.filter(t => t.type === 'PURCHASE').reduce((sum, t) => sum + t.stockIn, 0),
+                totalIssued: transactions.filter(t => t.type === 'ISSUE').reduce((sum, t) => sum + t.stockOut, 0),
+                totalReturned: transactions.filter(t => t.type === 'RETURN').reduce((sum, t) => sum + t.stockIn, 0),
+                totalDamaged: transactions.filter(t => t.type === 'DAMAGE').reduce((sum, t) => sum + t.stockOut, 0),
+                closingBalance: runningBalance,
+                currentStock: material.totalQuantity,
+                totalValue: material.totalQuantity * (material.unitCost || 0)
+            };
+            statements.push({
+                material: {
+                    id: material.id,
+                    sku: material.sku,
+                    name: material.name,
+                    category: material.materialCategory?.name || material.category || 'Uncategorized',
+                    unit: material.unit,
+                    unitCost: material.unitCost || 0,
+                    currentStock: material.totalQuantity,
+                    minStockLevel: material.minStockLevel
+                },
+                transactions,
+                totals
+            });
+        }
+        // Overall summary
+        const overallSummary = {
+            totalMaterials: statements.length,
+            totalOpeningStock: statements.reduce((sum, s) => sum + s.totals.openingStock, 0),
+            totalPurchased: statements.reduce((sum, s) => sum + s.totals.totalPurchased, 0),
+            totalIssued: statements.reduce((sum, s) => sum + s.totals.totalIssued, 0),
+            totalReturned: statements.reduce((sum, s) => sum + s.totals.totalReturned, 0),
+            totalDamaged: statements.reduce((sum, s) => sum + s.totals.totalDamaged, 0),
+            totalClosingStock: statements.reduce((sum, s) => sum + s.totals.closingBalance, 0),
+            totalValue: statements.reduce((sum, s) => sum + s.totals.totalValue, 0)
+        };
+        res.json({ statements, summary: overallSummary });
+    }
+    catch (error) {
+        console.error("Error generating material statement:", error);
+        res.status(500).json({ error: "Failed to generate material statement" });
     }
 });
 exports.default = router;

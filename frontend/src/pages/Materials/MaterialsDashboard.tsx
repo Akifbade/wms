@@ -35,18 +35,23 @@ interface MaterialIssue {
 
 interface StockPurchase {
     id: string;
-    orderNumber: string;
+    batchNumber: string;
+    orderNumber?: string;
     invoiceNumber?: string;
-    vendorName: string;
+    vendorName?: string;
     vendorId?: string;
     materialId: string;
-    material?: Material;
+    material?: { sku: string; name: string; unit?: string };
     quantity: number;
+    quantityPurchased: number;
+    quantityRemaining: number;
     unitCost: number;
+    sellingPrice?: number;
     totalCost: number;
-    orderDate: string;
+    purchaseDate: string;
+    orderDate?: string;
     receivedDate?: string;
-    status: string;
+    status?: string;
     notes?: string;
 }
 
@@ -122,11 +127,21 @@ const MaterialsDashboard: React.FC = () => {
             const issuesData = await issuesRes.json();
             setIssues(Array.isArray(issuesData) ? issuesData : []);
 
-            // Load purchase orders
-            const purchasesRes = await apiFetch('/materials/purchase-orders', { headers });
+            // Load stock batches (purchases)
+            const purchasesRes = await apiFetch('/materials/stock/all', { headers });
             const purchasesData = await purchasesRes.json();
             if (Array.isArray(purchasesData)) {
-                setPurchases(purchasesData);
+                // Transform stock batches to match StockPurchase interface
+                const transformed = purchasesData.map((batch: any) => ({
+                    ...batch,
+                    quantity: batch.quantityPurchased,
+                    totalCost: batch.quantityPurchased * (batch.unitCost || 0),
+                    orderDate: batch.purchaseDate,
+                    vendorName: batch.vendorName || 'Direct Entry',
+                    orderNumber: batch.batchNumber || batch.purchaseOrder || 'BATCH',
+                    status: 'RECEIVED'
+                }));
+                setPurchases(transformed);
             }
 
             // Calculate stats
@@ -354,15 +369,15 @@ const MaterialsDashboard: React.FC = () => {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
                                 className={`relative px-6 py-3 rounded-full font-medium transition-all flex items-center gap-2 ${activeTab === tab.id
-                                        ? 'bg-blue-500 text-white shadow-lg'
-                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                    ? 'bg-blue-500 text-white shadow-lg'
+                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                                     }`}
                             >
                                 {tab.label}
                                 {tab.count !== null && (
                                     <span className={`ml-2 px-2.5 py-0.5 rounded-full text-xs font-bold ${activeTab === tab.id
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-200 text-gray-800'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-200 text-gray-800'
                                         }`}>
                                         {tab.count}
                                     </span>
@@ -498,10 +513,10 @@ const MaterialsDashboard: React.FC = () => {
                                                         <td className="px-6 py-4 text-right text-gray-600">{material.minStockLevel}</td>
                                                         <td className="px-6 py-4 text-center">
                                                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${status === 'adequate'
-                                                                    ? 'bg-green-100 text-green-700'
-                                                                    : status === 'low'
-                                                                        ? 'bg-orange-100 text-orange-700'
-                                                                        : 'bg-red-100 text-red-700'
+                                                                ? 'bg-green-100 text-green-700'
+                                                                : status === 'low'
+                                                                    ? 'bg-orange-100 text-orange-700'
+                                                                    : 'bg-red-100 text-red-700'
                                                                 }`}>
                                                                 {status === 'adequate' ? 'Adequate' : status === 'low' ? 'Low' : 'Out'}
                                                             </span>
@@ -669,10 +684,10 @@ const MaterialsDashboard: React.FC = () => {
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${issue.issueType === 'JOB'
-                                                                    ? 'bg-blue-100 text-blue-700'
-                                                                    : issue.issueType === 'INTERNAL'
-                                                                        ? 'bg-yellow-100 text-yellow-700'
-                                                                        : 'bg-purple-100 text-purple-700'
+                                                                ? 'bg-blue-100 text-blue-700'
+                                                                : issue.issueType === 'INTERNAL'
+                                                                    ? 'bg-yellow-100 text-yellow-700'
+                                                                    : 'bg-purple-100 text-purple-700'
                                                                 }`}>
                                                                 {issue.issueType}
                                                             </span>
@@ -872,20 +887,20 @@ const MaterialsDashboard: React.FC = () => {
 
                                 {/* Purchase History */}
                                 <div>
-                                    <h3 className="text-lg font-bold text-gray-900 mb-4">Purchase History</h3>
+                                    <h3 className="text-lg font-bold text-gray-900 mb-4">Stock Purchase History</h3>
                                     <div className="overflow-x-auto">
                                         <table className="w-full">
                                             <thead>
                                                 <tr className="bg-gray-100 border-b border-gray-200">
-                                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">PO Number</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Invoice</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Vendor</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Batch #</th>
                                                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Material</th>
-                                                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Qty</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Vendor</th>
+                                                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Purchased</th>
+                                                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Remaining</th>
                                                     <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Unit Cost</th>
                                                     <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Total</th>
                                                     <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Status</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Order Date</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Date</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -895,33 +910,25 @@ const MaterialsDashboard: React.FC = () => {
                                                         className={`border-b border-gray-200 hover:bg-blue-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                                                             }`}
                                                     >
-                                                        <td className="px-6 py-4 font-mono font-semibold text-gray-900">{purchase.orderNumber}</td>
-                                                        <td className="px-6 py-4 font-mono text-sm text-gray-600">{purchase.invoiceNumber || '-'}</td>
-                                                        <td className="px-6 py-4 font-medium text-gray-900">{purchase.vendorName}</td>
+                                                        <td className="px-6 py-4 font-mono font-semibold text-gray-900">{purchase.batchNumber || purchase.orderNumber}</td>
                                                         <td className="px-6 py-4 text-sm text-gray-700">
-                                                            {purchase.material?.name || materials.find(m => m.id === purchase.materialId)?.name || 'Unknown'}
+                                                            <div className="font-medium">{purchase.material?.name || 'Unknown'}</div>
+                                                            <div className="text-xs text-gray-500">{purchase.material?.sku}</div>
                                                         </td>
-                                                        <td className="px-6 py-4 text-right font-semibold text-gray-900">{purchase.quantity}</td>
-                                                        <td className="px-6 py-4 text-right text-gray-600">{purchase.unitCost.toFixed(3)}</td>
+                                                        <td className="px-6 py-4 font-medium text-gray-900">{purchase.vendorName || '-'}</td>
+                                                        <td className="px-6 py-4 text-right font-semibold text-green-600">+{purchase.quantityPurchased || purchase.quantity}</td>
+                                                        <td className="px-6 py-4 text-right font-semibold text-gray-900">{purchase.quantityRemaining || purchase.quantity}</td>
+                                                        <td className="px-6 py-4 text-right text-gray-600">{(purchase.unitCost || 0).toFixed(3)} KWD</td>
                                                         <td className="px-6 py-4 text-right font-semibold text-gray-900">
-                                                            {(purchase.quantity * purchase.unitCost).toFixed(3)} KWD
+                                                            {((purchase.quantityPurchased || purchase.quantity) * (purchase.unitCost || 0)).toFixed(3)} KWD
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
-                                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${purchase.status === 'RECEIVED'
-                                                                    ? 'bg-green-100 text-green-700'
-                                                                    : purchase.status === 'ORDERED'
-                                                                        ? 'bg-blue-100 text-blue-700'
-                                                                        : purchase.status === 'APPROVED'
-                                                                            ? 'bg-yellow-100 text-yellow-700'
-                                                                            : purchase.status === 'PENDING'
-                                                                                ? 'bg-gray-100 text-gray-700'
-                                                                                : 'bg-red-100 text-red-700'
-                                                                }`}>
-                                                                {purchase.status}
+                                                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                                                                RECEIVED
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 text-sm text-gray-600">
-                                                            {new Date(purchase.orderDate).toLocaleDateString()}
+                                                            {purchase.orderDate ? new Date(purchase.orderDate).toLocaleDateString() : '-'}
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -930,7 +937,7 @@ const MaterialsDashboard: React.FC = () => {
                                         {purchases.length === 0 && (
                                             <div className="text-center py-12">
                                                 <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                                                <p className="text-gray-500">No purchases recorded</p>
+                                                <p className="text-gray-500">No stock purchases found</p>
                                             </div>
                                         )}
                                     </div>

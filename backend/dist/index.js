@@ -43,8 +43,6 @@ const categories_1 = __importDefault(require("./routes/categories")); // NEW: Ca
 const companies_1 = __importDefault(require("./routes/companies")); // NEW: Company profiles management
 const backups_1 = __importDefault(require("./routes/backups")); // NEW: Backup management
 const system_1 = __importDefault(require("./routes/system")); // NEW: System monitoring
-const consumables_1 = __importDefault(require("./routes/consumables"));
-const inventory_config_1 = __importDefault(require("./routes/inventory-config"));
 // Load environment variables FIRST (but allow env vars to override .env)
 dotenv_1.default.config({ override: false });
 // Initialize Express app
@@ -162,8 +160,6 @@ app.use('/api/companies', companies_1.default); // NEW: Company profiles (DIOR, 
 app.use('/api/company-profiles', companies_1.default); // Legacy alias for older frontend calls
 app.use('/api/backups', backups_1.default); // NEW: Backup management system
 app.use('/api/system', system_1.default); // NEW: System monitoring
-app.use('/api/consumables', consumables_1.default);
-app.use('/api/inventory-config', inventory_config_1.default);
 // Plugin routes will be added dynamically by patch system
 // These are registered in patches/modules/* via app.get/post/etc
 // NEW: Enhanced warehouse routes

@@ -93,37 +93,7 @@ router.get('/stats', async (req, res) => {
             }
         }
         catch (e) {
-            // Windows fallback for Disk Space
-            if (os_1.default.platform() === 'win32') {
-                try {
-                    const { stdout } = await execAsync('wmic logicaldisk get size,freespace,caption');
-                    const lines = stdout.trim().split('\n').slice(1);
-                    for (const line of lines) {
-                        const parts = line.trim().split(/\s+/);
-                        if (parts.length >= 3) {
-                            const caption = parts[0];
-                            const free = parseInt(parts[1]);
-                            const size = parseInt(parts[2]);
-                            const used = size - free;
-                            const percent = Math.round((used / size) * 100);
-                            diskSpace.push({
-                                filesystem: caption,
-                                size: (size / (1024 * 1024 * 1024)).toFixed(1) + 'G',
-                                used: (used / (1024 * 1024 * 1024)).toFixed(1) + 'G',
-                                available: (free / (1024 * 1024 * 1024)).toFixed(1) + 'G',
-                                usePercent: percent + '%',
-                                mount: caption
-                            });
-                        }
-                    }
-                }
-                catch (winErr) {
-                    console.error('Windows disk check failed:', winErr);
-                }
-            }
-            else {
-                console.error('Disk space check failed:', e);
-            }
+            console.error('Disk space check failed:', e);
         }
         // 5. Top Processes (Linux specific)
         let processes = [];
@@ -146,30 +116,7 @@ router.get('/stats', async (req, res) => {
             }
         }
         catch (e) {
-            // Windows fallback for Processes
-            if (os_1.default.platform() === 'win32') {
-                try {
-                    const { stdout } = await execAsync('tasklist /fo csv /nh');
-                    // "Image Name","PID","Session Name","Session#","Mem Usage"
-                    const lines = stdout.trim().split('\n').slice(0, 10); // Just take top 10 arbitrarily as sorting by CPU is hard with tasklist
-                    processes = lines.map(line => {
-                        const parts = line.split('","').map(p => p.replace(/"/g, ''));
-                        return {
-                            pid: parts[1],
-                            user: 'System', // Tasklist doesn't easily show user without /v which is slow
-                            cpu: 0, // Not easily available via tasklist
-                            memory: 0, // Parsing "12,345 K" is annoying but possible, skipping for now
-                            command: parts[0]
-                        };
-                    });
-                }
-                catch (winErr) {
-                    console.error('Windows process check failed:', winErr);
-                }
-            }
-            else {
-                console.error('Process check failed:', e);
-            }
+            console.error('Process check failed:', e);
         }
         // 6. Active Users & User Statistics
         const activeUsersData = (0, userActivityTracker_1.getActiveUsers)();

@@ -38,6 +38,9 @@ interface StockPurchase {
   sellingPrice: number;
   orderDate: string;
   receivedDate: string;
+  source?: 'stock_batch' | 'purchase_order'; // Track where data came from
+  materialName?: string;
+  materialSku?: string;
 }
 
 const MaterialsManagement = () => {
@@ -190,15 +193,33 @@ const MaterialsManagement = () => {
 
   const fetchStockPurchases = async (materialId?: string) => {
     try {
+      // Use unified API that combines stock_batches + purchase_order_items
       const url = materialId
-        ? `/api/materials/${materialId}/purchase-orders`
-        : '/api/materials/purchase-orders';
-      const response = await fetch(url, {
+        ? `/api/materials/stock/unified?materialId=${materialId}`
+        : '/api/materials/stock/unified';
+      const response = await apiFetch(url.replace('/api', ''), {
         headers: getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
-        setStockPurchases(data);
+        // Map to the StockPurchase interface
+        const mapped = data.map((item: any) => ({
+          id: item.id,
+          materialId: item.materialId,
+          materialName: item.materialName,
+          materialSku: item.materialSku,
+          orderNumber: item.orderNumber,
+          invoiceNumber: item.invoiceNumber,
+          vendorName: item.vendorName,
+          quantityReceived: item.quantity,
+          quantityRemaining: item.quantityRemaining,
+          unitCost: item.unitCost,
+          sellingPrice: item.sellingPrice,
+          orderDate: item.orderDate,
+          receivedDate: item.receivedDate,
+          source: item.source
+        }));
+        setStockPurchases(mapped);
       }
     } catch (error) {
       console.error('Failed to fetch stock purchases:', error);
@@ -1012,54 +1033,53 @@ const MaterialsManagement = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order #</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Quantity</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Unit Cost</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Cost</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {stockPurchases.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
-                      No stock purchases found.
+                      No stock purchases found. Add stock using the form above.
                     </td>
                   </tr>
                 ) : (
                   stockPurchases.map((purchase: any, idx: number) => (
                     <tr key={purchase.id} className={`hover:bg-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-semibold text-gray-900">{purchase.orderNumber}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{purchase.invoiceNumber || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{purchase.vendorName}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {purchase.material?.name || materials.find(m => m.id === purchase.materialId)?.name || 'Unknown'}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          purchase.source === 'stock_batch' 
+                            ? 'bg-purple-100 text-purple-700' 
+                            : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {purchase.source === 'stock_batch' ? 'Batch' : 'PO'}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900">{purchase.quantity}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-600">{purchase.unitCost.toFixed(3)} KWD</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-semibold text-gray-900">{purchase.orderNumber}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{purchase.vendorName || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {purchase.materialName || materials.find(m => m.id === purchase.materialId)?.name || 'Unknown'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900">{purchase.quantityReceived}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-600">{(purchase.unitCost || 0).toFixed(3)} KWD</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-gray-900">
-                        {(purchase.quantity * purchase.unitCost).toFixed(3)} KWD
+                        {((purchase.quantityReceived || 0) * (purchase.unitCost || 0)).toFixed(3)} KWD
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${purchase.status === 'RECEIVED'
-                            ? 'bg-green-100 text-green-700'
-                            : purchase.status === 'ORDERED'
-                              ? 'bg-blue-100 text-blue-700'
-                              : purchase.status === 'APPROVED'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : purchase.status === 'PENDING'
-                                  ? 'bg-gray-100 text-gray-700'
-                                  : 'bg-red-100 text-red-700'
-                          }`}>
-                          {purchase.status}
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                          RECEIVED
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {new Date(purchase.orderDate).toLocaleDateString()}
+                        {purchase.orderDate ? new Date(purchase.orderDate).toLocaleDateString() : '-'}
                       </td>
                     </tr>
                   ))

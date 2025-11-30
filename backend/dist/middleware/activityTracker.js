@@ -7,7 +7,7 @@ const activityTrackerMiddleware = (req, res, next) => {
         const currentPage = req.path;
         const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
         const userAgent = req.headers['user-agent'] || 'unknown';
-        (0, userActivityTracker_1.trackUserActivity)(req.user.id, req.user.name, req.user.email, req.user.role, currentPage, ipAddress, userAgent);
+        (0, userActivityTracker_1.trackUserActivity)(req.user.id, req.user.name || req.user.email, req.user.email, req.user.role, currentPage, ipAddress, userAgent);
     }
     next();
 };

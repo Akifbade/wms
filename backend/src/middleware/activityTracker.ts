@@ -10,7 +10,7 @@ export const activityTrackerMiddleware = (req: AuthRequest, res: Response, next:
 
     trackUserActivity(
       req.user.id,
-      req.user.username,
+      req.user.name || req.user.email,
       req.user.email,
       req.user.role,
       currentPage,
