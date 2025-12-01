@@ -54,6 +54,27 @@ export const Scanner: React.FC = () => {
   const [showShipmentDetails, setShowShipmentDetails] = useState(false);
   const [selectedShipmentForDetails, setSelectedShipmentForDetails] = useState<any>(null);
 
+  // Move Shipment Modal state
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [moveShipmentData, setMoveShipmentData] = useState<any>(null);
+  const [moveDestinationRack, setMoveDestinationRack] = useState<string>('');
+  const [moveReason, setMoveReason] = useState<string>('');
+  const [moveAuthorizedBy, setMoveAuthorizedBy] = useState<string>('');
+  const [moveNotes, setMoveNotes] = useState<string>('');
+  const [movePhotos, setMovePhotos] = useState<File[]>([]);
+  const [movingInProgress, setMovingInProgress] = useState(false);
+  const [authorizedUsers, setAuthorizedUsers] = useState<any[]>([]);
+  const [showMoveHistory, setShowMoveHistory] = useState(false);
+  const [moveHistory, setMoveHistory] = useState<any[]>([]);
+  const [loadingMoveHistory, setLoadingMoveHistory] = useState(false);
+
+  // Manual Move Modal state (without scanning)
+  const [showManualMoveModal, setShowManualMoveModal] = useState(false);
+  const [inStorageShipments, setInStorageShipments] = useState<any[]>([]);
+  const [selectedManualShipment, setSelectedManualShipment] = useState<string>('');
+  const [selectedSourceRack, setSelectedSourceRack] = useState<string>('');
+  const [loadingInStorageShipments, setLoadingInStorageShipments] = useState(false);
+
   // Manual code input state
   const [manualCode, setManualCode] = useState<string>('');
 
@@ -210,6 +231,306 @@ export const Scanner: React.FC = () => {
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  // Fetch authorized users (MANAGER, ADMIN) for move authorization
+  const fetchAuthorizedUsers = async () => {
+    try {
+      const response = await fetch('/api/users/authorized', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAuthorizedUsers(data.users);
+      }
+    } catch (error) {
+      console.error('Failed to fetch authorized users:', error);
+    }
+  };
+
+  // Fetch move history for a shipment
+  const fetchMoveHistory = async (shipmentId: string) => {
+    setLoadingMoveHistory(true);
+    try {
+      const response = await fetch(`/api/shipments/${shipmentId}/move-history`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setMoveHistory(data.history);
+      }
+    } catch (error) {
+      console.error('Failed to fetch move history:', error);
+    } finally {
+      setLoadingMoveHistory(false);
+    }
+  };
+
+  // Handle move shipment between racks
+  const handleMoveShipment = async () => {
+    if (!moveShipmentData || !moveDestinationRack || !moveReason || !moveAuthorizedBy) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    setMovingInProgress(true);
+    try {
+      // Upload photos first if any
+      const uploadedPhotoUrls: string[] = [];
+      for (const photo of movePhotos) {
+        const formData = new FormData();
+        const compressedPhoto = await compressPhoto(photo);
+        formData.append('photo', compressedPhoto);
+        
+        const uploadResponse = await fetch('/api/shipments/upload/photo', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          },
+          body: formData
+        });
+        const uploadData = await uploadResponse.json();
+        if (uploadData.success) {
+          uploadedPhotoUrls.push(uploadData.photoUrl);
+        }
+      }
+
+      // Get box IDs from the shipment
+      const boxIds = moveShipmentData.boxes
+        ?.filter((b: any) => b.rackId === moveShipmentData.sourceRackId)
+        .map((b: any) => b.id) || [];
+
+      if (boxIds.length === 0) {
+        setError('No boxes found to move');
+        setMovingInProgress(false);
+        return;
+      }
+
+      // Call move API
+      const response = await fetch(`/api/shipments/${moveShipmentData.id}/move-boxes`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sourceRackId: moveShipmentData.sourceRackId,
+          destinationRackId: moveDestinationRack,
+          boxIds,
+          reason: moveReason,
+          authorizedById: moveAuthorizedBy,
+          notes: moveNotes,
+          photos: uploadedPhotoUrls
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        playSuccessSound();
+        // Reset modal state
+        setShowMoveModal(false);
+        setMoveShipmentData(null);
+        setMoveDestinationRack('');
+        setMoveReason('');
+        setMoveAuthorizedBy('');
+        setMoveNotes('');
+        setMovePhotos([]);
+        setScanResult(null);
+        
+        // Show success message
+        setError(`✅ Successfully moved ${data.moveDetails.boxesMoved} boxes from ${data.moveDetails.from.code} to ${data.moveDetails.to.code}`);
+        setTimeout(() => setError(''), 5000);
+      } else {
+        throw new Error(data.error || 'Move failed');
+      }
+    } catch (error: any) {
+      playErrorSound();
+      setError(`❌ Move failed: ${error.message}`);
+    } finally {
+      setMovingInProgress(false);
+    }
+  };
+
+  // Open move modal with shipment data
+  const openMoveModal = (shipmentData: any) => {
+    // Find the rack this shipment is currently in
+    const assignedBox = shipmentData.boxes?.find((b: any) => b.rackId);
+    const sourceRackId = assignedBox?.rackId;
+    const sourceRackCode = assignedBox?.rack?.code || 'Unknown';
+
+    setMoveShipmentData({
+      ...shipmentData,
+      sourceRackId,
+      sourceRackCode
+    });
+    setShowMoveModal(true);
+    fetchAuthorizedUsers();
+  };
+
+  // Fetch IN_STORAGE shipments for manual move
+  const fetchInStorageShipments = async () => {
+    setLoadingInStorageShipments(true);
+    try {
+      const response = await fetch('/api/shipments?status=IN_STORAGE&status=IN_WAREHOUSE', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        }
+      });
+      const data = await response.json();
+      // Filter shipments that have assigned boxes
+      const shipmentsWithRacks = (data.shipments || []).filter((s: any) => 
+        s.status === 'IN_STORAGE' || s.status === 'IN_WAREHOUSE'
+      );
+      setInStorageShipments(shipmentsWithRacks);
+    } catch (error) {
+      console.error('Failed to fetch in-storage shipments:', error);
+    } finally {
+      setLoadingInStorageShipments(false);
+    }
+  };
+
+  // Open manual move modal (without scanning)
+  const openManualMoveModal = async () => {
+    setShowManualMoveModal(true);
+    setSelectedManualShipment('');
+    setSelectedSourceRack('');
+    setMoveDestinationRack('');
+    setMoveReason('');
+    setMoveAuthorizedBy('');
+    setMoveNotes('');
+    setMovePhotos([]);
+    await Promise.all([fetchInStorageShipments(), fetchAuthorizedUsers()]);
+  };
+
+  // Handle manual shipment selection - fetch boxes to get rack info
+  const handleManualShipmentSelect = async (shipmentId: string) => {
+    setSelectedManualShipment(shipmentId);
+    setSelectedSourceRack('');
+    
+    if (!shipmentId) return;
+
+    try {
+      const response = await fetch(`/api/shipments/${shipmentId}/boxes`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        }
+      });
+      const data = await response.json();
+      const boxes = data.boxes || [];
+      
+      // Group boxes by rack
+      const rackGroups: Record<string, { rackId: string; rackCode: string; boxCount: number; boxes: any[] }> = {};
+      boxes.forEach((box: any) => {
+        if (box.rackId && box.rack) {
+          if (!rackGroups[box.rackId]) {
+            rackGroups[box.rackId] = {
+              rackId: box.rackId,
+              rackCode: box.rack.code,
+              boxCount: 0,
+              boxes: []
+            };
+          }
+          rackGroups[box.rackId].boxCount++;
+          rackGroups[box.rackId].boxes.push(box);
+        }
+      });
+
+      // Find the selected shipment and add rack info
+      const selectedShipment = inStorageShipments.find(s => s.id === shipmentId);
+      if (selectedShipment) {
+        setMoveShipmentData({
+          ...selectedShipment,
+          boxes,
+          rackGroups: Object.values(rackGroups)
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch shipment boxes:', error);
+    }
+  };
+
+  // Handle manual move submission
+  const handleManualMoveSubmit = async () => {
+    if (!selectedManualShipment || !selectedSourceRack || !moveDestinationRack || !moveReason || !moveAuthorizedBy) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    // Get box IDs from the selected source rack
+    const rackGroup = moveShipmentData?.rackGroups?.find((rg: any) => rg.rackId === selectedSourceRack);
+    if (!rackGroup) {
+      setError('No boxes found in selected source rack');
+      return;
+    }
+
+    setMovingInProgress(true);
+    try {
+      // Upload photos first if any
+      const uploadedPhotoUrls: string[] = [];
+      for (const photo of movePhotos) {
+        const formData = new FormData();
+        const compressedPhoto = await compressPhoto(photo);
+        formData.append('photo', compressedPhoto);
+        
+        const uploadResponse = await fetch('/api/shipments/upload/photo', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          },
+          body: formData
+        });
+        const uploadData = await uploadResponse.json();
+        if (uploadData.success) {
+          uploadedPhotoUrls.push(uploadData.photoUrl);
+        }
+      }
+
+      // Call move API
+      const response = await fetch(`/api/shipments/${selectedManualShipment}/move-boxes`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sourceRackId: selectedSourceRack,
+          destinationRackId: moveDestinationRack,
+          boxIds: rackGroup.boxes.map((b: any) => b.id),
+          reason: moveReason,
+          authorizedById: moveAuthorizedBy,
+          notes: moveNotes,
+          photos: uploadedPhotoUrls
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        playSuccessSound();
+        setShowManualMoveModal(false);
+        setMoveShipmentData(null);
+        setSelectedManualShipment('');
+        setSelectedSourceRack('');
+        setMoveDestinationRack('');
+        setMoveReason('');
+        setMoveAuthorizedBy('');
+        setMoveNotes('');
+        setMovePhotos([]);
+        
+        setError(`✅ Successfully moved ${data.moveDetails.boxesMoved} boxes from ${data.moveDetails.from.code} to ${data.moveDetails.to.code}`);
+        setTimeout(() => setError(''), 5000);
+      } else {
+        throw new Error(data.error || 'Move failed');
+      }
+    } catch (error: any) {
+      playErrorSound();
+      setError(`❌ Move failed: ${error.message}`);
+    } finally {
+      setMovingInProgress(false);
+    }
   };
 
   useEffect(() => {
@@ -1356,13 +1677,25 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
           <span className="block">📋 Pending List</span>
           <span className="hidden sm:block text-xs font-normal mt-0.5">قائمة الانتظار</span>
         </button>
+        {/* Manual Move Button */}
+        <button
+          onClick={openManualMoveModal}
+          className="flex-1 py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 rounded-md sm:rounded-lg font-bold text-xs sm:text-sm md:text-lg transition-all bg-amber-500 text-white hover:bg-amber-600 shadow-lg"
+        >
+          <span className="block">🔄 Manual Move</span>
+          <span className="hidden sm:block text-xs font-normal mt-0.5">نقل يدوي</span>
+        </button>
       </div>
 
       {error && (
-        <div className="bg-red-50 border-2 border-red-200 text-red-700 px-6 py-4 rounded-xl flex items-center gap-3">
-          <XCircleIcon className="h-6 w-6 flex-shrink-0" />
+        <div className={`${error.startsWith('✅') ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'} border-2 px-6 py-4 rounded-xl flex items-center gap-3`}>
+          {error.startsWith('✅') ? (
+            <CheckCircleIcon className="h-6 w-6 flex-shrink-0" />
+          ) : (
+            <XCircleIcon className="h-6 w-6 flex-shrink-0" />
+          )}
           <span className="flex-1">{error}</span>
-          <button onClick={() => setError('')} className="text-red-500 hover:text-red-700 text-xl">✕</button>
+          <button onClick={() => setError('')} className="hover:opacity-70 text-xl">✕</button>
         </div>
       )}
 
@@ -1803,6 +2136,29 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                             )}
                           </div>
                           <div className="space-y-3">
+                            {/* Move to Another Rack Button */}
+                            <button
+                              onClick={() => openMoveModal(scanResult.data)}
+                              className="w-full py-3 sm:py-3.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-semibold text-sm sm:text-base flex items-center justify-center gap-2"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                              </svg>
+                              Move to Another Rack
+                            </button>
+                            {/* View Move History Button */}
+                            <button
+                              onClick={() => {
+                                fetchMoveHistory(scanResult.data.id);
+                                setShowMoveHistory(true);
+                              }}
+                              className="w-full py-3 sm:py-3.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm sm:text-base flex items-center justify-center gap-2"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              View Move History
+                            </button>
                             <button
                               onClick={() => {
                                 setSelectedShipmentForDetails(scanResult.data);
@@ -2565,6 +2921,572 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
           onClose={() => setShowShipmentDetails(false)}
           shipmentId={selectedShipmentForDetails.id}
         />
+      )}
+
+      {/* Move Shipment Modal */}
+      {showMoveModal && moveShipmentData && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6 space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-gray-900">🔄 Move Shipment</h3>
+                <button
+                  onClick={() => {
+                    setShowMoveModal(false);
+                    setMoveShipmentData(null);
+                    setMoveDestinationRack('');
+                    setMoveReason('');
+                    setMoveAuthorizedBy('');
+                    setMoveNotes('');
+                    setMovePhotos([]);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Current Location */}
+              <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+                <p className="text-sm text-amber-700 mb-1">Moving from:</p>
+                <p className="text-lg font-bold text-amber-900">
+                  📍 {moveShipmentData.sourceRackCode} → ?
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  Shipment: <span className="font-semibold">{moveShipmentData.name}</span>
+                </p>
+                <p className="text-sm text-gray-600">
+                  Boxes: <span className="font-semibold">{moveShipmentData.currentBoxCount}</span>
+                </p>
+              </div>
+
+              {/* Destination Rack Selection */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Destination Rack <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={moveDestinationRack}
+                  onChange={(e) => setMoveDestinationRack(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                >
+                  <option value="">Select destination rack...</option>
+                  {racks
+                    .filter(r => r.id !== moveShipmentData.sourceRackId && r.status !== 'FULL')
+                    .map(rack => (
+                      <option key={rack.id} value={rack.id}>
+                        {rack.code} - {rack.zone} ({rack.capacityUsed || 0}/{rack.capacityTotal || 100})
+                      </option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              {/* Reason Selection */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Reason for Move <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={moveReason}
+                  onChange={(e) => setMoveReason(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                >
+                  <option value="">Select reason...</option>
+                  <option value="Reorganization">📦 Reorganization</option>
+                  <option value="Space Optimization">📐 Space Optimization</option>
+                  <option value="Customer Request">👤 Customer Request</option>
+                  <option value="Damage Prevention">⚠️ Damage Prevention</option>
+                  <option value="Temperature Control">🌡️ Temperature Control</option>
+                  <option value="Easier Access">🚪 Easier Access</option>
+                  <option value="Consolidation">🔗 Consolidation</option>
+                  <option value="Other">📝 Other</option>
+                </select>
+              </div>
+
+              {/* Authorized By */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Authorized By <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={moveAuthorizedBy}
+                  onChange={(e) => setMoveAuthorizedBy(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                >
+                  <option value="">Select manager/admin...</option>
+                  {authorizedUsers.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.role === 'ADMIN' ? '👑' : '👔'} {user.name} ({user.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Additional Notes
+                </label>
+                <textarea
+                  value={moveNotes}
+                  onChange={(e) => setMoveNotes(e.target.value)}
+                  placeholder="Any additional details..."
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 h-20"
+                />
+              </div>
+
+              {/* Photo Upload */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  📸 Take Photos of New Location
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    setMovePhotos([...movePhotos, ...files]);
+                  }}
+                  className="w-full p-3 border border-gray-300 rounded-lg"
+                />
+                {movePhotos.length > 0 && (
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {movePhotos.map((photo, idx) => (
+                      <div key={idx} className="relative group">
+                        <img
+                          src={URL.createObjectURL(photo)}
+                          alt={`Photo ${idx + 1}`}
+                          className="w-16 h-16 object-cover rounded-lg"
+                        />
+                        <button
+                          onClick={() => setMovePhotos(movePhotos.filter((_, i) => i !== idx))}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowMoveModal(false);
+                    setMoveShipmentData(null);
+                    setMoveDestinationRack('');
+                    setMoveReason('');
+                    setMoveAuthorizedBy('');
+                    setMoveNotes('');
+                    setMovePhotos([]);
+                  }}
+                  className="flex-1 py-3 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleMoveShipment}
+                  disabled={movingInProgress || !moveDestinationRack || !moveReason || !moveAuthorizedBy}
+                  className="flex-1 py-3 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                >
+                  {movingInProgress ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Moving...
+                    </>
+                  ) : (
+                    '✅ Confirm Move'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move History Modal */}
+      {showMoveHistory && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">📜 Move History</h3>
+                <button
+                  onClick={() => setShowMoveHistory(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {loadingMoveHistory ? (
+                <div className="flex items-center justify-center py-12">
+                  <svg className="animate-spin h-8 w-8 text-purple-600" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                </div>
+              ) : moveHistory.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-lg">No move history found</p>
+                  <p className="text-gray-400 text-sm mt-2">This shipment hasn't been moved between racks yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {moveHistory.map((move, idx) => (
+                    <div key={move.id || idx} className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-colors">
+                      {/* Move Header */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">🔄</span>
+                          <div>
+                            <p className="font-bold text-gray-900">
+                              {move.fromRack?.code || '?'} → {move.toRack?.code || '?'}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(move.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-semibold">
+                          {move.boxCount} boxes
+                        </span>
+                      </div>
+
+                      {/* Move Details */}
+                      <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                        <div>
+                          <p className="text-gray-500 text-xs">Reason</p>
+                          <p className="font-semibold">{move.reason}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 text-xs">Authorized By</p>
+                          <p className="font-semibold">
+                            {move.authorizedBy?.role === 'ADMIN' ? '👑' : '👔'} {move.authorizedBy?.name || 'Unknown'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 text-xs">Moved By</p>
+                          <p className="font-semibold">👷 {move.movedBy?.name || 'Unknown'}</p>
+                        </div>
+                        {move.notes && (
+                          <div>
+                            <p className="text-gray-500 text-xs">Notes</p>
+                            <p className="font-semibold">{move.notes}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Photos */}
+                      {(move.oldPhotos?.length > 0 || move.newPhotos?.length > 0) && (
+                        <div className="border-t pt-3">
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* Old Photos */}
+                            {move.oldPhotos?.length > 0 && (
+                              <div>
+                                <p className="text-xs text-gray-500 mb-2">📷 Before Move (Old Location)</p>
+                                <div className="flex gap-2 flex-wrap">
+                                  {move.oldPhotos.map((photo: string, pIdx: number) => (
+                                    <img
+                                      key={pIdx}
+                                      src={photo}
+                                      alt={`Old photo ${pIdx + 1}`}
+                                      className="w-16 h-16 object-cover rounded-lg border border-gray-300"
+                                      onClick={() => window.open(photo, '_blank')}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {/* New Photos */}
+                            {move.newPhotos?.length > 0 && (
+                              <div>
+                                <p className="text-xs text-gray-500 mb-2">📸 After Move (New Location)</p>
+                                <div className="flex gap-2 flex-wrap">
+                                  {move.newPhotos.map((photo: string, pIdx: number) => (
+                                    <img
+                                      key={pIdx}
+                                      src={photo}
+                                      alt={`New photo ${pIdx + 1}`}
+                                      className="w-16 h-16 object-cover rounded-lg border border-gray-300"
+                                      onClick={() => window.open(photo, '_blank')}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Move Modal (without scanning) */}
+      {showManualMoveModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6 space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-gray-900">🔄 Manual Move (Without Scanning)</h3>
+                <button
+                  onClick={() => {
+                    setShowManualMoveModal(false);
+                    setMoveShipmentData(null);
+                    setSelectedManualShipment('');
+                    setSelectedSourceRack('');
+                    setMoveDestinationRack('');
+                    setMoveReason('');
+                    setMoveAuthorizedBy('');
+                    setMoveNotes('');
+                    setMovePhotos([]);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Step 1: Select Shipment */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Step 1: Select Shipment <span className="text-red-500">*</span>
+                </label>
+                {loadingInStorageShipments ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin h-6 w-6 border-2 border-amber-600 border-t-transparent rounded-full mx-auto"></div>
+                    <p className="text-sm text-gray-500 mt-2">Loading shipments...</p>
+                  </div>
+                ) : (
+                  <select
+                    value={selectedManualShipment}
+                    onChange={(e) => handleManualShipmentSelect(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  >
+                    <option value="">Select a shipment in storage...</option>
+                    {inStorageShipments.map(shipment => (
+                      <option key={shipment.id} value={shipment.id}>
+                        {shipment.name} - {shipment.referenceId} ({shipment.currentBoxCount} boxes)
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Step 2: Select Source Rack */}
+              {selectedManualShipment && moveShipmentData?.rackGroups && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Step 2: Select Source Rack <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedSourceRack}
+                    onChange={(e) => setSelectedSourceRack(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  >
+                    <option value="">Select current rack location...</option>
+                    {moveShipmentData.rackGroups.map((rg: any) => (
+                      <option key={rg.rackId} value={rg.rackId}>
+                        {rg.rackCode} ({rg.boxCount} boxes)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Step 3: Select Destination Rack */}
+              {selectedSourceRack && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Step 3: Destination Rack <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={moveDestinationRack}
+                    onChange={(e) => setMoveDestinationRack(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  >
+                    <option value="">Select destination rack...</option>
+                    {racks
+                      .filter(r => r.id !== selectedSourceRack && r.status !== 'FULL')
+                      .map(rack => (
+                        <option key={rack.id} value={rack.id}>
+                          {rack.code} - {rack.zone} ({rack.capacityUsed || 0}/{rack.capacityTotal || 100})
+                        </option>
+                      ))
+                    }
+                  </select>
+                </div>
+              )}
+
+              {/* Step 4: Reason */}
+              {moveDestinationRack && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Step 4: Reason for Move <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={moveReason}
+                      onChange={(e) => setMoveReason(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    >
+                      <option value="">Select reason...</option>
+                      <option value="Reorganization">📦 Reorganization</option>
+                      <option value="Space Optimization">📐 Space Optimization</option>
+                      <option value="Customer Request">👤 Customer Request</option>
+                      <option value="Damage Prevention">⚠️ Damage Prevention</option>
+                      <option value="Temperature Control">🌡️ Temperature Control</option>
+                      <option value="Easier Access">🚪 Easier Access</option>
+                      <option value="Consolidation">🔗 Consolidation</option>
+                      <option value="Other">📝 Other</option>
+                    </select>
+                  </div>
+
+                  {/* Authorized By */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Step 5: Authorized By <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={moveAuthorizedBy}
+                      onChange={(e) => setMoveAuthorizedBy(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    >
+                      <option value="">Select manager/admin...</option>
+                      {authorizedUsers.map(user => (
+                        <option key={user.id} value={user.id}>
+                          {user.role === 'ADMIN' ? '👑' : '👔'} {user.name} ({user.role})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Additional Notes (Optional)
+                    </label>
+                    <textarea
+                      value={moveNotes}
+                      onChange={(e) => setMoveNotes(e.target.value)}
+                      placeholder="Any additional details..."
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 h-20"
+                    />
+                  </div>
+
+                  {/* Photo Upload */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      📸 Take Photos of New Location (Optional)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      multiple
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []);
+                        setMovePhotos([...movePhotos, ...files]);
+                      }}
+                      className="w-full p-3 border border-gray-300 rounded-lg"
+                    />
+                    {movePhotos.length > 0 && (
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {movePhotos.map((photo, idx) => (
+                          <div key={idx} className="relative group">
+                            <img
+                              src={URL.createObjectURL(photo)}
+                              alt={`Photo ${idx + 1}`}
+                              className="w-16 h-16 object-cover rounded-lg"
+                            />
+                            <button
+                              onClick={() => setMovePhotos(movePhotos.filter((_, i) => i !== idx))}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Summary */}
+              {selectedSourceRack && moveDestinationRack && (
+                <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+                  <p className="font-semibold text-amber-900 mb-2">📋 Move Summary:</p>
+                  <div className="text-sm space-y-1">
+                    <p>📦 Shipment: <span className="font-semibold">{moveShipmentData?.name}</span></p>
+                    <p>📍 From: <span className="font-semibold">{moveShipmentData?.rackGroups?.find((rg: any) => rg.rackId === selectedSourceRack)?.rackCode}</span></p>
+                    <p>🎯 To: <span className="font-semibold">{racks.find(r => r.id === moveDestinationRack)?.code}</span></p>
+                    <p>📦 Boxes: <span className="font-semibold">{moveShipmentData?.rackGroups?.find((rg: any) => rg.rackId === selectedSourceRack)?.boxCount}</span></p>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowManualMoveModal(false);
+                    setMoveShipmentData(null);
+                    setSelectedManualShipment('');
+                    setSelectedSourceRack('');
+                    setMoveDestinationRack('');
+                    setMoveReason('');
+                    setMoveAuthorizedBy('');
+                    setMoveNotes('');
+                    setMovePhotos([]);
+                  }}
+                  className="flex-1 py-3 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleManualMoveSubmit}
+                  disabled={movingInProgress || !selectedManualShipment || !selectedSourceRack || !moveDestinationRack || !moveReason || !moveAuthorizedBy}
+                  className="flex-1 py-3 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                >
+                  {movingInProgress ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Moving...
+                    </>
+                  ) : (
+                    '✅ Confirm Move'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

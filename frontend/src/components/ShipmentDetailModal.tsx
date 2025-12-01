@@ -37,6 +37,150 @@ interface BoxDistributionProps {
   shipmentStatus?: string; // Pass status from parent
 }
 
+// Move History Component
+function MoveHistorySection({ shipmentId }: { shipmentId: string }) {
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (expanded) {
+      loadHistory();
+    }
+  }, [expanded, shipmentId]);
+
+  const loadHistory = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/shipments/${shipmentId}/move-history`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setHistory(data.history || []);
+      }
+    } catch (err) {
+      console.error('Failed to load move history:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="border border-amber-200 bg-amber-50 rounded-lg p-4">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between font-bold text-gray-800"
+      >
+        <span className="flex items-center">
+          <span className="text-xl mr-2">🔄</span> Move History
+        </span>
+        <span className="text-gray-500 text-sm">
+          {expanded ? '▲ Hide' : '▼ Show'}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="mt-4">
+          {loading ? (
+            <p className="text-gray-600 text-sm">Loading move history...</p>
+          ) : history.length === 0 ? (
+            <p className="text-gray-500 text-sm">No move history found. This shipment hasn't been moved between racks.</p>
+          ) : (
+            <div className="space-y-3">
+              {history.map((move, idx) => (
+                <div key={move.id || idx} className="bg-white p-3 rounded-lg border border-amber-200">
+                  {/* Move Header */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🔄</span>
+                      <div>
+                        <p className="font-bold text-gray-800">
+                          {move.fromRack?.code || '?'} → {move.toRack?.code || '?'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(move.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="bg-amber-200 text-amber-800 px-2 py-1 rounded-full text-xs font-semibold">
+                      {move.boxCount} boxes
+                    </span>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-gray-500">Reason</p>
+                      <p className="font-semibold">{move.reason}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Authorized By</p>
+                      <p className="font-semibold">
+                        {move.authorizedBy?.role === 'ADMIN' ? '👑' : '👔'} {move.authorizedBy?.name || 'Unknown'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Moved By</p>
+                      <p className="font-semibold">👷 {move.movedBy?.name || 'Unknown'}</p>
+                    </div>
+                    {move.notes && (
+                      <div>
+                        <p className="text-gray-500">Notes</p>
+                        <p className="font-semibold">{move.notes}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Photos */}
+                  {(move.oldPhotos?.length > 0 || move.newPhotos?.length > 0) && (
+                    <div className="mt-2 pt-2 border-t border-amber-100">
+                      <div className="grid grid-cols-2 gap-2">
+                        {move.oldPhotos?.length > 0 && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">📷 Before</p>
+                            <div className="flex gap-1 flex-wrap">
+                              {move.oldPhotos.slice(0, 3).map((photo: string, pIdx: number) => (
+                                <img
+                                  key={pIdx}
+                                  src={photo}
+                                  alt={`Before ${pIdx + 1}`}
+                                  className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80"
+                                  onClick={() => window.open(photo, '_blank')}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {move.newPhotos?.length > 0 && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">📸 After</p>
+                            <div className="flex gap-1 flex-wrap">
+                              {move.newPhotos.slice(0, 3).map((photo: string, pIdx: number) => (
+                                <img
+                                  key={pIdx}
+                                  src={photo}
+                                  alt={`After ${pIdx + 1}`}
+                                  className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80"
+                                  onClick={() => window.open(photo, '_blank')}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Box Distribution Component
 function BoxDistributionSection({ shipmentId, shipmentStatus }: BoxDistributionProps) {
   const [boxes, setBoxes] = useState<any[]>([]);
@@ -681,6 +825,9 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
                   </div>
                 </div>
               )}
+
+              {/* Move History */}
+              <MoveHistorySection shipmentId={shipmentId} />
 
               {/* Audit Trail */}
               <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">

@@ -18,20 +18,17 @@ import { CompaniesManagement } from './pages/Companies/CompaniesManagement';
 import { Expenses } from './pages/Expenses/Expenses';
 import { TemplateSettingsPage } from './pages/Settings/TemplateSettings';
 import UserProfile from './pages/Profile/UserProfile';
-import MovingJobsManager from './components/moving-jobs/MovingJobsManager';
-import MaterialsManager from './components/moving-jobs/MaterialsManager';
 import JobReportsDashboard from './components/moving-jobs/JobReportsDashboard';
 import PluginSystemManager from './components/moving-jobs/PluginSystemManager';
 import ApprovalManager from './components/moving-jobs/ApprovalManager';
-import { MaterialsManagement } from './pages/Materials';
 import MaterialReports from './pages/Materials/MaterialReports';
-import MaterialsDashboard from './pages/Materials/MaterialsDashboard';
 import MaterialsHub from './pages/Materials/MaterialsHub';
 import { DamageReport } from './components/reports/DamageReport';
 import { DebugLogin } from './pages/DebugLogin';
 import BackupManagement from './pages/BackupManagement/BackupManagement';
 import PluginSettings from './pages/Settings/PluginSettings';
 import SystemMonitorEnhanced from './pages/Admin/SystemMonitorEnhanced';
+import CompanyAnalytics from './pages/Analytics/CompanyAnalytics';
 
 import { getAuthToken } from './services/api';
 import { PermissionProvider } from './contexts/PermissionContext';
@@ -129,19 +126,14 @@ function App() {
                   <DamageReport />
                 </ProtectedRoute>
               } />
+              <Route path="analytics" element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                  <CompanyAnalytics />
+                </ProtectedRoute>
+              } />
               <Route path="moving-jobs" element={
                 <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                   <MovingJobs />
-                </ProtectedRoute>
-              } />
-              <Route path="jobs-management" element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
-                  <MovingJobsManager />
-                </ProtectedRoute>
-              } />
-              <Route path="materials-management" element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
-                  <MaterialsManager />
                 </ProtectedRoute>
               } />
               <Route path="job-reports" element={

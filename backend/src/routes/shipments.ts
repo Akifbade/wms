@@ -1885,5 +1885,362 @@ router.post('/:shipmentId/assign-rack',
   }
 );
 
+// ==========================================
+// MOVE BOXES BETWEEN RACKS (with Audit Trail)
+// ==========================================
+router.post('/:shipmentId/move-boxes',
+  authorizeRoles('ADMIN', 'MANAGER', 'WORKER'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { shipmentId } = req.params;
+      const { 
+        sourceRackId, 
+        destinationRackId, 
+        boxIds, // Array of box IDs to move
+        reason, 
+        authorizedById, 
+        notes, 
+        photos // New photos taken during move
+      } = req.body;
+
+      console.log('🔄 Move-boxes request:', {
+        shipmentId,
+        sourceRackId,
+        destinationRackId,
+        boxIds: boxIds?.length,
+        reason,
+        authorizedById,
+        notes,
+        photos: photos?.length || 0
+      });
+
+      // Validation
+      if (!sourceRackId || !destinationRackId || !boxIds?.length || !reason || !authorizedById) {
+        return res.status(400).json({
+          error: 'Missing required fields: sourceRackId, destinationRackId, boxIds, reason, authorizedById'
+        });
+      }
+
+      if (sourceRackId === destinationRackId) {
+        return res.status(400).json({
+          error: 'Source and destination racks cannot be the same'
+        });
+      }
+
+      // Get shipment with boxes
+      const shipment = await prisma.shipment.findUnique({
+        where: { id: shipmentId },
+        include: {
+          boxes: {
+            where: { id: { in: boxIds } }
+          }
+        }
+      });
+
+      if (!shipment) {
+        return res.status(404).json({ error: 'Shipment not found' });
+      }
+
+      // Verify all boxes belong to source rack
+      const invalidBoxes = shipment.boxes.filter((box: any) => box.rackId !== sourceRackId);
+      if (invalidBoxes.length > 0) {
+        return res.status(400).json({
+          error: `Some boxes are not in the source rack`,
+          invalidBoxIds: invalidBoxes.map((b: any) => b.id)
+        });
+      }
+
+      // Get source rack with current photos
+      const sourceRack = await prisma.rack.findUnique({
+        where: { id: sourceRackId }
+      });
+
+      if (!sourceRack) {
+        return res.status(404).json({ error: 'Source rack not found' });
+      }
+
+      // Get destination rack and check capacity
+      const destRack = await prisma.rack.findUnique({
+        where: { id: destinationRackId }
+      });
+
+      if (!destRack) {
+        return res.status(404).json({ error: 'Destination rack not found' });
+      }
+
+      // Get authorized user details
+      const authorizedUser = await prisma.user.findUnique({
+        where: { id: authorizedById },
+        select: { id: true, name: true, role: true }
+      });
+
+      if (!authorizedUser || !['ADMIN', 'MANAGER'].includes(authorizedUser.role)) {
+        return res.status(400).json({
+          error: 'Invalid authorized user. Must be ADMIN or MANAGER.'
+        });
+      }
+
+      // Get old photos from boxes (before move)
+      const oldPhotos: string[] = [];
+      shipment.boxes.forEach((box: any) => {
+        if (box.photos) {
+          try {
+            const boxPhotos = JSON.parse(box.photos);
+            oldPhotos.push(...boxPhotos);
+          } catch (e) {}
+        }
+      });
+
+      // Calculate pallet usage for capacity check
+      const boxesPerPallet = shipment.boxesPerPallet || 0;
+      const palletsToMove = boxesPerPallet > 0 
+        ? Math.ceil(boxIds.length / boxesPerPallet) 
+        : 0;
+
+      // Check destination rack capacity
+      const destCurrentUsage = destRack.capacityUsed || 0;
+      const destMaxCapacity = destRack.capacityTotal || 100;
+      
+      if (destCurrentUsage + palletsToMove > destMaxCapacity) {
+        return res.status(400).json({
+          error: `Destination rack capacity exceeded. Current: ${destCurrentUsage}, Adding: ${palletsToMove}, Max: ${destMaxCapacity}`
+        });
+      }
+
+      // Prepare move details for history
+      const moveDetails = {
+        shipmentId,
+        shipmentName: shipment.name,
+        customerName: shipment.clientName || shipment.customerName || 'Unknown',
+        fromRack: { id: sourceRack.id, code: sourceRack.code },
+        toRack: { id: destRack.id, code: destRack.code },
+        boxCount: boxIds.length,
+        boxNumbers: shipment.boxes.map((b: any) => b.boxNumber),
+        reason,
+        authorizedBy: { id: authorizedUser.id, name: authorizedUser.name, role: authorizedUser.role },
+        movedBy: { id: req.user!.id, name: req.user!.name, role: req.user!.role },
+        oldPhotos: oldPhotos,
+        newPhotos: photos || [],
+        notes: notes || '',
+        movedAt: new Date().toISOString()
+      };
+
+      const photosJson = photos && photos.length > 0 ? JSON.stringify(photos) : null;
+
+      // Execute move in transaction
+      await prisma.$transaction(async (tx) => {
+        // 1. Update boxes to new rack
+        await tx.shipmentBox.updateMany({
+          where: { id: { in: boxIds } },
+          data: {
+            rackId: destinationRackId,
+            photos: photosJson, // Update photos with new ones
+            updatedAt: new Date()
+          }
+        });
+
+        // 2. Log RackActivity for SOURCE rack (MOVE OUT)
+        await tx.rackActivity.create({
+          data: {
+            rackId: sourceRackId,
+            userId: req.user!.id,
+            activityType: 'MOVE',
+            itemDetails: JSON.stringify({
+              ...moveDetails,
+              direction: 'OUT',
+              description: `Moved ${boxIds.length} boxes to ${destRack.code}`
+            }),
+            quantityBefore: sourceRack.capacityUsed || 0,
+            quantityAfter: (sourceRack.capacityUsed || 0) - palletsToMove,
+            photos: JSON.stringify({ old: oldPhotos, new: photos || [] }),
+            notes: `Move to ${destRack.code}: ${reason}${notes ? ' - ' + notes : ''}`,
+            companyId: req.user!.companyId
+          }
+        });
+
+        // 3. Log RackActivity for DESTINATION rack (MOVE IN)
+        await tx.rackActivity.create({
+          data: {
+            rackId: destinationRackId,
+            userId: req.user!.id,
+            activityType: 'MOVE',
+            itemDetails: JSON.stringify({
+              ...moveDetails,
+              direction: 'IN',
+              description: `Received ${boxIds.length} boxes from ${sourceRack.code}`
+            }),
+            quantityBefore: destRack.capacityUsed || 0,
+            quantityAfter: (destRack.capacityUsed || 0) + palletsToMove,
+            photos: JSON.stringify({ old: oldPhotos, new: photos || [] }),
+            notes: `Move from ${sourceRack.code}: ${reason}${notes ? ' - ' + notes : ''}`,
+            companyId: req.user!.companyId
+          }
+        });
+      });
+
+      // 4. Recompute capacities for both racks
+      const sourceCapacity = await recomputeRackPalletUsage(prisma, sourceRackId, req.user!.companyId);
+      const destCapacity = await recomputeRackPalletUsage(prisma, destinationRackId, req.user!.companyId);
+
+      // 5. Update rack statuses
+      await prisma.rack.update({
+        where: { id: sourceRackId },
+        data: {
+          capacityUsed: sourceCapacity,
+          lastActivity: new Date(),
+          status: sourceCapacity >= (sourceRack.capacityTotal || 100) ? 'FULL' :
+            sourceCapacity > 0 ? 'OCCUPIED' : 'AVAILABLE'
+        }
+      });
+
+      await prisma.rack.update({
+        where: { id: destinationRackId },
+        data: {
+          capacityUsed: destCapacity,
+          lastActivity: new Date(),
+          status: destCapacity >= (destRack.capacityTotal || 100) ? 'FULL' :
+            destCapacity > 0 ? 'OCCUPIED' : 'AVAILABLE'
+        }
+      });
+
+      console.log('✅ Move completed successfully:', {
+        shipmentId,
+        from: sourceRack.code,
+        to: destRack.code,
+        boxesMoved: boxIds.length,
+        authorizedBy: authorizedUser.name
+      });
+
+      res.json({
+        success: true,
+        message: `Successfully moved ${boxIds.length} boxes from ${sourceRack.code} to ${destRack.code}`,
+        moveDetails: {
+          boxesMoved: boxIds.length,
+          from: { code: sourceRack.code, newCapacity: sourceCapacity },
+          to: { code: destRack.code, newCapacity: destCapacity },
+          reason,
+          authorizedBy: authorizedUser.name,
+          movedBy: req.user!.name
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Move-boxes error:', error);
+      res.status(500).json({ error: 'Failed to move boxes between racks' });
+    }
+  }
+);
+
+// ==========================================
+// GET MOVE HISTORY FOR SHIPMENT
+// ==========================================
+router.get('/:shipmentId/move-history',
+  authorizeRoles('ADMIN', 'MANAGER', 'WORKER'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { shipmentId } = req.params;
+
+      // Get all MOVE type activities related to this shipment
+      const moveActivities = await prisma.rackActivity.findMany({
+        where: {
+          companyId: req.user!.companyId,
+          activityType: 'MOVE',
+          itemDetails: {
+            contains: shipmentId
+          }
+        },
+        include: {
+          rack: {
+            select: { id: true, code: true, zone: true, location: true }
+          },
+          user: {
+            select: { id: true, name: true, role: true }
+          }
+        },
+        orderBy: { timestamp: 'desc' }
+      });
+
+      // Parse and format the history
+      const history = moveActivities.map(activity => {
+        let details: any = {};
+        let photos: any = {};
+        
+        try {
+          details = JSON.parse(activity.itemDetails || '{}');
+          photos = JSON.parse(activity.photos || '{}');
+        } catch (e) {}
+
+        return {
+          id: activity.id,
+          direction: details.direction, // 'IN' or 'OUT'
+          fromRack: details.fromRack,
+          toRack: details.toRack,
+          boxCount: details.boxCount,
+          boxNumbers: details.boxNumbers,
+          reason: details.reason,
+          notes: details.notes,
+          authorizedBy: details.authorizedBy,
+          movedBy: {
+            id: activity.user.id,
+            name: activity.user.name,
+            role: activity.user.role
+          },
+          oldPhotos: photos.old || [],
+          newPhotos: photos.new || [],
+          timestamp: activity.timestamp
+        };
+      });
+
+      // Group by move operation (pair IN and OUT)
+      const groupedHistory: any[] = [];
+      const processedIds = new Set();
+
+      for (const item of history) {
+        if (processedIds.has(item.id)) continue;
+
+        // Find the pair (IN for OUT, OUT for IN)
+        const pair = history.find(h => 
+          h.id !== item.id && 
+          h.fromRack?.id === item.fromRack?.id &&
+          h.toRack?.id === item.toRack?.id &&
+          Math.abs(new Date(h.timestamp).getTime() - new Date(item.timestamp).getTime()) < 5000 // within 5 seconds
+        );
+
+        if (pair) {
+          processedIds.add(pair.id);
+        }
+        processedIds.add(item.id);
+
+        // Use the OUT record as primary (has complete info)
+        const primary = item.direction === 'OUT' ? item : (pair?.direction === 'OUT' ? pair : item);
+
+        groupedHistory.push({
+          id: primary.id,
+          fromRack: primary.fromRack,
+          toRack: primary.toRack,
+          boxCount: primary.boxCount,
+          boxNumbers: primary.boxNumbers,
+          reason: primary.reason,
+          notes: primary.notes,
+          authorizedBy: primary.authorizedBy,
+          movedBy: primary.movedBy,
+          oldPhotos: primary.oldPhotos,
+          newPhotos: primary.newPhotos,
+          timestamp: primary.timestamp
+        });
+      }
+
+      res.json({
+        success: true,
+        history: groupedHistory
+      });
+
+    } catch (error) {
+      console.error('❌ Get move history error:', error);
+      res.status(500).json({ error: 'Failed to fetch move history' });
+    }
+  }
+);
+
 export default router;
 

@@ -70,9 +70,17 @@ export const DamageReport: React.FC = () => {
           'Authorization': `Bearer ${token}`
         }
       });
+      
+      if (!response.ok) {
+        console.error('Failed to load damage report: HTTP', response.status);
+        setDamages([]);
+        setSummary(null);
+        return;
+      }
+      
       const data = await response.json();
-      setDamages(data.damages);
-      setSummary(data.summary);
+      setDamages(data.damages || []);
+      setSummary(data.summary || null);
     } catch (error) {
       console.error('Failed to load damage report:', error);
     } finally {
@@ -85,16 +93,21 @@ export const DamageReport: React.FC = () => {
   };
 
   const handleExportCSV = () => {
+    if (!damages || damages.length === 0) {
+      alert('No damage records to export');
+      return;
+    }
+    
     const headers = ['Date', 'Job Code', 'Material', 'SKU', 'Quantity', 'Reason', 'Value', 'Recorded By'];
     const rows = damages.map(d => [
       new Date(d.recordedAt).toLocaleDateString(),
-      d.job.jobCode,
-      d.material.name,
-      d.material.sku,
-      d.quantity,
-      d.reason,
-      d.estimatedValue.toFixed(2),
-      d.recordedBy.name
+      d.job?.jobCode || 'N/A',
+      d.material?.name || 'N/A',
+      d.material?.sku || 'N/A',
+      d.quantity || 0,
+      d.reason || '',
+      (d.estimatedValue || 0).toFixed(2),
+      d.recordedBy?.name || 'N/A'
     ]);
 
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
@@ -152,16 +165,16 @@ export const DamageReport: React.FC = () => {
           </div>
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
             <p className="text-sm text-orange-700 font-medium mb-1">Estimated Value Loss</p>
-            <p className="text-3xl font-bold text-orange-600">{summary.totalValue.toFixed(2)} KWD</p>
+            <p className="text-3xl font-bold text-orange-600">{(summary.totalValue || 0).toFixed(2)} KWD</p>
           </div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-sm text-yellow-700 font-medium mb-1">Most Damaged</p>
-            <p className="text-lg font-bold text-yellow-600">{summary.mostDamagedMaterial}</p>
+            <p className="text-lg font-bold text-yellow-600">{summary.mostDamagedMaterial || 'N/A'}</p>
           </div>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-700 font-medium mb-1">Recent Damage</p>
             <p className="text-lg font-bold text-blue-600">
-              {new Date(summary.recentDamageDate).toLocaleDateString()}
+              {summary.recentDamageDate ? new Date(summary.recentDamageDate).toLocaleDateString() : 'N/A'}
             </p>
           </div>
         </div>

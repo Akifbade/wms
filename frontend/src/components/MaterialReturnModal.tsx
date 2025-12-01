@@ -147,6 +147,7 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess 
         // Create FormData
         const formData = new FormData();
         formData.append('jobId', jobId);
+        formData.append('materialId', material.material.id); // Required by backend
         formData.append('issueId', issueId);
         formData.append('quantityUsed', String(quantityUsed));
         formData.append('quantityGood', String(Number(returnData.quantityGood)));
