@@ -38,7 +38,8 @@ export default function PluginSettings() {
 
     const fetchPluginData = async (plugin: PluginStats, index: number) => {
         try {
-            const response = await fetch(`http://localhost:5000${plugin.endpoint}`, {
+            const backendUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5000' : '';
+            const response = await fetch(`${backendUrl}${plugin.endpoint}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
@@ -206,8 +207,8 @@ export default function PluginSettings() {
                                                                 <div key={i} className="bg-white p-2 rounded border">
                                                                     <span
                                                                         className={`font-mono ${log.statusCode >= 400
-                                                                                ? 'text-red-600'
-                                                                                : 'text-green-600'
+                                                                            ? 'text-red-600'
+                                                                            : 'text-green-600'
                                                                             }`}
                                                                     >
                                                                         {log.method} {log.path}

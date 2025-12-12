@@ -134,19 +134,28 @@ router.get('/all-analytics', authenticateToken, async (req: AuthRequest, res: Re
 
     // Calculate per-company statistics
     const companyStats = profiles.map(profile => {
-      const shipments = allShipments.filter(s => s.companyProfileId === profile.id);
-      const activeShipments = shipments.filter(s => 
-        s.status === 'IN_WAREHOUSE' || s.status === 'ACTIVE' || s.status === 'PARTIAL'
+      // 🔧 FIX: Match shipments by BOTH companyProfileId AND customerName/clientName
+      // Many older shipments have companyProfileId = NULL but correct customerName
+      const profileNameLower = profile.name.toLowerCase();
+      const shipments = allShipments.filter(s =>
+        s.companyProfileId === profile.id ||
+        (s.companyProfileId === null && (
+          (s.customerName && s.customerName.toLowerCase() === profileNameLower) ||
+          (s.clientName && s.clientName.toLowerCase() === profileNameLower)
+        ))
       );
-      
+      const activeShipments = shipments.filter(s =>
+        s.status === 'IN_WAREHOUSE' || s.status === 'ACTIVE' || s.status === 'PARTIAL' || s.status === 'IN_STORAGE'
+      );
+
       // Calculate boxes
       const totalBoxes = shipments.reduce((sum, s) => sum + (s.originalBoxCount || 0), 0);
       const currentBoxes = shipments.reduce((sum, s) => sum + (s.currentBoxCount || 0), 0);
-      
+
       // Calculate pallets from shipment's palletCount field
       const totalPallets = shipments.reduce((sum, s) => sum + ((s as any).palletCount || 0), 0);
       const currentPallets = activeShipments.reduce((sum, s) => sum + ((s as any).palletCount || 0), 0);
-      
+
       // Get rack locations from boxes
       const allBoxes = shipments.flatMap(s => s.boxes || []);
       const rackLocations = [...new Set(
@@ -154,7 +163,7 @@ router.get('/all-analytics', authenticateToken, async (req: AuthRequest, res: Re
           .filter(b => b.rack && b.rack.code)
           .map(b => b.rack!.code)
       )];
-      
+
       // Calculate invoice totals
       const invoices = shipments.flatMap(s => s.invoices || []);
       const totalInvoiceAmount = invoices.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
@@ -162,7 +171,7 @@ router.get('/all-analytics', authenticateToken, async (req: AuthRequest, res: Re
         const payments = inv.payments || [];
         return sum + payments.reduce((pSum, p) => pSum + (Number(p.amount) || 0), 0);
       }, 0);
-      
+
       return {
         id: profile.id,
         name: profile.name,
@@ -185,7 +194,7 @@ router.get('/all-analytics', authenticateToken, async (req: AuthRequest, res: Re
     const overall = {
       totalCompanies: profiles.length,
       totalShipments: allShipments.length,
-      activeShipments: allShipments.filter(s => 
+      activeShipments: allShipments.filter(s =>
         s.status === 'IN_WAREHOUSE' || s.status === 'ACTIVE' || s.status === 'PARTIAL'
       ).length,
       totalBoxes: allShipments.reduce((sum, s) => sum + (s.originalBoxCount || 0), 0),
@@ -202,7 +211,7 @@ router.get('/all-analytics', authenticateToken, async (req: AuthRequest, res: Re
       .map(rack => {
         const boxes = rack.boxes || [];
         const shipmentMap = new Map();
-        
+
         boxes.forEach(box => {
           if (box.shipment) {
             const key = box.shipment.id;
@@ -221,7 +230,7 @@ router.get('/all-analytics', authenticateToken, async (req: AuthRequest, res: Re
         });
 
         const shipments = Array.from(shipmentMap.values());
-        
+
         // Sum up pallets from all shipments in this rack
         const totalPallets = shipments.reduce((sum: number, s: any) => sum + (s.pallets || 0), 0);
 

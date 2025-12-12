@@ -45,7 +45,7 @@ router.get('/authorized', async (req: AuthRequest, res: Response) => {
     const companyId = req.user!.companyId;
 
     const authorizedUsers = await prisma.user.findMany({
-      where: { 
+      where: {
         companyId,
         role: { in: ['ADMIN', 'MANAGER'] },
         isActive: true
@@ -62,9 +62,9 @@ router.get('/authorized', async (req: AuthRequest, res: Response) => {
       ],
     });
 
-    res.json({ 
+    res.json({
       success: true,
-      users: authorizedUsers 
+      users: authorizedUsers
     });
   } catch (error) {
     console.error('Error fetching authorized users:', error);

@@ -160,6 +160,63 @@ export const shipmentsAPI = {
       method: 'DELETE',
     });
   },
+
+  // Dimensions API - Multiple dimensions per shipment
+  getDimensions: async (shipmentId: string) => {
+    return apiCall<{ dimensions: any[]; summary: any }>(`/shipments/${shipmentId}/dimensions`);
+  },
+
+  addDimension: async (shipmentId: string, data: any) => {
+    return apiCall<{ dimension: any }>(`/shipments/${shipmentId}/dimensions`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateDimension: async (shipmentId: string, dimensionId: string, data: any) => {
+    return apiCall<{ dimension: any }>(`/shipments/${shipmentId}/dimensions/${dimensionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteDimension: async (shipmentId: string, dimensionId: string) => {
+    return apiCall<{ message: string }>(`/shipments/${shipmentId}/dimensions/${dimensionId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  saveDimensionsBulk: async (shipmentId: string, dimensions: any[]) => {
+    return apiCall<{ dimensions: any[]; summary: any }>(`/shipments/${shipmentId}/dimensions/bulk`, {
+      method: 'POST',
+      body: JSON.stringify({ dimensions }),
+    });
+  },
+
+  // 🎯 NEW: Dimension Rack Assignment APIs
+  getDimensionsStatus: async (shipmentId: string) => {
+    return apiCall<{ dimensions: any[]; summary: any }>(`/shipments/${shipmentId}/dimensions/status`);
+  },
+
+  assignDimensionToRack: async (shipmentId: string, dimensionId: string, rackId: string) => {
+    return apiCall<any>(`/shipments/${shipmentId}/dimensions/${dimensionId}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ rackId }),
+    });
+  },
+
+  releaseDimension: async (shipmentId: string, dimensionId: string) => {
+    return apiCall<any>(`/shipments/${shipmentId}/dimensions/${dimensionId}/release`, {
+      method: 'POST',
+    });
+  },
+
+  bulkAssignDimensions: async (shipmentId: string, dimensionIds: string[], rackId: string) => {
+    return apiCall<any>(`/shipments/${shipmentId}/dimensions/bulk-assign`, {
+      method: 'POST',
+      body: JSON.stringify({ dimensionIds, rackId }),
+    });
+  },
 };
 
 // Racks API
@@ -681,7 +738,71 @@ const backupsAPI = {
   },
 };
 
+// Email API
+export const emailAPI = {
+  getSettings: async () => {
+    return apiCall<any>('/email/settings', { method: 'GET' });
+  },
+  updateSettings: async (data: any) => {
+    return apiCall<any>('/email/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  testConnection: async (testEmail: string) => {
+    return apiCall<any>('/email/test', {
+      method: 'POST',
+      body: JSON.stringify({ testEmail }),
+    });
+  },
+  getNotifications: async () => {
+    return apiCall<any>('/email/notifications', { method: 'GET' });
+  },
+  updateNotification: async (type: string, data: any) => {
+    return apiCall<any>(`/email/notifications/${type}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  getStats: async () => {
+    return apiCall<any>('/email/stats', { method: 'GET' });
+  },
+  sendCustom: async (data: { to: string | string[]; subject: string; message: string }) => {
+    return apiCall<any>('/email/send', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+};
+
+// Generic API methods (for components that use api.get, api.put, api.post pattern)
+const genericApi = {
+  get: async <T = any>(endpoint: string): Promise<{ data: T }> => {
+    const data = await apiCall<T>(endpoint, { method: 'GET' });
+    return { data };
+  },
+  put: async <T = any>(endpoint: string, body?: any): Promise<{ data: T }> => {
+    const data = await apiCall<T>(endpoint, {
+      method: 'PUT',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { data };
+  },
+  post: async <T = any>(endpoint: string, body?: any): Promise<{ data: T }> => {
+    const data = await apiCall<T>(endpoint, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { data };
+  },
+  delete: async <T = any>(endpoint: string): Promise<{ data: T }> => {
+    const data = await apiCall<T>(endpoint, { method: 'DELETE' });
+    return { data };
+  },
+};
+
 export default {
+  ...genericApi,
   auth: authAPI,
   dashboard: dashboardAPI,
   shipments: shipmentsAPI,
@@ -699,4 +820,5 @@ export default {
   customFields: customFieldsAPI,
   shipmentSettings: shipmentSettingsAPI,
   backups: backupsAPI,
+  email: emailAPI,
 };

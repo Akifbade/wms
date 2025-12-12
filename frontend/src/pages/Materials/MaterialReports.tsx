@@ -77,7 +77,7 @@ interface Summary {
 interface IssueHistoryItem {
   id: string;
   issueId: string | null;
-  action: 'CREATED' | 'EDITED' | 'DELETED';
+  action: 'CREATED' | 'EDITED' | 'DELETED' | 'RETURN_EDITED' | 'RETURN_DELETED';
   jobId: string | null;
   materialId: string;
   materialName: string;
@@ -526,19 +526,27 @@ const MaterialReports: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {issueHistory.map((item) => (
-                    <tr key={item.id} className={item.action === 'DELETED' ? 'bg-red-50' : item.action === 'EDITED' ? 'bg-yellow-50' : 'bg-green-50'}>
+                    <tr
+                      key={item.id}
+                      className={`
+                        ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'bg-red-50' : (item.action === 'EDITED' || item.action === 'RETURN_EDITED') ? 'bg-yellow-50' : 'bg-green-50'}
+                        ${item.jobId ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}
+                      `}
+                      onClick={() => item.jobId && window.open(`/jobs/${item.jobId}`, '_blank')}
+                      title={item.jobId ? "Click to open job details" : ""}
+                    >
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                         {new Date(item.performedAt).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${item.action === 'DELETED' ? 'bg-red-100 text-red-700' :
-                            item.action === 'EDITED' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-green-100 text-green-700'
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'bg-red-100 text-red-700' :
+                          (item.action === 'EDITED' || item.action === 'RETURN_EDITED') ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-green-100 text-green-700'
                           }`}>
-                          {item.action === 'DELETED' && <Trash2 className="w-3 h-3" />}
-                          {item.action === 'EDITED' && <Edit2 className="w-3 h-3" />}
+                          {(item.action === 'DELETED' || item.action === 'RETURN_DELETED') && <Trash2 className="w-3 h-3" />}
+                          {(item.action === 'EDITED' || item.action === 'RETURN_EDITED') && <Edit2 className="w-3 h-3" />}
                           {item.action === 'CREATED' && <ArrowUpCircle className="w-3 h-3" />}
-                          {item.action}
+                          {item.action.replace('_', ' ')}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -546,20 +554,20 @@ const MaterialReports: React.FC = () => {
                         <div className="text-xs text-gray-500">{item.materialSku}</div>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {item.action === 'EDITED' && item.previousQty !== null ? (
+                        {(item.action === 'EDITED' || item.action === 'RETURN_EDITED') && item.previousQty !== null ? (
                           <div className="text-sm">
                             <span className="text-gray-500 line-through">{item.previousQty}</span>
                             <span className="mx-1">→</span>
                             <span className="font-bold text-yellow-700">{item.quantity}</span>
                           </div>
                         ) : (
-                          <span className={`font-bold ${item.action === 'DELETED' ? 'text-red-600' : 'text-gray-900'}`}>
+                          <span className={`font-bold ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'text-red-600' : 'text-gray-900'}`}>
                             {item.quantity}
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-gray-600">
-                        AED {item.totalCost?.toFixed(2) || '0.00'}
+                        KWD {item.totalCost?.toFixed(2) || '0.00'}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
                         {item.reason || '-'}

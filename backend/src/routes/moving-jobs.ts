@@ -1,9 +1,22 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
+import path from "path";
 import { authenticateToken, authorizeRoles, AuthRequest } from "../middleware/auth";
+import { emailTemplates, sendEmail, getNotificationRecipients, sendNotification } from "../services/emailService";
 
 const prisma = new PrismaClient();
 const router = Router();
+
+function parseEmailList(value: any): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map(v => String(v).trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value.split(',').map(v => v.trim()).filter(Boolean);
+  }
+  return [];
+}
 
 /**
  * GET /api/moving-jobs
@@ -38,7 +51,16 @@ router.get("/", authenticateToken as any, async (req: AuthRequest, res) => {
             quantityGood: true,
             quantityDamaged: true
           }
-        }
+        },
+        approvals: {
+          where: { approvalType: 'JOB_COMPLETION_REPORT' },
+          orderBy: { requestedAt: 'desc' },
+          take: 1, // only latest approval per job
+          include: {
+            requestedBy: { select: { id: true, name: true, email: true } },
+            decisionBy: { select: { id: true, name: true, email: true } },
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -66,6 +88,15 @@ router.get("/:jobId", authenticateToken as any, async (req: AuthRequest, res) =>
         assignments: {
           include: {
             user: true,
+          },
+        },
+        approvals: {
+          where: { approvalType: 'JOB_COMPLETION_REPORT' },
+          orderBy: { requestedAt: 'desc' },
+          take: 1,
+          include: {
+            requestedBy: { select: { id: true, name: true, email: true } },
+            decisionBy: { select: { id: true, name: true, email: true } },
           },
         },
       },
@@ -128,6 +159,51 @@ router.post("/", authenticateToken as any, async (req: AuthRequest, res) => {
       },
     });
 
+    // Send email notification for new job
+    try {
+      const company = await prisma.company.findUnique({ where: { id: companyId } });
+      const notifyEmailsOverride = parseEmailList((req.body as any).notifyEmails);
+      await sendNotification(companyId, 'MOVING_JOB_CREATED', {
+        jobCode: newJob.jobCode,
+        customerName: clientName,
+        jobType: jobTitle,
+        pickupAddress: jobAddress,
+        deliveryAddress: dropoffAddress || 'N/A',
+        scheduledDate: new Date(jobDate).toLocaleString(),
+        companyName: company?.name || 'WMS',
+        clientPhone: clientPhone || '',
+        clientEmail: clientEmail || '',
+        driverName: driverName || '',
+        vehicleNumber: vehicleNumber || '',
+        notes: notes || '',
+      });
+
+      // Optional override: if caller provided explicit internal emails, send a copy directly to those (still not to customer)
+      if (notifyEmailsOverride.length > 0) {
+        await sendEmail(companyId, {
+          to: notifyEmailsOverride,
+          subject: `🚚 New Moving Job Created - ${newJob.jobCode}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2>🚚 New Moving Job</h2>
+              <p><strong>Job Code:</strong> ${newJob.jobCode}</p>
+              <p><strong>Customer:</strong> ${clientName}</p>
+              <p><strong>Phone:</strong> ${clientPhone || 'N/A'}</p>
+              <p><strong>Job Type:</strong> ${jobTitle}</p>
+              <p><strong>Pickup:</strong> ${jobAddress}</p>
+              <p><strong>Delivery:</strong> ${dropoffAddress || 'N/A'}</p>
+              <p><strong>Scheduled:</strong> ${new Date(jobDate).toLocaleString()}</p>
+              <p><strong>Driver:</strong> ${driverName || 'N/A'} | <strong>Vehicle:</strong> ${vehicleNumber || 'N/A'}</p>
+              ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+              <p style="color:#6b7280;font-size:12px;">Automated notification from ${company?.name || 'WMS'}.</p>
+            </div>
+          `,
+        });
+      }
+    } catch (emailErr) {
+      console.error('Email notification error:', emailErr);
+    }
+
     res.status(201).json(newJob);
   } catch (error) {
     console.error("Error creating job:", error);
@@ -154,10 +230,156 @@ router.patch("/:jobId", authenticateToken as any, async (req: AuthRequest, res) 
       return res.status(404).json({ error: "Job not found" });
     }
 
+    // If trying to mark as COMPLETED, change to PENDING_APPROVAL first
+    let finalUpdateData = { ...updateData };
+    if (updateData.status === 'COMPLETED' && existingJob.status !== 'COMPLETED') {
+      console.log(`[JOB-UPDATE] Changing status from ${existingJob.status} to PENDING_APPROVAL (was trying COMPLETED)`);
+      finalUpdateData.status = 'PENDING_APPROVAL';
+      // completedAt not present in schema; keep history via approvals instead
+    }
+
+    console.log(`[JOB-UPDATE] Final update data:`, finalUpdateData);
+
     const updatedJob = await prisma.movingJob.update({
       where: { id: jobId },
-      data: updateData,
+      data: finalUpdateData,
     });
+
+    console.log(`[JOB-UPDATE] Job ${jobId} updated to status: ${updatedJob.status}`);
+
+    // If job is pending approval, send approval request (internal) with full materials report
+    if (updateData.status === 'COMPLETED' && existingJob.status !== 'COMPLETED') {
+      try {
+        const company = await prisma.company.findUnique({ where: { id: companyId } });
+
+        // Pull materials issued + returns
+        const issues = await prisma.materialIssue.findMany({
+          where: { companyId, jobId },
+          include: {
+            material: { select: { name: true, unit: true } },
+            returns: { select: { quantityGood: true, quantityDamaged: true } },
+          },
+          orderBy: { issuedAt: 'asc' },
+        });
+
+        const materials = issues.map(issue => {
+          const returnedGood = (issue.returns || []).reduce((sum, r) => sum + (r.quantityGood || 0), 0);
+          const damaged = (issue.returns || []).reduce((sum, r) => sum + (r.quantityDamaged || 0), 0);
+          const used = Math.max(0, (issue.quantity || 0) - returnedGood - damaged);
+          return {
+            name: issue.material?.name || 'Unknown',
+            unit: issue.material?.unit || 'pcs',
+            issued: issue.quantity || 0,
+            used,
+            returnedGood,
+            damaged,
+            totalCost: issue.totalCost || 0,
+          };
+        });
+
+        const totals = materials.reduce(
+          (acc, m) => {
+            acc.issued += m.issued;
+            acc.used += m.used;
+            acc.returnedGood += m.returnedGood;
+            acc.damaged += m.damaged;
+            acc.totalCost += m.totalCost;
+            return acc;
+          },
+          { issued: 0, used: 0, returnedGood: 0, damaged: 0, totalCost: 0 }
+        );
+
+        // Determine internal recipients
+        const approvalNotifyEmailsOverride = parseEmailList((updateData as any).approvalNotifyEmails);
+        const recipients = approvalNotifyEmailsOverride.length > 0
+          ? approvalNotifyEmailsOverride
+          : await getNotificationRecipients(companyId, 'JOB_COMPLETION_APPROVAL_REQUEST');
+
+        if (recipients.length === 0) {
+          console.log('No recipients configured for JOB_COMPLETION_APPROVAL_REQUEST');
+        } else {
+          // Create or reuse a pending approval record
+          let approval = await prisma.materialApproval.findFirst({
+            where: {
+              companyId,
+              jobId,
+              approvalType: 'JOB_COMPLETION_REPORT',
+              status: 'PENDING',
+            },
+            orderBy: { requestedAt: 'desc' },
+          });
+
+          if (!approval) {
+            approval = await prisma.materialApproval.create({
+              data: {
+                companyId,
+                jobId,
+                approvalType: 'JOB_COMPLETION_REPORT',
+                status: 'PENDING',
+                requestedById: req.user!.id,
+                notifyEmails: recipients.join(', '),
+              },
+            });
+          } else {
+            // Keep recipients up to date if caller overrides
+            if (approvalNotifyEmailsOverride.length > 0) {
+              await prisma.materialApproval.update({
+                where: { id: approval.id },
+                data: { notifyEmails: recipients.join(', ') },
+              });
+            }
+          }
+
+          const baseUrl = req.get('origin') || process.env.APP_PUBLIC_URL || '';
+          const approvalUrl = baseUrl
+            ? `${baseUrl.replace(/\/$/, '')}/approvals?approvalId=${encodeURIComponent(approval.id)}`
+            : '#';
+
+          // Get physical reports from material returns for this job
+          const materialReturns = await prisma.materialReturn.findMany({
+            where: { jobId: updatedJob.id, companyId, physicalReportUrl: { not: null } },
+            select: { physicalReportUrl: true }
+          });
+          
+          const physicalReportPaths = materialReturns
+            .filter(r => r.physicalReportUrl)
+            .map(r => path.join(__dirname, '../..', r.physicalReportUrl!));
+
+          // Send approval request email (manual recipients or configured recipients)
+          await sendNotification(companyId, 'JOB_COMPLETION_APPROVAL_REQUEST', {
+            jobCode: updatedJob.jobCode,
+            customerName: updatedJob.clientName,
+            completedAt: new Date().toLocaleString(),
+            currency: company?.currency || 'KWD',
+            companyName: company?.name || 'WMS',
+            approvalUrl,
+            materials,
+            totals,
+          }, physicalReportPaths.length > 0 ? physicalReportPaths.map(p => ({ path: p })) : undefined);
+
+          // If caller provided explicit emails, ensure they receive it even if notification settings are empty/disabled
+          if (approvalNotifyEmailsOverride.length > 0) {
+            const template = emailTemplates.jobCompletionApprovalRequest({
+              jobCode: updatedJob.jobCode,
+              customerName: updatedJob.clientName,
+              completedAt: new Date().toLocaleString(),
+              currency: company?.currency || 'KWD',
+              companyName: company?.name || 'WMS',
+              approvalUrl,
+              materials,
+              totals,
+            });
+            await sendEmail(companyId, {
+              to: approvalNotifyEmailsOverride,
+              subject: template.subject,
+              html: template.html,
+            });
+          }
+        }
+      } catch (emailErr) {
+        console.error('Job completion approval email error:', emailErr);
+      }
+    }
 
     res.json(updatedJob);
   } catch (error) {

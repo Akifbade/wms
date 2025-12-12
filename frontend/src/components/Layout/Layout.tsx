@@ -28,30 +28,25 @@ const navigationConfig = {
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'Shipments', href: '/shipments', icon: ArchiveBoxIcon },
     { name: 'Racks', href: '/racks', icon: CubeIcon },
-    { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
+    { name: 'Finance', href: '/finance', icon: BanknotesIcon },
     { name: 'Materials', href: '/materials', icon: DocumentTextIcon },
     { name: 'Material Reports', href: '/material-reports', icon: ChartBarIcon },
     { name: 'Damage Report', href: '/damage-report', icon: ExclamationTriangleIcon },
     { name: 'Moving Jobs', href: '/moving-jobs', icon: TruckIcon },
-    { name: 'Invoices', href: '/invoices', icon: DocumentTextIcon },
-    { name: 'Expenses', href: '/expenses', icon: BanknotesIcon },
     { name: 'Scanner', href: '/scanner', icon: QrCodeIcon },
     { name: 'Backups', href: '/backups', icon: ServerStackIcon },
     { name: 'System Monitor', href: '/system-monitor', icon: CpuChipIcon },
-    { name: '⚙️ Plugin Settings', href: '/plugin-settings', icon: Cog6ToothIcon },
     { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
   ],
   MANAGER: [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'Shipments', href: '/shipments', icon: ArchiveBoxIcon },
     { name: 'Racks', href: '/racks', icon: CubeIcon },
-    { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
+    { name: 'Finance', href: '/finance', icon: BanknotesIcon },
     { name: 'Materials', href: '/materials', icon: DocumentTextIcon },
     { name: 'Material Reports', href: '/material-reports', icon: ChartBarIcon },
     { name: 'Damage Report', href: '/damage-report', icon: ExclamationTriangleIcon },
     { name: 'Moving Jobs', href: '/moving-jobs', icon: TruckIcon },
-    { name: 'Invoices', href: '/invoices', icon: DocumentTextIcon },
-    { name: 'Expenses', href: '/expenses', icon: BanknotesIcon },
     { name: 'Scanner', href: '/scanner', icon: QrCodeIcon },
   ],
   WORKER: [
@@ -105,47 +100,40 @@ export const Layout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-slate-100">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Modern Glass Dark Theme */}
       <div
         className={`
-          fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+          fixed inset-y-0 left-0 z-50 w-64 bg-slate-900/95 backdrop-blur-xl shadow-2xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-          <div className="flex items-center space-x-2">
-            <div className="w-9 h-9 bg-gradient-to-br from-primary-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
+        <div className="flex items-center justify-between h-16 px-6 border-b border-slate-700/50">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
               <CubeIcon className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-indigo-600 bg-clip-text text-transparent tracking-tight">QGOWMS</span>
+            <span className="text-xl font-bold text-white tracking-tight">QGOWMS</span>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-gray-500 hover:text-gray-700"
+            className="lg:hidden text-slate-400 hover:text-white"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-          {/* Debug: Show role at top of menu */}
-          {currentUser?.role === 'ADMIN' && (
-            <div className="px-4 py-2 text-xs bg-green-50 text-green-700 rounded mb-2 font-mono">
-              Admin Mode ✓
-            </div>
-          )}
-
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {/* Role-based Navigation */}
           {currentUser?.role ? (
             navigationConfig[currentUser.role as keyof typeof navigationConfig]?.map((item) => {
@@ -157,53 +145,50 @@ export const Layout: React.FC = () => {
                   key={item.name}
                   to={item.href}
                   className={`
-                    flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors
+                    flex items-center px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200
                     ${active
-                      ? 'bg-primary-50 text-primary-700 border-l-4 border-primary-600'
-                      : 'text-gray-700 hover:bg-gray-100'
+                      ? 'bg-white/10 text-white backdrop-blur-sm border border-white/10'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-white'
                     }
                   `}
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <Icon className={`mr-3 h-5 w-5 ${active ? 'text-primary-600' : 'text-gray-400'}`} />
+                  <Icon className={`mr-3 h-5 w-5 ${active ? 'text-blue-400' : 'text-slate-500'}`} />
                   {item.name}
                 </Link>
               );
             })
           ) : (
-            <div className="px-4 py-2 text-xs text-gray-500">
+            <div className="px-4 py-2 text-xs text-slate-500">
               Loading menu...
             </div>
           )}
         </nav>
 
         {/* User Profile & Logout */}
-        <div className="border-t border-gray-200 p-4 space-y-3">
+        <div className="border-t border-slate-700/50 p-4 space-y-2">
           <Link
             to="/profile"
-            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center space-x-3 p-2 rounded-xl hover:bg-white/5 transition-colors"
             onClick={() => setSidebarOpen(false)}
           >
-            <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-              <span className="text-primary-600 font-medium">
+            <div className="w-9 h-9 bg-gradient-to-br from-slate-600 to-slate-700 rounded-full flex items-center justify-center ring-2 ring-slate-600">
+              <span className="text-white font-semibold text-sm">
                 {currentUser?.name?.charAt(0)?.toUpperCase() || 'U'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-white truncate">
                 {currentUser?.name || 'User'}
               </p>
-              <p className="text-xs text-gray-500 truncate">
+              <p className="text-xs text-slate-500 truncate">
                 {currentUser?.email || 'user@demo.com'}
-              </p>
-              <p className="text-xs text-primary-600 font-medium">
-                View Profile →
               </p>
             </div>
           </Link>
           <button
             onClick={handleLogout}
-            className="flex items-center w-full px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="flex items-center w-full px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-xl transition-colors"
           >
             <ArrowRightOnRectangleIcon className="mr-3 h-5 w-5" />
             Logout
@@ -213,61 +198,43 @@ export const Layout: React.FC = () => {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top header */}
-        <header className="bg-white shadow-sm z-30">
-          <div className="flex items-center justify-between h-16 px-6">
+        {/* Top header - Glass Effect */}
+        <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 z-30 shadow-sm">
+          <div className="flex items-center justify-between h-14 px-6">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden text-gray-500 hover:text-gray-700"
+              className="lg:hidden text-slate-600 hover:text-slate-900 p-2 rounded-xl hover:bg-slate-100 transition-colors"
             >
               <Bars3Icon className="h-6 w-6" />
             </button>
 
-            <div className="flex-1 flex items-center justify-end space-x-4">
-              {/* Version badge - shows current deployed version */}
+            <div className="flex-1 flex items-center justify-end space-x-3">
+              {/* Version badge */}
               <VersionBadgeHeader />
-              {/* Search */}
-              <div className="hidden md:block">
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
 
               {/* Notifications */}
-              <button className="relative p-2 text-gray-400 hover:text-gray-600">
-                <BellIcon className="h-6 w-6" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              <button className="relative p-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
+                <BellIcon className="h-5 w-5" />
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white"></span>
               </button>
 
-              {/* User menu - Profile Link */}
+              {/* User menu */}
               <Link
                 to="/profile"
-                className="flex items-center space-x-2 px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="flex items-center space-x-2 px-3 py-1.5 text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
                 title="View Profile"
               >
-                <UserCircleIcon className="h-8 w-8" />
+                <UserCircleIcon className="h-7 w-7 text-slate-500" />
                 <span className="hidden md:inline text-sm font-medium">
                   {currentUser?.name || 'Profile'}
                 </span>
               </Link>
-
-              {/* Logout Button */}
-              <button
-                onClick={handleLogout}
-                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-                title="Logout"
-              >
-                <ArrowRightOnRectangleIcon className="h-5 w-5" />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto bg-slate-100 p-6">
           <Outlet />
         </main>
       </div>

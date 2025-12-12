@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, authorizeRoles, AuthRequest } from '../middleware/auth';
+import { sendNotification } from '../services/emailService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -341,7 +342,7 @@ router.delete('/charge-types/:id', authenticateToken, authorizeRoles('ADMIN'), a
 router.get('/invoices', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const companyId = req.user!.companyId;
-    const { status, search, isWarehouseInvoice } = req.query;
+    const { status, search, isWarehouseInvoice, includeShipment } = req.query;
 
     const where: any = { companyId };
     if (status) where.paymentStatus = status;
@@ -362,6 +363,15 @@ router.get('/invoices', authenticateToken, async (req: AuthRequest, res) => {
           select: {
             referenceId: true,
             currentBoxCount: true,
+          }
+        },
+        companyProfile: {
+          select: {
+            id: true,
+            name: true,
+            contactPerson: true,
+            contactPhone: true,
+            description: true,
           }
         },
         lineItems: true,
@@ -625,6 +635,21 @@ router.post('/invoices/:id/payments', authenticateToken, authorizeRoles('ADMIN',
       });
     }
 
+    // Send payment notification
+    try {
+      const company = await prisma.company.findUnique({ where: { id: companyId } });
+      await sendNotification(companyId, 'PAYMENT_RECEIVED', {
+        invoiceNumber: invoice.invoiceNumber,
+        clientName: invoice.clientName || 'Customer',
+        amount: amount,
+        currency: company?.currency || 'KWD',
+        paymentMethod: paymentMethod || 'Cash',
+        companyName: company?.name || 'WMS',
+      });
+    } catch (emailErr) {
+      console.error('Email notification error:', emailErr);
+    }
+
     res.status(201).json({
       payment,
       invoice: updatedInvoice,
@@ -632,6 +657,114 @@ router.post('/invoices/:id/payments', authenticateToken, authorizeRoles('ADMIN',
     });
   } catch (error: any) {
     console.error('Record payment error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Record advance payment for a shipment
+router.post('/shipments/:id/advance', authenticateToken, authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params; // Shipment ID
+    const companyId = req.user!.companyId;
+    const { amount, paymentMethod, transactionRef, notes } = req.body;
+
+    // 1. Get Shipment details for client info
+    const shipment = await prisma.shipment.findUnique({
+      where: { id },
+    });
+
+    if (!shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    // 2. Generate Invoice Number
+    const settings = await prisma.billingSettings.findUnique({ where: { companyId } });
+    const invoicePrefix = settings?.invoicePrefix || 'INV';
+    const lastInvoice = await prisma.invoice.findFirst({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+    });
+    let nextNumber = 1;
+    if (lastInvoice?.invoiceNumber) {
+      const match = lastInvoice.invoiceNumber.match(/\d+$/);
+      if (match) nextNumber = parseInt(match[0]) + 1;
+    }
+    const invoiceNumber = `${invoicePrefix}-${String(nextNumber).padStart(5, '0')}`;
+
+    // 3. Create Invoice (ADVANCE type)
+    const invoice = await prisma.invoice.create({
+      data: {
+        company: { connect: { id: companyId } },
+        shipment: { connect: { id: id } },
+        invoiceNumber,
+        invoiceType: 'ADVANCE',
+        invoiceDate: new Date(),
+        dueDate: new Date(),
+        clientName: shipment.clientName || 'Unknown Client',
+        clientPhone: shipment.clientPhone,
+        clientAddress: null,
+        subtotal: parseFloat(amount),
+        taxAmount: 0,
+        totalAmount: parseFloat(amount),
+        balanceDue: 0, // Paid immediately
+        paymentStatus: 'PAID',
+        paidAmount: parseFloat(amount),
+        notes: notes || 'Advance Payment',
+        lineItems: {
+          create: [{
+            companyId,
+            description: 'Advance Payment',
+            category: 'ADVANCE',
+            quantity: 1,
+            unitPrice: parseFloat(amount),
+            amount: parseFloat(amount),
+            isTaxable: false
+          }]
+        }
+      }
+    });
+
+    // 4. Create Payment Record
+    const payment = await prisma.payment.create({
+      data: {
+        companyId,
+        invoiceId: invoice.id,
+        amount: parseFloat(amount),
+        paymentMethod,
+        transactionRef,
+        notes,
+        paymentDate: new Date()
+      }
+    });
+
+    // 5. Update Shipment Charges
+    const shipmentCharges = await prisma.shipmentCharges.findUnique({ where: { shipmentId: id } });
+    if (shipmentCharges) {
+      await prisma.shipmentCharges.update({
+        where: { shipmentId: id },
+        data: {
+          totalInvoiced: { increment: parseFloat(amount) },
+          totalPaid: { increment: parseFloat(amount) },
+        }
+      });
+    } else {
+      await prisma.shipmentCharges.create({
+        data: {
+          companyId,
+          shipmentId: id,
+          currentStorageCharge: 0,
+          daysStored: 0,
+          totalInvoiced: parseFloat(amount),
+          totalPaid: parseFloat(amount),
+          outstandingBalance: 0
+        }
+      });
+    }
+
+    res.json({ invoice, payment });
+
+  } catch (error: any) {
+    console.error('Record advance payment error:', error);
     res.status(500).json({ error: error.message });
   }
 });

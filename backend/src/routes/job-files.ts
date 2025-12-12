@@ -23,7 +23,7 @@ const storage = multer.diskStorage({
   destination: (req: any, file, cb) => {
     // Use temp folder first, will organize by job/folder after upload
     const uploadPath = path.join(__dirname, '../../uploads/temp');
-    
+
     // Create directory if it doesn't exist
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
@@ -211,8 +211,8 @@ router.post('/folder', authenticateToken as any, async (req: AuthRequest, res) =
     const folderPath = path.join(__dirname, '../../uploads/job-files', jobId, folderName);
     fs.mkdirSync(folderPath, { recursive: true });
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       folder: folderName,
       path: `/uploads/job-files/${jobId}/${folderName}`
     });

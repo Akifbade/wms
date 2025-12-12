@@ -1,36 +1,72 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
+type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+interface ApprovalUser {
+  id: string;
+  name: string;
+  email?: string;
+}
+
+interface ApprovalJob {
+  id: string;
+  jobCode: string;
+  jobTitle?: string;
+  clientName?: string;
+  status?: string;
+}
 
 interface MaterialApproval {
   id: string;
-  materialId: string;
-  materialName: string;
-  materialSku: string;
-  category: string;
-  quantity: number;
-  estimatedCost: number;
-  approvalType: 'DAMAGE' | 'PREMIUM_MATERIAL' | 'QUANTITY_VARIATION';
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  requestedBy: string;
+  jobId: string;
+  approvalType: string;
+  status: ApprovalStatus;
   requestedAt: string;
-  approvedBy?: string;
-  approvedAt?: string;
-  decisionNotes?: string;
-  jobId?: string;
-  jobCode?: string;
+  requestedBy?: ApprovalUser | null;
+  decidedAt?: string | null;
+  decisionBy?: ApprovalUser | null;
+  decisionNotes?: string | null;
+  notifyEmails?: string | null;
+  reminderCount?: number;
+  lastReminderAt?: string | null;
+  job?: ApprovalJob | null;
 }
 
+type ApprovalDetailResponse =
+  | { approval: MaterialApproval }
+  | {
+    approval: MaterialApproval;
+    materials: Array<{ name: string; unit: string; issued: number; used: number; returnedGood: number; damaged: number; totalCost: number }>;
+    totals: { issued: number; used: number; returnedGood: number; damaged: number; totalCost: number };
+  };
+
 const ApprovalManager: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const approvalIdFromQuery = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('approvalId');
+  }, [location.search]);
+
   const [approvals, setApprovals] = useState<MaterialApproval[]>([]);
   const [filteredApprovals, setFilteredApprovals] = useState<MaterialApproval[]>([]);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'DAMAGE' | 'PREMIUM_MATERIAL' | 'QUANTITY_VARIATION'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | string>('ALL');
   const [selectedApproval, setSelectedApproval] = useState<MaterialApproval | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<ApprovalDetailResponse | null>(null);
   const [decisionNotes, setDecisionNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchApprovals();
   }, []);
+
+  useEffect(() => {
+    if (!approvalIdFromQuery) return;
+    // Deep-link from email: open approval detail modal
+    fetchApprovalDetail(approvalIdFromQuery);
+  }, [approvalIdFromQuery]);
 
   useEffect(() => {
     applyFilters();
@@ -49,6 +85,27 @@ const ApprovalManager: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to fetch approvals:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchApprovalDetail = async (approvalId: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/materials/approvals/${approvalId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as ApprovalDetailResponse;
+        setSelectedDetail(data);
+        setSelectedApproval((data as any).approval);
+      } else {
+        console.error('Failed to fetch approval detail');
+      }
+    } catch (error) {
+      console.error('Failed to fetch approval detail:', error);
     } finally {
       setLoading(false);
     }
@@ -77,7 +134,7 @@ const ApprovalManager: React.FC = () => {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
         body: JSON.stringify({
-          decision: 'APPROVED',
+          status: 'APPROVED',
           notes: decisionNotes,
         }),
       });
@@ -85,8 +142,11 @@ const ApprovalManager: React.FC = () => {
       if (res.ok) {
         alert('Approval recorded successfully');
         setSelectedApproval(null);
+        setSelectedDetail(null);
         setDecisionNotes('');
         fetchApprovals();
+        // Remove query param if this was opened from an email deep-link
+        if (approvalIdFromQuery) navigate('/approvals', { replace: true });
       } else {
         alert('Failed to record approval');
       }
@@ -104,7 +164,7 @@ const ApprovalManager: React.FC = () => {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
         body: JSON.stringify({
-          decision: 'REJECTED',
+          status: 'REJECTED',
           notes: decisionNotes,
         }),
       });
@@ -112,8 +172,10 @@ const ApprovalManager: React.FC = () => {
       if (res.ok) {
         alert('Rejection recorded successfully');
         setSelectedApproval(null);
+        setSelectedDetail(null);
         setDecisionNotes('');
         fetchApprovals();
+        if (approvalIdFromQuery) navigate('/approvals', { replace: true });
       } else {
         alert('Failed to record rejection');
       }
@@ -127,6 +189,9 @@ const ApprovalManager: React.FC = () => {
       DAMAGE: '#dc3545',
       PREMIUM_MATERIAL: '#007bff',
       QUANTITY_VARIATION: '#ffc107',
+      RETURN: '#0ea5e9',
+      STOCK_IN: '#8b5cf6',
+      JOB_COMPLETION_REPORT: '#111827',
     };
     return colors[type] || '#6c757d';
   };
@@ -178,9 +243,10 @@ const ApprovalManager: React.FC = () => {
             }}
           >
             <option value="ALL">All Types</option>
-            <option value="DAMAGE">Damage Claims</option>
-            <option value="PREMIUM_MATERIAL">Premium Materials</option>
-            <option value="QUANTITY_VARIATION">Quantity Variations</option>
+            <option value="JOB_COMPLETION_REPORT">Job Completion Report</option>
+            <option value="RETURN">Returns</option>
+            <option value="DAMAGE">Damages</option>
+            <option value="STOCK_IN">Stock In</option>
           </select>
         </div>
 
@@ -220,10 +286,10 @@ const ApprovalManager: React.FC = () => {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
                 <div>
-                  <h5 style={{ marginBottom: '5px' }}>{approval.materialName}</h5>
+                  <h5 style={{ marginBottom: '5px' }}>{approval.job?.jobCode || approval.jobId}</h5>
                   <small style={{ color: '#6c757d' }}>
-                    SKU: {approval.materialSku} • Category: {approval.category}
-                    {approval.jobCode && ` • Job: ${approval.jobCode}`}
+                    Type: {approval.approvalType.replace(/_/g, ' ')}
+                    {approval.job?.clientName ? ` • Customer: ${approval.job.clientName}` : ''}
                   </small>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
@@ -256,28 +322,29 @@ const ApprovalManager: React.FC = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '15px' }}>
                 <div>
-                  <small style={{ color: '#6c757d' }}>Quantity</small>
-                  <p style={{ fontWeight: 'bold', margin: '3px 0' }}>{approval.quantity} units</p>
-                </div>
-                <div>
-                  <small style={{ color: '#6c757d' }}>Estimated Cost</small>
-                  <p style={{ fontWeight: 'bold', margin: '3px 0' }}>{approval.estimatedCost.toFixed(2)} KWD</p>
-                </div>
-                <div>
-                  <small style={{ color: '#6c757d' }}>Requested By</small>
-                  <p style={{ fontWeight: 'bold', margin: '3px 0' }}>{approval.requestedBy}</p>
+                  <small style={{ color: '#6c757d' }}>Job</small>
+                  <p style={{ fontWeight: 'bold', margin: '3px 0' }}>{approval.job?.jobTitle || 'N/A'}</p>
                 </div>
                 <div>
                   <small style={{ color: '#6c757d' }}>Requested At</small>
-                  <p style={{ fontWeight: 'bold', margin: '3px 0' }}>
-                    {new Date(approval.requestedAt).toLocaleDateString()}
-                  </p>
+                  <p style={{ fontWeight: 'bold', margin: '3px 0' }}>{new Date(approval.requestedAt).toLocaleString()}</p>
+                </div>
+                <div>
+                  <small style={{ color: '#6c757d' }}>Requested By</small>
+                  <p style={{ fontWeight: 'bold', margin: '3px 0' }}>{approval.requestedBy?.name || 'System'}</p>
+                </div>
+                <div>
+                  <small style={{ color: '#6c757d' }}>Reminders</small>
+                  <p style={{ fontWeight: 'bold', margin: '3px 0' }}>{approval.reminderCount ?? 0}</p>
                 </div>
               </div>
 
               {approval.status === 'PENDING' && (
                 <button
-                  onClick={() => setSelectedApproval(approval)}
+                  onClick={() => {
+                    setSelectedApproval(approval);
+                    fetchApprovalDetail(approval.id);
+                  }}
                   style={{
                     padding: '8px 12px',
                     backgroundColor: '#17a2b8',
@@ -296,8 +363,8 @@ const ApprovalManager: React.FC = () => {
               {approval.status !== 'PENDING' && (
                 <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#e9ecef', borderRadius: '4px' }}>
                   <small style={{ color: '#6c757d' }}>
-                    <strong>Decision:</strong> {approval.status} by {approval.approvedBy} on{' '}
-                    {approval.approvedAt ? new Date(approval.approvedAt).toLocaleString() : 'N/A'}
+                    <strong>Decision:</strong> {approval.status} by {approval.decisionBy?.name || 'N/A'} on{' '}
+                    {approval.decidedAt ? new Date(approval.decidedAt).toLocaleString() : 'N/A'}
                   </small>
                   {approval.decisionNotes && (
                     <p style={{ margin: '5px 0', color: '#495057' }}>
@@ -326,7 +393,10 @@ const ApprovalManager: React.FC = () => {
             justifyContent: 'center',
             zIndex: 1000,
           }}
-          onClick={() => setSelectedApproval(null)}
+          onClick={() => {
+            setSelectedApproval(null);
+            setSelectedDetail(null);
+          }}
         >
           <div
             style={{
@@ -343,12 +413,53 @@ const ApprovalManager: React.FC = () => {
 
             <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
               <small style={{ color: '#6c757d' }}>
-                <strong>{selectedApproval.materialName}</strong> ({selectedApproval.materialSku})
+                <strong>{selectedApproval.job?.jobCode || selectedApproval.jobId}</strong> • {selectedApproval.approvalType.replace(/_/g, ' ')}
               </small>
               <p style={{ margin: '5px 0', fontWeight: 'bold' }}>
-                {selectedApproval.quantity} units • {selectedApproval.estimatedCost.toFixed(2)} KWD
+                {selectedApproval.job?.clientName ? `Customer: ${selectedApproval.job.clientName}` : ''}
               </p>
             </div>
+
+            {selectedDetail && (selectedDetail as any).materials && (
+              <div style={{ marginBottom: '15px' }}>
+                <h5 style={{ marginBottom: '10px' }}>Materials Summary</h5>
+                <div style={{ maxHeight: '260px', overflow: 'auto', border: '1px solid #dee2e6', borderRadius: '4px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f1f5f9' }}>
+                        <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #dee2e6' }}>Material</th>
+                        <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>Issued</th>
+                        <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>Used</th>
+                        <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>Returned</th>
+                        <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>Damaged</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(selectedDetail as any).materials.map((m: any, idx: number) => (
+                        <tr key={idx}>
+                          <td style={{ padding: '8px', borderBottom: '1px solid #f1f5f9' }}>{m.name || 'N/A'}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>{m.issued || 0} {m.unit || ''}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>{m.used || 0} {m.unit || ''}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>{m.returnedGood || 0} {m.unit || ''}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>{m.damaged || 0} {m.unit || ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    {(selectedDetail as any).totals && (
+                      <tfoot>
+                        <tr style={{ background: '#f8fafc' }}>
+                          <td style={{ padding: '8px', fontWeight: 'bold' }}>Totals</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>{(selectedDetail as any).totals?.issued || 0}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>{(selectedDetail as any).totals?.used || 0}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>{(selectedDetail as any).totals?.returnedGood || 0}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>{(selectedDetail as any).totals?.damaged || 0}</td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+            )}
 
             <div style={{ marginBottom: '15px' }}>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
@@ -371,7 +482,10 @@ const ApprovalManager: React.FC = () => {
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => setSelectedApproval(null)}
+                onClick={() => {
+                  setSelectedApproval(null);
+                  setSelectedDetail(null);
+                }}
                 style={{
                   padding: '8px 16px',
                   backgroundColor: '#6c757d',

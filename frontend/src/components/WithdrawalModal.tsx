@@ -17,7 +17,8 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     withdrawnBoxCount: shipment?.currentBoxCount || 0,
-    withdrawnBy: '',
+    withdrawnBy: '',  // Collector/Receiver name
+    driverName: '',   // Optional driver name
     reason: '',
     notes: '',
     receiptNumber: `WD-${Date.now()}`,
@@ -25,17 +26,23 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
   const [error, setError] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
+  // Photo upload state
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+
   // Reset form when modal opens or shipment changes
   useEffect(() => {
     if (isOpen && shipment) {
       setFormData({
         withdrawnBoxCount: shipment.currentBoxCount || 0,
         withdrawnBy: '',
+        driverName: '',
         reason: '',
         notes: '',
         receiptNumber: `WD-${Date.now()}`,
       });
       setError('');
+      setPhotos([]);
     }
   }, [isOpen, shipment]);
 
@@ -44,7 +51,7 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.withdrawnBy.trim()) {
       setError('Please enter the name of person collecting items');
       return;
@@ -68,7 +75,7 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
       `📄 Reason: ${formData.reason || 'N/A'}\n\n` +
       `⚠️ This will trigger payment/invoice process.\n\n` +
       `Are you sure you want to proceed?`;
-    
+
     if (!confirm(confirmMsg)) {
       return;
     }
@@ -137,11 +144,10 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
                 onClick={() => {
                   setFormData(prev => ({ ...prev, withdrawnBoxCount: shipment.currentBoxCount }));
                 }}
-                className={`p-4 border-2 rounded-xl text-center transition-all ${
-                  isFullRelease
+                className={`p-4 border-2 rounded-xl text-center transition-all ${isFullRelease
                     ? 'border-primary-600 bg-primary-50 text-primary-700'
                     : 'border-gray-200 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <p className="font-bold text-lg mb-1">Full Release</p>
                 <p className="text-sm text-gray-600">All {shipment?.currentBoxCount} boxes</p>
@@ -155,11 +161,10 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
                     setFormData(prev => ({ ...prev, withdrawnBoxCount: Math.floor(shipment.currentBoxCount / 2) }));
                   }
                 }}
-                className={`p-4 border-2 rounded-xl text-center transition-all ${
-                  !isFullRelease
+                className={`p-4 border-2 rounded-xl text-center transition-all ${!isFullRelease
                     ? 'border-purple-600 bg-purple-50 text-purple-700'
                     : 'border-gray-200 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <p className="font-bold text-lg mb-1">Partial Release</p>
                 <p className="text-sm text-gray-600">Some boxes only</p>
@@ -215,6 +220,25 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
             </div>
           </div>
 
+          {/* Driver Name (Optional) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              🚗 Driver Name (Optional)
+            </label>
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8m-8 5h6m-3 7v-3m-6-3a9 9 0 1118 0 9 9 0 01-18 0z" />
+              </svg>
+              <input
+                type="text"
+                value={formData.driverName}
+                onChange={(e) => setFormData({ ...formData, driverName: e.target.value })}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="Driver name (if applicable)"
+              />
+            </div>
+          </div>
+
           {/* Receipt Number */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -266,16 +290,88 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
             />
           </div>
 
-          {/* Photo Upload Placeholder */}
+          {/* Photo Upload - Enabled */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Photos (Optional)
+              📷 Photos (Optional)
             </label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors cursor-pointer">
-              <CameraIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-600 text-sm">Click to upload photos</p>
-              <p className="text-gray-400 text-xs mt-1">Photo upload feature coming soon</p>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-primary-400 transition-colors">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={async (e) => {
+                  const files = e.target.files;
+                  if (!files) return;
+
+                  setUploadingPhotos(true);
+                  const uploadedUrls: string[] = [];
+
+                  for (let i = 0; i < files.length; i++) {
+                    const formData = new FormData();
+                    formData.append('file', files[i]);
+                    formData.append('type', 'release');
+
+                    try {
+                      const res = await fetch('/api/upload', {
+                        method: 'POST',
+                        headers: {
+                          'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        },
+                        body: formData
+                      });
+                      const data = await res.json();
+                      if (data.url) {
+                        uploadedUrls.push(data.url);
+                      }
+                    } catch (err) {
+                      console.error('Upload error:', err);
+                    }
+                  }
+                  setPhotos([...photos, ...uploadedUrls]);
+                  setUploadingPhotos(false);
+                }}
+                className="hidden"
+                id="withdrawal-photo-upload"
+                disabled={uploadingPhotos}
+              />
+              <label
+                htmlFor="withdrawal-photo-upload"
+                className={`flex flex-col items-center cursor-pointer ${uploadingPhotos ? 'opacity-50' : ''}`}
+              >
+                {uploadingPhotos ? (
+                  <div className="w-10 h-10 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                ) : (
+                  <CameraIcon className="h-10 w-10 text-gray-400 mb-2" />
+                )}
+                <p className="text-gray-600 text-sm">
+                  {uploadingPhotos ? 'Uploading...' : 'Click to upload photos'}
+                </p>
+                <p className="text-gray-400 text-xs mt-1">JPG, PNG up to 10MB each</p>
+              </label>
             </div>
+
+            {/* Uploaded Photos Preview */}
+            {photos.length > 0 && (
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {photos.map((url, idx) => (
+                  <div key={idx} className="relative group">
+                    <img
+                      src={url.startsWith('http') ? url : `${window.location.origin}${url}`}
+                      alt={`Photo ${idx + 1}`}
+                      className="w-full h-20 object-cover rounded-lg border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPhotos(photos.filter((_, i) => i !== idx))}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Summary */}
@@ -328,7 +424,7 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         shipment={shipment}
-        withdrawalData={formData}
+        withdrawalData={{ ...formData, photos }}
         onSuccess={() => {
           setShowPaymentModal(false);
           onSuccess();

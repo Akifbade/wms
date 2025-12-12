@@ -93,6 +93,15 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
     photos: [] as File[]
   });
 
+  // Edit Return State
+  const [showEditReturnForm, setShowEditReturnForm] = useState(false);
+  const [editingReturn, setEditingReturn] = useState<any | null>(null);
+  const [editReturnForm, setEditReturnForm] = useState({
+    quantityGood: 0,
+    quantityDamaged: 0,
+    notes: ''
+  });
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -224,6 +233,85 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
     } catch (error) {
       console.error('Failed to record return:', error);
       alert('Failed to record material return');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openEditReturnForm = (ret: any) => {
+    setEditingReturn(ret);
+    setEditReturnForm({
+      quantityGood: ret.quantityGood,
+      quantityDamaged: ret.quantityDamaged,
+      notes: ret.notes || ''
+    });
+    setShowEditReturnForm(true);
+  };
+
+  const handleEditReturn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingReturn) return;
+
+    setLoading(true);
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const response = await fetch(`/api/materials/returns/${editingReturn.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          quantityGood: editReturnForm.quantityGood,
+          quantityDamaged: editReturnForm.quantityDamaged,
+          notes: editReturnForm.notes
+        })
+      });
+
+      if (response.ok) {
+        alert('Return updated successfully!');
+        setShowEditReturnForm(false);
+        setEditingReturn(null);
+        loadData();
+        onUpdate?.();
+      } else {
+        const error = await response.json();
+        alert(`Failed to update return: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to update return:', error);
+      alert('Failed to update return');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteReturn = async (returnId: string) => {
+    if (!confirm('Are you sure you want to delete this return? Stock will be adjusted.')) return;
+
+    setLoading(true);
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const response = await fetch(`/api/materials/returns/${returnId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        alert('Return deleted successfully!');
+        loadData();
+        onUpdate?.();
+      } else {
+        const error = await response.json();
+        alert(`Failed to delete return: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to delete return:', error);
+      alert('Failed to delete return');
     } finally {
       setLoading(false);
     }
@@ -582,7 +670,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                           </>
                         )}
                         {/* Record Return - only for completed jobs */}
-                        {(!issue.returns || issue.returns.length === 0) && jobStatus === 'COMPLETED' && (
+                        {jobStatus === 'COMPLETED' && (
                           <button
                             onClick={() => openReturnForm(issue)}
                             className="text-green-600 hover:text-green-800 flex items-center gap-1"
@@ -895,7 +983,23 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                   </div>
                 </div>
                 {issue.returns?.map(ret => (
-                  <div key={ret.id} className="bg-gray-50 p-3 rounded mt-2">
+                  <div key={ret.id} className="bg-gray-50 p-3 rounded mt-2 relative group">
+                    <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => openEditReturnForm(ret)}
+                        className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                        title="Edit Return"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReturn(ret.id)}
+                        className="p-1 text-red-600 hover:bg-red-100 rounded"
+                        title="Delete Return"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                     <div className="grid grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="text-gray-500">Used</p>
@@ -924,6 +1028,73 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
           {issuedMaterials.filter(issue => issue.returns && issue.returns.length > 0).length === 0 && (
             <p className="text-center text-gray-500 py-8">No returns recorded yet</p>
           )}
+        </div>
+      )}
+
+      {/* Edit Return Modal */}
+      {showEditReturnForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Edit Return</h3>
+              <button onClick={() => setShowEditReturnForm(false)} className="text-gray-500 hover:text-gray-700">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditReturn} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Quantity Good</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={editReturnForm.quantityGood}
+                  onChange={(e) => setEditReturnForm({ ...editReturnForm, quantityGood: parseInt(e.target.value) || 0 })}
+                  className="w-full border rounded px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Quantity Damaged</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={editReturnForm.quantityDamaged}
+                  onChange={(e) => setEditReturnForm({ ...editReturnForm, quantityDamaged: parseInt(e.target.value) || 0 })}
+                  className="w-full border rounded px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Notes</label>
+                <textarea
+                  value={editReturnForm.notes}
+                  onChange={(e) => setEditReturnForm({ ...editReturnForm, notes: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowEditReturnForm(false)}
+                  className="px-4 py-2 border rounded hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                >
+                  {loading ? 'Saving...' : 'Update Return'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

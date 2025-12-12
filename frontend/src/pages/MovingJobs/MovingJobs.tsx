@@ -59,11 +59,31 @@ export const MovingJobs: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Scheduled': return 'bg-blue-100 text-blue-800';
-      case 'In Progress': return 'bg-green-100 text-green-800';
-      case 'Completed': return 'bg-gray-100 text-gray-800';
-      case 'Cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'SCHEDULED':
+      case 'PLANNED':
+        return 'bg-blue-100 text-blue-800';
+      case 'IN_PROGRESS':
+        return 'bg-green-100 text-green-800';
+      case 'PENDING_APPROVAL':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'COMPLETED':
+        return 'bg-gray-100 text-gray-800';
+      case 'CANCELLED':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'PLANNED': return 'PLANNED';
+      case 'SCHEDULED': return 'SCHEDULED';
+      case 'IN_PROGRESS': return 'In Progress';
+      case 'PENDING_APPROVAL': return 'Awaiting Approval';
+      case 'COMPLETED': return 'Approved & Completed';
+      case 'CANCELLED': return 'Cancelled';
+      default: return status;
     }
   };
 
@@ -183,7 +203,91 @@ export const MovingJobs: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {jobs.map((job: any) => (
-            <div key={job.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all">
+            <div key={job.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all relative">
+              {/* Full red overlay for rejected jobs */}
+              {(() => {
+                const latestApproval = job.approvals?.[0];
+                if (latestApproval?.status === 'REJECTED') {
+                  const rejectedBy = latestApproval.decisionBy?.name || 'Manager';
+                  const rejectedAt = latestApproval.decidedAt ? new Date(latestApproval.decidedAt).toLocaleString() : '';
+                  const reason = latestApproval.decisionNotes || 'No reason provided';
+                  return (
+                    <div className="absolute inset-0 bg-red-500/80 backdrop-blur-md rounded-xl z-10 flex items-center justify-center">
+                      <div className="text-center p-6 text-white">
+                        <div className="text-6xl mb-4">❌</div>
+                        <h3 className="text-2xl font-bold mb-2">REJECTED</h3>
+                        <p className="text-lg mb-3">by {rejectedBy}</p>
+                        {rejectedAt && <p className="text-sm opacity-90 mb-4">🕐 {rejectedAt}</p>}
+                        <div className="bg-red-700 rounded-lg p-4 mt-4 max-w-md mx-auto">
+                          <p className="font-bold text-sm mb-1">Rejection Reason:</p>
+                          <p className="text-sm">{reason}</p>
+                        </div>
+                        <p className="text-sm mt-4 opacity-90">📝 Please fix issues and resubmit</p>
+                        <p className="text-xs mt-2">Job Code: {job.jobCode}</p>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+              {/* Blur overlay for pending approval */}
+              {job.status === 'PENDING_APPROVAL' && (
+                <div className="absolute inset-0 bg-yellow-50/90 backdrop-blur-sm rounded-xl z-10 flex items-center justify-center">
+                  <div className="text-center p-6">
+                    <div className="text-6xl mb-4">⏳</div>
+                    <h3 className="text-2xl font-bold text-yellow-800 mb-2">Waiting for Approval</h3>
+                    <p className="text-yellow-700">Manager approval pending...</p>
+                    <p className="text-sm text-yellow-600 mt-2">Job Code: {job.jobCode}</p>
+                  </div>
+                </div>
+              )}
+              {(() => {
+                const latestApproval = job.approvals?.[0];
+                if (!latestApproval) return null;
+                const status = latestApproval.status;
+                const approver = latestApproval.decisionBy?.name || 'Manager';
+                const requester = latestApproval.requestedBy?.name || 'Team';
+                const decidedAt = latestApproval.decidedAt ? new Date(latestApproval.decidedAt).toLocaleString() : null;
+                const requestedAt = latestApproval.requestedAt ? new Date(latestApproval.requestedAt).toLocaleString() : null;
+                const note = latestApproval.decisionNotes;
+
+                if (status === 'REJECTED') {
+                  return (
+                    <div className="absolute left-4 right-4 top-4 rounded-lg px-4 py-3 border-2 border-red-600 bg-red-600 text-white font-bold shadow-lg" style={{zIndex: 11}}>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">❌</span>
+                          <span className="text-lg">REJECTED by {approver}</span>
+                        </div>
+                        {decidedAt && <div className="text-sm opacity-90">🕐 {decidedAt}</div>}
+                        {note && (
+                          <div className="mt-1 p-2 bg-red-700 rounded text-sm">
+                            <strong>Reason:</strong> {note}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const bg = status === 'APPROVED' ? 'bg-green-50 text-green-800 border-green-200'
+                  : 'bg-yellow-50 text-yellow-800 border-yellow-200';
+
+                return (
+                  <div className={`absolute left-4 right-4 top-4 rounded-lg px-3 py-2 border text-xs font-medium shadow-sm ${bg}`} style={{zIndex: 11}}>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                      <span>
+                        {status === 'APPROVED' && (
+                          <span>✅ <strong>Approved</strong> by {approver}{decidedAt ? ' · ' + decidedAt : ''}</span>
+                        )}
+                        {status === 'PENDING' && (
+                          <span>⏳ <strong>Awaiting approval</strong> (requested by {requester}{requestedAt ? ' · ' + requestedAt : ''})</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
               {/* Header with Status Badge */}
               <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-t-xl">
                 <div className="flex items-center justify-between">
@@ -192,7 +296,7 @@ export const MovingJobs: React.FC = () => {
                     <p className="text-blue-100 text-sm">{job.jobCode || 'No Code'}</p>
                   </div>
                   <span className={`px-3 py-1 text-xs font-bold rounded-full ${getStatusColor(job.status)}`}>
-                    {job.status}
+                    {getStatusLabel(job.status)}
                   </span>
                 </div>
               </div>
@@ -320,17 +424,26 @@ export const MovingJobs: React.FC = () => {
                   >
                     📁 Files
                   </button>
-                  {job.status !== 'COMPLETED' && (
-                    <button
-                      onClick={() => {
-                        setSelectedJob(job);
-                        setReturnModalOpen(true);
-                      }}
-                      className="px-4 py-2 bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100 font-medium text-sm flex items-center justify-center gap-2"
-                    >
-                      ✅ Complete Job
-                    </button>
-                  )}
+                  {(() => {
+                    const latestApproval = job.approvals?.[0];
+                    const isRejected = latestApproval?.status === 'REJECTED';
+                    const isPending = job.status === 'PENDING_APPROVAL';
+                    const isCompleted = job.status === 'COMPLETED';
+                    
+                    if (isPending || isCompleted) return null;
+                    
+                    return (
+                      <button
+                        onClick={() => {
+                          setSelectedJob(job);
+                          setReturnModalOpen(true);
+                        }}
+                        className={`px-4 py-2 rounded-md font-medium text-sm flex items-center justify-center gap-2 ${isRejected ? 'relative z-20 bg-white text-red-600 hover:bg-red-50 border-2 border-red-600 shadow-lg' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}
+                      >
+                        {isRejected ? '🔄 Resubmit for Approval' : '✅ Complete Job'}
+                      </button>
+                    );
+                  })()}
                   <button
                     onClick={async () => {
                       if (confirm(`Delete job "${job.title || job.jobTitle}"?`)) {
@@ -384,20 +497,15 @@ export const MovingJobs: React.FC = () => {
         jobId={selectedJob?.id || ''}
       />
 
-      {/* Material Return Modal - Complete Job */}
+      {/* Material Return Modal - Record returns and send for approval */}
       <MaterialReturnModal
         isOpen={returnModalOpen}
         onClose={() => setReturnModalOpen(false)}
         jobId={selectedJob?.id || ''}
+        jobsAPI={jobsAPI}
         onSuccess={async () => {
-          // Update job status to COMPLETED after materials returned
-          try {
-            await jobsAPI.update(selectedJob.id, { status: 'COMPLETED' });
-            await loadJobs(); // Reload jobs to get updated data
-          } catch (error) {
-            console.error('Failed to update job status:', error);
-            throw error; // Re-throw so MaterialReturnModal can handle it
-          }
+          // Reload jobs to show updated status
+          await loadJobs();
         }}
       />
 

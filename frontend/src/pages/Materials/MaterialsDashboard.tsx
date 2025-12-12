@@ -127,19 +127,29 @@ const MaterialsDashboard: React.FC = () => {
             const issuesData = await issuesRes.json();
             setIssues(Array.isArray(issuesData) ? issuesData : []);
 
-            // Load stock batches (purchases)
-            const purchasesRes = await apiFetch('/materials/stock/all', { headers });
+            // Load stock purchases (unified: stock_batches + purchase_order_items)
+            const purchasesRes = await apiFetch('/materials/stock/unified', { headers });
             const purchasesData = await purchasesRes.json();
             if (Array.isArray(purchasesData)) {
-                // Transform stock batches to match StockPurchase interface
-                const transformed = purchasesData.map((batch: any) => ({
-                    ...batch,
-                    quantity: batch.quantityPurchased,
-                    totalCost: batch.quantityPurchased * (batch.unitCost || 0),
-                    orderDate: batch.purchaseDate,
-                    vendorName: batch.vendorName || 'Direct Entry',
-                    orderNumber: batch.batchNumber || batch.purchaseOrder || 'BATCH',
-                    status: 'RECEIVED'
+                // Transform unified data to match StockPurchase interface
+                const transformed = purchasesData.map((item: any) => ({
+                    ...item,
+                    quantity: item.quantity || item.quantityPurchased,
+                    quantityPurchased: item.quantity || item.quantityPurchased,
+                    quantityRemaining: item.quantityRemaining,
+                    totalCost: (item.quantity || item.quantityPurchased) * (item.unitCost || 0),
+                    orderDate: item.orderDate || item.purchaseDate,
+                    vendorName: item.vendorName || 'Direct Entry',
+                    batchNumber: item.orderNumber || item.batchNumber,
+                    orderNumber: item.orderNumber || item.batchNumber || 'BATCH',
+                    status: 'RECEIVED',
+                    source: item.source,
+                    // Map materialName/materialSku/materialUnit to material object for template
+                    material: {
+                        name: item.materialName || item.material?.name || 'Unknown',
+                        sku: item.materialSku || item.material?.sku || '',
+                        unit: item.materialUnit || item.material?.unit || 'PCS'
+                    }
                 }));
                 setPurchases(transformed);
             }

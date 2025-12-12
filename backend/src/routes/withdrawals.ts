@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, authorizeRoles, AuthRequest } from '../middleware/auth';
+import { sendReleaseNotification } from '../services/emailService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -12,7 +13,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
     const { status, search, startDate, endDate, shipmentId } = req.query;
 
     const where: any = { companyId };
-    
+
     if (status) where.status = status;
     if (shipmentId) where.shipmentId = shipmentId;
     if (search) {
@@ -96,6 +97,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       notes,
       photos,
       withdrawnBy,
+      driverName,
       receiptNumber,
     } = req.body;
 
@@ -109,8 +111,8 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     if (withdrawnBoxCount > shipment.currentBoxCount) {
-      return res.status(400).json({ 
-        error: `Cannot withdraw ${withdrawnBoxCount} boxes. Only ${shipment.currentBoxCount} boxes available.` 
+      return res.status(400).json({
+        error: `Cannot withdraw ${withdrawnBoxCount} boxes. Only ${shipment.currentBoxCount} boxes available.`
       });
     }
 
@@ -137,23 +139,81 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     });
 
     // Update shipment box count and status
-    const newStatus = remainingBoxCount === 0 
-      ? 'RELEASED' 
+    const newStatus = remainingBoxCount === 0
+      ? 'RELEASED'
       : (withdrawnBoxCount < shipment.currentBoxCount ? 'PARTIAL' : 'ACTIVE');
-    
+
     await prisma.shipment.update({
       where: { id: shipmentId },
-      data: { 
+      data: {
         currentBoxCount: remainingBoxCount,
         status: newStatus,
         releasedAt: remainingBoxCount === 0 ? new Date() : null,
       },
     });
 
-    res.status(201).json({ 
+    // 📧 SEND EMAIL NOTIFICATION
+    let notificationSent = false;
+    try {
+      // Get company info for email
+      const company = await prisma.company.findUnique({ where: { id: companyId } });
+
+      // Get the user who released the shipment (the logged in admin/manager)
+      const releasedByUser = await prisma.user.findUnique({ where: { id: userId } });
+
+      // Calculate days stored
+      const arrivalDate = new Date(shipment.arrivalDate);
+      const daysStored = Math.ceil((new Date().getTime() - arrivalDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      // Build full photo URLs if photos are provided
+      const fullPhotoUrls = photos?.map((photo: string) => {
+        if (photo.startsWith('http')) return photo;
+        return `${req.protocol}://${req.get('host')}${photo}`;
+      });
+
+      const emailResult = await sendReleaseNotification(companyId, {
+        shipmentId: shipment.id,
+        shipmentCode: shipment.referenceId,
+        clientName: shipment.clientName || 'Customer',
+        clientPhone: shipment.clientPhone || undefined,
+        boxesReleased: withdrawnBoxCount,
+        totalBoxes: shipment.originalBoxCount || shipment.currentBoxCount,
+        remainingBoxes: remainingBoxCount,
+        releaseType: remainingBoxCount === 0 ? 'FULL' : 'PARTIAL',
+        // releasedBy = actual admin/manager who processed the release
+        releasedBy: releasedByUser?.name || req.user?.name || 'Admin',
+        // receivedBy = collector/customer who picked up items
+        receivedBy: withdrawnBy || 'N/A',
+        // driverName = optional driver
+        driverName: driverName || undefined,
+        // reason for release
+        reason: reason || undefined,
+        // Additional professional details
+        cbm: shipment.cbm || undefined,
+        weight: shipment.weight || undefined,
+        receivedDate: shipment.arrivalDate?.toISOString(),
+        daysStored: daysStored,
+        photos: fullPhotoUrls,
+        description: shipment.description || undefined,
+        warehouseName: company?.name ? `${company.name} Warehouse` : undefined,
+        currency: 'KWD',
+      });
+
+      notificationSent = emailResult.success;
+      if (emailResult.success) {
+        console.log(`📧 Release email sent for shipment ${shipment.referenceId}`);
+      } else {
+        console.log(`📧 Release email failed: ${emailResult.error}`);
+      }
+    } catch (emailError) {
+      console.error('Email notification error:', emailError);
+    }
+
+    res.status(201).json({
       withdrawal,
-      message: remainingBoxCount === 0 
-        ? 'Shipment fully released' 
+      notificationSent,
+      message: remainingBoxCount === 0
+        ? 'Shipment fully released'
         : `Partial withdrawal completed. ${remainingBoxCount} boxes remaining.`
     });
   } catch (error: any) {

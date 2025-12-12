@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { racksAPI, shipmentsAPI, companiesAPI } from '../services/api';
+import { racksAPI, shipmentsAPI, companiesAPI, getBackendUrl } from '../services/api';
 import { parseNumberInput, getSafeNumber } from '../utils/inputHelpers';
 
 interface WHMShipmentModalProps {
@@ -49,6 +49,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [useDirectCBM, setUseDirectCBM] = useState(false); // Toggle for direct CBM input
 
   // Core shipment data (WHM style)
   const [formData, setFormData] = useState({
@@ -70,7 +71,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     length: 0, // in cm
     width: 0,  // in cm
     height: 0, // in cm
-    cbm: 0, // auto-calculated (m??)
+    cbm: 0, // auto-calculated or direct input (m³)
+    directCBM: 0, // direct CBM input value
     description: '',
     value: 0,
 
@@ -112,6 +114,148 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   const [variablePerPallet, setVariablePerPallet] = useState(false);
   const [boxesDistribution, setBoxesDistribution] = useState<number[]>([1]);
   const [extraBoxes, setExtraBoxes] = useState<number>(0);
+
+  // 📄 CONTRACT VALIDITY STATE
+  const [contractValidity, setContractValidity] = useState<{
+    hasContract: boolean;
+    isValid: boolean;
+    canOperate: boolean;
+    isExpired: boolean;
+    isSuspended: boolean;
+    message: string;
+    monthlyRate?: number;
+    status?: string;
+  } | null>(null);
+  const [checkingContract, setCheckingContract] = useState(false);
+
+  // 📦 MULTI-DIMENSION STATE
+  interface DimensionItem {
+    id: string;
+    label?: string;
+    length: number;
+    width: number;
+    height: number;
+    weight: number;
+    qty: number;
+    cbm: number;
+  }
+  const [dimensions, setDimensions] = useState<DimensionItem[]>([
+    { id: '1', label: 'Item 1', length: 0, width: 0, height: 0, weight: 0, qty: 1, cbm: 0 }
+  ]);
+
+  // Calculate total CBM and weight from dimensions
+  const dimensionsTotal = dimensions.reduce((acc, dim) => {
+    const cbm = (dim.length * dim.width * dim.height / 1000000) * dim.qty;
+    return {
+      cbm: acc.cbm + cbm,
+      weight: acc.weight + (dim.weight * dim.qty),
+      pieces: acc.pieces + dim.qty
+    };
+  }, { cbm: 0, weight: 0, pieces: 0 });
+
+  // Dimension management functions
+  const addDimension = () => {
+    const newId = String(Date.now());
+    const label = `📦 Item ${dimensions.length + 1}`;
+    setDimensions([...dimensions, { id: newId, label, length: 0, width: 0, height: 0, weight: 0, qty: 1, cbm: 0 }]);
+  };
+
+  const removeDimension = (id: string) => {
+    if (dimensions.length > 1) {
+      setDimensions(dimensions.filter(d => d.id !== id));
+    }
+  };
+
+  const updateDimension = (id: string, field: keyof DimensionItem, value: number) => {
+    setDimensions(dimensions.map(dim => {
+      if (dim.id === id) {
+        const updated = { ...dim, [field]: value };
+        // Auto-calculate CBM for this dimension
+        updated.cbm = (updated.length * updated.width * updated.height / 1000000) * updated.qty;
+        return updated;
+      }
+      return dim;
+    }));
+  };
+
+  // 🎯 AUTO-GENERATE DIMENSION ROWS BASED ON MODE AND COUNTS
+  useEffect(() => {
+    const palletCount = getSafeNumber(formData.palletCount, 0);
+    const pieces = getSafeNumber(formData.pieces, 0);
+    const looseBoxes = extraBoxes || 0;
+
+    console.log('🎯 Generating dimensions - Mode:', intakeMode, 'Pallets:', palletCount, 'Pieces:', pieces, 'Extra:', looseBoxes);
+
+    const newDimensions: DimensionItem[] = [];
+
+    if (intakeMode === 'pallet') {
+      // PALLET MODE: One dimension row per pallet + one for loose boxes if any
+      for (let i = 0; i < palletCount; i++) {
+        const existingDim = dimensions.find(d => d.id === `pallet-${i + 1}`) || dimensions[i];
+        if (existingDim && (existingDim.length > 0 || existingDim.width > 0 || existingDim.height > 0)) {
+          newDimensions.push({ ...existingDim, id: `pallet-${i + 1}`, label: `📦 P${i + 1}` });
+        } else {
+          newDimensions.push({
+            id: `pallet-${i + 1}`,
+            label: `📦 P${i + 1}`,
+            length: 0,
+            width: 0,
+            height: 0,
+            weight: 0,
+            qty: 1,
+            cbm: 0
+          });
+        }
+      }
+
+      // Add loose boxes dimension if any
+      if (looseBoxes > 0) {
+        const existingLoose = dimensions.find(d => d.id === 'loose-boxes');
+        if (existingLoose && (existingLoose.length > 0 || existingLoose.width > 0 || existingLoose.height > 0)) {
+          newDimensions.push({ ...existingLoose, label: `📤 Loose (${looseBoxes})`, qty: looseBoxes });
+        } else {
+          newDimensions.push({
+            id: 'loose-boxes',
+            label: `📤 Loose (${looseBoxes})`,
+            length: 0,
+            width: 0,
+            height: 0,
+            weight: 0,
+            qty: looseBoxes,
+            cbm: 0
+          });
+        }
+      }
+    } else if (intakeMode === 'box') {
+      // BOX MODE: One dimension row for all boxes (qty = pieces)
+      const existingDim = dimensions.find(d => d.id === 'all-boxes') || dimensions[0];
+      if (existingDim && (existingDim.length > 0 || existingDim.width > 0 || existingDim.height > 0)) {
+        newDimensions.push({ ...existingDim, id: 'all-boxes', label: `📦 Boxes (${pieces || 1})`, qty: pieces || 1 });
+      } else {
+        newDimensions.push({
+          id: 'all-boxes',
+          label: `📦 Boxes (${pieces || 1})`,
+          length: 0,
+          width: 0,
+          height: 0,
+          weight: 0,
+          qty: pieces || 1,
+          cbm: 0
+        });
+      }
+    }
+
+    // Only update if something changed
+    const currentIds = dimensions.map(d => d.id).join(',');
+    const newIds = newDimensions.map(d => d.id).join(',');
+    const currentQtys = dimensions.map(d => d.qty).join(',');
+    const newQtys = newDimensions.map(d => d.qty).join(',');
+
+    if (currentIds !== newIds || currentQtys !== newQtys || dimensions.length !== newDimensions.length) {
+      console.log('🎯 Updating dimensions:', newDimensions.length, 'rows');
+      setDimensions(newDimensions);
+    }
+  }, [intakeMode, formData.palletCount, formData.pieces, extraBoxes]);
 
   // ???? SHIPMENT SETTINGS STATE
   const [shipmentSettings, setShipmentSettings] = useState<any>({
@@ -301,6 +445,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       width: 0,
       height: 0,
       cbm: 0,
+      directCBM: 0, // Reset direct CBM
       weight: 0,
       dimensions: '',
       description: '',
@@ -318,6 +463,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       estimatedDays: 30,
       notes: '',
     });
+    setUseDirectCBM(false); // Reset toggle
     setIntakeMode('pallet');
     setPalletPhotoMap({});
     setPalletUploadState({});
@@ -332,6 +478,42 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     setError('');
     setSuccess('');
     generateBarcode();
+    setContractValidity(null); // Reset contract validity
+  };
+
+  // Check contract validity when company is selected
+  const checkContractValidity = async (companyProfileId: string) => {
+    if (!companyProfileId) {
+      setContractValidity(null);
+      return;
+    }
+
+    try {
+      setCheckingContract(true);
+      const response = await fetch(`${getBackendUrl()}/api/contracts/check/${companyProfileId}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setContractValidity(data);
+
+        // If contract is expired/suspended, show error
+        if (data.hasContract && !data.canOperate) {
+          setError(`⚠️ Cannot receive shipment: ${data.message}`);
+        } else {
+          // Clear error if contract is valid
+          setError('');
+        }
+      } else {
+        setContractValidity(null);
+      }
+    } catch (err) {
+      console.error('Error checking contract validity:', err);
+      setContractValidity(null);
+    } finally {
+      setCheckingContract(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -343,6 +525,11 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
       : isNumber
         ? parseNumberInput(value, true)
         : value;
+
+    // Check contract validity when company profile is selected
+    if (name === 'companyProfileId') {
+      checkContractValidity(value);
+    }
 
     setFormData(prev => {
       const updated = {
@@ -373,8 +560,8 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         const width = getSafeNumber(updated.width, 0);
         const height = getSafeNumber(updated.height, 0);
 
-        // CBM = (Length ?? Width ?? Height) / 1,000,000 (since input is in cm)
-        // Or: (L ?? W ?? H in cm) / 1,000,000 = CBM in m??
+        // CBM = (Length × Width × Height) / 1,000,000 (since input is in cm)
+        // Or: (L × W × H in cm) / 1,000,000 = CBM in m³
         const cbm = length > 0 && width > 0 && height > 0
           ? (length * width * height) / 1000000
           : 0;
@@ -382,6 +569,15 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         return {
           ...updated,
           cbm: parseFloat(cbm.toFixed(4)), // Round to 4 decimals
+        };
+      }
+
+      // Handle direct CBM input
+      if (name === 'directCBM') {
+        const directCBM = getSafeNumber(parsedValue as number | string, 0);
+        return {
+          ...updated,
+          cbm: directCBM, // Use direct CBM value
         };
       }
 
@@ -605,6 +801,11 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     setSuccess('');
 
     try {
+      // 🔒 CHECK CONTRACT VALIDITY - BLOCK IF EXPIRED/SUSPENDED
+      if (formData.companyProfileId && contractValidity?.hasContract && !contractValidity?.canOperate) {
+        throw new Error(`Cannot receive shipment: ${contractValidity?.message || 'Contract has expired or is suspended. Please renew the contract.'}`);
+      }
+
       // ???? VALIDATE AGAINST SHIPMENT SETTINGS
       if (!formData.clientName) {
         throw new Error('Client name is required');
@@ -722,6 +923,19 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
         // Custom fields
         customFieldValues: JSON.stringify(customFieldValues),
+
+        // Dimensions & CBM - Use multi-dimension totals when not in direct mode
+        length: useDirectCBM ? undefined : (dimensions.length > 0 ? dimensions[0].length : undefined),
+        width: useDirectCBM ? undefined : (dimensions.length > 0 ? dimensions[0].width : undefined),
+        height: useDirectCBM ? undefined : (dimensions.length > 0 ? dimensions[0].height : undefined),
+        cbm: useDirectCBM
+          ? (formData.directCBM > 0 ? formData.directCBM : undefined)
+          : (dimensionsTotal.cbm > 0 ? dimensionsTotal.cbm : undefined),
+        weight: useDirectCBM
+          ? (formData.weight > 0 ? formData.weight : undefined)
+          : (dimensionsTotal.weight > 0 ? dimensionsTotal.weight : undefined),
+        // Save multi-dimension data as JSON
+        dimensionsData: !useDirectCBM ? JSON.stringify(dimensions) : undefined,
       };
 
       const response: any = await shipmentsAPI.create(submissionData);
@@ -831,7 +1045,10 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             name="companyProfileId"
             value={formData.companyProfileId}
             onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${contractValidity?.hasContract && !contractValidity?.canOperate
+              ? 'border-red-500 bg-red-50'
+              : 'border-gray-300'
+              }`}
           >
             <option value="">Select company (optional)</option>
             {companyProfiles.map(profile => (
@@ -840,6 +1057,43 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </option>
             ))}
           </select>
+
+          {/* Checking Contract Status */}
+          {checkingContract && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+              Checking contract status...
+            </div>
+          )}
+
+          {/* Contract Expired/Suspended Warning */}
+          {contractValidity?.hasContract && !contractValidity?.canOperate && (
+            <div className="mt-2 p-3 bg-red-100 border border-red-300 rounded-lg">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">⛔</span>
+                <div>
+                  <p className="text-sm font-semibold text-red-700">
+                    CONTRACT {contractValidity.isExpired ? 'EXPIRED' : contractValidity.isSuspended ? 'SUSPENDED' : 'BLOCKED'} - SHIPMENT BLOCKED
+                  </p>
+                  <p className="text-xs text-red-600">
+                    {contractValidity.message || 'This customer\'s contract has expired or is suspended. Please renew the contract to receive shipments.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Contract Valid Badge */}
+          {contractValidity?.hasContract && contractValidity?.canOperate && (
+            <div className="mt-2 p-2 bg-blue-100 border border-blue-300 rounded-lg">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📄</span>
+                <span className="text-sm font-medium text-blue-700">
+                  Contract Customer - {contractValidity.monthlyRate} KWD/month ✓
+                </span>
+              </div>
+            </div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1123,85 +1377,210 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
           );
         })()}
 
-        {/* DIMENSIONS & CBM SECTION */}
+        {/* DIMENSIONS & CBM SECTION - MULTI DIMENSION */}
         <div className="md:col-span-3">
-          <div className="bg-orange-50 border-2 border-orange-300 p-4 rounded-lg">
-            <h4 className="text-sm font-semibold text-orange-900 mb-3 flex items-center">
-              Shipment Size & Volume
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Length (cm)
-                </label>
-                <input
-                  type="number"
-                  name="length"
-                  value={formData.length || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
-                  placeholder="0"
-                  min="0"
-                  step="0.1"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Width (cm)
-                </label>
-                <input
-                  type="number"
-                  name="width"
-                  value={formData.width || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
-                  placeholder="0"
-                  min="0"
-                  step="0.1"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Height (cm)
-                </label>
-                <input
-                  type="number"
-                  name="height"
-                  value={formData.height || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
-                  placeholder="0"
-                  min="0"
-                  step="0.1"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Weight (kg)
-                </label>
-                <input
-                  type="number"
-                  name="weight"
-                  value={formData.weight || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  placeholder="0"
-                  min="0"
-                  step="0.1"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-orange-900 font-bold mb-2">
-                  CBM (m3)
-                </label>
-                <div className="w-full px-3 py-2 border-2 border-orange-400 rounded-lg bg-orange-100 text-orange-900 font-bold text-center">
-                  {formData.cbm > 0 ? formData.cbm.toFixed(4) : '0'}
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-sm font-semibold text-slate-800">
+                📦 Shipment Dimensions & Volume
+              </h4>
+              <div className="flex items-center gap-3">
+                {/* Toggle for Direct CBM vs Dimensions */}
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs ${!useDirectCBM ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>
+                    Multi-Dim
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setUseDirectCBM(!useDirectCBM)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useDirectCBM ? 'bg-blue-600' : 'bg-slate-300'}`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${useDirectCBM ? 'translate-x-5' : 'translate-x-1'}`}
+                    />
+                  </button>
+                  <span className={`text-xs ${useDirectCBM ? 'text-blue-700 font-medium' : 'text-slate-400'}`}>
+                    Direct CBM
+                  </span>
                 </div>
               </div>
             </div>
-            <p className="text-xs text-gray-600 mt-2">
-              CBM auto-calculates: (Length x Width x Height) / 1,000,000
-            </p>
+
+            {useDirectCBM ? (
+              /* Direct CBM Input */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    CBM (m³) - Direct Input
+                  </label>
+                  <input
+                    type="number"
+                    name="directCBM"
+                    value={formData.directCBM || ''}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    placeholder="0.680"
+                    min="0"
+                    step="0.001"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Weight (kg)
+                  </label>
+                  <input
+                    type="number"
+                    name="weight"
+                    value={formData.weight || ''}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    placeholder="0"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+              </div>
+            ) : (
+              /* Multi-Dimension Inputs */
+              <div className="space-y-3">
+                {/* Header Row */}
+                <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-600 px-1">
+                  <div className="col-span-1">Item</div>
+                  <div className="col-span-2">Length (cm)</div>
+                  <div className="col-span-2">Width (cm)</div>
+                  <div className="col-span-2">Height (cm)</div>
+                  <div className="col-span-1">Weight</div>
+                  <div className="col-span-1">Qty</div>
+                  <div className="col-span-2">CBM</div>
+                  <div className="col-span-1"></div>
+                </div>
+
+                {/* Dimension Rows */}
+                {dimensions.map((dim, index) => {
+                  // Generate label based on ID
+                  let label = `#${index + 1}`;
+                  if (dim.id.startsWith('pallet-')) {
+                    label = `📦 P${dim.id.replace('pallet-', '')}`;
+                  } else if (dim.id === 'loose-boxes') {
+                    label = `📤 Loose`;
+                  } else if (dim.id === 'all-boxes') {
+                    label = `📦 Boxes`;
+                  }
+
+                  return (
+                    <div key={dim.id} className="grid grid-cols-12 gap-2 items-center">
+                      <div className="col-span-1">
+                        <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                          {label}
+                        </span>
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          value={dim.length || ''}
+                          onChange={(e) => updateDimension(dim.id, 'length', parseFloat(e.target.value) || 0)}
+                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="0"
+                          min="0"
+                          step="0.1"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          value={dim.width || ''}
+                          onChange={(e) => updateDimension(dim.id, 'width', parseFloat(e.target.value) || 0)}
+                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="0"
+                          min="0"
+                          step="0.1"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          value={dim.height || ''}
+                          onChange={(e) => updateDimension(dim.id, 'height', parseFloat(e.target.value) || 0)}
+                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="0"
+                          min="0"
+                          step="0.1"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <input
+                          type="number"
+                          value={dim.weight || ''}
+                          onChange={(e) => updateDimension(dim.id, 'weight', parseFloat(e.target.value) || 0)}
+                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="0"
+                          min="0"
+                          step="0.1"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <input
+                          type="number"
+                          value={dim.qty || 1}
+                          onChange={(e) => updateDimension(dim.id, 'qty', parseInt(e.target.value) || 1)}
+                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          min="1"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <div className="px-2 py-1.5 bg-slate-100 rounded text-sm font-medium text-slate-700 text-center">
+                          {dim.cbm.toFixed(4)}
+                        </div>
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                        {dimensions.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeDimension(dim.id)}
+                            className="p-1 text-red-500 hover:bg-red-50 rounded"
+                            title="Remove row"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Add Row Button */}
+                <button
+                  type="button"
+                  onClick={addDimension}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Dimension Row
+                </button>
+
+                {/* Totals */}
+                <div className="mt-4 pt-3 border-t border-slate-200">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-blue-50 p-3 rounded-lg text-center">
+                      <div className="text-xs text-slate-600 mb-1">Total CBM</div>
+                      <div className="text-lg font-bold text-blue-700">{dimensionsTotal.cbm.toFixed(4)} m³</div>
+                    </div>
+                    <div className="bg-slate-100 p-3 rounded-lg text-center">
+                      <div className="text-xs text-slate-600 mb-1">Total Weight</div>
+                      <div className="text-lg font-bold text-slate-700">{dimensionsTotal.weight.toFixed(2)} kg</div>
+                    </div>
+                    <div className="bg-slate-100 p-3 rounded-lg text-center">
+                      <div className="text-xs text-slate-600 mb-1">Total Pieces</div>
+                      <div className="text-lg font-bold text-slate-700">{dimensionsTotal.pieces}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1512,20 +1891,22 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 text-white">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-slate-200 transform transition-all duration-300 scale-100">
+        {/* Header - Clean Professional */}
+        <div className="bg-slate-900 px-6 py-4 text-white">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-2xl font-bold">New Shipment Intake</h2>
-              <p className="text-blue-100">WHM Warehouse Management System</p>
+              <h2 className="text-xl font-semibold">New Shipment Intake</h2>
+              <p className="text-slate-400 text-sm">Warehouse Management System</p>
             </div>
             <button
               onClick={onClose}
-              className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+              className="text-slate-400 hover:text-white rounded-lg p-2 hover:bg-white/10 transition-all duration-200"
             >
-              ×
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         </div>

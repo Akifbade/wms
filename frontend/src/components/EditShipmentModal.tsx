@@ -29,12 +29,33 @@ interface CustomField {
   section: string;
 }
 
+// Dimension entry interface
+interface DimensionEntry {
+  id?: string;
+  label: string;
+  itemType: string;
+  quantity: number;
+  length: string;
+  width: string;
+  height: string;
+  cbm: number;
+  totalCBM: number;
+  weight: string;
+  totalWeight: number | null;
+  notes: string;
+}
+
 export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment }: EditShipmentModalProps) {
   const [loading, setLoading] = useState(false);
   const [racks, setRacks] = useState<Rack[]>([]);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [companyProfiles, setCompanyProfiles] = useState<any[]>([]);
+
+  // Multi-dimension state
+  const [dimensions, setDimensions] = useState<DimensionEntry[]>([]);
+  const [loadingDimensions, setLoadingDimensions] = useState(false);
+
   const [formData, setFormData] = useState({
     clientName: '',
     clientPhone: '',
@@ -57,11 +78,13 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
     shipperPhone: '',
     consigneePhone: '',
     specialInstructions: '',
-    // 📏 Dimensions
+    // 📏 Dimensions - Now managed separately in dimensions array
     length: '',
     width: '',
     height: '',
-    cbm: 0, // auto-calculated (m³)
+    cbm: 0, // auto-calculated (m³) - Total from dimensions
+    useDirectCBM: false, // Toggle for direct CBM vs dimensions
+    directCBM: 0,        // Direct CBM input
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -75,13 +98,22 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
       loadRacks();
       loadCompanyProfiles();
       loadCustomFieldsWithValues();
+
+      // Debug: Log shipment dimensions
+      console.log('📏 EditShipment: Loading dimensions from shipment:', {
+        length: shipment.length,
+        width: shipment.width,
+        height: shipment.height,
+        cbm: shipment.cbm,
+      });
+
       // Populate form with existing data (including new warehouse fields)
       setFormData({
         clientName: shipment.clientName || '',
         clientPhone: shipment.clientPhone || '',
         clientEmail: shipment.clientEmail || '',
         description: shipment.description || '',
-        totalBoxCount: shipment.totalBoxCount || '',
+        totalBoxCount: shipment.originalBoxCount || shipment.totalBoxCount || '',
         currentBoxCount: shipment.currentBoxCount || '',
         rackId: shipment.rackId || '',
         estimatedValue: shipment.estimatedValue || '',
@@ -98,16 +130,138 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         shipperPhone: shipment.shipperPhone || '',
         consigneePhone: shipment.consigneePhone || '',
         specialInstructions: shipment.specialInstructions || '',
-        // 📏 Dimensions
-        length: shipment.length || '',
-        width: shipment.width || '',
-        height: shipment.height || '',
-        cbm: shipment.cbm || 0,
+        // 📏 Dimensions - convert to string for form inputs
+        length: shipment.length ? String(shipment.length) : '',
+        width: shipment.width ? String(shipment.width) : '',
+        height: shipment.height ? String(shipment.height) : '',
+        cbm: shipment.cbm ? Number(shipment.cbm) : 0,
+        // Determine if direct CBM mode: has CBM but no dimensions
+        useDirectCBM: Boolean(shipment.cbm && shipment.cbm > 0 && (!shipment.length || !shipment.width || !shipment.height)),
+        directCBM: shipment.cbm ? Number(shipment.cbm) : 0,
       });
       setError('');
       setSuccess('');
+
+      // Load multi-dimensions for this shipment
+      loadDimensions();
     }
   }, [isOpen, shipment]);
+
+  // Load dimensions for this shipment
+  const loadDimensions = async () => {
+    if (!shipment?.id) {
+      console.log('❌ loadDimensions: No shipment ID');
+      return;
+    }
+    try {
+      setLoadingDimensions(true);
+      console.log(`📦 loadDimensions: Fetching dimensions for shipment ${shipment.id}`);
+      const response = await shipmentsAPI.getDimensions(shipment.id);
+      console.log('📦 loadDimensions response:', response);
+      if (response.dimensions && response.dimensions.length > 0) {
+        setDimensions(response.dimensions.map((d: any) => ({
+          id: d.id,
+          label: d.label || '',
+          itemType: d.itemType || 'BOX',
+          quantity: d.quantity || 1,
+          length: String(d.length || ''),
+          width: String(d.width || ''),
+          height: String(d.height || ''),
+          cbm: d.cbm || 0,
+          totalCBM: d.totalCBM || 0,
+          weight: String(d.weight || ''),
+          totalWeight: d.totalWeight || null,
+          notes: d.notes || ''
+        })));
+        // Summary is computed locally from dimensions array via dimensionsTotal
+      } else {
+        // No dimensions yet - keep empty or migrate from single dimension
+        if (shipment.length && shipment.width && shipment.height) {
+          // Migrate existing single dimension to multi-dimension
+          setDimensions([{
+            label: 'Main',
+            itemType: 'BOX',
+            quantity: 1,
+            length: String(shipment.length || ''),
+            width: String(shipment.width || ''),
+            height: String(shipment.height || ''),
+            cbm: shipment.cbm || 0,
+            totalCBM: shipment.cbm || 0,
+            weight: '',
+            totalWeight: null,
+            notes: ''
+          }]);
+        } else {
+          setDimensions([]);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load dimensions:', err);
+    } finally {
+      setLoadingDimensions(false);
+    }
+  };
+
+  // Add new dimension row
+  const addDimension = () => {
+    setDimensions(prev => [...prev, {
+      label: `Item ${prev.length + 1}`,
+      itemType: 'BOX',
+      quantity: 1,
+      length: '',
+      width: '',
+      height: '',
+      cbm: 0,
+      totalCBM: 0,
+      weight: '',
+      totalWeight: null,
+      notes: ''
+    }]);
+  };
+
+  // Remove dimension row
+  const removeDimension = (index: number) => {
+    setDimensions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Update dimension row
+  const updateDimension = (index: number, field: string, value: any) => {
+    setDimensions(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+
+      // Auto-calculate CBM when dimensions change
+      if (['length', 'width', 'height', 'quantity'].includes(field)) {
+        const l = parseFloat(updated[index].length) || 0;
+        const w = parseFloat(updated[index].width) || 0;
+        const h = parseFloat(updated[index].height) || 0;
+        const qty = parseInt(String(updated[index].quantity)) || 1;
+        const cbm = (l * w * h) / 1000000; // cm to m³
+        updated[index].cbm = parseFloat(cbm.toFixed(4));
+        updated[index].totalCBM = parseFloat((cbm * qty).toFixed(4));
+
+        // Update weight too if present
+        if (updated[index].weight) {
+          updated[index].totalWeight = parseFloat((parseFloat(updated[index].weight) * qty).toFixed(2));
+        }
+      }
+
+      // Update weight total
+      if (field === 'weight') {
+        const qty = parseInt(String(updated[index].quantity)) || 1;
+        updated[index].totalWeight = value ? parseFloat((parseFloat(value) * qty).toFixed(2)) : null;
+      }
+
+      return updated;
+    });
+  };
+
+  // Calculate dimensions total
+  const dimensionsTotal = dimensions.reduce((acc, d) => ({
+    totalCBM: acc.totalCBM + (d.totalCBM || 0),
+    totalWeight: acc.totalWeight + (d.totalWeight || 0),
+    totalItems: acc.totalItems + (d.quantity || 0)
+  }), { totalCBM: 0, totalWeight: 0, totalItems: 0 });
 
   const loadCustomFieldsWithValues = async () => {
     try {
@@ -185,8 +339,8 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         [name]: (name.includes('Count') || name === 'estimatedValue') ? parseNumberInput(value, true) : value
       };
 
-      // Auto-calculate CBM when dimensions change
-      if (name === 'length' || name === 'width' || name === 'height') {
+      // Auto-calculate CBM when dimensions change (only if not using direct CBM)
+      if (!updated.useDirectCBM && (name === 'length' || name === 'width' || name === 'height')) {
         const length = getSafeNumber(updated.length, 0);
         const width = getSafeNumber(updated.width, 0);
         const height = getSafeNumber(updated.height, 0);
@@ -199,6 +353,14 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         return {
           ...updated,
           cbm: parseFloat(cbm.toFixed(4)), // Round to 4 decimals
+        };
+      }
+
+      // Handle direct CBM input
+      if (name === 'directCBM') {
+        return {
+          ...updated,
+          cbm: parseFloat(Number(value).toFixed(4)),
         };
       }
 
@@ -231,6 +393,21 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
       //   throw new Error('Please select a rack');
       // }
 
+      // Calculate CBM based on mode
+      const finalCBM = formData.useDirectCBM
+        ? (formData.directCBM || formData.cbm)
+        : formData.cbm;
+
+      // Debug log
+      console.log('📏 EditShipment: Saving dimensions:', {
+        useDirectCBM: formData.useDirectCBM,
+        length: formData.length,
+        width: formData.width,
+        height: formData.height,
+        cbm: finalCBM,
+        directCBM: formData.directCBM
+      });
+
       // Prepare update data with converted numbers + new warehouse fields
       const updateData = {
         clientName: formData.clientName,
@@ -253,11 +430,11 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         shipperPhone: formData.shipperPhone || null,
         consigneePhone: formData.consigneePhone || null,
         specialInstructions: formData.specialInstructions || null,
-        // 📏 Dimensions
+        // 📏 Dimensions - send both L×W×H and CBM
         length: getSafeNumber(formData.length) || null,
         width: getSafeNumber(formData.width) || null,
         height: getSafeNumber(formData.height) || null,
-        cbm: formData.cbm || null,
+        cbm: finalCBM || null,
       };
 
       await shipmentsAPI.update(shipment.id, updateData);
@@ -282,7 +459,22 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         }
       }
 
-      alert(`✅ SUCCESS!\n\nShipment ${shipment.referenceId} has been updated successfully!\n\n📦 Current Boxes: ${currentBoxCount}\n📍 Rack: ${formData.rackId}`);
+      // Save dimensions (bulk save - replaces all)
+      if (dimensions.length > 0) {
+        try {
+          const validDimensions = dimensions.filter(d =>
+            parseFloat(d.length) > 0 && parseFloat(d.width) > 0 && parseFloat(d.height) > 0
+          );
+          if (validDimensions.length > 0) {
+            await shipmentsAPI.saveDimensionsBulk(shipment.id, validDimensions);
+            console.log('📏 Dimensions saved:', validDimensions.length);
+          }
+        } catch (err) {
+          console.error('Failed to save dimensions:', err);
+        }
+      }
+
+      alert(`✅ SUCCESS!\n\nShipment ${shipment.referenceId} has been updated successfully!\n\n📦 Current Boxes: ${currentBoxCount}\n📐 Total CBM: ${dimensionsTotal.totalCBM.toFixed(4)} m³`);
 
       onSuccess();
       onClose();
@@ -296,17 +488,19 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
   if (!isOpen || !shipment) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 border border-slate-200">
         {/* Header */}
-        <div className="bg-blue-600 text-white px-6 py-4 rounded-t-lg flex justify-between items-center">
-          <h2 className="text-xl font-bold">✏️ Edit Shipment</h2>
+        <div className="bg-slate-900 text-white px-6 py-4 rounded-t-xl flex justify-between items-center sticky top-0 z-10">
+          <h2 className="text-xl font-semibold">Edit Shipment</h2>
           <button
             onClick={onClose}
-            className="text-white hover:text-gray-200 text-2xl font-bold"
+            className="text-slate-400 hover:text-white rounded-lg p-2 hover:bg-white/10 transition-all duration-200"
             disabled={loading}
           >
-            ×
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
@@ -455,68 +649,165 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
             </div>
           </div>
 
-          {/* 📏 Dimensions Section */}
+          {/* 📏 Multi-Dimensions Section */}
           <div className="border-b pb-4">
-            <h3 className="text-lg font-semibold mb-4 text-gray-700">📏 Dimensions (cm)</h3>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Length
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="length"
-                  value={formData.length}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Width
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="width"
-                  value={formData.width}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Height
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="height"
-                  value={formData.height}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0.00"
-                />
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-700">📏 Dimensions (Multiple)</h3>
+              <button
+                type="button"
+                onClick={addDimension}
+                className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 flex items-center gap-1"
+              >
+                ➕ Add Dimension
+              </button>
             </div>
 
-            {/* Auto-calculated CBM Display */}
-            <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-blue-900">
-                  CBM (m³)
-                </span>
-                <span className="text-lg font-bold text-blue-700">
-                  {formData.cbm > 0 ? formData.cbm.toFixed(4) : '0.0000'}
-                </span>
+            {loadingDimensions ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-gray-500">Loading dimensions...</span>
               </div>
-              <p className="text-xs text-blue-600 mt-1">
-                CBM auto-calculates: (Length × Width × Height) / 1,000,000
-              </p>
-            </div>
+            ) : dimensions.length === 0 ? (
+              <div className="text-center py-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                <p className="text-gray-500">No dimensions added yet</p>
+                <button
+                  type="button"
+                  onClick={addDimension}
+                  className="mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  ➕ Add first dimension
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {dimensions.map((dim, index) => (
+                  <div key={dim.id || index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-500">#{index + 1}</span>
+                        <input
+                          type="text"
+                          value={dim.label}
+                          onChange={(e) => updateDimension(index, 'label', e.target.value)}
+                          placeholder="Label (e.g., Pallet 1)"
+                          className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 w-32"
+                        />
+                        <select
+                          value={dim.itemType}
+                          onChange={(e) => updateDimension(index, 'itemType', e.target.value)}
+                          className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="BOX">📦 Box</option>
+                          <option value="PALLET">📋 Pallet</option>
+                          <option value="CRATE">🪵 Crate</option>
+                          <option value="LOOSE">📦 Loose</option>
+                          <option value="CARTON">📦 Carton</option>
+                          <option value="OTHER">Other</option>
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeDimension(index)}
+                        className="text-red-500 hover:text-red-700 p-1"
+                        title="Remove dimension"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-6 gap-2">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Qty</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={dim.quantity}
+                          onChange={(e) => updateDimension(index, 'quantity', e.target.value)}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">L (cm)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={dim.length}
+                          onChange={(e) => updateDimension(index, 'length', e.target.value)}
+                          placeholder="0"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">W (cm)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={dim.width}
+                          onChange={(e) => updateDimension(index, 'width', e.target.value)}
+                          placeholder="0"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">H (cm)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={dim.height}
+                          onChange={(e) => updateDimension(index, 'height', e.target.value)}
+                          placeholder="0"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Weight (kg)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={dim.weight}
+                          onChange={(e) => updateDimension(index, 'weight', e.target.value)}
+                          placeholder="0"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">CBM</label>
+                        <div className="px-2 py-1.5 text-sm bg-blue-50 border border-blue-200 rounded font-semibold text-blue-700">
+                          {dim.totalCBM.toFixed(4)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Total Summary */}
+                <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-medium text-gray-700">Total Dimensions:</span>
+                      <span className="ml-2 text-sm text-gray-600">{dimensions.length} entries</span>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500">Total Items</p>
+                        <p className="text-lg font-bold text-gray-700">{dimensionsTotal.totalItems}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500">Total Weight</p>
+                        <p className="text-lg font-bold text-gray-700">{dimensionsTotal.totalWeight.toFixed(2)} kg</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500">Total CBM</p>
+                        <p className="text-2xl font-bold text-blue-700">{dimensionsTotal.totalCBM.toFixed(4)} m³</p>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    💡 CBM is used for storage charge calculation. Add multiple dimensions for pallets, loose boxes, etc.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 🆕 NEW: Warehouse Shipment Toggle & Info */}

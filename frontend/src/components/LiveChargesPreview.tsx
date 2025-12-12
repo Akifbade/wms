@@ -130,9 +130,9 @@ export default function LiveChargesPreview({ shipmentId }: LiveChargesProps) {
                     <p className="text-sm text-gray-600 uppercase font-medium mb-2">Total Amount Due</p>
                     <div className="flex items-center justify-center gap-2">
                         <span className="text-5xl font-bold text-green-700">
-                            {charges.totalCharge.toFixed(3)}
+                            {(charges.totalCharge || 0).toFixed(3)}
                         </span>
-                        <span className="text-2xl text-green-600 font-medium">{charges.breakdown.currency}</span>
+                        <span className="text-2xl text-green-600 font-medium">{charges.breakdown?.currency || 'KWD'}</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
                         ⏱️ Storage Duration: <strong>{charges.daysCharged} days</strong>
@@ -152,16 +152,16 @@ export default function LiveChargesPreview({ shipmentId }: LiveChargesProps) {
                             {charges.rateUsed.type === 'CUSTOM' ? '⭐ Custom Rate Applied' : '📊 Company Default Rate'}
                         </p>
                         <p className="text-sm text-gray-600 mt-1">{charges.rateUsed.source}</p>
-                        {charges.rateUsed.ratePerCBMPerDay && (
+                        {/* Show ONLY the rate that's actually being used - CBM takes priority */}
+                        {charges.rateUsed.ratePerCBMPerDay ? (
                             <p className="text-sm text-blue-600 mt-1">
                                 📦 {charges.rateUsed.ratePerCBMPerDay.toFixed(3)} {charges.breakdown.currency}/m³/day
                             </p>
-                        )}
-                        {charges.rateUsed.ratePerBoxPerDay && (
+                        ) : charges.rateUsed.ratePerBoxPerDay ? (
                             <p className="text-sm text-blue-600 mt-1">
                                 📦 {charges.rateUsed.ratePerBoxPerDay.toFixed(3)} {charges.breakdown.currency}/box/day
                             </p>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             </div>
@@ -178,7 +178,7 @@ export default function LiveChargesPreview({ shipmentId }: LiveChargesProps) {
                             <div className="flex-1">
                                 <p className="font-medium text-gray-800">{item.description}</p>
                                 <p className="text-xs text-gray-500">
-                                    {item.quantity} × {item.unitPrice.toFixed(3)} {charges.breakdown.currency}
+                                    {item.quantity} × {(item.unitPrice || 0).toFixed(3)} {charges.breakdown.currency}
                                     {item.isTaxable && <span className="ml-2 text-blue-600">(Taxable)</span>}
                                 </p>
                                 <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
@@ -186,7 +186,7 @@ export default function LiveChargesPreview({ shipmentId }: LiveChargesProps) {
                                 </span>
                             </div>
                             <p className="font-bold text-gray-900 text-lg ml-4">
-                                {item.amount.toFixed(3)}
+                                {(item.amount || 0).toFixed(3)}
                             </p>
                         </div>
                     ))}
@@ -199,31 +199,31 @@ export default function LiveChargesPreview({ shipmentId }: LiveChargesProps) {
                     <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Subtotal (Base + Additional):</span>
                         <span className="font-medium text-gray-800">
-                            {(charges.breakdown.baseCharge + charges.breakdown.additionalCharges).toFixed(3)} {charges.breakdown.currency}
+                            {((charges.breakdown?.baseCharge || 0) + (charges.breakdown?.additionalCharges || 0)).toFixed(3)} {charges.breakdown?.currency || 'KWD'}
                         </span>
                     </div>
-                    {charges.breakdown.additionalCharges > 0 && (
+                    {(charges.breakdown?.additionalCharges || 0) > 0 && (
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-600 ml-4">├─ Base Storage:</span>
-                            <span className="text-gray-700">{charges.breakdown.baseCharge.toFixed(3)}</span>
+                            <span className="text-gray-700">{(charges.breakdown?.baseCharge || 0).toFixed(3)}</span>
                         </div>
                     )}
-                    {charges.breakdown.additionalCharges > 0 && (
+                    {(charges.breakdown?.additionalCharges || 0) > 0 && (
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-600 ml-4">└─ Additional Charges:</span>
-                            <span className="text-gray-700">{charges.breakdown.additionalCharges.toFixed(3)}</span>
+                            <span className="text-gray-700">{(charges.breakdown?.additionalCharges || 0).toFixed(3)}</span>
                         </div>
                     )}
                     <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Tax:</span>
                         <span className="font-medium text-gray-800">
-                            {charges.breakdown.taxAmount.toFixed(3)} {charges.breakdown.currency}
+                            {(charges.breakdown?.taxAmount || 0).toFixed(3)} {charges.breakdown?.currency || 'KWD'}
                         </span>
                     </div>
                     <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-300">
                         <span className="text-gray-800">Total:</span>
                         <span className="text-green-700">
-                            {charges.totalCharge.toFixed(3)} {charges.breakdown.currency}
+                            {(charges.totalCharge || 0).toFixed(3)} {charges.breakdown?.currency || 'KWD'}
                         </span>
                     </div>
                 </div>

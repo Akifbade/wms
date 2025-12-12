@@ -122,7 +122,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy Frontend to Production (Rocky Linux)
+      - name: Deploy Frontend & Backend to Production (Rocky Linux)
         env:
           VPS_HOST: ${{ secrets.PROD_VPS_HOST }}
           VPS_USER: ${{ secrets.PROD_VPS_USER }}
@@ -130,8 +130,15 @@ jobs:
           echo "📦 Deploying to Rocky Linux production server..."
           echo "Target: ${VPS_USER}@${VPS_HOST}"
           
-          # Copy updated source files (for reference/debugging)
-          echo "📁 Copying source files..."
+          # Copy BACKEND source code (needed for Prisma migrations)
+          echo "📁 Copying backend source..."
+          scp -i ~/.ssh/deploy_key -r backend/src/ ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/backend/"
+          scp -i ~/.ssh/deploy_key -r backend/prisma/ ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/backend/"
+          scp -i ~/.ssh/deploy_key backend/package.json ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/backend/"
+          scp -i ~/.ssh/deploy_key backend/tsconfig.json ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/backend/"
+          
+          # Copy updated frontend source files (for reference/debugging)
+          echo "📁 Copying frontend source..."
           scp -i ~/.ssh/deploy_key -r frontend/src/ ${VPS_USER}@${VPS_HOST}:"${{ env.PRODUCTION_PATH }}/frontend/" || true
           
           # Copy built dist files (main deployment files)
@@ -180,35 +187,62 @@ jobs:
           docker exec wms-database mysqldump -u root -prootpassword warehouse_wms > "$BACKUP_FILE" 2>/dev/null || echo "⚠️  Backup failed (non-critical)"
           [ -f "$BACKUP_FILE" ] && echo "✅ Backup saved: $BACKUP_FILE"
           
+          # Install backend dependencies
+          echo ""
+          echo "📦 Installing backend dependencies..."
+          cd backend
+          docker exec wms-backend sh -c "cd /app && npm install --production" || echo "⚠️  npm install skipped"
+          cd ..
+          
+          # Run Prisma migrations
+          echo ""
+          echo "🔄 Running Prisma migrations..."
+          docker exec wms-backend sh -c "cd /app && npx prisma migrate deploy" || echo "⚠️  Migration skipped/failed"
+          
+          # Rebuild backend inside container
+          echo ""
+          echo "🔨 Building backend..."
+          docker exec wms-backend sh -c "cd /app && npm run build 2>/dev/null || echo 'Build skipped (running from source)'"
+          
           # Set correct permissions for nginx to read files
           echo ""
           echo "🔐 Setting file permissions..."
           chmod -R 755 frontend/dist
           chown -R root:root frontend/dist
           
-          # Restart frontend container (nginx)
+          # Restart containers
           echo ""
-          echo "🔄 Restarting frontend container..."
+          echo "🔄 Restarting containers..."
+          docker-compose restart backend
           docker-compose restart frontend
           
-          # Wait for container to become healthy
+          # Wait for containers to become healthy
           echo ""
-          echo "⏳ Waiting for container health check (10s)..."
-          sleep 10
+          echo "⏳ Waiting for containers health check (15s)..."
+          sleep 15
           
           # Verify deployment
           echo ""
           echo "✅ Verifying deployment..."
-          docker ps --filter "name=wms-frontend" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          docker ps --filter "name=wms" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
           
-          # Test local endpoint
+          # Test backend API
           echo ""
-          echo "🔍 Testing local endpoint..."
-          curl -f http://localhost:80 > /dev/null 2>&1 && echo "✅ Local endpoint OK" || echo "⚠️  Local endpoint check failed"
+          echo "🔍 Testing backend API..."
+          curl -f http://localhost:5000/api/health > /dev/null 2>&1 && echo "✅ Backend API OK" || echo "⚠️  Backend API check failed"
           
-          # Show nginx logs (last 10 lines)
+          # Test frontend
           echo ""
-          echo "📋 Recent nginx logs:"
+          echo "🔍 Testing frontend..."
+          curl -f http://localhost:80 > /dev/null 2>&1 && echo "✅ Frontend OK" || echo "⚠️  Frontend check failed"
+          
+          # Show container logs (last 10 lines each)
+          echo ""
+          echo "📋 Recent backend logs:"
+          docker logs wms-backend --tail 10
+          
+          echo ""
+          echo "📋 Recent frontend logs:"
           docker logs wms-frontend --tail 10
           
           echo ""

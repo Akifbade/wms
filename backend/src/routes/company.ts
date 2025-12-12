@@ -24,6 +24,10 @@ router.get('/branding', async (req, res: Response) => {
         loginBackgroundType: true,
         loginBackgroundImage: true,
         loginShowFeatures: true,
+        loginEnableCursor: true,
+        loginEnable3D: true,
+        loginBlurStrength: true,
+        loginThemeMode: true,
       },
     });
 
@@ -43,6 +47,10 @@ router.get('/branding', async (req, res: Response) => {
           loginBackgroundType: 'video',
           loginBackgroundImage: null,
           loginShowFeatures: true,
+          loginEnableCursor: true,
+          loginEnable3D: true,
+          loginBlurStrength: 'medium',
+          loginThemeMode: 'system',
         }
       });
     }
@@ -68,6 +76,10 @@ router.get('/branding', async (req, res: Response) => {
         loginBackgroundType: (company as any).loginBackgroundType || 'video',
         loginBackgroundImage: (company as any).loginBackgroundImage || null,
         loginShowFeatures: (company as any).loginShowFeatures !== false,
+        loginEnableCursor: (company as any).loginEnableCursor !== false,
+        loginEnable3D: (company as any).loginEnable3D !== false,
+        loginBlurStrength: (company as any).loginBlurStrength || 'medium',
+        loginThemeMode: (company as any).loginThemeMode || 'system',
       }
     });
   } catch (error) {
@@ -146,7 +158,8 @@ router.put('/', async (req: AuthRequest, res: Response) => {
       name, email, phone, website, address, logo,
       primaryColor, secondaryColor, accentColor, showCompanyName,
       loginVideoUrl, loginVideoEnabled, loginGlassEffect,
-      loginBackgroundType, loginBackgroundImage, loginShowFeatures
+      loginBackgroundType, loginBackgroundImage, loginShowFeatures,
+      loginEnableCursor, loginEnable3D, loginBlurStrength, loginThemeMode
     } = req.body;
 
     // Validation
@@ -213,6 +226,22 @@ router.put('/', async (req: AuthRequest, res: Response) => {
 
     if (loginShowFeatures !== undefined) {
       updateData.loginShowFeatures = loginShowFeatures;
+    }
+
+    if (loginEnableCursor !== undefined) {
+      updateData.loginEnableCursor = loginEnableCursor;
+    }
+
+    if (loginEnable3D !== undefined) {
+      updateData.loginEnable3D = loginEnable3D;
+    }
+
+    if (loginBlurStrength !== undefined) {
+      updateData.loginBlurStrength = loginBlurStrength;
+    }
+
+    if (loginThemeMode !== undefined) {
+      updateData.loginThemeMode = loginThemeMode;
     }
 
     const company = await prisma.company.update({

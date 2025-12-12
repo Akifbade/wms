@@ -14,6 +14,8 @@ import shipmentRoutes from './routes/shipments';
 import rackRoutes from './routes/racks';
 import dashboardRoutes from './routes/dashboard';
 import billingRoutes from './routes/billing';
+import prepaidRoutes from './routes/prepaid'; // Legacy prepaid (for backward compatibility)
+import contractRoutes from './routes/contracts'; // NEW: Contract management system
 import withdrawalRoutes from './routes/withdrawals';
 import expenseRoutes from './routes/expenses';
 import companyRoutes from './routes/company';
@@ -40,6 +42,10 @@ import categoriesRoutes from './routes/categories'; // NEW: Category management
 import companiesRoutes from './routes/companies'; // NEW: Company profiles management
 import backupsRoutes from './routes/backups'; // NEW: Backup management
 import systemRoutes from './routes/system'; // NEW: System monitoring
+import financeRoutes from './routes/finance'; // NEW: Finance dashboard
+import emailRoutes from './routes/email'; // NEW: Email notification system
+import mobileUploadRoutes from './routes/mobile-upload'; // NEW: Mobile physical report upload
+import { startAllNotificationJobs } from './cron/notificationJobs'; // NEW: Notification cron jobs
 
 // Load environment variables FIRST (but allow env vars to override .env)
 dotenv.config({ override: false });
@@ -143,10 +149,15 @@ app.get('/api/version', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/finance', financeRoutes);
+app.use('/api/email', emailRoutes); // NEW: Email notification system
+app.use('/api/mobile-upload', mobileUploadRoutes); // NEW: Mobile physical report upload
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/racks', rackRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/prepaid', prepaidRoutes); // Legacy prepaid (backward compatibility)
+app.use('/api/contracts', contractRoutes); // NEW: Contract management system
 app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/company', companyRoutes);
@@ -193,6 +204,7 @@ const startServer = async () => {
   try {
     // 404 handler - registered AFTER plugins so their routes work
     app.use((req, res) => {
+      console.log(`❌ 404 Route not found: ${req.method} ${req.originalUrl}`);
       res.status(404).json({ error: 'Route not found' });
     });
   } catch (error) {
@@ -205,6 +217,9 @@ const startServer = async () => {
     console.log(`📊 Environment: ${process.env.NODE_ENV}`);
     console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}`);
     console.log(`🚛 Fleet Management: ${process.env.FLEET_ENABLED === 'true' ? '✅ ENABLED' : '❌ DISABLED'}`);
+
+    // Start notification cron jobs
+    startAllNotificationJobs();
   });
 };
 

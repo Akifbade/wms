@@ -123,17 +123,28 @@ export async function calculateShipmentCharges(
             };
         }
     } else {
-        // ✅ COMPANY DEFAULT: Use billing settings rates
+        // ✅ COMPANY DEFAULT: Use billing settings rates based on storageRateType
         console.log(`💰 Using COMPANY DEFAULT rates for shipment ${shipment.referenceId}`);
 
-        // Use storageRatePerBox from BillingSettings (existing field)
-        const boxCount = shipment.boxes.length;
-        baseCharge = boxCount * billingSettings.storageRatePerBox * chargeableDays;
-        rateUsed = {
-            type: 'COMPANY_DEFAULT',
-            ratePerBoxPerDay: billingSettings.storageRatePerBox,
-            source: `Company default: ${billingSettings.storageRatePerBox} KWD/box/day`
-        };
+        // Check if company uses CBM-based or Box-based billing
+        if (billingSettings.storageRateType === 'PER_CUBIC_M' && shipment.cbm && shipment.cbm > 0 && billingSettings.storageRatePerCBM) {
+            // CBM-based billing
+            baseCharge = shipment.cbm * billingSettings.storageRatePerCBM * chargeableDays;
+            rateUsed = {
+                type: 'COMPANY_DEFAULT',
+                ratePerCBMPerDay: billingSettings.storageRatePerCBM,
+                source: `Company default: ${billingSettings.storageRatePerCBM} KWD/m³/day`
+            };
+        } else {
+            // Box-based billing (default fallback)
+            const boxCount = shipment.boxes.length;
+            baseCharge = boxCount * billingSettings.storageRatePerBox * chargeableDays;
+            rateUsed = {
+                type: 'COMPANY_DEFAULT',
+                ratePerBoxPerDay: billingSettings.storageRatePerBox,
+                source: `Company default: ${billingSettings.storageRatePerBox} KWD/box/day`
+            };
+        }
     }
 
     // Apply minimum charge if configured
@@ -151,6 +162,8 @@ export async function calculateShipmentCharges(
         storageDescription = `Storage charges (${chargeableDays} days × ${shipment.cbm.toFixed(3)} m³ × ${shipment.customRatePerCBMPerDay} KWD/m³/day)`;
     } else if (shipment.customRateEnabled && shipment.customRatePerBoxPerDay) {
         storageDescription = `Storage charges (${chargeableDays} days × ${shipment.boxes.length} boxes × ${shipment.customRatePerBoxPerDay} KWD/box/day)`;
+    } else if (billingSettings.storageRateType === 'PER_CUBIC_M' && shipment.cbm && shipment.cbm > 0 && billingSettings.storageRatePerCBM) {
+        storageDescription = `Storage charges (${chargeableDays} days × ${shipment.cbm.toFixed(3)} m³ × ${billingSettings.storageRatePerCBM} KWD/m³/day)`;
     } else {
         storageDescription = `Storage charges (${chargeableDays} days × ${shipment.boxes.length} boxes × ${billingSettings.storageRatePerBox} KWD/box/day)`;
     }

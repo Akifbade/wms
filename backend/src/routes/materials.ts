@@ -4,9 +4,123 @@ import { authenticateToken, authorizeRoles, AuthRequest } from "../middleware/au
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
+import { sendNotification } from "../services/emailService";
 
 const prisma = new PrismaClient();
 const router = Router();
+
+async function buildJobMaterialsSummary(companyId: string, jobId: string) {
+  const issues = await prisma.materialIssue.findMany({
+    where: { companyId, jobId },
+    include: {
+      material: { select: { name: true, unit: true } },
+      returns: { select: { quantityGood: true, quantityDamaged: true } },
+    },
+    orderBy: { issuedAt: 'asc' },
+  });
+
+  const materials = issues.map(issue => {
+    const returnedGood = (issue.returns || []).reduce((sum, r) => sum + (r.quantityGood || 0), 0);
+    const damaged = (issue.returns || []).reduce((sum, r) => sum + (r.quantityDamaged || 0), 0);
+    const used = Math.max(0, (issue.quantity || 0) - returnedGood - damaged);
+    return {
+      name: issue.material?.name || 'Unknown',
+      unit: issue.material?.unit || 'pcs',
+      issued: issue.quantity || 0,
+      used,
+      returnedGood,
+      damaged,
+      totalCost: issue.totalCost || 0,
+    };
+  });
+
+  const totals = materials.reduce(
+    (acc, m) => {
+      acc.issued += m.issued;
+      acc.used += m.used;
+      acc.returnedGood += m.returnedGood;
+      acc.damaged += m.damaged;
+      acc.totalCost += m.totalCost;
+      return acc;
+    },
+    { issued: 0, used: 0, returnedGood: 0, damaged: 0, totalCost: 0 }
+  );
+
+  return { materials, totals };
+}
+
+async function applyDeferredReturnRestock(companyId: string, jobId: string) {
+  console.log(`[RESTOCK] ============ START RESTOCK FOR JOB ${jobId} ============`);
+  
+  const returns = await prisma.materialReturn.findMany({
+    where: {
+      companyId,
+      jobId,
+      restocked: false,
+      quantityGood: { gt: 0 },
+    },
+    select: { id: true, materialId: true, rackId: true, quantityGood: true },
+  });
+
+  console.log(`[RESTOCK] Found ${returns.length} pending returns for job ${jobId}`);
+  console.log(`[RESTOCK] Returns to process:`, JSON.stringify(returns, null, 2));
+
+  for (const r of returns) {
+    const qty = r.quantityGood || 0;
+    console.log(`[RESTOCK] Processing return ${r.id}: qty=${qty}, materialId=${r.materialId}, rackId=${r.rackId}`);
+    
+    if (qty <= 0) {
+      console.log(`[RESTOCK] Skipping return ${r.id} - quantity is 0`);
+      continue;
+    }
+
+    // Get material before update
+    const materialBefore = await prisma.packingMaterial.findUnique({ where: { id: r.materialId }, select: { totalQuantity: true, name: true } });
+    console.log(`[RESTOCK] Material ${r.materialId} (${materialBefore?.name}) BEFORE: totalQuantity=${materialBefore?.totalQuantity}`);
+
+    if (r.rackId) {
+      const uniqueBatchId = `RETURN-${r.id}`;
+      const rackBefore = await prisma.rackStockLevel.findUnique({
+        where: { materialId_rackId_stockBatchId: { materialId: r.materialId, rackId: r.rackId!, stockBatchId: uniqueBatchId } },
+        select: { quantity: true }
+      });
+      console.log(`[RESTOCK] Rack stock BEFORE: ${rackBefore?.quantity || 0}`);
+      
+      await prisma.rackStockLevel.upsert({
+        where: { materialId_rackId_stockBatchId: { materialId: r.materialId, rackId: r.rackId!, stockBatchId: uniqueBatchId } },
+        create: { materialId: r.materialId, rackId: r.rackId!, quantity: qty, companyId, stockBatchId: uniqueBatchId },
+        update: { quantity: { increment: qty } },
+      });
+      
+      const rackAfter = await prisma.rackStockLevel.findUnique({
+        where: { materialId_rackId_stockBatchId: { materialId: r.materialId, rackId: r.rackId!, stockBatchId: uniqueBatchId } },
+        select: { quantity: true }
+      });
+      console.log(`[RESTOCK] Rack stock AFTER: ${rackAfter?.quantity}`);
+      console.log(`[RESTOCK] ✅ Restocked return ${r.id} material ${r.materialId} qty ${qty} -> rack ${r.rackId}`);
+    } else {
+      console.warn(`[RESTOCK] ⚠️ Return ${r.id} has no rackId. Incrementing only totalQuantity.`);
+    }
+
+    await prisma.packingMaterial.update({
+      where: { id: r.materialId },
+      data: { totalQuantity: { increment: qty } },
+    });
+    
+    const materialAfter = await prisma.packingMaterial.findUnique({ where: { id: r.materialId }, select: { totalQuantity: true } });
+    console.log(`[RESTOCK] Material ${r.materialId} AFTER: totalQuantity=${materialAfter?.totalQuantity}`);
+
+    await prisma.materialReturn.update({
+      where: { id: r.id },
+      data: { restocked: true, restockedAt: new Date() },
+    });
+    console.log(`[RESTOCK] ✅ Marked return ${r.id} as restocked`);
+  }
+
+  console.log(`[RESTOCK] ============ END RESTOCK - Processed ${returns.length} returns ============`);
+  return { restockedCount: returns.length };
+}
 
 // Configure multer for damage photo uploads
 const damagePhotoStorage = multer.diskStorage({
@@ -418,9 +532,9 @@ router.get("/stock/unified", authenticateToken as any, async (req: AuthRequest, 
       }))
     );
 
-    // Combine and sort by date (newest first)
+    // Combine and sort by ORDER DATE (newest purchase first)
     const unified = [...normalizedBatches, ...normalizedPurchases]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
 
     res.json(unified);
   } catch (error) {
@@ -629,6 +743,23 @@ async function handleCreateIssue(req: AuthRequest, res: any) {
     // Update material total quantity
     await prisma.packingMaterial.update({ where: { id: materialId }, data: { totalQuantity: Math.max(0, (material.totalQuantity || 0) - quantity) } });
 
+    // Send email notification for material issued
+    try {
+      const job = jobId ? await prisma.movingJob.findUnique({ where: { id: jobId } }) : null;
+      const company = await prisma.company.findUnique({ where: { id: companyId } });
+      const issuedBy = await prisma.user.findUnique({ where: { id: req.user!.id } });
+
+      await sendNotification(companyId, 'MATERIAL_ISSUED', {
+        jobCode: job?.jobCode || reference || 'Direct Issue',
+        materials: [{ name: material.name, quantity, unit: material.unit || 'pcs' }],
+        issuedBy: issuedBy?.name || 'System',
+        issuedAt: new Date().toLocaleString(),
+        companyName: company?.name || 'WMS',
+      });
+    } catch (emailErr) {
+      console.error('Email notification error:', emailErr);
+    }
+
     res.status(201).json(issue);
   } catch (error) {
     console.error("Error creating material issue:", error);
@@ -654,14 +785,31 @@ router.get("/issues/history", authenticateToken as any, async (req: AuthRequest,
 
     const whereClause: any = { companyId };
     if (startDate && endDate) {
-      // Parse range as UTC to avoid timezone shifts. Use lt (less-than) with next day start to avoid inclusive/exclusive datetime issues
-      const start = new Date(`${startDate}T00:00:00.000Z`);
-      const endNextDay = new Date(`${endDate}T00:00:00.000Z`);
-      endNextDay.setUTCDate(endNextDay.getUTCDate() + 1);
-      whereClause.performedAt = {
-        gte: start,
-        lt: endNextDay
-      };
+      // Parse range. Check if it's already ISO format or just date
+      const startStr = String(startDate).replace(/['"]/g, '');
+      const endStr = String(endDate).replace(/['"]/g, '');
+
+      console.log(`Parsing dates - Start: "${startStr}", End: "${endStr}"`);
+
+      let start = new Date(startStr);
+      if (isNaN(start.getTime()) && !startStr.includes('T')) {
+        start = new Date(`${startStr}T00:00:00.000Z`);
+      }
+
+      let end = new Date(endStr);
+      if (isNaN(end.getTime()) && !endStr.includes('T')) {
+        end = new Date(`${endStr}T23:59:59.999Z`);
+      }
+
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        console.error('Invalid Date parsed:', { startStr, endStr });
+        // Fallback to current date range if invalid
+        start = new Date();
+        start.setMonth(start.getMonth() - 1);
+        end = new Date();
+      }
+
+      whereClause.performedAt = { gte: start, lte: end };
     }
 
     console.log(`Getting history for company ${companyId} - startDate: ${startDate}, endDate: ${endDate}`);
@@ -904,23 +1052,56 @@ router.delete("/issues/:id", authenticateToken as any, authorizeRoles('ADMIN'), 
 async function handleCreateReturn(req: AuthRequest, res: any) {
   try {
     const { companyId } = req.user!;
-    const { jobId, materialId, issueId, quantityGood, quantityDamaged, rackId, notes } = req.body;
+    const { jobId, materialId, issueId, quantityGood, quantityDamaged, rackId, notes, generateUploadToken } = req.body;
 
     if (!jobId || !materialId) {
       return res.status(400).json({ error: "Missing required fields" });
     }
+
+    // Parse quantities as integers (FormData sends strings)
+    const parsedQuantityGood = parseInt(quantityGood) || 0;
+    const parsedQuantityDamaged = parseInt(quantityDamaged) || 0;
+
+    const job = await prisma.movingJob.findFirst({
+      where: { id: jobId, companyId },
+      select: { id: true, status: true, jobCode: true },
+    });
+
+    // If job has pending approval, defer restock until approval
+    const pendingJobCompletionApproval = await prisma.materialApproval.findFirst({
+      where: {
+        companyId,
+        jobId,
+        approvalType: 'JOB_COMPLETION_REPORT',
+        status: 'PENDING',
+      },
+      select: { id: true },
+    });
+    // ALWAYS defer restock if there's a pending approval (job can be PENDING_APPROVAL or COMPLETED)
+    const shouldDeferRestock = Boolean(pendingJobCompletionApproval);
+
+    // Generate upload token if requested (for mobile upload)
+    const uploadToken = generateUploadToken === 'true' || generateUploadToken === true 
+      ? crypto.randomBytes(32).toString('hex') 
+      : null;
+    const uploadTokenExpiry = uploadToken 
+      ? new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
+      : null;
 
     const return_ = await prisma.materialReturn.create({
       data: {
         jobId,
         materialId,
         issueId,
-        quantityGood: quantityGood || 0,
-        quantityDamaged: quantityDamaged || 0,
+        quantityGood: parsedQuantityGood,
+        quantityDamaged: parsedQuantityDamaged,
         rackId,
         recordedById: req.user!.id,
         notes,
         companyId,
+        uploadToken,
+        uploadTokenExpiry,
+        physicalReportUrl: null, // Will be set when file is uploaded
       },
       include: {
         material: true,
@@ -928,20 +1109,9 @@ async function handleCreateReturn(req: AuthRequest, res: any) {
       },
     });
 
-    // Auto-restock good materials to specified rack
-    if (quantityGood > 0 && rackId) {
-      const uniqueBatchId = `RETURN-${return_.id}`;
-      await prisma.rackStockLevel.upsert({
-        where: { materialId_rackId_stockBatchId: { materialId, rackId, stockBatchId: uniqueBatchId } },
-        create: { materialId, rackId, quantity: quantityGood, companyId, stockBatchId: uniqueBatchId },
-        update: { quantity: { increment: quantityGood } },
-      });
-
-      const material = await prisma.packingMaterial.findUnique({ where: { id: materialId } });
-      await prisma.packingMaterial.update({ where: { id: materialId }, data: { totalQuantity: (material?.totalQuantity || 0) + quantityGood } });
-
-      await prisma.materialReturn.update({ where: { id: return_.id }, data: { restocked: true, restockedAt: new Date() } });
-    }
+    // Don't restock immediately - wait for approval
+    // Restock will happen in approval endpoint when manager approves
+    // (All returns now require approval before restocking)
 
     // Handle any uploaded files for damaged items
     let photoUrls: string[] = [];
@@ -950,21 +1120,69 @@ async function handleCreateReturn(req: AuthRequest, res: any) {
       photoUrls = files.map(f => `/uploads/damages/${f.filename}`);
     }
 
-    if (quantityDamaged > 0) {
+    if (parsedQuantityDamaged > 0) {
       await prisma.materialDamage.create({
         data: {
           returnId: return_.id,
           materialId,
-          quantity: quantityDamaged,
+          quantity: parsedQuantityDamaged,
           recordedById: req.user!.id,
           status: "PENDING",
           photoUrls: photoUrls.length > 0 ? photoUrls.join(',') : null,
           companyId,
         }
       });
+
+      // Send damage notification
+      try {
+        const job = await prisma.movingJob.findUnique({ where: { id: jobId } });
+        const company = await prisma.company.findUnique({ where: { id: companyId } });
+        const reportedBy = await prisma.user.findUnique({ where: { id: req.user!.id } });
+
+        await sendNotification(companyId, 'MATERIAL_DAMAGED', {
+          jobCode: job?.jobCode || 'Unknown',
+          materials: [{ name: return_.material.name, quantity: parsedQuantityDamaged, damageType: 'General Damage', cost: 0 }],
+          reportedBy: reportedBy?.name || 'System',
+          reportedAt: new Date().toLocaleString(),
+          totalDamageCost: 0,
+          currency: company?.currency || 'KWD',
+          companyName: company?.name || 'WMS',
+        });
+      } catch (emailErr) {
+        console.error('Email notification error:', emailErr);
+      }
     }
 
-    res.status(201).json(return_);
+    // Send return notification
+    try {
+      const jobFull = await prisma.movingJob.findUnique({ where: { id: jobId } });
+      const company = await prisma.company.findUnique({ where: { id: companyId } });
+      const returnedBy = await prisma.user.findUnique({ where: { id: req.user!.id } });
+
+      await sendNotification(companyId, 'MATERIAL_RETURNED', {
+        jobCode: jobFull?.jobCode || job?.jobCode || 'Unknown',
+        materials: [{
+          name: return_.material.name,
+          quantity: parsedQuantityGood + parsedQuantityDamaged,
+          unit: return_.material.unit || 'pcs',
+          condition: parsedQuantityDamaged > 0 ? `${parsedQuantityGood} Good, ${parsedQuantityDamaged} Damaged` : 'Good'
+        }],
+        returnedBy: returnedBy?.name || 'System',
+        returnedAt: new Date().toLocaleString(),
+        companyName: company?.name || 'WMS',
+      });
+    } catch (emailErr) {
+      console.error('Email notification error:', emailErr);
+    }
+
+    res.status(201).json({
+      ...return_,
+      restockDeferred: shouldDeferRestock,
+      pendingApprovalId: pendingJobCompletionApproval?.id || null,
+      uploadToken, // For QR code generation
+      uploadTokenExpiry,
+      uploadUrl: uploadToken ? `/mobile-upload/${uploadToken}` : null,
+    });
   } catch (error) {
     console.error("Error creating material return:", error);
     res.status(500).json({ error: "Failed to record material return" });
@@ -1012,6 +1230,40 @@ router.get("/approvals", authenticateToken as any, async (req: AuthRequest, res)
 });
 
 /**
+ * GET /api/materials/approvals/:approvalId
+ * Get a single approval with optional job-completion materials summary
+ */
+router.get("/approvals/:approvalId", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    const { approvalId } = req.params;
+
+    const approval = await prisma.materialApproval.findFirst({
+      where: { id: approvalId, companyId },
+      include: {
+        job: { select: { id: true, jobCode: true, jobTitle: true, clientName: true, status: true } },
+        requestedBy: { select: { id: true, name: true, email: true } },
+        decisionBy: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (!approval) {
+      return res.status(404).json({ error: 'Approval not found' });
+    }
+
+    if (approval.approvalType === 'JOB_COMPLETION_REPORT') {
+      const summary = await buildJobMaterialsSummary(companyId, approval.jobId);
+      return res.json({ approval, ...summary });
+    }
+
+    return res.json({ approval });
+  } catch (error) {
+    console.error('Error fetching approval:', error);
+    res.status(500).json({ error: 'Failed to fetch approval' });
+  }
+});
+
+/**
  * POST /api/materials/approvals
  * Request approval for material return or damage
  */
@@ -1051,9 +1303,18 @@ router.patch("/approvals/:approvalId", authenticateToken as any, async (req: Aut
   try {
     const { approvalId } = req.params;
     const { status, notes } = req.body;
+    const { companyId } = req.user!;
 
     if (!["APPROVED", "REJECTED"].includes(status)) {
       return res.status(400).json({ error: "Invalid status. Must be APPROVED or REJECTED" });
+    }
+
+    const existingApproval = await prisma.materialApproval.findFirst({
+      where: { id: approvalId, companyId },
+    });
+
+    if (!existingApproval) {
+      return res.status(404).json({ error: "Approval not found" });
     }
 
     const approval = await prisma.materialApproval.update({
@@ -1065,6 +1326,84 @@ router.patch("/approvals/:approvalId", authenticateToken as any, async (req: Aut
         decisionNotes: notes,
       },
     });
+
+    // If this is a job completion report approval, send the completion email AFTER approval
+    if (status === 'APPROVED' && existingApproval.approvalType === 'JOB_COMPLETION_REPORT') {
+      try {
+        // Apply any deferred restock from returns recorded while approval was pending
+        const restockResult = await applyDeferredReturnRestock(companyId, existingApproval.jobId);
+        console.log(`[RESTOCK] Approval ${approvalId} -> restocked ${restockResult.restockedCount} returns`);
+
+        const job = await prisma.movingJob.findFirst({
+          where: { id: existingApproval.jobId, companyId },
+        });
+
+        if (job) {
+          // Update job status to COMPLETED now that it's approved
+          await prisma.movingJob.update({
+            where: { id: job.id },
+            data: { status: 'COMPLETED' },
+          });
+
+          const company = await prisma.company.findUnique({ where: { id: companyId } });
+
+          const { materials, totals } = await buildJobMaterialsSummary(companyId, job.id);
+
+          await sendNotification(companyId, 'MOVING_JOB_COMPLETED', {
+            jobCode: job.jobCode,
+            customerName: job.clientName,
+            completedAt: approval.decidedAt ? new Date(approval.decidedAt).toLocaleString() : new Date().toLocaleString(),
+            totalAmount: (job as any).totalCost || totals.totalCost || 0,
+            currency: company?.currency || 'KWD',
+            companyName: company?.name || 'WMS',
+            approvedBy: req.user?.name || 'Manager',
+            approvalNotes: notes || '',
+            materials,
+            totals,
+          });
+        }
+      } catch (emailErr) {
+        console.error('Error sending MOVING_JOB_COMPLETED after approval:', emailErr);
+      }
+    }
+
+    // If this is a job completion report REJECTION, notify job creator and reset job status
+    if (status === 'REJECTED' && existingApproval.approvalType === 'JOB_COMPLETION_REPORT') {
+      try {
+        const job = await prisma.movingJob.findFirst({
+          where: { id: existingApproval.jobId, companyId },
+          include: {
+            teamLeader: { select: { name: true, email: true } },
+          },
+        });
+
+        if (job) {
+          // Reset job status to IN_PROGRESS so they can re-work and re-submit
+          await prisma.movingJob.update({
+            where: { id: job.id },
+            data: { status: 'IN_PROGRESS' },
+          });
+
+          const company = await prisma.company.findUnique({ where: { id: companyId } });
+
+          const { materials, totals } = await buildJobMaterialsSummary(companyId, job.id);
+
+          // Send rejection notification to job creator/team leader
+          await sendNotification(companyId, 'JOB_COMPLETION_REJECTED', {
+            jobCode: job.jobCode,
+            customerName: job.clientName,
+            rejectedBy: req.user?.name || 'Manager',
+            rejectedAt: approval.decidedAt ? new Date(approval.decidedAt).toLocaleString() : new Date().toLocaleString(),
+            rejectionReason: notes || 'No reason provided',
+            companyName: company?.name || 'WMS',
+            materials,
+            totals,
+          });
+        }
+      } catch (emailErr) {
+        console.error('Error sending JOB_COMPLETION_REJECTED notification:', emailErr);
+      }
+    }
 
     res.json(approval);
   } catch (error) {
@@ -1835,7 +2174,7 @@ router.post("/purchase-orders", authenticateToken as any, async (req: AuthReques
       notes
     } = req.body;
 
-    if (!orderNumber || !vendorName || !materialId || !quantity || unitCost === undefined) {
+    if (!vendorName || !materialId || !quantity || unitCost === undefined) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -1843,10 +2182,38 @@ router.post("/purchase-orders", authenticateToken as any, async (req: AuthReques
 
     // Use a transaction to ensure data consistency
     const result = await prisma.$transaction(async (prisma) => {
+      // Auto-generate unique order number if not provided
+      let finalOrderNumber = orderNumber;
+      if (!finalOrderNumber) {
+        const lastOrder = await prisma.purchaseOrder.findFirst({
+          where: { companyId },
+          orderBy: { createdAt: 'desc' }
+        });
+
+        const timestamp = Date.now().toString().slice(-6);
+        const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        finalOrderNumber = `PO${timestamp}${randomNum}`;
+      }
+
+      // Check if order number already exists for this company
+      const existingOrder = await prisma.purchaseOrder.findFirst({
+        where: {
+          orderNumber: finalOrderNumber,
+          companyId
+        }
+      });
+
+      if (existingOrder) {
+        // Generate a guaranteed unique number with timestamp
+        const timestamp = Date.now();
+        const randomNum = Math.floor(Math.random() * 10000);
+        finalOrderNumber = `PO${timestamp}${randomNum}`;
+      }
+
       // Create purchase order
       const purchaseOrder = await prisma.purchaseOrder.create({
         data: {
-          orderNumber,
+          orderNumber: finalOrderNumber,
           vendorName,
           vendorId: vendorId || null,
           orderDate: orderDate ? new Date(orderDate) : new Date(),
@@ -1925,11 +2292,15 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
     const { companyId } = req.user!;
     const { startDate, endDate, materialId } = req.query;
 
+    console.log(`[MATERIAL-STATEMENT] Query params - startDate: ${startDate}, endDate: ${endDate}, materialId: ${materialId}, companyId: ${companyId}`);
+
     // Build date filter
     const dateFilter = startDate && endDate ? {
       gte: new Date(startDate as string),
       lte: new Date(endDate as string)
     } : undefined;
+
+    console.log(`[MATERIAL-STATEMENT] Date filter - gte: ${dateFilter?.gte}, lte: ${dateFilter?.lte}`);
 
     // Get all materials
     const materialsWhere: any = { companyId, isActive: true };
@@ -1949,11 +2320,11 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
       const transactions: any[] = [];
 
       // 1a. Get all PURCHASES from Purchase Orders (Stock IN)
+      // Fetch all PO items for this material, then filter by date in code to avoid Prisma relation filter issues
       const purchaseItems = await prisma.purchaseOrderItem.findMany({
         where: {
           materialId: material.id,
-          companyId,
-          ...(dateFilter ? { purchaseOrder: { orderDate: dateFilter } } : {})
+          companyId
         },
         include: {
           purchaseOrder: {
@@ -1963,22 +2334,43 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
         orderBy: { purchaseOrder: { orderDate: 'asc' } }
       });
 
+      console.log(`[MATERIAL-STATEMENT] Material ${material.name} (${material.id}) - Found ${purchaseItems.length} PO items`);
+
       for (const item of purchaseItems) {
-        if (item.purchaseOrder.status === 'RECEIVED') {
-          transactions.push({
-            id: item.id,
-            date: item.purchaseOrder.orderDate,
-            type: 'PURCHASE',
-            description: `Purchased from ${item.purchaseOrder.vendorName || item.purchaseOrder.vendor?.name || 'Unknown Vendor'}`,
-            reference: item.purchaseOrder.orderNumber,
-            referenceType: 'purchase_order',
-            referenceId: item.purchaseOrder.id,
-            stockIn: item.quantity,
-            stockOut: 0,
-            unitCost: item.unitCost,
-            totalCost: item.totalCost
-          });
+        // Check if PO is RECEIVED
+        if (item.purchaseOrder.status !== 'RECEIVED') {
+          console.log(`[MATERIAL-STATEMENT] Skipping PO ${item.purchaseOrder.orderNumber} - status: ${item.purchaseOrder.status}`);
+          continue;
         }
+
+        // Apply date filter in code if present
+        if (dateFilter) {
+          const orderDate = new Date(item.purchaseOrder.orderDate);
+          console.log(`[MATERIAL-STATEMENT] PO ${item.purchaseOrder.orderNumber} orderDate: ${orderDate.toISOString()}, filter gte: ${dateFilter.gte?.toISOString()}, filter lte: ${dateFilter.lte?.toISOString()}`);
+          if (dateFilter.gte && orderDate < dateFilter.gte) {
+            console.log(`[MATERIAL-STATEMENT] SKIPPED - orderDate < gte`);
+            continue;
+          }
+          if (dateFilter.lte && orderDate > dateFilter.lte) {
+            console.log(`[MATERIAL-STATEMENT] SKIPPED - orderDate > lte`);
+            continue;
+          }
+          console.log(`[MATERIAL-STATEMENT] PASSED date filter`);
+        }
+
+        transactions.push({
+          id: item.id,
+          date: item.purchaseOrder.orderDate,
+          type: 'PURCHASE',
+          description: `Purchased from ${item.purchaseOrder.vendorName || item.purchaseOrder.vendor?.name || 'Unknown Vendor'}`,
+          reference: item.purchaseOrder.orderNumber,
+          referenceType: 'purchase_order',
+          referenceId: item.purchaseOrder.id,
+          stockIn: item.quantity,
+          stockOut: 0,
+          unitCost: item.unitCost,
+          totalCost: item.totalCost
+        });
       }
 
       // 1b. Get all PURCHASES from Stock Batches (Stock IN)
@@ -2058,16 +2450,22 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
 
       for (const ret of returns) {
         if (ret.quantityGood > 0) {
+          // Check if this return is waiting for approval
+          const isPendingApproval = ret.restocked === false;
+          
           transactions.push({
             id: ret.id,
             date: ret.recordedAt,
-            type: 'RETURN',
-            description: `Returned from Job: ${ret.issue?.job?.jobCode || 'N/A'} (Good condition)`,
+            type: isPendingApproval ? 'RETURN_PENDING_APPROVAL' : 'RETURN',
+            description: isPendingApproval 
+              ? `🕒 Returned from Job: ${ret.issue?.job?.jobCode || 'N/A'} (WAITING FOR APPROVAL)`
+              : `Returned from Job: ${ret.issue?.job?.jobCode || 'N/A'} (Good condition)`,
             reference: ret.issue?.job?.jobCode || 'N/A',
             referenceType: 'moving_job',
             referenceId: ret.issue?.jobId,
-            stockIn: ret.quantityGood,
+            stockIn: isPendingApproval ? 0 : ret.quantityGood,  // Don't add to balance until approved
             stockOut: 0,
+            pendingApproval: isPendingApproval ? ret.quantityGood : 0,  // Show separately
             unitCost: ret.issue?.unitCost || 0,
             totalCost: ret.quantityGood * (ret.issue?.unitCost || 0),
             recordedBy: ret.recordedBy?.name || 'Unknown'
@@ -2107,7 +2505,7 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
         });
       }
 
-      // Sort all transactions by date
+      // Sort all transactions by date - OLDEST FIRST for balance calculation
       transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       // Calculate OPENING STOCK (transactions BEFORE the date range)
@@ -2174,6 +2572,9 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
         txn.balance = runningBalance;
       }
 
+      // Reverse to show NEWEST FIRST for display
+      transactions.reverse();
+
       // Calculate totals
       const totals = {
         openingStock: openingStock,
@@ -2200,7 +2601,21 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
         transactions,
         totals
       });
+
+      // Debug: Log totals for each material
+      if (transactions.length > 0) {
+        console.log(`[MATERIAL-STATEMENT] ${material.name} - Transactions: ${transactions.length}, TotalPurchased: ${totals.totalPurchased}`);
+      }
     }
+
+    // Sort statements by most recent transaction date (newest activity first)
+    statements.sort((a, b) => {
+      // Get the most recent transaction date for each material
+      // Since transactions are already reversed (newest first), first transaction is the most recent
+      const aLatest = a.transactions.length > 0 ? new Date(a.transactions[0].date).getTime() : 0;
+      const bLatest = b.transactions.length > 0 ? new Date(b.transactions[0].date).getTime() : 0;
+      return bLatest - aLatest; // Newest first
+    });
 
     // Overall summary
     const overallSummary = {
@@ -2214,10 +2629,185 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
       totalValue: statements.reduce((sum, s) => sum + s.totals.totalValue, 0)
     };
 
+    console.log(`[MATERIAL-STATEMENT] OVERALL SUMMARY - totalPurchased: ${overallSummary.totalPurchased}, totalMaterials: ${overallSummary.totalMaterials}`);
+
     res.json({ statements, summary: overallSummary });
   } catch (error) {
     console.error("Error generating material statement:", error);
     res.status(500).json({ error: "Failed to generate material statement" });
+  }
+});
+
+
+/**
+ * PUT /api/materials/returns/:id
+ * Update a material return
+ */
+router.put("/returns/:id", authenticateToken as any, authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    const { id } = req.params;
+    const { quantityGood, quantityDamaged, notes } = req.body;
+
+    const existingReturn = await prisma.materialReturn.findFirst({
+      where: { id, companyId },
+      include: { material: true }
+    });
+
+    if (!existingReturn) {
+      return res.status(404).json({ error: "Return not found" });
+    }
+
+    const oldQtyGood = existingReturn.quantityGood;
+    const newQtyGood = parseInt(quantityGood);
+    const diffQtyGood = newQtyGood - oldQtyGood;
+
+    // Update stock if quantity good changed
+    if (diffQtyGood !== 0 && existingReturn.rackId) {
+      const uniqueBatchId = `RETURN-${existingReturn.id}`;
+
+      // Update rack stock
+      const rackStock = await prisma.rackStockLevel.findUnique({
+        where: { materialId_rackId_stockBatchId: { materialId: existingReturn.materialId, rackId: existingReturn.rackId, stockBatchId: uniqueBatchId } }
+      });
+
+      if (rackStock) {
+        await prisma.rackStockLevel.update({
+          where: { materialId_rackId_stockBatchId: { materialId: existingReturn.materialId, rackId: existingReturn.rackId, stockBatchId: uniqueBatchId } },
+          data: { quantity: { increment: diffQtyGood } }
+        });
+      } else if (newQtyGood > 0) {
+        // If it didn't exist (maybe deleted manually?), create it
+        await prisma.rackStockLevel.create({
+          data: {
+            materialId: existingReturn.materialId,
+            rackId: existingReturn.rackId,
+            quantity: newQtyGood,
+            companyId,
+            stockBatchId: uniqueBatchId
+          }
+        });
+      }
+
+      // Update material total
+      await prisma.packingMaterial.update({
+        where: { id: existingReturn.materialId },
+        data: { totalQuantity: { increment: diffQtyGood } }
+      });
+    }
+
+    // Update return record
+    const updatedReturn = await prisma.materialReturn.update({
+      where: { id },
+      data: {
+        quantityGood: newQtyGood,
+        quantityDamaged: parseInt(quantityDamaged),
+        notes
+      }
+    });
+
+    // Log history
+    if (existingReturn.issueId) {
+      await prisma.materialIssueHistory.create({
+        data: {
+          issueId: existingReturn.issueId,
+          action: 'RETURN_EDITED',
+          jobId: existingReturn.jobId,
+          materialId: existingReturn.materialId,
+          materialName: existingReturn.material.name,
+          materialSku: existingReturn.material.sku,
+          quantity: newQtyGood, // Tracking the returned good quantity
+          previousQty: oldQtyGood,
+          unitCost: 0, // Not relevant for return edit
+          totalCost: 0,
+          rackId: existingReturn.rackId,
+          notes: notes || existingReturn.notes,
+          reason: 'Return record updated',
+          performedById: req.user!.id,
+          companyId
+        }
+      });
+    }
+
+    res.json(updatedReturn);
+  } catch (error) {
+    console.error("Error updating return:", error);
+    res.status(500).json({ error: "Failed to update return" });
+  }
+});
+
+/**
+ * DELETE /api/materials/returns/:id
+ * Delete a material return
+ */
+router.delete("/returns/:id", authenticateToken as any, authorizeRoles('ADMIN'), async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    const { id } = req.params;
+
+    const existingReturn = await prisma.materialReturn.findFirst({
+      where: { id, companyId },
+      include: { material: true }
+    });
+
+    if (!existingReturn) {
+      return res.status(404).json({ error: "Return not found" });
+    }
+
+    // Reverse stock addition
+    if (existingReturn.quantityGood > 0 && existingReturn.rackId) {
+      const uniqueBatchId = `RETURN-${existingReturn.id}`;
+
+      // Decrease rack stock
+      try {
+        await prisma.rackStockLevel.update({
+          where: { materialId_rackId_stockBatchId: { materialId: existingReturn.materialId, rackId: existingReturn.rackId, stockBatchId: uniqueBatchId } },
+          data: { quantity: { decrement: existingReturn.quantityGood } }
+        });
+      } catch (e) {
+        // Ignore if not found
+      }
+
+      // Decrease material total
+      await prisma.packingMaterial.update({
+        where: { id: existingReturn.materialId },
+        data: { totalQuantity: { decrement: existingReturn.quantityGood } }
+      });
+    }
+
+    // Log history BEFORE deletion
+    if (existingReturn.issueId) {
+      await prisma.materialIssueHistory.create({
+        data: {
+          issueId: existingReturn.issueId,
+          action: 'RETURN_DELETED',
+          jobId: existingReturn.jobId,
+          materialId: existingReturn.materialId,
+          materialName: existingReturn.material.name,
+          materialSku: existingReturn.material.sku,
+          quantity: existingReturn.quantityGood,
+          previousQty: null,
+          unitCost: 0,
+          totalCost: 0,
+          rackId: existingReturn.rackId,
+          notes: existingReturn.notes,
+          reason: 'Return record deleted',
+          performedById: req.user!.id,
+          companyId
+        }
+      });
+    }
+
+    // Delete damages
+    await prisma.materialDamage.deleteMany({ where: { returnId: id } });
+
+    // Delete return
+    await prisma.materialReturn.delete({ where: { id } });
+
+    res.json({ message: "Return deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting return:", error);
+    res.status(500).json({ error: "Failed to delete return" });
   }
 });
 

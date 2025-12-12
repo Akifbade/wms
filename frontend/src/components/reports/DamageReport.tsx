@@ -70,14 +70,14 @@ export const DamageReport: React.FC = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) {
         console.error('Failed to load damage report: HTTP', response.status);
         setDamages([]);
         setSummary(null);
         return;
       }
-      
+
       const data = await response.json();
       setDamages(data.damages || []);
       setSummary(data.summary || null);
@@ -97,7 +97,7 @@ export const DamageReport: React.FC = () => {
       alert('No damage records to export');
       return;
     }
-    
+
     const headers = ['Date', 'Job Code', 'Material', 'SKU', 'Quantity', 'Reason', 'Value', 'Recorded By'];
     const rows = damages.map(d => [
       new Date(d.recordedAt).toLocaleDateString(),

@@ -61,7 +61,7 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
 
   const loadCustomFieldsWithValues = async () => {
     if (!job?.id) return;
-    
+
     try {
       // Load custom field definitions
       const fieldsResponse = await fetch('/api/custom-fields?section=JOB', {
@@ -69,7 +69,7 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         }
       });
-      
+
       if (fieldsResponse.ok) {
         const fieldsData = await fieldsResponse.json();
         const fields = fieldsData.customFields || fieldsData;
@@ -103,6 +103,26 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleCompleteJob = () => {
+    if (confirm('Are you sure you want to complete this job? This will open the material return form.')) {
+      setShowReturnModal(true);
+    }
+  };
+
+  const handleReturnSuccess = async () => {
+    try {
+      // Update job status to COMPLETED
+      await jobsAPI.update(job.id, { status: 'COMPLETED' });
+
+      setShowReturnModal(false);
+      onSuccess();
+      onClose();
+    } catch (err) {
+      console.error('Failed to complete job:', err);
+      alert('Failed to update job status to COMPLETED');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -164,7 +184,7 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
           }
         }
       }
-      
+
       // Update job successfully
       setSuccess('Moving job updated successfully! ✅');
       setTimeout(() => {
@@ -370,7 +390,7 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
                       {field.fieldName}
                       {field.isRequired && <span className="text-red-500 ml-1">*</span>}
                     </label>
-                    
+
                     {field.fieldType === 'TEXT' && (
                       <input
                         type="text"
@@ -453,6 +473,16 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
             >
               Cancel
             </button>
+            {formData.status !== 'COMPLETED' && (
+              <button
+                type="button"
+                onClick={handleCompleteJob}
+                className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-medium"
+                disabled={loading}
+              >
+                Complete Job
+              </button>
+            )}
             <button
               type="submit"
               className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
@@ -467,17 +497,9 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
       {/* Material Return Modal */}
       <MaterialReturnModal
         isOpen={showReturnModal}
-        onClose={() => {
-          setShowReturnModal(false);
-          onSuccess();
-          onClose();
-        }}
+        onClose={() => setShowReturnModal(false)}
         jobId={job?.id || ''}
-        onSuccess={() => {
-          setShowReturnModal(false);
-          onSuccess();
-          onClose();
-        }}
+        onSuccess={handleReturnSuccess}
       />
     </div>
   );

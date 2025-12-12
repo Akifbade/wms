@@ -53,7 +53,8 @@ export const Shipments: React.FC = () => {
       setLoading(true);
 
       // Load all shipments first for counts (without filters)
-      const allData = await shipmentsAPI.getAll({});
+      // 🔧 FIX: Request high limit to get ALL shipments, not just first 50
+      const allData = await shipmentsAPI.getAll({ limit: 2000 });
       const allShipments = allData.shipments || [];
 
       // Calculate status counts (Schema: PENDING, IN_WAREHOUSE, PARTIAL, RELEASED)
@@ -75,7 +76,8 @@ export const Shipments: React.FC = () => {
       setWarehouseCounts(warehouseCounts);
 
       // Now load filtered shipments for display
-      const params: any = {};
+      // 🔧 FIX: Request high limit to get ALL shipments for Folder View
+      const params: any = { limit: 2000 };
       if (activeTab !== 'all') {
         params.status = activeTab === 'in_storage' ? 'IN_WAREHOUSE' : activeTab.toUpperCase();
       }
@@ -291,14 +293,14 @@ export const Shipments: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 p-6 space-y-6">
+    <div className="min-h-screen bg-slate-50 p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white rounded-xl shadow-sm p-6 border border-slate-200">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-semibold text-slate-900">
             📦 Warehouse Shipments
           </h1>
-          <p className="text-gray-600 mt-2 text-lg">Complete warehouse management with intake, tracking, and release</p>
+          <p className="text-slate-600 mt-2">Complete warehouse management with intake, tracking, and release</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Print Report Buttons */}
@@ -312,11 +314,10 @@ export const Shipments: React.FC = () => {
           {/* New Shipment Button */}
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="group relative inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold overflow-hidden"
+            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
-            <PlusIcon className="h-6 w-6 mr-2 relative z-10" />
-            <span className="relative z-10">📦 New Shipment Intake</span>
+            <PlusIcon className="h-5 w-5 mr-2" />
+            New Shipment Intake
           </button>
         </div>
       </div>
@@ -328,46 +329,46 @@ export const Shipments: React.FC = () => {
       )}
 
       {/* Warehouse Type Filter */}
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg">
-            <FunnelIcon className="h-6 w-6 text-white" />
+          <div className="p-2 bg-slate-900 rounded-lg">
+            <FunnelIcon className="h-5 w-5 text-white" />
           </div>
-          <span className="text-lg font-bold text-gray-800">Shipment Type</span>
+          <span className="text-lg font-semibold text-slate-800">Shipment Type</span>
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => setWarehouseFilter('all')}
-            className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 ${warehouseFilter === 'all'
-              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 shadow-sm'
+            className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${warehouseFilter === 'all'
+              ? 'bg-slate-900 text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
           >
             All Types ({warehouseCounts.all})
           </button>
           <button
             onClick={() => setWarehouseFilter('regular')}
-            className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 flex items-center gap-2 ${warehouseFilter === 'regular'
-              ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 shadow-sm'
+            className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${warehouseFilter === 'regular'
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
           >
-            <HomeIcon className="h-5 w-5" />
-            Regular Shipments ({warehouseCounts.regular})
+            <HomeIcon className="h-4 w-4" />
+            Regular ({warehouseCounts.regular})
           </button>
           <button
             onClick={() => setWarehouseFilter('warehouse')}
-            className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 flex items-center gap-2 ${warehouseFilter === 'warehouse'
-              ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white shadow-lg'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 shadow-sm'
+            className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${warehouseFilter === 'warehouse'
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
           >
-            <BuildingStorefrontIcon className="h-5 w-5" />
-            Warehouse Shipments ({warehouseCounts.warehouse})
+            <BuildingStorefrontIcon className="h-4 w-4" />
+            Warehouse ({warehouseCounts.warehouse})
           </button>
           {longStayCounts.warning > 0 && (
             <button
-              className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-lg flex items-center gap-2 transform hover:scale-105 transition-all duration-300"
+              className="px-5 py-2.5 rounded-lg text-sm font-medium bg-yellow-500 text-white flex items-center gap-2 transition-colors"
               title="Shipments stored 30-60 days"
             >
               🟡 Warning: {longStayCounts.warning}
@@ -375,7 +376,7 @@ export const Shipments: React.FC = () => {
           )}
           {longStayCounts.urgent > 0 && (
             <button
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-100 text-red-700 border border-red-300 flex items-center gap-2 animate-pulse"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white border border-red-700 flex items-center gap-2"
               title="Shipments stored over 60 days"
             >
               🔴 Urgent: {longStayCounts.urgent}
@@ -743,9 +744,9 @@ export const Shipments: React.FC = () => {
                                   )}
                                 </div>
 
-                                {/* Rack Locations */}
+                                {/* Rack Locations with Move Indicator */}
                                 {shipment.rackLocations && shipment.rackLocations !== 'N/A' && (
-                                  <div className="flex items-center gap-2 text-sm">
+                                  <div className="flex items-center gap-2 text-sm flex-wrap">
                                     <span className="text-xs text-gray-600 font-semibold">Racks:</span>
                                     <div className="flex flex-wrap gap-1">
                                       {shipment.rackLocations.split(',').map((rack: string, idx: number) => (
@@ -754,6 +755,21 @@ export const Shipments: React.FC = () => {
                                         </span>
                                       ))}
                                     </div>
+                                    {/* Move History Indicator */}
+                                    {shipment.hasMoveHistory && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs font-semibold border border-purple-300">
+                                        🔄 Moved
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                {/* Original Rack if Moved */}
+                                {shipment.originalRack && shipment.originalRack !== shipment.rackLocations && (
+                                  <div className="flex items-center gap-2 text-xs text-gray-500 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                                    <span>📦 Originally in:</span>
+                                    <span className="font-semibold text-amber-700">{shipment.originalRack}</span>
+                                    <span>→</span>
+                                    <span className="font-semibold text-green-700">{shipment.rackLocations}</span>
                                   </div>
                                 )}
 

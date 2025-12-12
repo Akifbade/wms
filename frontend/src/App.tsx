@@ -4,6 +4,7 @@ import './App.css';
 import { VersionBadge } from './components/VersionBadge';
 import { Layout } from './components/Layout/Layout';
 import { Dashboard } from './pages/Dashboard/Dashboard';
+import { FinanceDashboard } from './pages/Finance/FinanceDashboard';
 import { Shipments } from './pages/Shipments/Shipments';
 import ShipmentReport from './pages/ShipmentReport/ShipmentReport';
 import { Racks } from './pages/Racks/Racks';
@@ -11,24 +12,25 @@ import { MovingJobs } from './pages/MovingJobs/MovingJobs';
 import { Settings } from './pages/Settings/Settings';
 import { Scanner } from './pages/Scanner/Scanner';
 import { Login } from './pages/Login/Login';
+import { SwiftCargoLanding } from './pages/Landing/SwiftCargoLanding';
 import { Invoices } from './pages/Invoices/Invoices';
 import { InvoiceDetail } from './pages/Invoices/InvoiceDetail';
 import { CompanyProfile } from './pages/CompanyProfile/CompanyProfile';
 import { CompaniesManagement } from './pages/Companies/CompaniesManagement';
 import { Expenses } from './pages/Expenses/Expenses';
 import { TemplateSettingsPage } from './pages/Settings/TemplateSettings';
+import EmailSettings from './pages/Settings/EmailSettings';
 import UserProfile from './pages/Profile/UserProfile';
 import JobReportsDashboard from './components/moving-jobs/JobReportsDashboard';
-import PluginSystemManager from './components/moving-jobs/PluginSystemManager';
 import ApprovalManager from './components/moving-jobs/ApprovalManager';
 import MaterialReports from './pages/Materials/MaterialReports';
 import MaterialsHub from './pages/Materials/MaterialsHub';
 import { DamageReport } from './components/reports/DamageReport';
 import { DebugLogin } from './pages/DebugLogin';
 import BackupManagement from './pages/BackupManagement/BackupManagement';
-import PluginSettings from './pages/Settings/PluginSettings';
 import SystemMonitorEnhanced from './pages/Admin/SystemMonitorEnhanced';
 import CompanyAnalytics from './pages/Analytics/CompanyAnalytics';
+import MobileUploadPage from './pages/MobileUpload/MobileUploadPage';
 
 import { getAuthToken } from './services/api';
 import { PermissionProvider } from './contexts/PermissionContext';
@@ -84,7 +86,9 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
+            <Route path="/landing" element={<SwiftCargoLanding />} />
             <Route path="/debug-login" element={<DebugLogin />} />
+            <Route path="/mobile-upload/:token" element={<MobileUploadPage />} />
 
 
 
@@ -95,6 +99,11 @@ function App() {
               {/* ADMIN & MANAGER Routes */}
               <Route path="dashboard" element={
                 <Dashboard />
+              } />
+              <Route path="finance" element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                  <FinanceDashboard />
+                </ProtectedRoute>
               } />
               <Route path="shipments" element={
                 <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
@@ -126,11 +135,6 @@ function App() {
                   <DamageReport />
                 </ProtectedRoute>
               } />
-              <Route path="analytics" element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
-                  <CompanyAnalytics />
-                </ProtectedRoute>
-              } />
               <Route path="moving-jobs" element={
                 <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                   <MovingJobs />
@@ -139,16 +143,6 @@ function App() {
               <Route path="job-reports" element={
                 <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                   <JobReportsDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="plugin-settings" element={
-                <ProtectedRoute allowedRoles={['ADMIN']}>
-                  <PluginSettings />
-                </ProtectedRoute>
-              } />
-              <Route path="plugin-system" element={
-                <ProtectedRoute allowedRoles={['ADMIN']}>
-                  <PluginSystemManager />
                 </ProtectedRoute>
               } />
               <Route path="approvals" element={
@@ -196,6 +190,11 @@ function App() {
               <Route path="settings/templates" element={
                 <ProtectedRoute allowedRoles={['ADMIN']}>
                   <TemplateSettingsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="settings/email" element={
+                <ProtectedRoute allowedRoles={['ADMIN']}>
+                  <EmailSettings />
                 </ProtectedRoute>
               } />
               <Route path="backups" element={

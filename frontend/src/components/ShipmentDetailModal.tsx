@@ -3,6 +3,7 @@ import { shipmentsAPI } from '../services/api';
 import LiveChargesPreview from './LiveChargesPreview';
 import { ShipmentPhoto } from './ShipmentPhoto';
 import CustomChargesModal from './CustomChargesModal';
+import { AdvancePaymentModal } from './AdvancePaymentModal';
 
 // Wrapper component for safe rendering
 function SafeLiveCharges({ shipmentId }: { shipmentId: string }) {
@@ -233,7 +234,7 @@ function BoxDistributionSection({ shipmentId, shipmentStatus }: BoxDistributionP
       const unassigned: any[] = [];
 
       for (const box of boxList) {
-        if (box.rackId && box.rack) {
+        if (box?.rackId && box?.rack && box?.rack?.code) {
           const rackKey = `${box.rack.code}|${box.rack.location || ''}`;
           if (!grouped[rackKey]) {
             grouped[rackKey] = [];
@@ -275,11 +276,23 @@ function BoxDistributionSection({ shipmentId, shipmentStatus }: BoxDistributionP
   const assignedBoxes = boxes.filter(b => b.rackId).length;
   const rackCount = Object.keys(rackDistribution).filter(k => !k.startsWith('Unassigned')).length;
 
+  // Performance: Limit rendering if too many boxes
+  const MAX_BOXES_TO_RENDER = 500;
+  const tooManyBoxes = totalBoxes > MAX_BOXES_TO_RENDER;
+
   return (
     <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
       <h4 className="font-bold text-gray-800 mb-3 flex items-center">
         <span className="text-xl mr-2">📦</span> Box Distribution & Locations
       </h4>
+
+      {tooManyBoxes && (
+        <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-3 mb-3">
+          <p className="text-sm text-yellow-800">
+            ⚠️ Large shipment ({totalBoxes} boxes). Showing summary only to prevent performance issues.
+          </p>
+        </div>
+      )}
 
       {/* Summary Stats */}
       <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-white rounded-lg border border-blue-200">
@@ -299,7 +312,7 @@ function BoxDistributionSection({ shipmentId, shipmentStatus }: BoxDistributionP
 
       {/* Box Tree by Rack */}
       <div className="space-y-3">
-        {Object.entries(rackDistribution).map(([rackKey, boxList]) => {
+        {!tooManyBoxes && Object.entries(rackDistribution).map(([rackKey, boxList]) => {
           const [rackCode, rackLocation] = rackKey.split('|');
           const isUnassigned = rackKey.startsWith('Unassigned');
 
@@ -329,25 +342,30 @@ function BoxDistributionSection({ shipmentId, shipmentStatus }: BoxDistributionP
                 </span>
               </div>
 
-              {/* Box Grid with Pallet Info */}
+              {/* Box Grid with Pallet Info - Limit to first 100 boxes per rack for performance */}
               <div className="grid grid-cols-8 gap-1 mt-2">
-                {boxList.map(box => (
+                {boxList.slice(0, 100).map(box => (
                   <div
-                    key={box.id}
-                    className={`aspect-square flex flex-col items-center justify-center text-xs font-bold rounded ${box.status === 'IN_STORAGE'
+                    key={box?.id || Math.random()}
+                    className={`aspect-square flex flex-col items-center justify-center text-xs font-bold rounded ${box?.status === 'IN_STORAGE'
                       ? 'bg-green-500 text-white'
-                      : box.status === 'RELEASED'
+                      : box?.status === 'RELEASED'
                         ? 'bg-gray-400 text-white'
                         : 'bg-yellow-400 text-gray-800'
                       }`}
-                    title={`Box #${box.boxNumber}${box.palletNumber ? ` - Pallet ${box.palletNumber}` : ''} - ${box.status}`}
+                    title={`Box #${box?.boxNumber || 'N/A'}${box?.palletNumber ? ` - Pallet ${box.palletNumber}` : ''} - ${box?.status || 'Unknown'}`}
                   >
-                    <span>{box.boxNumber}</span>
-                    {box.palletNumber && (
+                    <span>{box?.boxNumber || '?'}</span>
+                    {box?.palletNumber && (
                       <span className="text-[8px] opacity-80">P{box.palletNumber}</span>
                     )}
                   </div>
                 ))}
+                {boxList.length > 100 && (
+                  <div className="aspect-square flex items-center justify-center text-xs bg-gray-200 text-gray-600 rounded">
+                    +{boxList.length - 100}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -449,9 +467,10 @@ interface CustomFieldValue {
 export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: ShipmentDetailModalProps) {
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<CustomFieldValue[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [chargesModalOpen, setChargesModalOpen] = useState(false);
+  const [advanceModalOpen, setAdvanceModalOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen && shipmentId) {
@@ -591,10 +610,10 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
                       <p className="font-semibold text-gray-800">{shipment.clientEmail}</p>
                     </div>
                   )}
-                  {shipment.estimatedValue && (
+                  {shipment.estimatedValue != null && (
                     <div>
                       <p className="text-gray-600">Estimated Value</p>
-                      <p className="font-semibold text-gray-800">KWD {shipment.estimatedValue.toFixed(3)}</p>
+                      <p className="font-semibold text-gray-800">KWD {Number(shipment.estimatedValue).toFixed(3)}</p>
                     </div>
                   )}
                 </div>
@@ -868,6 +887,12 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
         {/* Footer */}
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t rounded-b-lg">
           <button
+            onClick={() => setAdvanceModalOpen(true)}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+          >
+            Record Advance
+          </button>
+          <button
             onClick={onClose}
             className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
           >
@@ -885,6 +910,19 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
           shipmentRef={shipment.referenceId}
           currentCBM={(shipment as any).cbm}
           currentBoxCount={shipment.currentBoxCount}
+          onSuccess={() => {
+            loadShipmentDetails();
+          }}
+        />
+      )}
+
+      {/* Advance Payment Modal */}
+      {shipment && (
+        <AdvancePaymentModal
+          isOpen={advanceModalOpen}
+          onClose={() => setAdvanceModalOpen(false)}
+          shipmentId={shipment.id}
+          shipmentRef={shipment.referenceId}
           onSuccess={() => {
             loadShipmentDetails();
           }}

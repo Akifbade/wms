@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   PlusIcon,
   QrCodeIcon,
@@ -31,7 +32,8 @@ const ShipmentBoxCard: React.FC<{
   boxCount: number;
   photos: string[];
   assignedDate?: Date;
-}> = ({ shipment, boxCount, photos, assignedDate }) => {
+  onViewShipment?: (shipmentId: string) => void;
+}> = ({ shipment, boxCount, photos, assignedDate, onViewShipment }) => {
   const [showPhotos, setShowPhotos] = useState(false);
 
   // Calculate days in rack
@@ -39,11 +41,20 @@ const ShipmentBoxCard: React.FC<{
     ? Math.floor((new Date().getTime() - new Date(assignedDate).getTime()) / (1000 * 60 * 60 * 24))
     : 0;
 
+  // Calculate total CBM - use shipment.cbm first, then fallback to dimensions calculation
+  const totalCBM = shipment?.cbm || shipment?.totalCBM || shipment?.dimensions?.reduce((sum: number, d: any) =>
+    sum + ((d.length || 0) * (d.width || 0) * (d.height || 0) * (d.pieces || 1) / 1000000), 0) || 0;
+
   return (
-    <div className="bg-gradient-to-r from-white to-blue-50 border-2 border-blue-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-md transition-all">
+    <div
+      className="bg-gradient-to-r from-white to-blue-50 border-2 border-blue-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer"
+      onClick={() => onViewShipment && shipment?.id && onViewShipment(shipment.id)}
+      title="Click to view shipment details"
+    >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
+          {/* Shipment ID and Status */}
+          <div className="flex items-center gap-2 mb-2">
             <span className="text-sm font-bold text-blue-600">
               #{shipment?.referenceId || 'N/A'}
             </span>
@@ -56,24 +67,45 @@ const ShipmentBoxCard: React.FC<{
               {shipment?.status || 'N/A'}
             </span>
           </div>
-          <p className="text-xs text-gray-700 font-semibold">
-            🏢 {shipment?.companyProfile?.name || shipment?.clientName || 'Unknown Company'}
-          </p>
-          {shipment?.clientPhone && (
-            <p className="text-xs text-gray-600 mt-1">
-              📞 {shipment.clientPhone}
+
+          {/* Client/Company - More Prominent */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+            <p className="text-sm font-bold text-amber-800">
+              🏢 {shipment?.companyProfile?.name || shipment?.clientName || 'Unknown Client'}
             </p>
-          )}
-          <div className="flex items-center gap-3 mt-2 text-xs">
-            <span className="text-gray-600">
-              📦 <span className="font-semibold text-gray-700">{boxCount}</span> boxes
-            </span>
-            {daysInRack > 0 && (
-              <span className={`font-semibold ${daysInRack > 30 ? 'text-orange-600' : 'text-green-600'}`}>
-                📅 {daysInRack} day{daysInRack !== 1 ? 's' : ''} in rack
-              </span>
+            {shipment?.clientPhone && (
+              <p className="text-xs text-amber-700 mt-0.5">
+                📞 {shipment.clientPhone}
+              </p>
             )}
           </div>
+
+          {/* Key Info Grid */}
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="bg-blue-50 rounded px-2 py-1.5 text-center">
+              <span className="text-blue-600 font-bold">{boxCount}</span>
+              <p className="text-blue-500 text-[10px]">📦 Boxes</p>
+            </div>
+            {totalCBM > 0 && (
+              <div className="bg-purple-50 rounded px-2 py-1.5 text-center">
+                <span className="text-purple-600 font-bold">{totalCBM.toFixed(2)}</span>
+                <p className="text-purple-500 text-[10px]">📐 CBM</p>
+              </div>
+            )}
+            {daysInRack > 0 && (
+              <div className={`rounded px-2 py-1.5 text-center ${daysInRack > 30 ? 'bg-orange-50' : 'bg-green-50'}`}>
+                <span className={`font-bold ${daysInRack > 30 ? 'text-orange-600' : 'text-green-600'}`}>{daysInRack}</span>
+                <p className={`text-[10px] ${daysInRack > 30 ? 'text-orange-500' : 'text-green-500'}`}>📅 Days</p>
+              </div>
+            )}
+          </div>
+
+          {/* Arrival Date */}
+          {shipment?.arrivalDate && (
+            <p className="text-[10px] text-gray-500 mt-2">
+              Arrived: {new Date(shipment.arrivalDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </p>
+          )}
         </div>
       </div>
 
@@ -118,6 +150,7 @@ const ShipmentBoxCard: React.FC<{
 };
 
 export const Racks: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedSection, setSelectedSection] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedZone, setSelectedZone] = useState('all'); // NEW: Zone filter
@@ -128,6 +161,9 @@ export const Racks: React.FC = () => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [bulkAddModalOpen, setBulkAddModalOpen] = useState(false); // NEW: Bulk add modal
+  const [bulkCbmModalOpen, setBulkCbmModalOpen] = useState(false); // NEW: Bulk CBM modal
+  const [bulkCbmValue, setBulkCbmValue] = useState('');
+  const [bulkCbmLoading, setBulkCbmLoading] = useState(false);
   const [selectedRack, setSelectedRack] = useState<any>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [rackDetails, setRackDetails] = useState<any>(null);
@@ -464,6 +500,13 @@ export const Racks: React.FC = () => {
           >
             <CameraIcon className="h-5 w-5 mr-2" />
             Bulk QR
+          </button>
+          <button
+            onClick={() => setBulkCbmModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-colors shadow-md"
+          >
+            <CubeIcon className="h-5 w-5 mr-2" />
+            Set CBM
           </button>
           <button
             onClick={() => setBulkAddModalOpen(true)}
@@ -931,6 +974,24 @@ export const Racks: React.FC = () => {
                                 <span className="text-xs text-blue-600 font-semibold">{shipmentCount} shipment{shipmentCount > 1 ? 's' : ''}</span>
                               </div>
                             )}
+
+                            {/* CBM Progress Bar - Juice Bar Style */}
+                            {(rack as any).cbmCapacity > 0 && (
+                              <div className="mt-2 pt-2 border-t border-dashed border-gray-200">
+                                <div className="flex items-center justify-between text-xs mb-1">
+                                  <span className="text-purple-600 font-medium">📦 CBM</span>
+                                  <span className="font-bold text-gray-700">
+                                    {((rack as any).cbmUsed || 0).toFixed(1)} / {((rack as any).cbmCapacity || 0).toFixed(1)} m³
+                                  </span>
+                                </div>
+                                <div className="relative w-full bg-gradient-to-r from-purple-100 to-pink-100 rounded-full h-2.5 overflow-hidden">
+                                  <div
+                                    className="h-2.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-700 ease-out"
+                                    style={{ width: `${Math.min((((rack as any).cbmUsed || 0) / ((rack as any).cbmCapacity || 1)) * 100, 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1021,18 +1082,18 @@ export const Racks: React.FC = () => {
                   {/* Status Badge */}
                   <div className="absolute -top-2 -right-2 z-10">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold shadow ${(rack.status === 'ACTIVE' || rack.status === 'OCCUPIED')
-                        ? utilization >= 100
-                          ? 'bg-red-500 text-white'
-                          : utilization >= 90
-                            ? 'bg-orange-500 text-white'
-                            : utilization > 0
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-green-500 text-white'
-                        : rack.status === 'MAINTENANCE'
-                          ? 'bg-amber-600 text-white'
-                          : rack.status === 'RESERVED'
-                            ? 'bg-purple-500 text-white'
-                            : 'bg-gray-400 text-white'
+                      ? utilization >= 100
+                        ? 'bg-red-500 text-white'
+                        : utilization >= 90
+                          ? 'bg-orange-500 text-white'
+                          : utilization > 0
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-green-500 text-white'
+                      : rack.status === 'MAINTENANCE'
+                        ? 'bg-amber-600 text-white'
+                        : rack.status === 'RESERVED'
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-gray-400 text-white'
                       }`}>
                       {(rack.status === 'ACTIVE' || rack.status === 'OCCUPIED')
                         ? utilization >= 100
@@ -1141,6 +1202,29 @@ export const Racks: React.FC = () => {
                         <p className="text-xl font-bold text-blue-600">{shipmentCount}</p>
                       </div>
                     </div>
+
+                    {/* CBM Usage Bar */}
+                    {rack.cbmCapacity > 0 && (
+                      <div className="pt-3 border-t-2 border-gray-200 mt-3">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-purple-600 font-bold flex items-center gap-1">
+                            📦 CBM Usage
+                          </span>
+                          <span className="font-bold text-purple-700">
+                            {((rack.cbmUsed || 0) / rack.cbmCapacity * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="relative w-full bg-purple-100 rounded-full h-3 overflow-hidden">
+                          <div
+                            className="h-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
+                            style={{ width: `${Math.min(((rack.cbmUsed || 0) / rack.cbmCapacity) * 100, 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1 text-center font-medium">
+                          {(rack.cbmUsed || 0).toFixed(2)} / {rack.cbmCapacity} m³
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -1206,7 +1290,7 @@ export const Racks: React.FC = () => {
               <>
                 {/* Stats Grid */}
                 <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
                       <p className="text-xs text-gray-500 font-medium mb-1">Status</p>
                       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${rackDetails?.status === 'ACTIVE'
@@ -1233,6 +1317,18 @@ export const Racks: React.FC = () => {
                       <p className="text-2xl font-bold text-green-600">
                         {Math.max((rackDetails?.capacityTotal || 0) - (rackDetails?.capacityUsed || 0), 0)}
                       </p>
+                    </div>
+                    {/* CBM Info */}
+                    <div className="bg-white rounded-xl p-4 shadow-sm border border-purple-200">
+                      <p className="text-xs text-gray-500 font-medium mb-1">📐 CBM Used</p>
+                      <p className="text-2xl font-bold text-purple-600">
+                        {(rackDetails?.cbmUsed || 0).toFixed(2)} m³
+                      </p>
+                      {rackDetails?.cbmCapacity && (
+                        <p className="text-xs text-purple-500 mt-1">
+                          of {rackDetails.cbmCapacity} m³ capacity
+                        </p>
+                      )}
                     </div>
                     <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
                       <p className="text-xs text-gray-500 font-medium mb-1">Utilization</p>
@@ -1438,6 +1534,10 @@ export const Racks: React.FC = () => {
                                         boxCount={shipmentBoxes.length}
                                         photos={allPhotos}
                                         assignedDate={firstBox.assignedAt}
+                                        onViewShipment={(id) => {
+                                          setDetailsModalOpen(false);
+                                          navigate(`/shipment-report/${id}`);
+                                        }}
                                       />
                                     );
                                   });
@@ -1620,7 +1720,111 @@ export const Racks: React.FC = () => {
           setBulkAddModalOpen(false);
         }}
       />
+
+      {/* Bulk CBM Capacity Modal */}
+      {bulkCbmModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-5">
+              <h2 className="text-xl font-bold flex items-center gap-3">
+                <CubeIcon className="h-7 w-7" />
+                Set CBM Capacity
+              </h2>
+              <p className="text-purple-100 text-sm mt-1">
+                Set cubic meter capacity for all racks
+              </p>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  CBM Capacity (m³)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={bulkCbmValue}
+                  onChange={(e) => setBulkCbmValue(e.target.value)}
+                  placeholder="e.g., 5.0"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-lg font-mono"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  This will set the maximum CBM capacity for all racks. Current CBM used will be tracked automatically when shipments are assigned.
+                </p>
+              </div>
+
+              {/* Summary */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <p className="text-sm text-purple-800">
+                  <strong>{racks.length}</strong> racks will be updated
+                </p>
+                {bulkCbmValue && (
+                  <p className="text-sm text-purple-600 mt-1">
+                    Each rack will have <strong>{bulkCbmValue} m³</strong> capacity
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setBulkCbmModalOpen(false);
+                  setBulkCbmValue('');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium"
+                disabled={bulkCbmLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!bulkCbmValue || parseFloat(bulkCbmValue) < 0) {
+                    alert('Please enter a valid CBM capacity');
+                    return;
+                  }
+                  setBulkCbmLoading(true);
+                  try {
+                    const response = await fetch('/api/racks/bulk-cbm-capacity', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                      },
+                      body: JSON.stringify({
+                        applyToAll: true,
+                        cbmCapacity: parseFloat(bulkCbmValue)
+                      })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                      alert(`✅ Updated CBM capacity for ${data.updatedCount} racks`);
+                      loadRacks();
+                      setBulkCbmModalOpen(false);
+                      setBulkCbmValue('');
+                    } else {
+                      alert('❌ Failed: ' + (data.error || 'Unknown error'));
+                    }
+                  } catch (err) {
+                    console.error('Bulk CBM update error:', err);
+                    alert('❌ Failed to update CBM capacity');
+                  } finally {
+                    setBulkCbmLoading(false);
+                  }
+                }}
+                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-semibold disabled:opacity-50"
+                disabled={bulkCbmLoading || !bulkCbmValue}
+              >
+                {bulkCbmLoading ? 'Updating...' : 'Apply to All Racks'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-

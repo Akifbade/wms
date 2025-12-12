@@ -8,7 +8,8 @@ import {
   PencilIcon,
   TrashIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  CreditCardIcon
 } from '@heroicons/react/24/outline';
 import { billingAPI } from '../../../services/api';
 
@@ -58,19 +59,67 @@ interface BillingSettings {
   companyRegistrationNo?: string;
 }
 
-type TabId = 'general' | 'invoice' | 'bank' | 'terms' | 'charges';
+// Prepaid Balance Interfaces
+interface CompanyProfile {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  contactPhone?: string;
+}
+
+interface PrepaidTransaction {
+  id: string;
+  type: 'CREDIT' | 'DEBIT' | 'ADJUSTMENT' | 'REFUND';
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  referenceType?: string;
+  referenceId?: string;
+  description?: string;
+  createdAt: string;
+}
+
+interface PrepaidBalance {
+  id: string;
+  companyProfileId: string;
+  companyProfile?: CompanyProfile;
+  totalPaid: number;
+  balanceRemaining: number;
+  monthlyRate?: number;
+  validFrom: string;
+  validUntil?: string;
+  status: 'ACTIVE' | 'EXHAUSTED' | 'EXPIRED' | 'CANCELLED';
+  notes?: string;
+  transactions?: PrepaidTransaction[];
+}
+
+type TabId = 'general' | 'invoice' | 'bank' | 'terms' | 'charges' | 'prepaid';
 
 export const BillingSettings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('general');
   const [settings, setSettings] = useState<BillingSettings | null>(null);
   const [chargeTypes, setChargeTypes] = useState<ChargeType[]>([]);
+  const [prepaidBalances, setPrepaidBalances] = useState<PrepaidBalance[]>([]);
+  const [companyProfiles, setCompanyProfiles] = useState<CompanyProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+  // Prepaid form state
+  const [showPrepaidForm, setShowPrepaidForm] = useState(false);
+  const [prepaidForm, setPrepaidForm] = useState({
+    companyProfileId: '',
+    amount: 0,
+    monthlyRate: 0,
+    validUntil: '',
+    notes: ''
+  });
+
   useEffect(() => {
     loadSettings();
     loadChargeTypes();
+    loadPrepaidBalances();
+    loadCompanyProfiles();
   }, []);
 
   const loadSettings = async () => {
@@ -91,6 +140,101 @@ export const BillingSettings: React.FC = () => {
       setChargeTypes(data);
     } catch (error) {
       console.error('Failed to load charge types:', error);
+    }
+  };
+
+  const loadPrepaidBalances = async () => {
+    try {
+      const response = await fetch('/api/prepaid/balances', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPrepaidBalances(data);
+      }
+    } catch (error) {
+      console.error('Failed to load prepaid balances:', error);
+    }
+  };
+
+  const loadCompanyProfiles = async () => {
+    try {
+      const response = await fetch('/api/companies', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCompanyProfiles(data.profiles || data);
+      }
+    } catch (error) {
+      console.error('Failed to load company profiles:', error);
+    }
+  };
+
+  const handleAddPrepaidPayment = async () => {
+    if (!prepaidForm.companyProfileId || prepaidForm.amount <= 0) {
+      setMessage({ type: 'error', text: 'Please select a customer and enter a valid amount' });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch('/api/prepaid/balance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify(prepaidForm)
+      });
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'Prepaid payment added successfully' });
+        setShowPrepaidForm(false);
+        setPrepaidForm({ companyProfileId: '', amount: 0, monthlyRate: 0, validUntil: '', notes: '' });
+        loadPrepaidBalances();
+      } else {
+        const error = await response.json();
+        setMessage({ type: 'error', text: error.error || 'Failed to add prepaid payment' });
+      }
+    } catch (error) {
+      console.error('Failed to add prepaid payment:', error);
+      setMessage({ type: 'error', text: 'Failed to add prepaid payment' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Charge Type Handlers
+  const handleToggleChargeType = async (charge: ChargeType) => {
+    try {
+      await billingAPI.updateChargeType(charge.id, { isActive: !charge.isActive });
+      setChargeTypes(prev => prev.map(c =>
+        c.id === charge.id ? { ...c, isActive: !c.isActive } : c
+      ));
+      setMessage({ type: 'success', text: `${charge.name} ${!charge.isActive ? 'enabled' : 'disabled'}` });
+      setTimeout(() => setMessage(null), 2000);
+    } catch (error) {
+      console.error('Failed to toggle charge type:', error);
+      setMessage({ type: 'error', text: 'Failed to update charge type' });
+    }
+  };
+
+  const handleDeleteChargeType = async (charge: ChargeType) => {
+    if (!window.confirm(`Are you sure you want to delete "${charge.name}"?`)) return;
+
+    try {
+      await billingAPI.deleteChargeType(charge.id);
+      setChargeTypes(prev => prev.filter(c => c.id !== charge.id));
+      setMessage({ type: 'success', text: `${charge.name} deleted` });
+      setTimeout(() => setMessage(null), 2000);
+    } catch (error) {
+      console.error('Failed to delete charge type:', error);
+      setMessage({ type: 'error', text: 'Failed to delete charge type' });
     }
   };
 
@@ -151,6 +295,7 @@ export const BillingSettings: React.FC = () => {
     { id: 'bank' as TabId, name: 'Bank Details', icon: BanknotesIcon },
     { id: 'terms' as TabId, name: 'Terms & Conditions', icon: DocumentTextIcon },
     { id: 'charges' as TabId, name: 'Charge Types', icon: CurrencyDollarIcon },
+    { id: 'prepaid' as TabId, name: 'Prepaid Balances', icon: CreditCardIcon },
   ];
 
   if (loading) {
@@ -613,22 +758,16 @@ export const BillingSettings: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Charge Types</h3>
-                <p className="text-sm text-gray-600">Manage custom charges for storage and release</p>
+                <p className="text-sm text-gray-600">Enable/disable charges applied to shipments</p>
               </div>
-              <button
-                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-              >
-                <PlusIcon className="h-5 w-5" />
-                Add Charge Type
-              </button>
             </div>
 
             <div className="space-y-3">
               {chargeTypes.map((charge) => (
-                <div key={charge.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-primary-300">
+                <div key={charge.id} className={`flex items-center justify-between p-4 border rounded-lg ${charge.isActive ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
-                      <h4 className="font-semibold text-gray-900">{charge.name}</h4>
+                      <h4 className={`font-semibold ${charge.isActive ? 'text-gray-900' : 'text-gray-500'}`}>{charge.name}</h4>
                       <span className={`px-2 py-1 text-xs rounded-full ${charge.category === 'STORAGE' ? 'bg-blue-100 text-blue-700' :
                         charge.category === 'RELEASE' ? 'bg-green-100 text-green-700' :
                           charge.category === 'SERVICE' ? 'bg-purple-100 text-purple-700' :
@@ -636,11 +775,6 @@ export const BillingSettings: React.FC = () => {
                         }`}>
                         {charge.category}
                       </span>
-                      {charge.isActive ? (
-                        <CheckCircleIcon className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <XCircleIcon className="h-5 w-5 text-gray-400" />
-                      )}
                     </div>
                     <p className="text-sm text-gray-600 mt-1">{charge.description}</p>
                     <div className="flex items-center gap-4 mt-2 text-sm">
@@ -658,11 +792,20 @@ export const BillingSettings: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
-                      <PencilIcon className="h-5 w-5" />
+                  <div className="flex items-center gap-3">
+                    {/* Toggle Switch */}
+                    <button
+                      onClick={() => handleToggleChargeType(charge)}
+                      className={`relative w-14 h-7 rounded-full transition-colors duration-200 ${charge.isActive ? 'bg-green-500' : 'bg-gray-300'}`}
+                      title={charge.isActive ? 'Click to disable' : 'Click to enable'}
+                    >
+                      <span className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${charge.isActive ? 'translate-x-8' : 'translate-x-1'}`} />
                     </button>
-                    <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                    <button
+                      onClick={() => handleDeleteChargeType(charge)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      title="Delete charge type"
+                    >
                       <TrashIcon className="h-5 w-5" />
                     </button>
                   </div>
@@ -675,6 +818,189 @@ export const BillingSettings: React.FC = () => {
                 <CurrencyDollarIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <p>No charge types configured yet</p>
                 <p className="text-sm">Add your first charge type to get started</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* PREPAID BALANCES TAB */}
+        {activeTab === 'prepaid' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">💳 Prepaid Customer Balances</h3>
+                <p className="text-sm text-gray-600">Manage advance payments from customers (e.g., 300 KWD/month subscription)</p>
+              </div>
+              <button
+                onClick={() => setShowPrepaidForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                <PlusIcon className="h-5 w-5" />
+                Add Prepaid Payment
+              </button>
+            </div>
+
+            {/* Prepaid Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-600 font-medium">Total Customers</p>
+                <p className="text-2xl font-bold text-blue-800">{prepaidBalances.length}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <p className="text-sm text-green-600 font-medium">Total Prepaid Received</p>
+                <p className="text-2xl font-bold text-green-800">
+                  {prepaidBalances.reduce((sum, b) => sum + b.totalPaid, 0).toFixed(3)} {settings?.currency || 'KWD'}
+                </p>
+              </div>
+              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <p className="text-sm text-yellow-600 font-medium">Balance Remaining</p>
+                <p className="text-2xl font-bold text-yellow-800">
+                  {prepaidBalances.reduce((sum, b) => sum + b.balanceRemaining, 0).toFixed(3)} {settings?.currency || 'KWD'}
+                </p>
+              </div>
+            </div>
+
+            {/* Add Payment Form */}
+            {showPrepaidForm && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                <h4 className="text-lg font-semibold text-green-800 mb-4">Add Prepaid Payment</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Customer (Company Profile) <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={prepaidForm.companyProfileId}
+                      onChange={(e) => setPrepaidForm(prev => ({ ...prev, companyProfileId: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="">Select Customer...</option>
+                      {companyProfiles.map(profile => (
+                        <option key={profile.id} value={profile.id}>{profile.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Amount ({settings?.currency || 'KWD'}) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={prepaidForm.amount || ''}
+                      onChange={(e) => setPrepaidForm(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                      placeholder="300"
+                      min="0"
+                      step="0.001"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Monthly Rate (Optional)
+                    </label>
+                    <input
+                      type="number"
+                      value={prepaidForm.monthlyRate || ''}
+                      onChange={(e) => setPrepaidForm(prev => ({ ...prev, monthlyRate: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                      placeholder="300"
+                      min="0"
+                      step="0.001"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Monthly subscription rate if applicable</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Valid Until (Optional)
+                    </label>
+                    <input
+                      type="date"
+                      value={prepaidForm.validUntil}
+                      onChange={(e) => setPrepaidForm(prev => ({ ...prev, validUntil: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Notes
+                    </label>
+                    <input
+                      type="text"
+                      value={prepaidForm.notes}
+                      onChange={(e) => setPrepaidForm(prev => ({ ...prev, notes: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                      placeholder="Payment reference, receipt number, etc."
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-4">
+                  <button
+                    onClick={() => {
+                      setShowPrepaidForm(false);
+                      setPrepaidForm({ companyProfileId: '', amount: 0, monthlyRate: 0, validUntil: '', notes: '' });
+                    }}
+                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddPrepaidPayment}
+                    disabled={saving}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {saving ? 'Adding...' : 'Add Payment'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Prepaid Balance List */}
+            <div className="space-y-3">
+              {prepaidBalances.map((balance) => (
+                <div key={balance.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-green-300">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <h4 className="font-semibold text-gray-900">{balance.companyProfile?.name || 'Unknown Customer'}</h4>
+                      <span className={`px-2 py-1 text-xs rounded-full ${balance.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
+                        balance.status === 'EXHAUSTED' ? 'bg-red-100 text-red-700' :
+                          balance.status === 'EXPIRED' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-gray-100 text-gray-700'
+                        }`}>
+                        {balance.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-6 mt-2 text-sm">
+                      <span className="text-gray-600">
+                        Total Paid: <strong className="text-gray-900">{balance.totalPaid.toFixed(3)} {settings?.currency || 'KWD'}</strong>
+                      </span>
+                      <span className="text-gray-600">
+                        Remaining: <strong className={balance.balanceRemaining > 0 ? 'text-green-600' : 'text-red-600'}>
+                          {balance.balanceRemaining.toFixed(3)} {settings?.currency || 'KWD'}
+                        </strong>
+                      </span>
+                      {balance.monthlyRate && (
+                        <span className="text-gray-600">
+                          Monthly Rate: <strong>{balance.monthlyRate.toFixed(3)} {settings?.currency || 'KWD'}</strong>
+                        </span>
+                      )}
+                    </div>
+                    {balance.notes && (
+                      <p className="text-sm text-gray-500 mt-1">📝 {balance.notes}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Last Updated</p>
+                    <p className="text-sm text-gray-700">{new Date(balance.validFrom).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {prepaidBalances.length === 0 && (
+              <div className="text-center py-12 text-gray-500">
+                <CreditCardIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p>No prepaid balances configured yet</p>
+                <p className="text-sm">Add your first prepaid payment to get started</p>
               </div>
             )}
           </div>

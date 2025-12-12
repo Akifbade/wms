@@ -11,6 +11,7 @@ import {
   UserIcon,
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
+import { getBackendUrl } from '../../services/api';
 
 interface Company {
   id: string;
@@ -49,7 +50,7 @@ export const CompaniesManagement: React.FC = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/companies', {
+      const response = await axios.get(`${getBackendUrl()}/api/companies`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCompanies(response.data || []);
@@ -67,14 +68,14 @@ export const CompaniesManagement: React.FC = () => {
       if (editingCompany) {
         // Update existing company
         await axios.put(
-          `http://localhost:5000/api/companies/${editingCompany.id}`,
+          `${getBackendUrl()}/api/companies/${editingCompany.id}`,
           formData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
         // Create new company
         await axios.post(
-          'http://localhost:5000/api/companies',
+          `${getBackendUrl()}/api/companies`,
           formData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -114,7 +115,7 @@ export const CompaniesManagement: React.FC = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/companies/${id}`, {
+      await axios.delete(`${getBackendUrl()}/api/companies/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       loadCompanies();

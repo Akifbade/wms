@@ -41,6 +41,23 @@ interface ReleaseShipmentModalProps {
 
 type QuantityType = 'BOXES' | 'PALLETS' | 'PIECES' | 'CARTONS' | 'BAGS' | 'CONTAINERS' | 'CRATES' | 'UNITS' | 'CUSTOM';
 
+interface ContractData {
+  id: string;
+  monthlyRate: number;
+  status: string;
+  contractEndDate?: string;
+}
+
+interface ContractValidity {
+  hasContract: boolean;
+  isValid: boolean;
+  canOperate: boolean;
+  isExpired: boolean;
+  isSuspended: boolean;
+  message: string;
+  monthlyRate?: number;
+}
+
 export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
   isOpen,
   onClose,
@@ -61,10 +78,12 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
   const [releasePhotos, setReleasePhotos] = useState<string[]>([]);
   const [showReleaseNote, setShowReleaseNote] = useState(false);
   const [releaseNoteData, setReleaseNoteData] = useState<any>(null);
+  const [contractValidity, setContractValidity] = useState<ContractValidity | null>(null);
 
   useEffect(() => {
     if (isOpen && shipment) {
       loadData();
+      loadContractValidity();
       setBoxesToRelease(shipment.currentBoxCount || 0);
     }
   }, [isOpen, shipment]);
@@ -98,6 +117,31 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
       console.error('Failed to load billing data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadContractValidity = async () => {
+    // Only load if shipment has a companyProfileId
+    if (!shipment?.companyProfileId) {
+      setContractValidity(null);
+      return;
+    }
+
+    try {
+      // Check contract validity
+      const validityResponse = await fetch(`/api/contracts/check/${shipment.companyProfileId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+
+      if (validityResponse.ok) {
+        const validityData = await validityResponse.json();
+        setContractValidity(validityData);
+      }
+    } catch (error) {
+      console.error('Failed to check contract validity:', error);
+      setContractValidity(null);
     }
   };
 
@@ -231,6 +275,12 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
   const handleGenerateInvoice = async () => {
     if (!shipment || lineItems.length === 0) return;
 
+    // 🔒 CHECK CONTRACT VALIDITY - BLOCK IF EXPIRED/SUSPENDED
+    if (contractValidity?.hasContract && !contractValidity?.canOperate) {
+      alert(`Cannot release shipment: ${contractValidity?.message || 'Contract has expired or is suspended. Please renew the contract.'}`);
+      return;
+    }
+
     // Validate required fields based on settings
     if (settings?.requireIDVerification && !collectorID.trim()) {
       alert('Collector ID verification is required by company settings');
@@ -248,15 +298,20 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
         ? customQuantityType.toLowerCase()
         : quantityType.toLowerCase();
 
+      // Contract customers pay monthly - no deduction needed
+      const totalAmount = subtotal + totalTax;
+
       const invoice = {
         shipmentId: shipment.id,
         clientName: shipment.clientName,
         clientPhone: shipment.clientPhone,
         clientAddress: shipment.clientAddress,
         lineItems,
-        notes: `Release ${releaseType.toLowerCase()} shipment - ${boxesToRelease} ${quantityLabel}`,
+        notes: `Release ${releaseType.toLowerCase()} shipment - ${boxesToRelease} ${quantityLabel}${contractValidity?.hasContract ? ' (Contract Customer)' : ''}`,
         isWarehouseInvoice: shipment.isWarehouseShipment || false,
         warehouseData: shipment.warehouseData || null,
+        amountDue: totalAmount,
+        isContractCustomer: contractValidity?.hasContract || false,
       };
 
       console.log('Creating invoice with data:', invoice);
@@ -321,6 +376,7 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
         collectorID,
         releaseType,
         boxesReleased: releaseType === 'FULL' ? shipment.currentBoxCount : boxesToRelease,
+        isContractCustomer: contractValidity?.hasContract || false,
       };
 
       setReleaseNoteData(releaseData);
@@ -348,9 +404,21 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Release Shipment</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-gray-900">Release Shipment</h2>
+              {contractValidity?.hasContract && (
+                <span className={`px-3 py-1 text-sm font-bold rounded-full flex items-center gap-1 ${contractValidity?.canOperate ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                  📄 CONTRACT CUSTOMER
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-600 mt-1">
               {shipment?.referenceId} - {shipment?.clientName}
+              {contractValidity?.hasContract && (
+                <span className="ml-2 text-blue-600 font-medium">
+                  • Monthly: {contractValidity.monthlyRate?.toFixed(3)} {settings?.currency || 'KWD'}
+                </span>
+              )}
             </p>
           </div>
           <button
@@ -368,6 +436,26 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
           </div>
         ) : (
           <div className="p-6 space-y-6">
+            {/* CONTRACT EXPIRED/SUSPENDED WARNING BANNER */}
+            {contractValidity?.hasContract && !contractValidity?.canOperate && (
+              <div className="bg-red-100 border-2 border-red-500 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">⛔</span>
+                  <div>
+                    <h4 className="text-lg font-bold text-red-700">
+                      CONTRACT {contractValidity.isExpired ? 'EXPIRED' : contractValidity.isSuspended ? 'SUSPENDED' : 'BLOCKED'} - RELEASE BLOCKED
+                    </h4>
+                    <p className="text-sm text-red-600 mt-1">
+                      {contractValidity.message || 'This customer\'s contract has expired or is suspended. Please renew the contract to release shipments.'}
+                    </p>
+                    <p className="text-xs text-red-500 mt-2">
+                      Contact administrator to renew or reactivate the contract.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Shipment & Rack Information */}
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">📦 Current Status</h3>
@@ -428,8 +516,8 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                     setBoxesToRelease(shipment.currentBoxCount || 0);
                   }}
                   className={`p-4 border-2 rounded-lg text-center transition-all ${releaseType === 'FULL'
-                      ? 'border-primary-500 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                    : 'border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <div className="font-semibold">Full Release</div>
@@ -440,8 +528,8 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                 <button
                   onClick={() => setReleaseType('PARTIAL')}
                   className={`p-4 border-2 rounded-lg text-center transition-all ${releaseType === 'PARTIAL'
-                      ? 'border-primary-500 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                    : 'border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <div className="font-semibold">Partial Release</div>
@@ -461,8 +549,8 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                     key={type}
                     onClick={() => setQuantityType(type)}
                     className={`px-3 py-2 text-sm border rounded-lg transition-all ${quantityType === type
-                        ? 'border-primary-500 bg-primary-50 text-primary-700 font-medium'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 font-medium'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-700'
                       }`}
                   >
                     {type.charAt(0) + type.slice(1).toLowerCase()}
@@ -543,30 +631,91 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
               )}
             </div>
 
-            {/* Release Photos */}
+            {/* Release Photos - Real Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Release Photos
+                📷 Release Photos
                 {settings?.requireReleasePhotos && (
                   <span className="text-red-500 ml-1">*</span>
                 )}
               </label>
-              <input
-                type="text"
-                value={releasePhotos.join(', ')}
-                onChange={(e) => setReleasePhotos(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                placeholder="Enter photo URLs (comma-separated)"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                required={settings?.requireReleasePhotos}
-              />
-              {settings?.requireReleasePhotos && (
-                <p className="text-xs text-orange-600 mt-1">
-                  ⚠️ Release photos are required by company settings
+
+              {/* Photo Upload Area */}
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-primary-500 transition-colors">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const files = e.target.files;
+                    if (!files) return;
+
+                    const uploadedUrls: string[] = [];
+                    for (let i = 0; i < files.length; i++) {
+                      const formData = new FormData();
+                      formData.append('file', files[i]);
+                      formData.append('type', 'release');
+
+                      try {
+                        const res = await fetch('/api/upload', {
+                          method: 'POST',
+                          headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                          },
+                          body: formData
+                        });
+                        const data = await res.json();
+                        if (data.url) {
+                          uploadedUrls.push(data.url);
+                        }
+                      } catch (err) {
+                        console.error('Upload error:', err);
+                      }
+                    }
+                    setReleasePhotos([...releasePhotos, ...uploadedUrls]);
+                  }}
+                  className="hidden"
+                  id="release-photo-upload"
+                />
+                <label
+                  htmlFor="release-photo-upload"
+                  className="flex flex-col items-center cursor-pointer"
+                >
+                  <svg className="w-10 h-10 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm text-gray-600">Click to upload release photos</span>
+                  <span className="text-xs text-gray-400 mt-1">JPG, PNG up to 5MB each</span>
+                </label>
+              </div>
+
+              {/* Uploaded Photos Preview */}
+              {releasePhotos.length > 0 && (
+                <div className="mt-3 grid grid-cols-4 gap-2">
+                  {releasePhotos.map((url, idx) => (
+                    <div key={idx} className="relative group">
+                      <img
+                        src={url.startsWith('http') ? url : `${window.location.origin}${url}`}
+                        alt={`Release photo ${idx + 1}`}
+                        className="w-full h-20 object-cover rounded-lg border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setReleasePhotos(releasePhotos.filter((_, i) => i !== idx))}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {settings?.requireReleasePhotos && releasePhotos.length === 0 && (
+                <p className="text-xs text-orange-600 mt-2">
+                  ⚠️ At least one release photo is required
                 </p>
               )}
-              <p className="text-xs text-gray-500 mt-1">
-                Upload photos and paste URLs here, separated by commas
-              </p>
             </div>
 
             {/* Charge Selection */}
@@ -579,8 +728,8 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                   <label
                     key={charge.id}
                     className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${selectedCharges.has(charge.id)
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
                       }`}
                   >
                     <input
@@ -688,7 +837,7 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                       <div>
                         <label className="text-xs text-gray-600">Amount</label>
                         <div className="px-2 py-1 text-sm font-semibold text-gray-900 bg-gray-100 rounded border border-gray-300">
-                          {item.amount.toFixed(3)} {settings.currency}
+                          {(item.amount || 0).toFixed(3)} {settings.currency}
                         </div>
                       </div>
                     </div>
@@ -711,9 +860,9 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                           />
                           Taxable
                         </label>
-                        {item.taxAmount > 0 && (
+                        {(item.taxAmount || 0) > 0 && (
                           <span className="text-xs text-gray-500">
-                            Tax: +{item.taxAmount.toFixed(3)} {settings.currency}
+                            Tax: +{(item.taxAmount || 0).toFixed(3)} {settings.currency}
                           </span>
                         )}
                       </div>
@@ -782,6 +931,23 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                         </span>
                       </div>
                     </div>
+
+                    {/* Contract Customer Info */}
+                    {contractValidity?.hasContract && contractValidity?.canOperate && (
+                      <div className="border-t border-blue-300 pt-3 mt-3 bg-blue-50 -mx-4 px-4 pb-3 rounded-b-lg">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-sm font-medium text-blue-800">
+                            📄 Contract Customer
+                          </span>
+                          <span className="text-sm text-blue-700">
+                            Monthly Rate: <strong>{contractValidity.monthlyRate?.toFixed(3)} {settings.currency}</strong>
+                          </span>
+                        </div>
+                        <p className="text-xs text-blue-600 mt-2">
+                          ✅ Payment will be added to monthly bill
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

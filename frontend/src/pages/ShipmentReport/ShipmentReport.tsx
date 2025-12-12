@@ -88,6 +88,7 @@ const ShipmentReport: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [chargesModalOpen, setChargesModalOpen] = useState(false);
+    const [liveCharges, setLiveCharges] = useState<any>(null);
 
     // Safe number helpers to avoid runtime crashes when backend returns null/strings
     const safeNumber = (v: any) => {
@@ -103,6 +104,28 @@ const ShipmentReport: React.FC = () => {
         loadShipmentDetails();
     }, [id]);
 
+    // Load live charges from backend
+    const loadLiveCharges = async () => {
+        if (!id) return;
+        try {
+            const response = await fetch(`/api/shipments/${id}/charges-calculation`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setLiveCharges(data.calculation || data);
+            }
+        } catch (err) {
+            console.error('Failed to load live charges:', err);
+        }
+    };
+
+    useEffect(() => {
+        if (shipment) {
+            loadLiveCharges();
+        }
+    }, [shipment]);
+
     const loadShipmentDetails = async () => {
         try {
             setLoading(true);
@@ -110,7 +133,7 @@ const ShipmentReport: React.FC = () => {
             const response = await shipmentsAPI.getById(id!);
             console.log('📄 Report API response:', response);
             // Backend returns { shipment: {...} }
-            setShipment(response.shipment || response.data || response);
+            setShipment(response.shipment || (response as any).data || response);
         } catch (err: any) {
             console.error('❌ Report load error:', err);
             setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to load shipment details');
@@ -132,10 +155,15 @@ const ShipmentReport: React.FC = () => {
     };
 
     const getCurrentStorageCharge = () => {
+        // ✅ Use live charges from backend if available (most accurate)
+        if (liveCharges && liveCharges.totalCharge !== undefined) {
+            return liveCharges.totalCharge;
+        }
+
+        // Fallback calculation if live charges not loaded yet
         const days = getDaysStored();
         const cbm = (shipment as any)?.cbm || (shipment as any)?.totalCBM || 0;
 
-        // ✅ SAME PRIORITY AS INVOICE - MUST MATCH!
         // Priority 1: Custom CBM rate on shipment
         if ((shipment as any)?.customRateEnabled && (shipment as any)?.customRatePerCBMPerDay && cbm > 0) {
             return days * cbm * parseFloat((shipment as any).customRatePerCBMPerDay);
@@ -145,19 +173,27 @@ const ShipmentReport: React.FC = () => {
             const boxCount = (shipment as any)?.originalBoxCount || (shipment as any)?.currentBoxCount || 0;
             return days * boxCount * parseFloat((shipment as any).customRatePerBoxPerDay);
         }
-        // Priority 3: Settings type is CBM and shipment has CBM
-        // NOTE: Would need to fetch settings here for full accuracy
-        // For now, use CBM if available with default rate
+        // Priority 3/Fallback: Use CBM if available, otherwise box count
         else if (cbm > 0) {
-            // Default CBM rate (would need settings API call to get actual rate)
-            // Using 0.5 as fallback - should match settings.storageRatePerCBM
-            return days * cbm * 0.5;
+            return days * cbm * 1; // Default CBM rate from settings
         }
-        // Priority 4/Fallback: Box count with default rate
         else {
             const boxCount = (shipment as any)?.originalBoxCount || (shipment as any)?.currentBoxCount || 0;
             return days * boxCount * 0.5;
         }
+    };
+
+    // Get rate display info from live charges
+    const getRateDisplayInfo = () => {
+        if (liveCharges && liveCharges.rateUsed) {
+            return {
+                source: liveCharges.rateUsed.source,
+                type: liveCharges.rateUsed.type,
+                ratePerCBM: liveCharges.rateUsed.ratePerCBMPerDay,
+                ratePerBox: liveCharges.rateUsed.ratePerBoxPerDay
+            };
+        }
+        return null;
     };
 
     const getStatusBadge = (status: string) => {
@@ -347,6 +383,25 @@ const ShipmentReport: React.FC = () => {
                                     </svg>
                                     Storage Charges
                                 </h2>
+                                {/* Rate Info Display */}
+                                {getRateDisplayInfo() && (
+                                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <p className="text-sm font-semibold text-blue-800">
+                                            {getRateDisplayInfo()?.type === 'CUSTOM' ? '⭐ Custom Rate' : '📊 Company Default Rate'}
+                                        </p>
+                                        <p className="text-sm text-blue-700">{getRateDisplayInfo()?.source}</p>
+                                        {getRateDisplayInfo()?.ratePerCBM && (
+                                            <p className="text-sm text-blue-600 font-medium mt-1">
+                                                📦 {getRateDisplayInfo()?.ratePerCBM?.toFixed(3)} KWD/m³/day
+                                            </p>
+                                        )}
+                                        {getRateDisplayInfo()?.ratePerBox && (
+                                            <p className="text-sm text-blue-600 font-medium mt-1">
+                                                📦 {getRateDisplayInfo()?.ratePerBox?.toFixed(3)} KWD/box/day
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                     <div className="bg-white rounded-lg p-4 border border-yellow-300">
                                         <p className="text-sm text-gray-600 mb-1">Current Storage Charge</p>

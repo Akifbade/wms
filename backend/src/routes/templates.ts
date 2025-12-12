@@ -65,7 +65,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         showQRCode: false,
         showWatermark: false,
       };
-      
+
       return res.json({ success: true, settings: defaultSettings });
     }
 

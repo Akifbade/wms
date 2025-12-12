@@ -58,6 +58,9 @@ export const Scanner: React.FC = () => {
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [moveShipmentData, setMoveShipmentData] = useState<any>(null);
   const [moveDestinationRack, setMoveDestinationRack] = useState<string>('');
+  const [moveDestinationRackCode, setMoveDestinationRackCode] = useState<string>('');
+  const [scanningForDestination, setScanningForDestination] = useState(false);
+  const destinationScannerRef = useRef<Html5Qrcode | null>(null);
   const [moveReason, setMoveReason] = useState<string>('');
   const [moveAuthorizedBy, setMoveAuthorizedBy] = useState<string>('');
   const [moveNotes, setMoveNotes] = useState<string>('');
@@ -74,6 +77,8 @@ export const Scanner: React.FC = () => {
   const [selectedManualShipment, setSelectedManualShipment] = useState<string>('');
   const [selectedSourceRack, setSelectedSourceRack] = useState<string>('');
   const [loadingInStorageShipments, setLoadingInStorageShipments] = useState(false);
+  const [palletsToMove, setPalletsToMove] = useState<number>(0);
+  const [looseBoxesToMove, setLooseBoxesToMove] = useState<number>(0);
 
   // Manual code input state
   const [manualCode, setManualCode] = useState<string>('');
@@ -285,7 +290,7 @@ export const Scanner: React.FC = () => {
         const formData = new FormData();
         const compressedPhoto = await compressPhoto(photo);
         formData.append('photo', compressedPhoto);
-        
+
         const uploadResponse = await fetch('/api/shipments/upload/photo', {
           method: 'POST',
           headers: {
@@ -335,12 +340,14 @@ export const Scanner: React.FC = () => {
         setShowMoveModal(false);
         setMoveShipmentData(null);
         setMoveDestinationRack('');
+        setMoveDestinationRackCode('');
+        setScanningForDestination(false);
         setMoveReason('');
         setMoveAuthorizedBy('');
         setMoveNotes('');
         setMovePhotos([]);
         setScanResult(null);
-        
+
         // Show success message
         setError(`✅ Successfully moved ${data.moveDetails.boxesMoved} boxes from ${data.moveDetails.from.code} to ${data.moveDetails.to.code}`);
         setTimeout(() => setError(''), 5000);
@@ -382,7 +389,7 @@ export const Scanner: React.FC = () => {
       });
       const data = await response.json();
       // Filter shipments that have assigned boxes
-      const shipmentsWithRacks = (data.shipments || []).filter((s: any) => 
+      const shipmentsWithRacks = (data.shipments || []).filter((s: any) =>
         s.status === 'IN_STORAGE' || s.status === 'IN_WAREHOUSE'
       );
       setInStorageShipments(shipmentsWithRacks);
@@ -399,18 +406,21 @@ export const Scanner: React.FC = () => {
     setSelectedManualShipment('');
     setSelectedSourceRack('');
     setMoveDestinationRack('');
+    setMoveDestinationRackCode('');
+    setScanningForDestination(false);
     setMoveReason('');
     setMoveAuthorizedBy('');
     setMoveNotes('');
     setMovePhotos([]);
-    await Promise.all([fetchInStorageShipments(), fetchAuthorizedUsers()]);
+    // Load racks and shipments
+    await Promise.all([fetchInStorageShipments(), fetchAuthorizedUsers(), loadRacks()]);
   };
 
   // Handle manual shipment selection - fetch boxes to get rack info
   const handleManualShipmentSelect = async (shipmentId: string) => {
     setSelectedManualShipment(shipmentId);
     setSelectedSourceRack('');
-    
+
     if (!shipmentId) return;
 
     try {
@@ -421,7 +431,7 @@ export const Scanner: React.FC = () => {
       });
       const data = await response.json();
       const boxes = data.boxes || [];
-      
+
       // Group boxes by rack
       const rackGroups: Record<string, { rackId: string; rackCode: string; boxCount: number; boxes: any[] }> = {};
       boxes.forEach((box: any) => {
@@ -460,10 +470,56 @@ export const Scanner: React.FC = () => {
       return;
     }
 
+    // Check if any items to move
+    if ((palletsToMove || 0) === 0 && (looseBoxesToMove || 0) === 0) {
+      setError('Please select at least 1 pallet or box to move');
+      return;
+    }
+
     // Get box IDs from the selected source rack
     const rackGroup = moveShipmentData?.rackGroups?.find((rg: any) => rg.rackId === selectedSourceRack);
     if (!rackGroup) {
       setError('No boxes found in selected source rack');
+      return;
+    }
+
+    // Calculate which boxes to move based on pallets/loose selection
+    const boxesInRack = rackGroup.boxes || [];
+    const palletGroups: Record<number, any[]> = {};
+    const looseBoxes: any[] = [];
+
+    boxesInRack.forEach((box: any) => {
+      try {
+        const pieceQR = typeof box.pieceQR === 'string' ? JSON.parse(box.pieceQR) : box.pieceQR;
+        const palletNum = pieceQR?.palletNumber || 0;
+        if (palletNum > 0) {
+          if (!palletGroups[palletNum]) palletGroups[palletNum] = [];
+          palletGroups[palletNum].push(box);
+        } else {
+          looseBoxes.push(box);
+        }
+      } catch {
+        looseBoxes.push(box);
+      }
+    });
+
+    // Select boxes to move
+    const boxIdsToMove: string[] = [];
+
+    // Add pallets (take first N pallets)
+    const palletNums = Object.keys(palletGroups).map(Number).sort((a, b) => a - b);
+    for (let i = 0; i < (palletsToMove || 0) && i < palletNums.length; i++) {
+      const palletNum = palletNums[i];
+      palletGroups[palletNum].forEach(box => boxIdsToMove.push(box.id));
+    }
+
+    // Add loose boxes (take first N loose boxes)
+    for (let i = 0; i < (looseBoxesToMove || 0) && i < looseBoxes.length; i++) {
+      boxIdsToMove.push(looseBoxes[i].id);
+    }
+
+    if (boxIdsToMove.length === 0) {
+      setError('No boxes selected to move');
       return;
     }
 
@@ -475,7 +531,7 @@ export const Scanner: React.FC = () => {
         const formData = new FormData();
         const compressedPhoto = await compressPhoto(photo);
         formData.append('photo', compressedPhoto);
-        
+
         const uploadResponse = await fetch('/api/shipments/upload/photo', {
           method: 'POST',
           headers: {
@@ -489,7 +545,7 @@ export const Scanner: React.FC = () => {
         }
       }
 
-      // Call move API
+      // Call move API with selected boxes
       const response = await fetch(`/api/shipments/${selectedManualShipment}/move-boxes`, {
         method: 'POST',
         headers: {
@@ -499,7 +555,7 @@ export const Scanner: React.FC = () => {
         body: JSON.stringify({
           sourceRackId: selectedSourceRack,
           destinationRackId: moveDestinationRack,
-          boxIds: rackGroup.boxes.map((b: any) => b.id),
+          boxIds: boxIdsToMove,
           reason: moveReason,
           authorizedById: moveAuthorizedBy,
           notes: moveNotes,
@@ -519,8 +575,10 @@ export const Scanner: React.FC = () => {
         setMoveAuthorizedBy('');
         setMoveNotes('');
         setMovePhotos([]);
-        
-        setError(`✅ Successfully moved ${data.moveDetails.boxesMoved} boxes from ${data.moveDetails.from.code} to ${data.moveDetails.to.code}`);
+        setPalletsToMove(0);
+        setLooseBoxesToMove(0);
+
+        setError(`✅ Successfully moved ${data.moveDetails?.boxesMoved || boxIdsToMove.length} boxes from ${data.moveDetails?.from?.code || 'source'} to ${data.moveDetails?.to?.code || 'destination'}`);
         setTimeout(() => setError(''), 5000);
       } else {
         throw new Error(data.error || 'Move failed');
@@ -532,6 +590,182 @@ export const Scanner: React.FC = () => {
       setMovingInProgress(false);
     }
   };
+
+  // Start destination rack scanner
+  const startDestinationScanner = async () => {
+    try {
+      // Wait for DOM element
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const element = document.getElementById('destination-qr-reader');
+      if (!element) {
+        console.error('Destination QR reader element not found');
+        return;
+      }
+
+      // Stop existing scanner if any
+      if (destinationScannerRef.current) {
+        try {
+          await destinationScannerRef.current.stop();
+        } catch (e) {
+          console.log('No scanner to stop');
+        }
+      }
+
+      const scanner = new Html5Qrcode('destination-qr-reader');
+      destinationScannerRef.current = scanner;
+
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 200, height: 200 } },
+        async (decodedText) => {
+          console.log('🎯 Destination rack scanned:', decodedText);
+          const upperCode = decodedText.toUpperCase();
+
+          // Handle multiple QR formats:
+          // Format 1: RACK_XXX -> extract XXX  
+          // Format 2: QR-XXX -> extract XXX
+          // Format 3: GROUND_B -> convert to GROUND-B (underscore to hyphen)
+          // Format 4: Just the rack code like 8E, 7L, etc.
+          let rackCode = decodedText
+            .replace(/^RACK_/i, '')
+            .replace(/^QR-/i, '');
+
+          // Create hyphen version (GROUND_B -> GROUND-B)
+          let rackCodeWithHyphen = rackCode.replace(/_/g, '-');
+          // Create underscore version (GROUND-B -> GROUND_B)
+          let rackCodeWithUnderscore = rackCode.replace(/-/g, '_');
+
+          console.log('🔍 Scanned:', decodedText, '→ Hyphen:', rackCodeWithHyphen, '→ Underscore:', rackCodeWithUnderscore);
+
+          // Find rack using EXACT same logic as processScanCode (which works!)
+          let rack = null;
+
+          // ALWAYS fetch from API first
+          try {
+            // Search with HYPHEN version first (since DB uses hyphens like GROUND-B)
+            console.log('📡 Fetching rack from API with search:', rackCodeWithHyphen);
+            let response = await racksAPI.getAll({ search: rackCodeWithHyphen });
+            console.log('📊 API returned:', response.racks?.length, 'racks');
+
+            // If no results, try original scanned text
+            if (!response.racks || response.racks.length === 0) {
+              console.log('📡 Retry with original text:', decodedText);
+              response = await racksAPI.getAll({ search: decodedText });
+              console.log('📊 Retry returned:', response.racks?.length, 'racks');
+            }
+
+            if (response.racks && response.racks.length > 0) {
+              response.racks.forEach((r: any) => {
+                console.log('  - Rack:', r.code, 'qrCode:', r.qrCode);
+              });
+
+              // Match by qrCode first
+              rack = response.racks.find((r: any) =>
+                r.qrCode?.toUpperCase() === upperCode ||
+                r.qrCode?.toUpperCase() === rackCodeWithHyphen.toUpperCase() ||
+                r.qrCode?.toUpperCase() === rackCodeWithUnderscore.toUpperCase()
+              );
+
+              // If not found by qrCode, try matching by code with all variations
+              if (!rack) {
+                rack = response.racks.find((r: any) => {
+                  const dbCode = r.code.toUpperCase();
+                  const dbCodeNormalized = dbCode.replace(/[-_]/g, '');
+                  const scannedNormalized = upperCode.replace(/[-_]/g, '');
+
+                  return dbCode === upperCode ||
+                    dbCode === rackCodeWithHyphen.toUpperCase() ||
+                    dbCode === rackCodeWithUnderscore.toUpperCase() ||
+                    dbCodeNormalized === scannedNormalized ||
+                    r.code.replace(/-/g, '_').toUpperCase() === upperCode ||
+                    r.code.replace(/_/g, '-').toUpperCase() === upperCode;
+                });
+              }
+
+              // Final fallback: take first rack if only one result
+              if (!rack && response.racks.length === 1) {
+                console.log('⚠️ Taking first rack as fallback');
+                rack = response.racks[0];
+              }
+            }
+          } catch (err) {
+            console.error('❌ Error fetching rack from API:', err);
+          }
+
+          // Fallback to local racks array
+          if (!rack) {
+            console.log('📦 Trying local racks array, count:', racks.length);
+            rack = racks.find(r => {
+              const dbCode = r.code.toUpperCase();
+              const scannedNormalized = upperCode.replace(/[-_]/g, '');
+              const dbCodeNormalized = dbCode.replace(/[-_]/g, '');
+
+              return r.qrCode?.toUpperCase() === upperCode ||
+                dbCode === upperCode ||
+                dbCode === rackCodeWithHyphen.toUpperCase() ||
+                dbCode === rackCodeWithUnderscore.toUpperCase() ||
+                dbCodeNormalized === scannedNormalized;
+            });
+          }
+
+          if (rack) {
+            console.log('✅ Found rack:', rack.code, 'ID:', rack.id);
+            if (rack.id === moveShipmentData?.sourceRackId) {
+              alert('Cannot move to the same rack!');
+              return;
+            }
+            if (rack.status === 'FULL') {
+              alert('This rack is full! Choose another rack.');
+              return;
+            }
+            // Stop scanner and set values
+            scanner.stop().then(() => {
+              setMoveDestinationRack(rack.id);
+              setMoveDestinationRackCode(rack.code);
+              setScanningForDestination(false);
+              playSuccessSound();
+            }).catch(console.error);
+          } else {
+            console.error('❌ Rack not found. Scanned:', decodedText, 'Hyphen:', rackCodeWithHyphen, 'Underscore:', rackCodeWithUnderscore);
+            alert('Rack not found!\n\nScanned: ' + decodedText + '\nTried: ' + rackCodeWithHyphen + '\n\nPlease use dropdown to select rack manually.');
+          }
+        },
+        (errorMessage) => {
+          // Ignore scan errors (no QR in frame)
+        }
+      );
+    } catch (error) {
+      console.error('Failed to start destination scanner:', error);
+      alert('Failed to start camera. Please check camera permissions.');
+      setScanningForDestination(false);
+    }
+  };
+
+  // Stop destination scanner
+  const stopDestinationScanner = async () => {
+    if (destinationScannerRef.current) {
+      try {
+        await destinationScannerRef.current.stop();
+        destinationScannerRef.current = null;
+      } catch (e) {
+        console.log('Error stopping destination scanner:', e);
+      }
+    }
+    setScanningForDestination(false);
+  };
+
+  // Effect to start/stop destination scanner
+  useEffect(() => {
+    if (scanningForDestination) {
+      startDestinationScanner();
+    }
+    return () => {
+      if (destinationScannerRef.current) {
+        destinationScannerRef.current.stop().catch(console.error);
+      }
+    };
+  }, [scanningForDestination]);
 
   useEffect(() => {
     return () => {
@@ -888,8 +1122,8 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       }))
     });
 
-    // ⚠️ CHECK: If shipment is IN_STORAGE and has 0 remaining boxes, it's already fully assigned
-    if (shipment.status === 'IN_STORAGE' && unassignedBoxes.length === 0) {
+    // ⚠️ CHECK: If shipment is IN_STORAGE or IN_WAREHOUSE and has 0 remaining boxes, it's already fully assigned
+    if ((shipment.status === 'IN_STORAGE' || shipment.status === 'IN_WAREHOUSE') && unassignedBoxes.length === 0) {
       // Find which rack it's assigned to
       const assignedBoxes = boxData.boxes.filter((b: any) => b.rackId);
       const rackCodes = [...new Set(assignedBoxes.map((b: any) => b.rack?.code || 'Unknown'))];
@@ -1105,6 +1339,21 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
     if (totalBoxes > remainingBoxes) {
       setError(`Only ${remainingBoxes} boxes remaining!`);
+      return;
+    }
+
+    // 🔒 CBM CAPACITY CHECK - Block if shipment CBM exceeds rack's remaining CBM
+    const rackCBMCapacity = Number(scanResult.data.cbmCapacity) || 0;
+    const rackCBMUsed = Number(scanResult.data.cbmUsed) || 0;
+    const rackCBMRemaining = rackCBMCapacity - rackCBMUsed;
+
+    // Calculate CBM for this assignment based on selected pallets/boxes
+    const cbmPerPallet = pendingShipment.cbmPerPallet || 0;
+    const cbmPerBox = pendingShipment.cbmPerBox || 0;
+    const assignmentCBM = (palletQuantity * cbmPerPallet) + (looseBoxQuantity * cbmPerBox);
+
+    if (rackCBMCapacity > 0 && assignmentCBM > rackCBMRemaining) {
+      alert(`❌ No CBM Space Left!\n\n📦 Shipment CBM: ${assignmentCBM.toFixed(4)} m³\n📏 Rack Free CBM: ${rackCBMRemaining.toFixed(4)} m³\n\n⚠️ This shipment requires more space than available.\n\n👉 Try another rack with more capacity.`);
       return;
     }
 
@@ -1419,19 +1668,31 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   // Select shipment from list - show rack selection
   const handleSelectShipment = async (shipment: any) => {
     console.log('🎯 Choose Rack clicked for shipment:', shipment);
-    console.log('📦 Fetching FRESH box data...');
+    console.log('📦 Fetching FRESH box data and dimensions...');
 
     try {
       setLoading(true);
-      // ✅ CRITICAL FIX: Fetch CURRENT unassigned boxes, not stale data
-      // Use cache-busting timestamp to ensure fresh data after assignment
-      const boxResponse = await fetch(`/api/shipments/${shipment.id}/boxes?t=${Date.now()}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Cache-Control': 'no-cache'
-        }
-      });
+
+      // Fetch boxes AND dimensions in parallel
+      const [boxResponse, dimResponse] = await Promise.all([
+        fetch(`/api/shipments/${shipment.id}/boxes?t=${Date.now()}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Cache-Control': 'no-cache'
+          }
+        }),
+        fetch(`/api/shipments/${shipment.id}/dimensions`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          }
+        })
+      ]);
+
       const boxData = await boxResponse.json();
+      const dimData = dimResponse.ok ? await dimResponse.json() : { dimensions: [] };
+
+      console.log('📏 Dimensions loaded:', dimData.dimensions?.length || 0);
+
       // ✅ CRITICAL: Filter out boxes that are assigned (have rackId) OR already in storage/released
       // A box is unassigned if: rackId is null/undefined AND status is not IN_STORAGE/RELEASED
       const unassignedBoxes = boxData.boxes.filter((b: any) => {
@@ -1486,21 +1747,59 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         boxCount: palletGroups[num]
       }));
 
-      console.log('✅ Fresh data:', { totalPallets, looseBoxes, palletDetails, unassignedBoxes: unassignedBoxes.length });
+      // Calculate total CBM from dimensions OR use shipment.cbm directly
+      const dimensions = dimData.dimensions || [];
+      let totalCBM = 0;
+
+      // Priority 1: Use shipment.cbm if available (from direct input or L×W×H calculation)
+      if (shipment.cbm && Number(shipment.cbm) > 0) {
+        totalCBM = Number(shipment.cbm);
+        console.log('📦 Using shipment.cbm:', totalCBM);
+      }
+      // Priority 2: Calculate from dimensions array
+      else if (dimensions.length > 0) {
+        totalCBM = dimensions.reduce((sum: number, d: any) => {
+          const cbm = ((d.length || 0) * (d.width || 0) * (d.height || 0) * (d.pieces || d.quantity || 1)) / 1000000;
+          return sum + cbm;
+        }, 0);
+        console.log('📐 Calculated CBM from dimensions:', totalCBM);
+      }
+
+      // Calculate CBM per pallet and per box (for partial assignments)
+      // Use originalBoxCount for accurate per-box CBM
+      const originalBoxCount = Number(shipment.originalBoxCount) || unassignedBoxes.length || 1;
+      const cbmPerPallet = totalPallets > 0 ? totalCBM / totalPallets : 0;
+      const cbmPerBox = totalCBM / originalBoxCount;
+
+      console.log('✅ Fresh data:', {
+        totalPallets,
+        looseBoxes,
+        palletDetails,
+        unassignedBoxes: unassignedBoxes.length,
+        originalBoxCount,
+        totalCBM: totalCBM.toFixed(4),
+        cbmPerPallet: cbmPerPallet.toFixed(4),
+        cbmPerBox: cbmPerBox.toFixed(6)
+      });
 
       setSelectedShipmentForRack({
         ...shipment,
         remainingBoxes: unassignedBoxes.length,
         totalPallets,
         looseBoxes,
-        palletDetails
+        palletDetails,
+        dimensions,
+        totalCBM,
+        cbmPerPallet,
+        cbmPerBox
       });
       setShowRackSelection(true);
-      console.log('✅ Rack selection enabled with FRESH data:', {
+      console.log('✅ Rack selection enabled with FRESH data + CBM:', {
         totalPallets,
         looseBoxes,
         palletDetails,
-        unassignedBoxes: unassignedBoxes.length
+        unassignedBoxes: unassignedBoxes.length,
+        totalCBM
       });
     } catch (err) {
       console.error('Failed to fetch boxes:', err);
@@ -1555,10 +1854,27 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
           selectedShipmentForRack.boxesPerPallet || 0
         ) + (looseBoxQuantity || 0);
 
+      // Calculate CBM for this assignment
+      const assignmentCBM = (palletQuantity * (selectedShipmentForRack.cbmPerPallet || 0)) +
+        (looseBoxQuantity * (selectedShipmentForRack.cbmPerBox || 0));
+
+      // 🔒 CBM CAPACITY CHECK - Block if shipment CBM exceeds rack's remaining CBM
+      const rackCBMCapacity = Number(selectedRackForAssignment.cbmCapacity) || 0;
+      const rackCBMUsed = Number(selectedRackForAssignment.cbmUsed) || 0;
+      const rackCBMRemaining = rackCBMCapacity - rackCBMUsed;
+
+      if (rackCBMCapacity > 0 && assignmentCBM > rackCBMRemaining) {
+        setLoading(false);
+        alert(`❌ No CBM Space Left!\n\n📦 Shipment CBM: ${assignmentCBM.toFixed(4)} m³\n📏 Rack Free CBM: ${rackCBMRemaining.toFixed(4)} m³\n\n⚠️ This shipment requires more space than available.\n\n👉 Try another rack with more capacity.`);
+        return;
+      }
+
       console.log('🎯 Assigning:', {
         pallets: palletQuantity,
         looseBoxes: looseBoxQuantity,
         totalBoxes: totalBoxesToAssign,
+        cbm: assignmentCBM.toFixed(4),
+        rackCBMRemaining: rackCBMRemaining.toFixed(4),
         rack: selectedRackForAssignment.code,
         shipment: selectedShipmentForRack.referenceId,
         photos: assignmentPhotos.length
@@ -1585,7 +1901,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         console.log('📸 Uploaded photos:', photoUrls);
       }
 
-      // Assign boxes to rack with photos
+      // Assign boxes to rack with photos and CBM
       const response = await fetch(`/api/shipments/${selectedShipmentForRack.id}/assign-rack`, {
         method: 'POST',
         headers: {
@@ -1597,7 +1913,8 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
           quantity: totalBoxesToAssign,
           pallets: palletQuantity,
           looseBoxes: looseBoxQuantity,
-          photos: photoUrls
+          photos: photoUrls,
+          cbm: assignmentCBM // Send CBM for this assignment
         })
       });
 
@@ -1807,6 +2124,26 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                         </div>
                       </div>
 
+                      {/* 📏 CBM Capacity Display */}
+                      {(scanResult.data.cbmCapacity > 0) && (
+                        <div className="mt-3 p-3 bg-white rounded-lg border border-blue-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-600 text-sm font-medium">📏 CBM Capacity:</span>
+                            <div className="text-right">
+                              <span className={`font-bold ${(Number(scanResult.data.cbmCapacity) - Number(scanResult.data.cbmUsed || 0)) <= 0
+                                  ? 'text-red-600'
+                                  : 'text-green-600'
+                                }`}>
+                                {(Number(scanResult.data.cbmCapacity) - Number(scanResult.data.cbmUsed || 0)).toFixed(2)} m³ Free
+                              </span>
+                              <span className="text-gray-500 text-xs ml-2">
+                                ({Number(scanResult.data.cbmUsed || 0).toFixed(2)} / {Number(scanResult.data.cbmCapacity).toFixed(2)})
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {pendingShipment && (
                         <div className="mt-6 pt-6 border-t-2 border-blue-300">
                           <div className="flex items-center justify-between mb-4">
@@ -1863,6 +2200,41 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                   </div>
                                 )}
                               </div>
+
+                              {/* 📏 DIMENSIONS LIST - Show each pallet/item dimensions */}
+                              {pendingShipment.dimensions && pendingShipment.dimensions.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                  <p className="text-xs text-gray-500 mb-2 font-semibold">📏 Dimensions (L×W×H cm):</p>
+                                  <div className="grid grid-cols-1 gap-2">
+                                    {pendingShipment.dimensions.map((dim: any, idx: number) => {
+                                      const cbm = ((dim.length || 0) * (dim.width || 0) * (dim.height || 0) * (dim.quantity || 1)) / 1000000;
+                                      return (
+                                        <div key={idx} className="bg-purple-50 rounded-lg p-2 border border-purple-200 flex items-center justify-between">
+                                          <div className="flex items-center gap-2">
+                                            <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded">
+                                              {dim.label || `#${idx + 1}`}
+                                            </span>
+                                            <span className="text-sm text-gray-700 font-medium">
+                                              {dim.length || 0}×{dim.width || 0}×{dim.height || 0}
+                                            </span>
+                                            {(dim.quantity || 1) > 1 && (
+                                              <span className="text-xs text-gray-500">×{dim.quantity}</span>
+                                            )}
+                                          </div>
+                                          <span className="text-xs font-semibold text-green-600">{cbm.toFixed(4)} m³</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  {pendingShipment.totalCBM > 0 && (
+                                    <div className="mt-2 flex gap-2">
+                                      <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full">
+                                        📦 Total: {pendingShipment.totalCBM.toFixed(4)} m³
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
 
                             {/* Pallets to Assign - Only show if pallets available - MOBILE OPTIMIZED */}
@@ -2066,26 +2438,26 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                   )}
 
                   {scanResult.type === 'shipment' && (
-                    <div className={`border-2 rounded-xl p-6 space-y-4 ${scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
+                    <div className={`border-2 rounded-xl p-6 space-y-4 ${scanResult.data.remainingBoxes === 0 && (scanResult.data.status === 'IN_STORAGE' || scanResult.data.status === 'IN_WAREHOUSE')
                       ? 'bg-red-50 border-red-500'
                       : 'bg-purple-50 border-purple-200'
                       }`}>
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <ArchiveBoxIcon className={`h-8 w-8 ${scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
+                          <ArchiveBoxIcon className={`h-8 w-8 ${scanResult.data.remainingBoxes === 0 && (scanResult.data.status === 'IN_STORAGE' || scanResult.data.status === 'IN_WAREHOUSE')
                             ? 'text-red-600'
                             : 'text-purple-600'
                             }`} />
-                          <h4 className={`text-xl font-bold ${scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
+                          <h4 className={`text-xl font-bold ${scanResult.data.remainingBoxes === 0 && (scanResult.data.status === 'IN_STORAGE' || scanResult.data.status === 'IN_WAREHOUSE')
                             ? 'text-red-900'
                             : 'text-purple-900'
                             }`}>
-                            {scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE'
+                            {scanResult.data.remainingBoxes === 0 && (scanResult.data.status === 'IN_STORAGE' || scanResult.data.status === 'IN_WAREHOUSE')
                               ? '⛔ Already in Storage!'
                               : 'Shipment Scanned!'}
                           </h4>
                         </div>
-                        {scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE' ? (
+                        {scanResult.data.remainingBoxes === 0 && (scanResult.data.status === 'IN_STORAGE' || scanResult.data.status === 'IN_WAREHOUSE') ? (
                           <div className="bg-red-600 text-white px-4 py-2 rounded-full font-bold text-sm">
                             🚫 FULLY STORED
                           </div>
@@ -2117,7 +2489,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                         </div>
                       </div>
 
-                      {scanResult.data.remainingBoxes === 0 && scanResult.data.status === 'IN_STORAGE' ? (
+                      {scanResult.data.remainingBoxes === 0 && (scanResult.data.status === 'IN_STORAGE' || scanResult.data.status === 'IN_WAREHOUSE') ? (
                         <div className="mt-4">
                           <div className="bg-red-100 border-2 border-red-600 p-6 rounded-lg mb-4">
                             <p className="text-center text-red-900 font-bold text-xl mb-3">
@@ -2199,13 +2571,24 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                 // ✅ CRITICAL FIX: Re-fetch fresh shipment data before setting pendingShipment
                                 // This ensures we get the latest box counts after any previous assignments
                                 try {
-                                  const freshResponse = await fetch(`/api/shipments/${scanResult.data.id}/boxes?t=${Date.now()}`, {
-                                    headers: {
-                                      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-                                      'Cache-Control': 'no-cache'
-                                    }
-                                  });
+                                  // Fetch boxes AND dimensions in parallel
+                                  const [freshResponse, dimResponse] = await Promise.all([
+                                    fetch(`/api/shipments/${scanResult.data.id}/boxes?t=${Date.now()}`, {
+                                      headers: {
+                                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                                        'Cache-Control': 'no-cache'
+                                      }
+                                    }),
+                                    fetch(`/api/shipments/${scanResult.data.id}/dimensions`, {
+                                      headers: {
+                                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                                      }
+                                    })
+                                  ]);
+
                                   const freshBoxData = await freshResponse.json();
+                                  const dimData = dimResponse.ok ? await dimResponse.json() : { dimensions: [] };
+
                                   const freshUnassignedBoxes = freshBoxData.boxes.filter((b: any) => {
                                     const hasRackId = b.rackId !== null && b.rackId !== undefined && b.rackId !== '';
                                     const isInStorage = b.status === 'IN_STORAGE';
@@ -2239,13 +2622,23 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                                     boxCount: freshPalletGroups[num]
                                   }));
 
-                                  // Update scanResult.data with fresh counts
+                                  // Calculate CBM from dimensions
+                                  const dimensions = dimData.dimensions || [];
+                                  const totalCBM = dimensions.reduce((sum: number, d: any) => {
+                                    const cbm = ((d.length || 0) * (d.width || 0) * (d.height || 0) * (d.quantity || 1)) / 1000000;
+                                    return sum + cbm;
+                                  }, 0);
+
+                                  // Update scanResult.data with fresh counts + dimensions
                                   const freshShipmentData = {
                                     ...scanResult.data,
                                     remainingBoxes: freshUnassignedBoxes.length,
                                     availablePallets: freshTotalPallets,
                                     availableLooseBoxes: freshLooseBoxes,
-                                    palletDetails: freshPalletDetails
+                                    palletDetails: freshPalletDetails,
+                                    dimensions: dimensions,
+                                    totalCBM: totalCBM,
+                                    cbmPerPallet: freshTotalPallets > 0 ? totalCBM / freshTotalPallets : 0
                                   };
 
                                   setPendingShipment(freshShipmentData);
@@ -2538,6 +2931,10 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                           {shipment.notes && (
                             <p className="text-gray-600 text-sm">📝 {shipment.notes}</p>
                           )}
+                          {/* Show CBM if available */}
+                          {shipment.cbm > 0 && (
+                            <p className="text-green-600 text-sm font-semibold">📏 CBM: {Number(shipment.cbm).toFixed(4)} m³</p>
+                          )}
                         </div>
                         <button
                           onClick={() => handleSelectShipment(shipment)}
@@ -2681,6 +3078,26 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                   </p>
                 </div>
               </div>
+
+              {/* 📏 CBM Capacity Display */}
+              {(selectedRackForAssignment.cbmCapacity > 0) && (
+                <div className="mt-3 p-3 bg-white rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm font-medium">📏 CBM Capacity:</span>
+                    <div className="text-right">
+                      <span className={`font-bold ${(Number(selectedRackForAssignment.cbmCapacity) - Number(selectedRackForAssignment.cbmUsed || 0)) <= 0
+                          ? 'text-red-600'
+                          : 'text-green-600'
+                        }`}>
+                        {(Number(selectedRackForAssignment.cbmCapacity) - Number(selectedRackForAssignment.cbmUsed || 0)).toFixed(2)} m³ Free
+                      </span>
+                      <span className="text-gray-500 text-xs ml-2">
+                        ({Number(selectedRackForAssignment.cbmUsed || 0).toFixed(2)} / {Number(selectedRackForAssignment.cbmCapacity).toFixed(2)})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Assignment Section - MOBILE OPTIMIZED */}
@@ -2703,7 +3120,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                 {/* Available Info */}
                 <div className="bg-white rounded-lg p-4 mb-4 border-2 border-purple-300">
                   <p className="text-sm text-gray-600 mb-2">Available for assignment:</p>
-                  <div className="flex items-center gap-6 text-lg">
+                  <div className="flex flex-wrap items-center gap-4 text-lg">
                     {selectedShipmentForRack.totalPallets > 0 && (
                       <div>
                         <span className="font-bold text-purple-700">{selectedShipmentForRack.totalPallets} Pallets</span>
@@ -2722,6 +3139,50 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       <span className="font-bold text-blue-700">{selectedShipmentForRack.looseBoxes} Loose Boxes</span>
                     </div>
                   </div>
+
+                  {/* 📏 DIMENSIONS LIST - Show each pallet/item dimensions */}
+                  {selectedShipmentForRack.dimensions && selectedShipmentForRack.dimensions.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-purple-200">
+                      <p className="text-xs text-gray-500 mb-2 font-semibold">📏 Dimensions (L×W×H cm):</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {selectedShipmentForRack.dimensions.map((dim: any, idx: number) => {
+                          const cbm = ((dim.length || 0) * (dim.width || 0) * (dim.height || 0) * (dim.pieces || dim.quantity || 1)) / 1000000;
+                          return (
+                            <div key={idx} className="bg-slate-50 rounded-lg p-2 border border-slate-200 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded">
+                                  {dim.label || `#${idx + 1}`}
+                                </span>
+                                <span className="text-sm text-gray-700">
+                                  {dim.length || 0}×{dim.width || 0}×{dim.height || 0}
+                                </span>
+                                {(dim.pieces || dim.quantity) > 1 && (
+                                  <span className="text-xs text-gray-500">×{dim.pieces || dim.quantity}</span>
+                                )}
+                              </div>
+                              <span className="text-xs font-semibold text-green-600">{cbm.toFixed(4)} m³</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CBM Total Info */}
+                  {selectedShipmentForRack.totalCBM > 0 && (
+                    <div className="mt-3 pt-3 border-t border-purple-200">
+                      <div className="flex flex-wrap items-center gap-4 text-sm">
+                        <div className="bg-green-100 px-3 py-1 rounded-full">
+                          <span className="text-green-700 font-semibold">📏 Total: {selectedShipmentForRack.totalCBM.toFixed(4)} m³</span>
+                        </div>
+                        {selectedShipmentForRack.cbmPerPallet > 0 && (
+                          <div className="bg-purple-100 px-3 py-1 rounded-full">
+                            <span className="text-purple-700 font-semibold">Per Pallet: {selectedShipmentForRack.cbmPerPallet.toFixed(4)} m³</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Pallet Input - MOBILE OPTIMIZED */}
@@ -2831,6 +3292,15 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       selectedShipmentForRack.boxesPerPallet || 0
                     ) + looseBoxQuantity} Total Boxes
                   </p>
+                  {/* CBM for selected items */}
+                  {selectedShipmentForRack.cbmPerPallet > 0 && (palletQuantity > 0 || looseBoxQuantity > 0) && (
+                    <div className="mt-2 pt-2 border-t border-green-300">
+                      <p className="text-sm font-semibold text-green-800">
+                        📏 CBM: {((palletQuantity * selectedShipmentForRack.cbmPerPallet) +
+                          (looseBoxQuantity * (selectedShipmentForRack.cbmPerBox || 0))).toFixed(4)} m³
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Photo Upload Section */}
@@ -2963,26 +3433,77 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                 </p>
               </div>
 
-              {/* Destination Rack Selection */}
+              {/* Destination Rack Selection - QR Scanner */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Destination Rack <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={moveDestinationRack}
-                  onChange={(e) => setMoveDestinationRack(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                >
-                  <option value="">Select destination rack...</option>
-                  {racks
-                    .filter(r => r.id !== moveShipmentData.sourceRackId && r.status !== 'FULL')
-                    .map(rack => (
-                      <option key={rack.id} value={rack.id}>
-                        {rack.code} - {rack.zone} ({rack.capacityUsed || 0}/{rack.capacityTotal || 100})
-                      </option>
-                    ))
-                  }
-                </select>
+
+                {/* Show selected rack or scan button */}
+                {moveDestinationRack ? (
+                  <div className="bg-green-50 border-2 border-green-500 p-4 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-green-800 font-bold text-lg">✅ {moveDestinationRackCode}</p>
+                        <p className="text-green-600 text-sm">Rack selected</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setMoveDestinationRack('');
+                          setMoveDestinationRackCode('');
+                        }}
+                        className="px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 text-sm"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  </div>
+                ) : scanningForDestination ? (
+                  <div className="space-y-3">
+                    <div className="bg-blue-50 border-2 border-blue-500 p-4 rounded-lg">
+                      <p className="text-blue-800 font-bold text-center mb-2">📷 Scan Destination Rack QR</p>
+                      <div id="destination-qr-reader" style={{ width: '100%', maxWidth: '300px', margin: '0 auto' }}></div>
+                    </div>
+                    <button
+                      onClick={() => stopDestinationScanner()}
+                      className="w-full py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                    >
+                      Cancel Scanning
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setScanningForDestination(true)}
+                      className="w-full py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                      </svg>
+                      📷 Scan Destination Rack QR
+                    </button>
+                    <p className="text-center text-gray-500 text-sm">or select manually</p>
+                    <select
+                      value={moveDestinationRack}
+                      onChange={(e) => {
+                        const rack = racks.find(r => r.id === e.target.value);
+                        setMoveDestinationRack(e.target.value);
+                        setMoveDestinationRackCode(rack?.code || '');
+                      }}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    >
+                      <option value="">Select destination rack...</option>
+                      {racks
+                        .filter(r => r.id !== moveShipmentData.sourceRackId && r.status !== 'FULL')
+                        .map(rack => (
+                          <option key={rack.id} value={rack.id}>
+                            {rack.code} - {rack.zone} ({rack.capacityUsed || 0}/{rack.capacityTotal || 100})
+                          </option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Reason Selection */}
@@ -3243,12 +3764,17 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
       {/* Manual Move Modal (without scanning) */}
       {showManualMoveModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="p-6 space-y-4">
-              {/* Header */}
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* Header - Green like scan success */}
+            <div className="bg-emerald-500 text-white px-6 py-4 rounded-t-2xl">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-900">🔄 Manual Move (Without Scanning)</h3>
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    🔄 Move Shipment
+                  </h3>
+                  <p className="text-emerald-100 text-sm mt-1">Select items to move to different rack</p>
+                </div>
                 <button
                   onClick={() => {
                     setShowManualMoveModal(false);
@@ -3260,32 +3786,35 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                     setMoveAuthorizedBy('');
                     setMoveNotes('');
                     setMovePhotos([]);
+                    setPalletsToMove(0);
+                    setLooseBoxesToMove(0);
                   }}
-                  className="p-2 hover:bg-gray-100 rounded-full"
+                  className="p-2 hover:bg-white/20 rounded-full transition-colors"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
+            </div>
 
+            <div className="p-5 space-y-4">
               {/* Step 1: Select Shipment */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Step 1: Select Shipment <span className="text-red-500">*</span>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  📦 Select Shipment
                 </label>
                 {loadingInStorageShipments ? (
                   <div className="text-center py-4">
-                    <div className="animate-spin h-6 w-6 border-2 border-amber-600 border-t-transparent rounded-full mx-auto"></div>
-                    <p className="text-sm text-gray-500 mt-2">Loading shipments...</p>
+                    <div className="animate-spin h-6 w-6 border-2 border-emerald-600 border-t-transparent rounded-full mx-auto"></div>
                   </div>
                 ) : (
                   <select
                     value={selectedManualShipment}
                     onChange={(e) => handleManualShipmentSelect(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
                   >
-                    <option value="">Select a shipment in storage...</option>
+                    <option value="">Select a shipment...</option>
                     {inStorageShipments.map(shipment => (
                       <option key={shipment.id} value={shipment.id}>
                         {shipment.name} - {shipment.referenceId} ({shipment.currentBoxCount} boxes)
@@ -3297,16 +3826,20 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
               {/* Step 2: Select Source Rack */}
               {selectedManualShipment && moveShipmentData?.rackGroups && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Step 2: Select Source Rack <span className="text-red-500">*</span>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    📍 Source Rack (From)
                   </label>
                   <select
                     value={selectedSourceRack}
-                    onChange={(e) => setSelectedSourceRack(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    onChange={(e) => {
+                      setSelectedSourceRack(e.target.value);
+                      setPalletsToMove(0);
+                      setLooseBoxesToMove(0);
+                    }}
+                    className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
                   >
-                    <option value="">Select current rack location...</option>
+                    <option value="">Select current rack...</option>
                     {moveShipmentData.rackGroups.map((rg: any) => (
                       <option key={rg.rackId} value={rg.rackId}>
                         {rg.rackCode} ({rg.boxCount} boxes)
@@ -3316,114 +3849,297 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                 </div>
               )}
 
-              {/* Step 3: Select Destination Rack */}
-              {selectedSourceRack && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Step 3: Destination Rack <span className="text-red-500">*</span>
+              {/* Rack Info Card - like 1st image */}
+              {selectedSourceRack && moveShipmentData?.rackGroups && (() => {
+                const sourceRackGroup = moveShipmentData.rackGroups.find((rg: any) => rg.rackId === selectedSourceRack);
+                const sourceRackInfo = racks.find(r => r.id === selectedSourceRack);
+                if (!sourceRackGroup) return null;
+
+                // Calculate pallets and loose boxes
+                const boxesInRack = sourceRackGroup.boxes || [];
+                const palletGroups: Record<number, any[]> = {};
+                const looseBoxes: any[] = [];
+
+                boxesInRack.forEach((box: any) => {
+                  try {
+                    const pieceQR = typeof box.pieceQR === 'string' ? JSON.parse(box.pieceQR) : box.pieceQR;
+                    const palletNum = pieceQR?.palletNumber || 0;
+                    if (palletNum > 0) {
+                      if (!palletGroups[palletNum]) palletGroups[palletNum] = [];
+                      palletGroups[palletNum].push(box);
+                    } else {
+                      looseBoxes.push(box);
+                    }
+                  } catch {
+                    looseBoxes.push(box);
+                  }
+                });
+
+                const palletCount = Object.keys(palletGroups).length;
+                const looseCount = looseBoxes.length;
+                const maxPallets = palletCount;
+                const maxLoose = looseCount;
+
+                return (
+                  <>
+                    {/* Rack Info Display */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                      <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                        📦 Rack Information
+                      </h4>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-slate-500">Code:</span>
+                          <p className="font-bold text-lg text-slate-900">{sourceRackInfo?.code}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Location:</span>
+                          <p className="font-bold text-slate-900">{sourceRackInfo?.location || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Section:</span>
+                          <p className="font-bold text-slate-900">{sourceRackInfo?.section || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Capacity:</span>
+                          <p className="font-bold text-slate-900">{sourceRackInfo?.capacityUsed || 0} / {sourceRackInfo?.capacityTotal || 100}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* How Many to Move - Partial Move Support */}
+                    <div className="bg-white border-2 border-emerald-200 rounded-xl p-4">
+                      <h4 className="text-sm font-semibold text-emerald-800 mb-3 flex items-center gap-2">
+                        📦 How Many to Move?
+                      </h4>
+
+                      {/* Available for move */}
+                      <div className="bg-emerald-50 rounded-lg p-3 mb-4">
+                        <p className="text-xs text-slate-600 mb-1">Available for move:</p>
+                        <div className="flex gap-4">
+                          <span className="text-emerald-700 font-bold">{palletCount} Pallets</span>
+                          <span className="text-blue-600 font-bold">{looseCount} Loose Boxes</span>
+                        </div>
+                      </div>
+
+                      {/* Pallets to Move */}
+                      {palletCount > 0 && (
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-slate-700 mb-2">🎁 Pallets to Move:</label>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setPalletsToMove(Math.max(0, (palletsToMove || 0) - 1))}
+                              className="w-12 h-12 bg-red-500 text-white rounded-lg text-xl font-bold hover:bg-red-600 transition-colors"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              value={palletsToMove || 0}
+                              onChange={(e) => setPalletsToMove(Math.min(maxPallets, Math.max(0, parseInt(e.target.value) || 0)))}
+                              className="flex-1 text-center text-xl font-bold p-3 border border-slate-300 rounded-lg"
+                              min="0"
+                              max={maxPallets}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setPalletsToMove(Math.min(maxPallets, (palletsToMove || 0) + 1))}
+                              className="w-12 h-12 bg-emerald-500 text-white rounded-lg text-xl font-bold hover:bg-emerald-600 transition-colors"
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPalletsToMove(maxPallets)}
+                              className="px-4 h-12 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors"
+                            >
+                              📦 All
+                            </button>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">⚡ Max: {maxPallets} | Remaining: {maxPallets - (palletsToMove || 0)}</p>
+                        </div>
+                      )}
+
+                      {/* Loose Boxes to Move */}
+                      {looseCount > 0 && (
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-slate-700 mb-2">📦 Loose Boxes to Move:</label>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setLooseBoxesToMove(Math.max(0, (looseBoxesToMove || 0) - 1))}
+                              className="w-12 h-12 bg-red-500 text-white rounded-lg text-xl font-bold hover:bg-red-600 transition-colors"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              value={looseBoxesToMove || 0}
+                              onChange={(e) => setLooseBoxesToMove(Math.min(maxLoose, Math.max(0, parseInt(e.target.value) || 0)))}
+                              className="flex-1 text-center text-xl font-bold p-3 border border-slate-300 rounded-lg"
+                              min="0"
+                              max={maxLoose}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setLooseBoxesToMove(Math.min(maxLoose, (looseBoxesToMove || 0) + 1))}
+                              className="w-12 h-12 bg-emerald-500 text-white rounded-lg text-xl font-bold hover:bg-emerald-600 transition-colors"
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setLooseBoxesToMove(maxLoose)}
+                              className="px-4 h-12 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors"
+                            >
+                              📦 All
+                            </button>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">⚡ Max: {maxLoose} | Remaining: {maxLoose - (looseBoxesToMove || 0)}</p>
+                        </div>
+                      )}
+
+                      {/* Total Summary */}
+                      <div className="bg-green-100 border border-green-300 rounded-lg p-3">
+                        <p className="text-sm text-slate-700">Total to move:</p>
+                        <p className="font-bold text-green-800">
+                          {palletsToMove || 0} Pallet{(palletsToMove || 0) !== 1 ? 's' : ''}
+                          {looseBoxesToMove > 0 && ` + ${looseBoxesToMove} Loose Box${looseBoxesToMove !== 1 ? 'es' : ''}`}
+                        </p>
+                        <p className="text-emerald-700 font-semibold mt-1">
+                          = {((palletsToMove || 0) * (Object.values(palletGroups)[0]?.length || 1)) + (looseBoxesToMove || 0)} Total Boxes
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+
+              {/* Destination Rack Selection */}
+              {selectedSourceRack && ((palletsToMove || 0) > 0 || (looseBoxesToMove || 0) > 0) && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">
+                    🎯 Select Destination Rack
                   </label>
-                  <select
-                    value={moveDestinationRack}
-                    onChange={(e) => setMoveDestinationRack(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                  >
-                    <option value="">Select destination rack...</option>
+                  <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
                     {racks
                       .filter(r => r.id !== selectedSourceRack && r.status !== 'FULL')
-                      .map(rack => (
-                        <option key={rack.id} value={rack.id}>
-                          {rack.code} - {rack.zone} ({rack.capacityUsed || 0}/{rack.capacityTotal || 100})
-                        </option>
-                      ))
+                      .map(rack => {
+                        const isSelected = moveDestinationRack === rack.id;
+                        const capacity = rack.capacityUsed || 0;
+                        const total = rack.capacityTotal || 100;
+                        const percentage = (capacity / total) * 100;
+
+                        return (
+                          <button
+                            key={rack.id}
+                            type="button"
+                            onClick={() => setMoveDestinationRack(rack.id)}
+                            className={`p-3 rounded-xl text-center transition-all duration-200 ${isSelected
+                              ? 'bg-emerald-500 text-white ring-4 ring-emerald-300 scale-105 shadow-lg'
+                              : percentage > 80
+                                ? 'bg-orange-100 text-orange-800 border-2 border-orange-300 hover:bg-orange-200'
+                                : 'bg-emerald-100 text-emerald-800 border-2 border-emerald-300 hover:bg-emerald-200'
+                              }`}
+                          >
+                            <div className="font-bold text-sm">{rack.code}</div>
+                            <div className="text-xs mt-1">
+                              {isSelected ? '✓ Selected' : `${capacity}/${total}`}
+                            </div>
+                          </button>
+                        );
+                      })
                     }
-                  </select>
+                  </div>
                 </div>
               )}
 
-              {/* Step 4: Reason */}
+              {/* Reason & Authorized By */}
               {moveDestinationRack && (
                 <>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Step 4: Reason for Move <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={moveReason}
-                      onChange={(e) => setMoveReason(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                    >
-                      <option value="">Select reason...</option>
-                      <option value="Reorganization">📦 Reorganization</option>
-                      <option value="Space Optimization">📐 Space Optimization</option>
-                      <option value="Customer Request">👤 Customer Request</option>
-                      <option value="Damage Prevention">⚠️ Damage Prevention</option>
-                      <option value="Temperature Control">🌡️ Temperature Control</option>
-                      <option value="Easier Access">🚪 Easier Access</option>
-                      <option value="Consolidation">🔗 Consolidation</option>
-                      <option value="Other">📝 Other</option>
-                    </select>
-                  </div>
-
-                  {/* Authorized By */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Step 5: Authorized By <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={moveAuthorizedBy}
-                      onChange={(e) => setMoveAuthorizedBy(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                    >
-                      <option value="">Select manager/admin...</option>
-                      {authorizedUsers.map(user => (
-                        <option key={user.id} value={user.id}>
-                          {user.role === 'ADMIN' ? '👑' : '👔'} {user.name} ({user.role})
-                        </option>
-                      ))}
-                    </select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Reason *</label>
+                      <select
+                        value={moveReason}
+                        onChange={(e) => setMoveReason(e.target.value)}
+                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">Select...</option>
+                        <option value="Reorganization">📦 Reorganization</option>
+                        <option value="Space Optimization">📐 Space Optimization</option>
+                        <option value="Customer Request">👤 Customer Request</option>
+                        <option value="Consolidation">🔗 Consolidation</option>
+                        <option value="Other">📝 Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Authorized By *</label>
+                      <select
+                        value={moveAuthorizedBy}
+                        onChange={(e) => setMoveAuthorizedBy(e.target.value)}
+                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">Select...</option>
+                        {authorizedUsers.map(user => (
+                          <option key={user.id} value={user.id}>
+                            {user.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   {/* Notes */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Additional Notes (Optional)
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Notes (Optional)</label>
                     <textarea
                       value={moveNotes}
                       onChange={(e) => setMoveNotes(e.target.value)}
+                      className="w-full p-2.5 border border-slate-300 rounded-lg text-sm h-16 focus:ring-2 focus:ring-emerald-500"
                       placeholder="Any additional details..."
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 h-20"
                     />
                   </div>
 
                   {/* Photo Upload */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      📸 Take Photos of New Location (Optional)
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                      📸 Upload Photos (Optional - Max 10)
                     </label>
+                    <p className="text-xs text-slate-500 mb-2">Take photos of pallets/boxes for reference</p>
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById('movePhotoInput')?.click()}
+                      className="w-full py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
+                    >
+                      📷 Take/Select Photos ({movePhotos.length}/10)
+                    </button>
                     <input
+                      id="movePhotoInput"
                       type="file"
                       accept="image/*"
                       capture="environment"
                       multiple
                       onChange={(e) => {
-                        const files = Array.from(e.target.files || []);
+                        const files = Array.from(e.target.files || []).slice(0, 10 - movePhotos.length);
                         setMovePhotos([...movePhotos, ...files]);
                       }}
-                      className="w-full p-3 border border-gray-300 rounded-lg"
+                      className="hidden"
                     />
                     {movePhotos.length > 0 && (
-                      <div className="flex gap-2 mt-2 flex-wrap">
+                      <div className="flex gap-2 mt-3 flex-wrap">
                         {movePhotos.map((photo, idx) => (
-                          <div key={idx} className="relative group">
+                          <div key={idx} className="relative">
                             <img
                               src={URL.createObjectURL(photo)}
                               alt={`Photo ${idx + 1}`}
-                              className="w-16 h-16 object-cover rounded-lg"
+                              className="w-14 h-14 object-cover rounded-lg border-2 border-white shadow"
                             />
                             <button
+                              type="button"
                               onClick={() => setMovePhotos(movePhotos.filter((_, i) => i !== idx))}
-                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow"
                             >
                               ✕
                             </button>
@@ -3435,22 +4151,10 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                 </>
               )}
 
-              {/* Summary */}
-              {selectedSourceRack && moveDestinationRack && (
-                <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
-                  <p className="font-semibold text-amber-900 mb-2">📋 Move Summary:</p>
-                  <div className="text-sm space-y-1">
-                    <p>📦 Shipment: <span className="font-semibold">{moveShipmentData?.name}</span></p>
-                    <p>📍 From: <span className="font-semibold">{moveShipmentData?.rackGroups?.find((rg: any) => rg.rackId === selectedSourceRack)?.rackCode}</span></p>
-                    <p>🎯 To: <span className="font-semibold">{racks.find(r => r.id === moveDestinationRack)?.code}</span></p>
-                    <p>📦 Boxes: <span className="font-semibold">{moveShipmentData?.rackGroups?.find((rg: any) => rg.rackId === selectedSourceRack)?.boxCount}</span></p>
-                  </div>
-                </div>
-              )}
-
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-2">
                 <button
+                  type="button"
                   onClick={() => {
                     setShowManualMoveModal(false);
                     setMoveShipmentData(null);
@@ -3461,15 +4165,18 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                     setMoveAuthorizedBy('');
                     setMoveNotes('');
                     setMovePhotos([]);
+                    setPalletsToMove(0);
+                    setLooseBoxesToMove(0);
                   }}
-                  className="flex-1 py-3 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600"
+                  className="flex-1 py-3.5 bg-slate-700 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleManualMoveSubmit}
-                  disabled={movingInProgress || !selectedManualShipment || !selectedSourceRack || !moveDestinationRack || !moveReason || !moveAuthorizedBy}
-                  className="flex-1 py-3 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                  disabled={movingInProgress || !moveDestinationRack || !moveReason || !moveAuthorizedBy || ((palletsToMove || 0) === 0 && (looseBoxesToMove || 0) === 0)}
+                  className="flex-1 py-3.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
                 >
                   {movingInProgress ? (
                     <>
@@ -3480,7 +4187,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       Moving...
                     </>
                   ) : (
-                    '✅ Confirm Move'
+                    <>✅ Confirm</>
                   )}
                 </button>
               </div>

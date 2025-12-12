@@ -56,6 +56,12 @@ model Company {
   loginBackgroundType String? @default("video") // video, gradient, image
   loginBackgroundImage String? // URL for background image
   loginShowFeatures   Boolean @default(true) // Show feature showcase on left side
+  
+  // NEW: Gemini Login Features
+  loginEnableCursor   Boolean @default(true)
+  loginEnable3D       Boolean @default(true)
+  loginBlurStrength   String  @default("medium") // none, low, medium, high
+  loginThemeMode      String  @default("system") // light, dark, system
 
   // NEW: Contract & Contact Info
   contactPerson      String?
@@ -109,6 +115,12 @@ model Company {
   purchaseOrderItems   PurchaseOrderItem[]
   materialPriceHistory MaterialPriceHistory[]
   rackAuditLogs        RackAuditLog[]
+  prepaidBalances      CustomerPrepaidBalance[]
+  
+  // Email & Notification System
+  emailSettings        EmailSettings?
+  notificationSettings NotificationSettings[]
+  emailLogs            EmailLog[]
 
   @@map("companies")
 }
@@ -233,6 +245,8 @@ model CompanyProfile {
   company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   racks            Rack[]   // One-to-many: Profile can have many racks assigned
   shipments        Shipment[] // One-to-many: Shipments from/to this company profile
+  prepaidBalance   CustomerPrepaidBalance? // One-to-one: Contract for this customer (legacy name kept for migration)
+  invoices         Invoice[] // Contract invoices for this customer
 
   @@unique([name, companyId]) // Company profile name unique per company
   @@map("company_profiles")
@@ -272,6 +286,10 @@ model Rack {
   currentBoxes     Int?     @default(0) // Current loose boxes stored
   capacityNotes    String?  @db.Text // "3 pallets OR 50 boxes OR mixed"
   
+  // NEW: CBM (Cubic Meter) Tracking
+  cbmCapacity      Float?   // Max CBM rack can hold (optional)
+  cbmUsed          Float    @default(0) // Current CBM used (auto-calculated)
+  
   status        String    @default("ACTIVE") // ACTIVE, MAINTENANCE, RESERVED
   lastActivity  DateTime?
   companyId     String
@@ -284,6 +302,7 @@ model Rack {
   category          Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull) // FK to Category
   companyProfile    CompanyProfile?   @relation(fields: [companyProfileId], references: [id], onDelete: SetNull) // NEW: FK to CompanyProfile
   boxes             ShipmentBox[] // Individual boxes assigned
+  dimensions        ShipmentDimension[] // 🎯 NEW: Dimension items assigned to this rack
   activities        RackActivity[]
   inventory         RackInventory[]
   materialLevels    RackStockLevel[] @relation("RackMaterialLevels")
@@ -321,11 +340,11 @@ model RackActivity {
   rackId         String
   userId         String
   activityType   String // ASSIGN, REMOVE, USE, MOVE, CHECK
-  itemDetails    String
+  itemDetails    String   @db.Text // JSON string of activity details
   quantityBefore Int?
   quantityAfter  Int?
-  photos         String? // JSON string of photo URLs array
-  notes          String?
+  photos         String?  @db.Text // JSON string of photo URLs array
+  notes          String?  @db.Text
   gpsLocation    String?
   timestamp      DateTime @default(now())
   companyId      String
@@ -433,11 +452,60 @@ model Shipment {
   assignedBy User? @relation("ShipmentAssignedBy", fields: [assignedById], references: [id])
   releasedBy User? @relation("ShipmentReleasedBy", fields: [releasedById], references: [id])
 
+  // NEW: Multiple Dimensions Tracking
+  dimensions ShipmentDimension[] // Multiple dimension entries (pallets, boxes, etc.)
+
   @@index([category])
   @@index([customerName])
   @@index([awbNumber])
   @@index([deletedAt]) // Index for filtering active shipments
   @@map("shipments")
+}
+
+// NEW: Multiple Dimensions per Shipment (for pallets, loose boxes, etc.)
+model ShipmentDimension {
+  id          String    @id @default(cuid())
+  shipmentId  String
+  companyId   String
+  
+  // Dimension identification
+  label       String?   // Optional label: "Pallet 1", "Loose Boxes", "Carton A", etc.
+  itemType    String    @default("BOX") // BOX, PALLET, CRATE, LOOSE, CARTON, OTHER
+  quantity    Int       @default(1) // How many of this dimension (e.g., 3 pallets of same size)
+  
+  // Dimensions (in centimeters)
+  length      Float     // Length in cm
+  width       Float     // Width in cm
+  height      Float     // Height in cm
+  
+  // Calculated/Entered values
+  cbm         Float     // CBM for this entry (calculated or direct input)
+  totalCBM    Float     // Total CBM = cbm × quantity
+  weight      Float?    // Optional weight per item (kg)
+  totalWeight Float?    // Optional total weight = weight × quantity
+  
+  // 🎯 NEW: Rack Assignment & Status
+  rackId      String?   // Which rack this dimension is assigned to
+  status      String    @default("PENDING") // PENDING, ASSIGNED, RELEASED
+  assignedAt  DateTime? // When assigned to rack
+  releasedAt  DateTime? // When released from rack
+  
+  // Notes
+  notes       String?   @db.Text
+  
+  // Metadata
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  shipment    Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  rack        Rack?     @relation(fields: [rackId], references: [id], onDelete: SetNull)
+  
+  @@index([shipmentId])
+  @@index([companyId])
+  @@index([rackId])
+  @@index([status])
+  @@map("shipment_dimensions")
 }
 
 // Individual Boxes (Each has own QR code)
@@ -668,20 +736,96 @@ model ChargeType {
   @@map("charge_types")
 }
 
+// Customer Prepaid Balance (Advance Payment System)
+// Customer Contract (Monthly Payment Agreement)
+model CustomerPrepaidBalance {
+  id               String   @id @default(cuid())
+  companyId        String
+  companyProfileId String   @unique // Which customer (DIOR, JAZEERA, etc.) - unique for 1:1 relation
+  
+  // Contract Terms
+  monthlyRate       Float    @default(0)   // Monthly payment amount (e.g., 150 KWD/month)
+  paymentDueDay     Int      @default(30)  // Day of month payment is due (1-31, 30 = end of month)
+  maxCBM            Float?   // Maximum CBM this customer can store (null = unlimited)
+  maxStorageDays    Int?     // Maximum days items can be stored (null = unlimited)
+  
+  // Contract Period
+  contractStartDate DateTime @default(now()) // Contract start date
+  contractEndDate   DateTime? // Contract end date (null = indefinite)
+  
+  // Billing Tracking
+  lastBilledDate    DateTime? // When was last invoice generated
+  nextBillingDate   DateTime? // When is next billing due
+  totalBilled       Float     @default(0) // Total amount billed to date
+    totalPaid         Float     @default(0) // Total amount paid to date   
+    balanceRemaining  Float     @default(0) // Outstanding balance (unpaid)
+
+    // History
+    history           ContractHistory[]
+
+    createdAt         DateTime @default(now())
+    updatedAt         DateTime @updatedAt  // Legacy Fields (keep for migration)
+  validFrom         DateTime @default(now())
+  validUntil        DateTime? // Contract expiry date
+  
+  // Status
+  status            String   @default("ACTIVE") // ACTIVE, EXPIRED, SUSPENDED, CANCELLED
+  notes             String?  @db.Text
+  
+  // Relations
+  company           Company        @relation(fields: [companyId], references: [id])
+  companyProfile    CompanyProfile @relation(fields: [companyProfileId], references: [id])
+  transactions      PrepaidTransaction[]
+  
+  @@unique([companyId, companyProfileId]) // One contract per customer
+  @@map("customer_prepaid_balances")
+}
+
+// Prepaid Transaction History
+model PrepaidTransaction {
+  id               String   @id @default(cuid())
+  prepaidBalanceId String
+  
+  // Transaction Details
+  type              String   // CREDIT (payment), DEBIT (charge deduction), REFUND, ADJUSTMENT
+  amount            Float    // Amount of transaction
+  balanceBefore     Float    // Balance before this transaction
+  balanceAfter      Float    // Balance after this transaction
+  
+  // Reference
+  referenceType     String?  // SHIPMENT, INVOICE, MANUAL
+  referenceId       String?  // Shipment ID or Invoice ID
+  description       String?  @db.Text
+  
+  createdAt         DateTime @default(now())
+  
+  // Relations
+  prepaidBalance    CustomerPrepaidBalance @relation(fields: [prepaidBalanceId], references: [id])
+  
+  @@index([prepaidBalanceId])
+  @@index([referenceType, referenceId])
+  @@map("prepaid_transactions")
+}
+
 // Invoices
 model Invoice {
-  id            String  @id @default(cuid())
-  invoiceNumber String  @unique
-  companyId     String
-  shipmentId    String
-  clientName    String
-  clientPhone   String?
-  clientAddress String?
+  id               String  @id @default(cuid())
+  invoiceNumber    String  @unique
+  companyId        String
+  shipmentId       String?  // Optional for contract invoices
+  companyProfileId String?  // For contract invoices - links to customer
+  clientName       String
+  clientPhone      String?
+  clientAddress    String?
 
   // Invoice Details
   invoiceDate DateTime @default(now())
   dueDate     DateTime
-  invoiceType String   @default("STORAGE") // STORAGE, PARTIAL, PERIODIC
+  invoiceType String   @default("STORAGE") // STORAGE, PARTIAL, PERIODIC, CONTRACT
+
+  // Contract Invoice Fields
+  billingMonth  Int?    // Month number (1-12) for contract invoices
+  billingYear   Int?    // Year for contract invoices
 
   // Warehouse Integration Fields (Non-breaking additions)
   isWarehouseInvoice Boolean @default(false) // Flag for warehouse vs regular invoices
@@ -709,10 +853,11 @@ model Invoice {
   updatedAt DateTime @updatedAt
 
   // Relations
-  company   Company           @relation(fields: [companyId], references: [id])
-  shipment  Shipment          @relation(fields: [shipmentId], references: [id])
-  lineItems InvoiceLineItem[]
-  payments  Payment[]
+  company        Company           @relation(fields: [companyId], references: [id])
+  shipment       Shipment?         @relation(fields: [shipmentId], references: [id])
+  companyProfile CompanyProfile?   @relation(fields: [companyProfileId], references: [id])
+  lineItems      InvoiceLineItem[]
+  payments       Payment[]
 
   @@map("invoices")
 }
@@ -1333,21 +1478,24 @@ model MaterialIssueHistory {
 }
 
 model MaterialReturn {
-  id              String    @id @default(cuid())
-  jobId           String
-  materialId      String
-  issueId         String?
-  quantityIssued  Int?
-  quantityUsed    Int?
-  quantityGood    Int       @default(0)
-  quantityDamaged Int       @default(0)
-  restocked       Boolean   @default(false)
-  restockedAt     DateTime?
-  rackId          String?
-  recordedById    String?
-  recordedAt      DateTime  @default(now())
-  notes           String?
-  companyId       String
+  id                 String    @id @default(cuid())
+  jobId              String
+  materialId         String
+  issueId            String?
+  quantityIssued     Int?
+  quantityUsed       Int?
+  quantityGood       Int       @default(0)
+  quantityDamaged    Int       @default(0)
+  restocked          Boolean   @default(false)
+  restockedAt        DateTime?
+  rackId             String?
+  recordedById       String?
+  recordedAt         DateTime  @default(now())
+  notes              String?
+  companyId          String
+  physicalReportUrl  String?   // Physical report document (PDF/Image)
+  uploadToken        String?   @unique // Token for mobile upload authentication
+  uploadTokenExpiry  DateTime? // Token expiry for security
 
   job        MovingJob         @relation(fields: [jobId], references: [id], onDelete: Restrict) // ← CHANGED: Restrict instead of Cascade - preserves history
   material   PackingMaterial   @relation(fields: [materialId], references: [id])
@@ -1397,6 +1545,9 @@ model MaterialApproval {
   decisionById    String?
   decidedAt       DateTime?
   decisionNotes   String?
+  notifyEmails    String?   @db.Text // Comma-separated internal recipients for approval emails
+  reminderCount   Int       @default(0)
+  lastReminderAt  DateTime?
   subjectReturnId String?   @unique
   subjectDamageId String?   @unique
   companyId       String
@@ -1408,6 +1559,7 @@ model MaterialApproval {
   subjectDamage MaterialDamage? @relation("DamageApproval", fields: [subjectDamageId], references: [id])
   company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  @@index([companyId, status, approvalType])
   @@map("material_approvals")
 }
 
@@ -1622,3 +1774,124 @@ model MaterialPriceHistory {
   @@index([materialId])
   @@map("material_price_history")
 }
+
+// ============================================
+// CONTRACT HISTORY
+// ============================================
+
+model ContractHistory {
+  id                       String                 @id @default(cuid())
+  customerPrepaidBalanceId String
+  customerPrepaidBalance   CustomerPrepaidBalance @relation(fields: [customerPrepaidBalanceId], references: [id], onDelete: Cascade)
+
+  // Snapshot of terms
+  monthlyRate       Float
+  contractStartDate DateTime
+  contractEndDate   DateTime?
+
+  // Metadata
+  changeDate      DateTime @default(now())
+  changedByUserId String? // Optional: if we want to track who changed it
+  reason          String? // 'Rate Change', 'Extension', 'Initial Setup'
+
+  @@index([customerPrepaidBalanceId])
+}
+
+// ============================================
+// EMAIL & NOTIFICATION SYSTEM
+// ============================================
+
+// Email Settings per Company (SMTP Configuration)
+model EmailSettings {
+  id            String   @id @default(cuid())
+  companyId     String   @unique
+  
+  // Provider
+  provider      String   @default("gmail") // gmail, smtp, sendgrid, etc.
+  isEnabled     Boolean  @default(false)
+  
+  // SMTP Configuration
+  smtpHost      String   @default("smtp.gmail.com")
+  smtpPort      Int      @default(587)
+  smtpSecure    Boolean  @default(false) // true for 465, false for 587
+  smtpUser      String   @default("")
+  smtpPassword  String   @default("") // App Password for Gmail
+  
+  // Sender Info
+  senderName    String   @default("")
+  senderEmail   String   @default("")
+  
+  // Rate Limiting
+  dailyLimit    Int      @default(500) // Gmail free limit
+  sentToday     Int      @default(0)
+  lastResetDate DateTime @default(now())
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("email_settings")
+}
+
+// Notification Settings (what notifications to send and to whom)
+model NotificationSettings {
+  id               String   @id @default(cuid())
+  companyId        String
+  notificationType String   // SHIPMENT_RELEASED, CONTRACT_EXPIRING, etc.
+  isEnabled        Boolean  @default(true)
+  
+  // Who to notify
+  notifyAdmins     Boolean  @default(true)
+  notifyManagers   Boolean  @default(false)
+  customEmails     String?  @db.Text // Comma-separated additional emails
+  
+  // Timing (for alerts)
+  alertDaysBefore  Int?     // For CONTRACT_EXPIRING: days before to alert
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  recipients       NotificationRecipient[]
+
+  @@unique([companyId, notificationType])
+  @@map("notification_settings")
+}
+
+// Notification Recipients (specific users/emails per notification type)
+model NotificationRecipient {
+  id                     String   @id @default(cuid())
+  notificationSettingsId String
+  
+  userId                 String?  // If linked to a user
+  email                  String   // Email address
+  name                   String?  // Display name
+  
+  createdAt              DateTime @default(now())
+
+  notificationSettings   NotificationSettings @relation(fields: [notificationSettingsId], references: [id], onDelete: Cascade)
+
+  @@map("notification_recipients")
+}
+
+// Email Log (track all sent emails)
+model EmailLog {
+  id         String   @id @default(cuid())
+  companyId  String
+  
+  recipients String   @db.Text // Comma-separated list
+  subject    String
+  status     String   // SENT, FAILED, PENDING
+  messageId  String?  // Email provider message ID
+  error      String?  @db.Text
+  
+  sentAt     DateTime @default(now())
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([sentAt])
+  @@map("email_logs")
+}
+

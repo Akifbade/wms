@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cache Clear Test</title>
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
+</head>
+<body>
+    <h1>Testing Cache...</h1>
+    <script>
+        const timestamp = new Date().getTime();
+        console.log('Page loaded at:', timestamp);
+        window.location.href = '/?nocache=' + timestamp;
+    </script>
+</body>
+</html>

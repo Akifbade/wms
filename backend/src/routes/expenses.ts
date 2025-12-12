@@ -12,12 +12,12 @@ router.use(authenticateToken);
 router.get('/', async (req: AuthRequest, res) => {
   try {
     const companyId = req.user!.companyId;
-    const { 
-      category, 
-      status, 
-      startDate, 
-      endDate, 
-      search 
+    const {
+      category,
+      status,
+      startDate,
+      endDate,
+      search
     } = req.query;
 
     const where: any = { companyId };
@@ -114,8 +114,8 @@ router.post('/', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, re
 
     // Validation
     if (!title || !category || !amount || !expenseDate) {
-      return res.status(400).json({ 
-        error: 'Title, category, amount, and expense date are required' 
+      return res.status(400).json({
+        error: 'Title, category, amount, and expense date are required'
       });
     }
 
@@ -229,14 +229,14 @@ router.patch('/:id/status', async (req: AuthRequest, res) => {
 
     // Only ADMIN or MANAGER can approve/reject
     if (userRole !== 'ADMIN' && userRole !== 'MANAGER') {
-      return res.status(403).json({ 
-        error: 'Only admins and managers can approve/reject expenses' 
+      return res.status(403).json({
+        error: 'Only admins and managers can approve/reject expenses'
       });
     }
 
     if (!['APPROVED', 'REJECTED'].includes(status)) {
-      return res.status(400).json({ 
-        error: 'Status must be APPROVED or REJECTED' 
+      return res.status(400).json({
+        error: 'Status must be APPROVED or REJECTED'
       });
     }
 
@@ -307,7 +307,7 @@ router.get('/stats/summary', async (req: AuthRequest, res) => {
       return acc;
     }, {});
 
-    const totalAmount = expenses.reduce((sum: number, exp: any) => 
+    const totalAmount = expenses.reduce((sum: number, exp: any) =>
       sum + parseFloat(exp.amount.toString()), 0
     );
 
