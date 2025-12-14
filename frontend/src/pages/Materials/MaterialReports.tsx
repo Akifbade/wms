@@ -807,39 +807,110 @@ const MaterialReports: React.FC = () => {
                           No transactions found for this material in the selected date range.
                         </div>
                       ) : (
-                        <div className="divide-y divide-gray-100">
-                          {stmt.transactions.map((txn, idx) => (
-                            <div key={txn.id || idx} className={`px-4 py-3 ${getTransactionColor(txn.type)}`}>
-                              <div className="flex justify-between items-start">
-                                <div className="flex items-start gap-3">
-                                  {getTransactionIcon(txn.type)}
-                                  <div>
-                                    <p className="font-medium text-gray-900">{txn.description}</p>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                      📅 {formatDate(txn.date)} •
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full">
+                            <thead className="bg-gray-50 border-b">
+                              <tr>
+                                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Date</th>
+                                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Type</th>
+                                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Job / Details</th>
+                                <th className="px-4 py-2 text-right text-xs font-semibold text-green-600">IN</th>
+                                <th className="px-4 py-2 text-right text-xs font-semibold text-red-600">OUT</th>
+                                <th className="px-4 py-2 text-right text-xs font-semibold text-gray-800">Balance</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {stmt.transactions.map((txn, idx) => {
+                                // Extract customer name from description
+                                const customerMatch = txn.description?.match(/- (.+?)(?:\s*\(|$)/);
+                                const customerName = customerMatch ? customerMatch[1].trim() : '';
+                                const isPending = txn.type === 'RETURN_PENDING_APPROVAL';
+                                
+                                return (
+                                  <tr 
+                                    key={txn.id || idx} 
+                                    className={`hover:bg-gray-50 ${isPending ? 'bg-yellow-50' : ''} ${
+                                      txn.type === 'PURCHASE' ? 'bg-green-50/50' : 
+                                      txn.type === 'ISSUE' ? 'bg-blue-50/50' : 
+                                      txn.type === 'RETURN' ? 'bg-purple-50/50' : 
+                                      txn.type === 'DAMAGE' ? 'bg-red-50/50' : ''
+                                    }`}
+                                  >
+                                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                                      {formatDate(txn.date)}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                        txn.type === 'PURCHASE' ? 'bg-green-100 text-green-700' :
+                                        txn.type === 'ISSUE' ? 'bg-blue-100 text-blue-700' :
+                                        txn.type === 'RETURN' ? 'bg-purple-100 text-purple-700' :
+                                        txn.type === 'RETURN_PENDING_APPROVAL' ? 'bg-yellow-100 text-yellow-700' :
+                                        txn.type === 'DAMAGE' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                                      }`}>
+                                        {txn.type === 'PURCHASE' && '📦 Stock In'}
+                                        {txn.type === 'ISSUE' && '📤 Issued'}
+                                        {txn.type === 'RETURN' && '↩️ Returned'}
+                                        {txn.type === 'RETURN_PENDING_APPROVAL' && '⏳ Pending Return'}
+                                        {txn.type === 'DAMAGE' && '❌ Damaged'}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3">
                                       {txn.referenceType === 'moving_job' && txn.referenceId ? (
-                                        <Link to={`/moving-jobs/${txn.referenceId}`} className="text-blue-600 hover:underline ml-1">
-                                          {txn.reference}
+                                        <Link 
+                                          to={`/moving-jobs/${txn.referenceId}`} 
+                                          className="group block"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-blue-600 hover:text-blue-800 font-medium group-hover:underline">
+                                              {customerName || txn.reference}
+                                            </span>
+                                            <span className="text-xs text-gray-400 group-hover:text-blue-500">
+                                              → Open Job
+                                            </span>
+                                          </div>
+                                          <p className="text-xs text-gray-400">{txn.reference}</p>
                                         </Link>
                                       ) : (
-                                        <span className="ml-1">{txn.reference}</span>
+                                        <div>
+                                          <p className="font-medium text-gray-800">
+                                            {txn.description?.replace('Issued to Job:', '').replace('Returned from Job:', '').replace('Purchased from', '').trim() || txn.reference}
+                                          </p>
+                                          {txn.reference !== 'N/A' && txn.reference && (
+                                            <p className="text-xs text-gray-400">{txn.reference}</p>
+                                          )}
+                                        </div>
                                       )}
-                                      {txn.issuedBy && <span> • By: {txn.issuedBy}</span>}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  {txn.stockIn > 0 && (
-                                    <p className="text-lg font-bold text-green-600">+{txn.stockIn}</p>
-                                  )}
-                                  {txn.stockOut > 0 && (
-                                    <p className="text-lg font-bold text-red-600">-{txn.stockOut}</p>
-                                  )}
-                                  <p className="text-xs text-gray-500">Balance: {txn.balance}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                                      {isPending && (
+                                        <span className="inline-block mt-1 text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">
+                                          ⏳ Waiting for approval - not added to stock
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                      {txn.stockIn > 0 ? (
+                                        <span className="text-lg font-bold text-green-600">+{txn.stockIn}</span>
+                                      ) : (
+                                        <span className="text-gray-300">-</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                      {txn.stockOut > 0 ? (
+                                        <span className="text-lg font-bold text-red-600">-{txn.stockOut}</span>
+                                      ) : (
+                                        <span className="text-gray-300">-</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                      <span className={`text-lg font-bold ${txn.balance < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                                        {txn.balance}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
                         </div>
                       )}
 

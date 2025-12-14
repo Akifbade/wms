@@ -33,6 +33,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
     categoryId: '',
     companyProfileId: '',
     capacityTotal: 100,
+    cbmCapacity: 0,
     status: 'ACTIVE',
     length: '',
     width: '',
@@ -151,6 +152,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
         zone: rack.zone || '',
         zoneDescription: rack.zoneDescription || '',
         zoneIcon: rack.zoneIcon || '📦',
+        cbmCapacity: rack.cbmCapacity || 0,
       });
 
       // Set selected category info
@@ -185,7 +187,7 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
     setFormData(prev => {
       const next = {
         ...prev,
-        [name]: name === 'capacityTotal' ? Number(value) : value
+        [name]: (name === 'capacityTotal' || name === 'cbmCapacity') ? Number(value) : value
       } as typeof prev;
 
       if (name === 'categoryId') {
@@ -556,6 +558,31 @@ export default function EditRackModal({ isOpen, onClose, onSuccess, rack }: Edit
                 <p className="text-xs text-gray-500 mt-1">
                   Min: {rack.capacityUsed} (current usage)
                 </p>
+              </div>
+
+              {/* CBM Capacity - Individual Rack Setting */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                <label className="block text-sm font-semibold text-purple-800 mb-1">
+                  📦 CBM Capacity (m³)
+                </label>
+                <input
+                  type="number"
+                  name="cbmCapacity"
+                  value={formData.cbmCapacity}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-purple-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                  placeholder="e.g., 5.0 or 40.0"
+                  step="0.1"
+                  min="0"
+                />
+                <p className="text-xs text-purple-600 mt-1">
+                  Max cubic meters this rack can hold (e.g., Ground = 40, Normal = 5)
+                </p>
+                {rack.cbmUsed > 0 && (
+                  <p className="text-xs text-purple-700 mt-1 font-medium">
+                    Currently using: {(rack.cbmUsed || 0).toFixed(2)} m³
+                  </p>
+                )}
               </div>
 
               <div>

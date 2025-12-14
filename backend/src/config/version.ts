@@ -6,7 +6,9 @@
 /**
  * Auto-incremented version (updated by pre-commit hook)
  */
-export const APP_VERSION = 'v2.2.86';
+export const APP_VERSION = 'v2.2.87';
+
+export const COMMIT_MESSAGE = 'Fix: Job click in Material Report, Individual Rack CBM, Old returns restocked';
 
 export const getVersionInfo = () => {
   return {
@@ -15,6 +17,7 @@ export const getVersionInfo = () => {
     stage: process.env.DEPLOYMENT_STAGE || 'local', // local, staging, production
     buildDate: new Date().toISOString(),
     commitHash: process.env.COMMIT_HASH || 'local-dev',
+    commitMessage: COMMIT_MESSAGE,
     timestamp: Date.now(),
   };
 };

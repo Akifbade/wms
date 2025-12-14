@@ -1,9 +1,9 @@
 {
   "version": "v2.2.86",
   "buildDate": "Dec 14, 2025",
-  "buildTime": "14:02:17",
-  "commit": "50f6e648d",
-  "commitMessage": "chore: sync all versions to v2.2.86 and verify physical report system",
+  "buildTime": "18:20:52",
+  "commit": "d3f3ad03e",
+  "commitMessage": "fix: show Release button for IN_STORAGE shipments (same as IN_WAREHOUSE)",
   "author": "akifbade46-del",
   "environment": "local"
 }

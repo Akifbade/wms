@@ -1,9 +1,15 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.2.86**
-- **Released**: Dec 14, 2025 at 16:30:00
+## Current Version: **v2.2.87**
+- **Released**: Dec 14, 2025 at 19:30:00
 - **Author**: akifbade46-del
 - **Status**: Development
+
+### Changes in v2.2.87:
+- 🔧 Fix: Job click in Material Report opens job instead of scanner
+- 📦 Feature: Individual Rack CBM setting (Ground=40, others=5)
+- ✅ Fix: Old returns marked as restocked (before approval system)
+- 📊 Fix: LARGE CARTON balance recalculated correctly (36)
 
 ### Changes in v2.2.86:
 - 🔧 Fixed version sync across all files (backend, frontend, VERSION.md)

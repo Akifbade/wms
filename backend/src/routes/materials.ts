@@ -2625,7 +2625,7 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
         });
         openingStock -= priorIssues.reduce((sum, i) => sum + i.quantity, 0);
 
-        // Add returns before start date
+        // Add returns before start date - ONLY count restocked returns
         const priorReturns = await prisma.materialReturn.findMany({
           where: {
             materialId: material.id,
@@ -2633,7 +2633,7 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
             recordedAt: { lt: dateFilter.gte }
           }
         });
-        openingStock += priorReturns.reduce((sum, r) => sum + r.quantityGood, 0);
+        openingStock += priorReturns.filter(r => r.restocked === true).reduce((sum, r) => sum + r.quantityGood, 0);
 
         // Subtract damages before start date
         const priorDamages = await prisma.materialDamage.findMany({
