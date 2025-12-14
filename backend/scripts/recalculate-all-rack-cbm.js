@@ -4,21 +4,15 @@
  * Run on VPS: docker exec -it wms-backend node scripts/recalculate-all-rack-cbm.js
  */
 
-const mysql = require('mysql2/promise');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 async function recalculateAllRackCBM() {
   console.log('🔄 Starting CBM Recalculation for ALL Racks...\n');
 
-  const connection = await mysql.createConnection({
-    host: process.env.DB_HOST || 'wms-database',
-    user: process.env.DB_USER || 'wms_user',
-    password: process.env.DB_PASSWORD || 'wmspassword123',
-    database: process.env.DB_NAME || 'warehouse_wms',
-  });
-
   try {
-    // Get all racks
-    const [racks] = await connection.execute('SELECT id, name, companyId, cbmUsed, cbmCapacity FROM racks');
+    // Get all racks with raw SQL to access cbmUsed
+    const racks = await prisma.$queryRaw`SELECT id, name, companyId, cbmUsed, cbmCapacity FROM racks`;
     console.log(`📦 Found ${racks.length} racks to process\n`);
 
     let updatedCount = 0;
@@ -27,20 +21,32 @@ async function recalculateAllRackCBM() {
 
     for (const rack of racks) {
       // Get all boxes in this rack with status IN_STORAGE or STORED
-      const [boxes] = await connection.execute(
-        `SELECT b.id, b.shipmentId, s.cbm, s.originalBoxCount, s.length, s.width, s.height
-         FROM ShipmentBox b
-         JOIN Shipment s ON b.shipmentId = s.id
-         WHERE b.rackId = ? AND b.status IN ('IN_STORAGE', 'STORED')`,
-        [rack.id]
-      );
+      const boxes = await prisma.shipmentBox.findMany({
+        where: {
+          rackId: rack.id,
+          status: { in: ['IN_STORAGE', 'STORED'] }
+        },
+        include: {
+          shipment: {
+            select: {
+              id: true,
+              cbm: true,
+              originalBoxCount: true,
+              length: true,
+              width: true,
+              height: true,
+            }
+          }
+        }
+      });
 
       if (boxes.length === 0) {
         // No boxes, set CBM to 0
-        if (rack.cbmUsed > 0) {
-          await connection.execute('UPDATE racks SET cbmUsed = 0 WHERE id = ?', [rack.id]);
-          console.log(`📭 ${rack.name}: ${rack.cbmUsed.toFixed(3)} → 0.000 (empty rack)`);
-          totalOldCBM += Number(rack.cbmUsed) || 0;
+        const oldCBM = Number(rack.cbmUsed) || 0;
+        if (oldCBM > 0) {
+          await prisma.$executeRaw`UPDATE racks SET cbmUsed = 0 WHERE id = ${rack.id}`;
+          console.log(`📭 ${rack.name}: ${oldCBM.toFixed(3)} → 0.000 (empty rack)`);
+          totalOldCBM += oldCBM;
           updatedCount++;
         }
         continue;
@@ -52,26 +58,30 @@ async function recalculateAllRackCBM() {
 
       for (const shipmentId of shipmentIds) {
         const box = boxes.find(b => b.shipmentId === shipmentId);
-        const totalBoxes = box.originalBoxCount || 1;
+        const shipment = box.shipment;
+        const totalBoxes = shipment.originalBoxCount || 1;
         let shipmentTotalCBM = 0;
 
         // Priority 1: Use shipment.cbm if available
-        if (box.cbm && Number(box.cbm) > 0) {
-          shipmentTotalCBM = Number(box.cbm);
+        if (shipment.cbm && Number(shipment.cbm) > 0) {
+          shipmentTotalCBM = Number(shipment.cbm);
         }
         // Priority 2: Calculate from L×W×H
-        else if (box.length && box.width && box.height) {
-          shipmentTotalCBM = (Number(box.length) * Number(box.width) * Number(box.height)) / 1000000;
+        else if (shipment.length && shipment.width && shipment.height) {
+          shipmentTotalCBM = (Number(shipment.length) * Number(shipment.width) * Number(shipment.height)) / 1000000;
         }
         // Priority 3: Check ShipmentDimension table
         else {
-          const [dimensions] = await connection.execute(
-            'SELECT length, width, height, pieces FROM ShipmentDimension WHERE shipmentId = ?',
-            [shipmentId]
-          );
-          for (const dim of dimensions) {
-            const cbm = (Number(dim.length) * Number(dim.width) * Number(dim.height) * (dim.pieces || 1)) / 1000000;
-            shipmentTotalCBM += cbm;
+          try {
+            const dimensions = await prisma.shipmentDimension.findMany({
+              where: { shipmentId }
+            });
+            for (const dim of dimensions) {
+              const cbm = (Number(dim.length) * Number(dim.width) * Number(dim.height) * (dim.pieces || 1)) / 1000000;
+              shipmentTotalCBM += cbm;
+            }
+          } catch (e) {
+            // ShipmentDimension table might not exist
           }
         }
 
@@ -93,7 +103,7 @@ async function recalculateAllRackCBM() {
       totalNewCBM += newCBM;
 
       if (Math.abs(newCBM - oldCBM) > 0.001) {
-        await connection.execute('UPDATE racks SET cbmUsed = ? WHERE id = ?', [newCBM, rack.id]);
+        await prisma.$executeRaw`UPDATE racks SET cbmUsed = ${newCBM} WHERE id = ${rack.id}`;
         console.log(`📊 ${rack.name}: ${oldCBM.toFixed(3)} → ${newCBM.toFixed(3)} (${boxes.length} boxes)`);
         updatedCount++;
       }
@@ -110,7 +120,7 @@ async function recalculateAllRackCBM() {
   } catch (error) {
     console.error('❌ Error:', error);
   } finally {
-    await connection.end();
+    await prisma.$disconnect();
   }
 }
 
