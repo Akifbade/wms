@@ -8,7 +8,7 @@ set -e
 echo "🚀 Starting VPS Deployment..."
 cd "/root/NEW START"
 
-# 1. BACKUP (Non-fatal)
+# 1. BACKUP (Non-fatal) - Keep only last 2 backups
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_DIR="/root/backups/pre_deploy_$TIMESTAMP"
 mkdir -p "$BACKUP_DIR"
@@ -31,7 +31,20 @@ fi
 
 echo "✅ Backup Complete."
 
-# 2. CLEANUP OLD NETWORKS AND CONTAINERS
+# KEEP ONLY LAST 2 BACKUPS
+echo "🗑️ Removing old backups (keeping last 2)..."
+cd /root/backups
+ls -dt pre_deploy_* 2>/dev/null | tail -n +3 | xargs rm -rf 2>/dev/null || true
+cd "/root/NEW START"
+echo "✅ Old backups removed."
+
+# 2. KILL ANY STUCK PROCESSES
+echo "🔪 Killing stuck build processes..."
+pkill -9 -f 'vite build' 2>/dev/null || true
+pkill -9 -f 'docker-buildx' 2>/dev/null || true
+pkill -9 -f 'npm run build' 2>/dev/null || true
+
+# 3. CLEANUP OLD NETWORKS AND CONTAINERS
 echo "🧹 Cleaning up old resources..."
 docker stop wms-backend wms-frontend wms-database 2>/dev/null || true
 docker rm -f wms-backend wms-frontend wms-database 2>/dev/null || true
@@ -46,12 +59,12 @@ docker network rm wms-network 2>/dev/null || true
 echo "🌐 Creating fresh Docker network..."
 docker network create wms-network
 
-# 3. FIX DATABASE VOLUME PERMISSIONS
+# 4. FIX DATABASE VOLUME PERMISSIONS
 echo "🔧 Fixing database permissions..."
 docker volume create mysql_prod_data 2>/dev/null || true
 docker run --rm -v mysql_prod_data:/var/lib/mysql alpine chown -R 999:999 /var/lib/mysql 2>/dev/null || true
 
-# 4. START DATABASE
+# 5. START DATABASE
 echo "🗄️ Starting database..."
 docker run -d --name wms-database \
   --network wms-network \
@@ -67,7 +80,16 @@ docker run -d --name wms-database \
 echo "⏳ Waiting 20s for database..."
 sleep 20
 
-# 5. START BACKEND
+# 6. RUN PRISMA MIGRATIONS (inside backend container temporarily)
+echo "🔄 Running Prisma migrations..."
+docker run --rm --network wms-network \
+  -e DATABASE_URL='mysql://wms_user:wmspassword123@wms-database:3306/warehouse_wms' \
+  -v "/root/NEW START/backend:/app" \
+  -w /app \
+  ghcr.io/akifbade/wms-backend:latest \
+  npx prisma db push --accept-data-loss 2>/dev/null || echo "⚠️ Prisma migration skipped"
+
+# 7. START BACKEND
 echo "⚙️ Starting backend..."
 docker run -d --name wms-backend \
   --network wms-network \
@@ -84,7 +106,7 @@ docker run -d --name wms-backend \
 echo "⏳ Waiting 10s for backend..."
 sleep 10
 
-# 6. START FRONTEND
+# 8. START FRONTEND
 echo "🌐 Starting frontend..."
 docker run -d --name wms-frontend \
   --network wms-network \
@@ -99,7 +121,7 @@ docker run -d --name wms-frontend \
 echo "⏳ Waiting 5s for frontend..."
 sleep 5
 
-# 7. VERIFY NETWORK CONNECTIVITY
+# 9. VERIFY NETWORK CONNECTIVITY
 echo "🔍 Verifying network connectivity..."
 docker network inspect wms-network --format '{{range .Containers}}{{.Name}} {{end}}'
 
@@ -112,7 +134,7 @@ else
     docker logs wms-backend --tail 20
 fi
 
-# 8. EXTERNAL HEALTH CHECK
+# 10. EXTERNAL HEALTH CHECK
 echo "🔍 Running external health checks..."
 if curl -s http://localhost:5000/api/health | grep -q "ok"; then
     echo "✅ Backend API: HEALTHY"
@@ -120,10 +142,17 @@ else
     echo "❌ Backend API: Check 'docker logs wms-backend'"
 fi
 
-# 9. CLEANUP UNUSED
-echo "🧹 Cleaning up unused images..."
-docker image prune -f
+# 11. AGGRESSIVE CLEANUP - Free up disk space
+echo "🧹 AGGRESSIVE CLEANUP - Freeing disk space..."
+docker image prune -af 2>/dev/null || true
+docker container prune -f 2>/dev/null || true
+docker volume prune -f 2>/dev/null || true
 docker network prune -f 2>/dev/null || true
+docker builder prune -af 2>/dev/null || true
+
+# Clean up temp files
+rm -rf /tmp/compose-* 2>/dev/null || true
+rm -rf /root/.npm/_cacache 2>/dev/null || true
 
 echo ""
 echo "=========================================="
