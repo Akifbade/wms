@@ -1,6 +1,24 @@
 {
   "$schema": "https://json.schemastore.org/mcp.json",
   "description": "MCP Server Configuration for WMS Project",
+  
+  "⚠️_CRITICAL_DEPLOYMENT_RULES": {
+    "rule_1": "🚫 NEVER deploy directly to VPS using plink/pscp",
+    "rule_2": "🚫 NEVER run docker build on VPS",
+    "rule_3": "✅ ALWAYS use Git Flow: local build → git push → GitHub Actions → VPS",
+    "correct_flow": [
+      "1. Make changes locally",
+      "2. npm run build (in frontend/)",
+      "3. git add -A",
+      "4. git commit --no-verify -m 'message'",
+      "5. git push origin stable/prisma-mysql-production",
+      "6. GitHub Actions automatically deploys to VPS"
+    ],
+    "vps_access_only_for": ["checking logs", "database queries", "debugging"],
+    "vps_ip": "148.230.107.155",
+    "branch": "stable/prisma-mysql-production"
+  },
+
   "servers": {
     "docker": {
       "name": "Docker/Container MCP Server",

@@ -4,23 +4,38 @@
 
 ---
 
-## 🚨 CRITICAL DEPLOYMENT RULE
+## 🚨🚨🚨 CRITICAL DEPLOYMENT RULE 🚨🚨🚨
 
-**ALWAYS USE GIT FLOW FOR DEPLOYMENT. NEVER DEPLOY DIRECTLY TO VPS.**
-
-```powershell
-# CORRECT WAY TO DEPLOY:
-git add -A
-git commit --no-verify -m "your message"
-git push origin stable/prisma-mysql-production
-# GitHub Actions automatically deploys to VPS
+### ❌ FORBIDDEN ACTIONS (NEVER DO THESE):
+```
+❌ plink -pw ... root@148.230.107.155 "any deploy command"
+❌ pscp ... root@148.230.107.155:/path
+❌ docker build on VPS
+❌ docker cp to VPS containers
+❌ ANY direct deployment to VPS
+Use if user allow you to do or he ask you yo do via plink or putty on vps
 ```
 
-❌ **NEVER DO THIS:**
-- `plink` to VPS for deployment
-- `pscp` to copy files to VPS
-- Direct SSH commands to deploy
-- `docker build` on VPS
+### ✅ CORRECT DEPLOYMENT FLOW (ALWAYS DO THIS):
+```powershell
+# Step 1: Build locally
+cd frontend
+npm run build
+
+# Step 2: Commit to Git
+git add -A
+git commit --no-verify -m "your message"
+
+# Step 3: Push (GitHub Actions deploys automatically)
+git push origin stable/prisma-mysql-production
+
+# DONE! GitHub Actions handles VPS deployment
+```
+
+### 📍 VPS ACCESS ONLY FOR:
+- Checking logs: `plink ... "docker logs wms-backend --tail 50"`
+- Database queries: `plink ... "docker exec wms-database mysql ..."`
+- Debugging container issues
 
 ---
 

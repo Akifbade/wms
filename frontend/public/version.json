@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 14, 2025",
-  "buildTime": "23:19:54",
-  "commit": "c4394166a",
-  "commitMessage": "fix: Compact mobile UI - hide export/print buttons, reduce padding/spacing for high DPI",
+  "buildTime": "23:46:04",
+  "commit": "53205ed32",
+  "commitMessage": "feat: Add sort options (date/name/CBM/duration/pieces) - newest first default",
   "author": "akifbade46-del",
   "environment": "local"
 }

@@ -245,6 +245,16 @@
         "reveal": "always",
         "panel": "shared"
       }
+    },
+    {
+      "label": "⚡ QUICK DEPLOY: Build → Git Push → VPS Auto",
+      "type": "shell",
+      "command": "Write-Host '🔨 Building frontend...' -ForegroundColor Cyan; cd frontend; npm run build; if ($LASTEXITCODE -ne 0) { Write-Host '❌ Build failed!' -ForegroundColor Red; exit 1 }; cd ..; Write-Host '📤 Pushing to GitHub...' -ForegroundColor Cyan; git add -A; git commit --no-verify -m \"deploy: Quick deploy $(Get-Date -Format 'yyyy-MM-dd HH:mm')\"; git push origin stable/prisma-mysql-production; Write-Host ''; Write-Host '✅ DONE! GitHub Actions deploying to VPS...' -ForegroundColor Green; Write-Host '🔗 https://github.com/Akifbade/wms/actions' -ForegroundColor Yellow; Start-Process 'https://github.com/Akifbade/wms/actions'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
     }
   ]
 }

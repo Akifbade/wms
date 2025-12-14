@@ -104,8 +104,8 @@ export const Shipments: React.FC = () => {
         );
       }
 
-      // Sort shipments (default: newest first)
-      filtered.sort((a: any, b: any) => {
+      // Sort shipments (default: newest first) - Create new array to trigger React re-render
+      const sorted = [...filtered].sort((a: any, b: any) => {
         const getDate = (s: any) => new Date(s.arrivalDate || s.createdAt || 0).getTime();
         const getDays = (s: any) => {
           const src = s.arrivalDate || s.receivedDate || s.createdAt;
@@ -128,7 +128,7 @@ export const Shipments: React.FC = () => {
         }
       });
 
-      setShipments(filtered);
+      setShipments(sorted);
     } catch (err: any) {
       setError(err.message);
     } finally {
