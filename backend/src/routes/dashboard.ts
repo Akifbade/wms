@@ -123,14 +123,42 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
         id: true,
         cbm: true,
         referenceId: true,
+        length: true,
+        width: true,
+        height: true,
       },
     });
 
-    // Calculate total CBM in storage
-    const totalCBMInStorage = inStorageShipmentsData.reduce(
-      (sum: number, s: any) => sum + (parseFloat(s.cbm) || 0),
-      0
-    );
+    // Calculate total CBM in storage (check multiple sources)
+    let totalCBMInStorage = 0;
+    for (const s of inStorageShipmentsData) {
+      let shipmentCBM = 0;
+      
+      // Priority 1: Use shipment.cbm if available
+      if ((s as any).cbm && parseFloat((s as any).cbm) > 0) {
+        shipmentCBM = parseFloat((s as any).cbm);
+      }
+      // Priority 2: Calculate from L×W×H
+      else if ((s as any).length && (s as any).width && (s as any).height) {
+        shipmentCBM = ((s as any).length * (s as any).width * (s as any).height) / 1000000;
+      }
+      // Priority 3: Check ShipmentDimension table
+      else {
+        try {
+          const dimensions = await (prisma as any).shipmentDimension.findMany({
+            where: { shipmentId: s.id },
+          });
+          for (const dim of dimensions) {
+            const cbm = ((dim.length || 0) * (dim.width || 0) * (dim.height || 0) * (dim.pieces || 1)) / 1000000;
+            shipmentCBM += cbm;
+          }
+        } catch (e) {
+          // ShipmentDimension table might not exist
+        }
+      }
+      
+      totalCBMInStorage += shipmentCBM;
+    }
 
     // Calculate estimated charges for all in-storage shipments
     let totalEstimatedCharges = 0;
