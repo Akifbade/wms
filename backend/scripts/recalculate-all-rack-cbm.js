@@ -11,8 +11,8 @@ async function recalculateAllRackCBM() {
   console.log('🔄 Starting CBM Recalculation for ALL Racks...\n');
 
   try {
-    // Get all racks with raw SQL to access cbmUsed
-    const racks = await prisma.$queryRaw`SELECT id, name, companyId, cbmUsed, cbmCapacity FROM racks`;
+    // Get all racks with raw SQL to access cbmUsed (use 'code' not 'name')
+    const racks = await prisma.$queryRaw`SELECT id, code, companyId, cbmUsed, cbmCapacity FROM racks`;
     console.log(`📦 Found ${racks.length} racks to process\n`);
 
     let updatedCount = 0;
@@ -45,7 +45,7 @@ async function recalculateAllRackCBM() {
         const oldCBM = Number(rack.cbmUsed) || 0;
         if (oldCBM > 0) {
           await prisma.$executeRaw`UPDATE racks SET cbmUsed = 0 WHERE id = ${rack.id}`;
-          console.log(`📭 ${rack.name}: ${oldCBM.toFixed(3)} → 0.000 (empty rack)`);
+          console.log(`📭 ${rack.code}: ${oldCBM.toFixed(3)} → 0.000 (empty rack)`);
           totalOldCBM += oldCBM;
           updatedCount++;
         }
@@ -104,7 +104,7 @@ async function recalculateAllRackCBM() {
 
       if (Math.abs(newCBM - oldCBM) > 0.001) {
         await prisma.$executeRaw`UPDATE racks SET cbmUsed = ${newCBM} WHERE id = ${rack.id}`;
-        console.log(`📊 ${rack.name}: ${oldCBM.toFixed(3)} → ${newCBM.toFixed(3)} (${boxes.length} boxes)`);
+        console.log(`📊 ${rack.code}: ${oldCBM.toFixed(3)} → ${newCBM.toFixed(3)} (${boxes.length} boxes)`);
         updatedCount++;
       }
     }
