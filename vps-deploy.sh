@@ -16,11 +16,12 @@ mkdir -p "$BACKUP_DIR"
 echo "📦 Creating Backup in $BACKUP_DIR..."
 
 # Backup Database
-if docker ps | grep -q wms-database; then
-    echo "  - Backing up database..."
-    docker exec wms-database mysqldump -u wms_user -pwmspassword123 --no-tablespaces warehouse_wms > "$BACKUP_DIR/db_backup.sql"
+echo "  - Attempting database backup..."
+# Try to dump, but don't fail the script if it fails (e.g. if container is restarting)
+if docker exec wms-database mysqldump -u wms_user -pwmspassword123 --no-tablespaces warehouse_wms > "$BACKUP_DIR/db_backup.sql" 2>/dev/null; then
+    echo "  ✅ Database backup successful."
 else
-    echo "  ⚠️ Database container not running, skipping DB backup."
+    echo "  ⚠️ Database backup FAILED (Container might be restarting/broken). Skipping backup to proceed with deployment fix."
 fi
 
 # Backup Uploads
