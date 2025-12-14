@@ -13,16 +13,26 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Lowercase Repo Name
         run: |
           echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
+      - name: Get Version
+        id: version
+        run: |
+          VERSION=$(cat VERSION.md | grep -oP 'v\d+\.\d+\.\d+' | head -1)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
@@ -36,42 +46,50 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ steps.version.outputs.VERSION }}
           build-args: |
             NODE_ENV=production
+          no-cache: true
 
       - name: Build and push Frontend
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ steps.version.outputs.VERSION }}
           build-args: |
-            REACT_APP_API_URL=https://qgocargo.cloud/api
             VITE_API_URL=https://qgocargo.cloud/api
             NODE_ENV=production
+          no-cache: true
 
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check Secrets
         env:
           VPS_PASS: ${{ secrets.VPS_PASSWORD }}
         run: |
           if [ -z "$VPS_PASS" ]; then
-            echo "::error::VPS_PASSWORD secret is NOT set! Go to Settings > Secrets > Actions and add it."
+            echo "::error::VPS_PASSWORD secret is NOT set!"
             exit 1
           else
-            echo "✅ VPS_PASSWORD is set (Length: ${#VPS_PASS})"
+            echo "✅ VPS_PASSWORD is set"
           fi
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
+        timeout-minutes: 12
         with:
           host: 148.230.107.155
           username: root
           password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 10m
           script: |
             echo "🚀 Starting Deployment..."
             cd "/root/NEW START"
@@ -81,10 +99,14 @@ jobs:
             git fetch origin stable/prisma-mysql-production
             git reset --hard origin/stable/prisma-mysql-production
             
-            # 2. Pull latest images from GHCR (public registry, no login needed for akifbade)
-            echo "⬇️ Pulling images..."
-            docker pull ghcr.io/akifbade/wms-backend:latest || true
-            docker pull ghcr.io/akifbade/wms-frontend:latest || true
+            # 2. Force pull NEW images (remove old ones first)
+            echo "🗑️ Removing old images..."
+            docker rmi ghcr.io/akifbade/wms-backend:latest 2>/dev/null || true
+            docker rmi ghcr.io/akifbade/wms-frontend:latest 2>/dev/null || true
+            
+            echo "⬇️ Pulling fresh images..."
+            docker pull ghcr.io/akifbade/wms-backend:latest
+            docker pull ghcr.io/akifbade/wms-frontend:latest
             
             # 3. Run Deployment Script
             chmod +x vps-deploy.sh

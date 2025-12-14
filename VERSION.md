@@ -1,7 +1,7 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.2.83**
-- **Released**: Dec 14, 2025 at 12:53:40
+## Current Version: **v2.2.84**
+- **Released**: Dec 14, 2025 at 13:07:53
 - **Author**: akifbade46-del
 - **Status**: Development
 

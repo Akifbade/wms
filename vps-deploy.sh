@@ -142,17 +142,10 @@ else
     echo "❌ Backend API: Check 'docker logs wms-backend'"
 fi
 
-# 11. AGGRESSIVE CLEANUP - Free up disk space
-echo "🧹 AGGRESSIVE CLEANUP - Freeing disk space..."
-docker image prune -af 2>/dev/null || true
-docker container prune -f 2>/dev/null || true
-docker volume prune -f 2>/dev/null || true
-docker network prune -f 2>/dev/null || true
-docker builder prune -af 2>/dev/null || true
-
-# Clean up temp files
-rm -rf /tmp/compose-* 2>/dev/null || true
-rm -rf /root/.npm/_cacache 2>/dev/null || true
+# 11. QUICK CLEANUP (non-blocking)
+echo "🧹 Quick cleanup..."
+docker container prune -f 2>/dev/null &
+docker network prune -f 2>/dev/null &
 
 echo ""
 echo "=========================================="
