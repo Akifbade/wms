@@ -23,6 +23,7 @@ import {
   FolderIcon,
   BuildingOfficeIcon,
   ScaleIcon,
+  ArrowsUpDownIcon,
 } from '@heroicons/react/24/outline';
 import { shipmentsAPI, getBackendUrl } from '../../services/api';
 import { WithdrawalModal } from '../../components/WithdrawalModal';
@@ -37,6 +38,7 @@ export const Shipments: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeStatus, setActiveStatus] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'folders' | 'table'>('folders');
+  const [sortBy, setSortBy] = useState<string>('date_desc');
   const [shipments, setShipments] = useState<any[]>([]);
   const [statusCounts, setStatusCounts] = useState({ all: 0, pending: 0, in_storage: 0, partial: 0, released: 0 });
   const [loading, setLoading] = useState(true);
@@ -60,7 +62,7 @@ export const Shipments: React.FC = () => {
 
   useEffect(() => {
     loadShipments();
-  }, [activeStatus, searchTerm]);
+  }, [activeStatus, searchTerm, sortBy]);
 
   const loadShipments = async () => {
     try {
@@ -101,6 +103,30 @@ export const Shipments: React.FC = () => {
           s.rackLocation?.toLowerCase().includes(q)
         );
       }
+
+      // Sort shipments (default: newest first)
+      filtered.sort((a: any, b: any) => {
+        const getDate = (s: any) => new Date(s.arrivalDate || s.createdAt || 0).getTime();
+        const getDays = (s: any) => {
+          const src = s.arrivalDate || s.receivedDate || s.createdAt;
+          if (!src) return 0;
+          return Math.ceil((Date.now() - new Date(src).getTime()) / (1000 * 60 * 60 * 24));
+        };
+        
+        switch (sortBy) {
+          case 'date_desc': return getDate(b) - getDate(a); // Newest first
+          case 'date_asc': return getDate(a) - getDate(b); // Oldest first
+          case 'name_asc': return (a.clientName || '').localeCompare(b.clientName || '');
+          case 'name_desc': return (b.clientName || '').localeCompare(a.clientName || '');
+          case 'cbm_desc': return (Number(b.cbm) || 0) - (Number(a.cbm) || 0);
+          case 'cbm_asc': return (Number(a.cbm) || 0) - (Number(b.cbm) || 0);
+          case 'duration_desc': return getDays(b) - getDays(a); // Longest first
+          case 'duration_asc': return getDays(a) - getDays(b); // Shortest first
+          case 'pieces_desc': return (b.currentBoxCount || 0) - (a.currentBoxCount || 0);
+          case 'pieces_asc': return (a.currentBoxCount || 0) - (b.currentBoxCount || 0);
+          default: return getDate(b) - getDate(a);
+        }
+      });
 
       setShipments(filtered);
     } catch (err: any) {
@@ -414,8 +440,8 @@ export const Shipments: React.FC = () => {
             </div>
           </div>
 
-          {/* Search & Filter Bar */}
-          <div className="mt-2 md:mt-6 flex flex-col md:flex-row gap-2 md:gap-4">
+          {/* Search & Sort Bar */}
+          <div className="mt-2 md:mt-6 flex flex-row gap-2 md:gap-4">
             <div className="relative flex-1">
               <MagnifyingGlassIcon className="absolute left-2 md:left-3 top-1/2 -translate-y-1/2 h-4 md:h-5 w-4 md:w-5 text-blue-400" />
               <input
@@ -430,6 +456,27 @@ export const Shipments: React.FC = () => {
                   <XMarkIcon className="h-4 md:h-5 w-4 md:w-5 text-slate-400 hover:text-slate-600" />
                 </button>
               )}
+            </div>
+            
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="appearance-none pl-2 md:pl-3 pr-7 md:pr-8 py-2 md:py-3 text-xs md:text-sm bg-white border border-slate-200 rounded-lg md:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
+              >
+                <option value="date_desc">📅 Newest</option>
+                <option value="date_asc">📅 Oldest</option>
+                <option value="name_asc">🔤 A-Z</option>
+                <option value="name_desc">🔤 Z-A</option>
+                <option value="duration_desc">⏱️ Longest</option>
+                <option value="duration_asc">⏱️ Shortest</option>
+                <option value="cbm_desc">📦 CBM ↓</option>
+                <option value="cbm_asc">📦 CBM ↑</option>
+                <option value="pieces_desc">🔢 Pieces ↓</option>
+                <option value="pieces_asc">🔢 Pieces ↑</option>
+              </select>
+              <ArrowsUpDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 h-3 md:h-4 w-3 md:w-4 text-slate-400 pointer-events-none" />
             </div>
           </div>
 

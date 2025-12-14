@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 14, 2025",
-  "buildTime": "23:02:18",
-  "commit": "1504dd9e3",
-  "commitMessage": "feat: Update Shipments page with view toggle, branding, and rich data display",
+  "buildTime": "23:19:54",
+  "commit": "c4394166a",
+  "commitMessage": "fix: Compact mobile UI - hide export/print buttons, reduce padding/spacing for high DPI",
   "author": "akifbade46-del",
   "environment": "local"
 }

@@ -115,7 +115,28 @@
     "ai.rule5": "Staging is ISOLATED (separate DB, network, containers)",
     "ai.rule6": "Use GitHub Actions for all deployments",
     "ai.rule7": "Staging password is admin@demo.com / demo123",
+    "ai.rule8": "ALWAYS USE GIT FLOW - NEVER deploy directly to VPS",
+    "ai.rule9": "Read .github/copilot-instructions.md for deployment rules",
     "ai.documentation": "Read THREE-STAGE-DEPLOYMENT-GUIDE.md for full details",
+    
+    // =============================================================================
+    // 🚀 GIT FLOW DEPLOYMENT (MANDATORY)
+    // =============================================================================
+    "deployment.flow.step1": "git add -A",
+    "deployment.flow.step2": "git commit --no-verify -m 'message'",
+    "deployment.flow.step3": "git push origin stable/prisma-mysql-production",
+    "deployment.flow.step4": "GitHub Actions auto-deploys to VPS",
+    "deployment.flow.warning": "NEVER use plink/pscp to deploy - ONLY for debugging",
+    
+    // =============================================================================
+    // 🔌 GITHUB COPILOT INTEGRATION
+    // =============================================================================
+    "github.copilot.enable": {
+        "*": true
+    },
+    "github.copilot.advanced": {
+        "inlineSuggest.enable": true
+    },
     
     // =============================================================================
     // 🔄 AUTO-VERSION & AUTO-COMMIT SYSTEM
