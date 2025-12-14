@@ -15,8 +15,10 @@ import {
   ClockIcon,
   MapPinIcon,
   XMarkIcon,
+  PhotoIcon,
+  ChevronLeftIcon,
 } from '@heroicons/react/24/outline';
-import { shipmentsAPI } from '../../services/api';
+import { shipmentsAPI, getBackendUrl } from '../../services/api';
 import { WithdrawalModal } from '../../components/WithdrawalModal';
 import WHMShipmentModal from '../../components/WHMShipmentModal';
 import EditShipmentModal from '../../components/EditShipmentModal';
@@ -43,6 +45,11 @@ export const Shipments: React.FC = () => {
 
   // Folder view state
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+
+  // Photo lightbox state
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   useEffect(() => {
     loadShipments();
@@ -307,11 +314,39 @@ export const Shipments: React.FC = () => {
                       {items.map((shipment: any) => {
                         const days = getDaysStored(shipment);
                         const canRelease = ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE', 'PARTIAL'].includes(shipment.status) && shipment.currentBoxCount > 0;
+                        const photos = shipment.shipmentPhotos || [];
+                        const firstRackId = shipment.boxes?.find((b: any) => b.rackId)?.rackId;
 
                         return (
                           <div key={shipment.id} className="px-4 py-3 hover:bg-slate-50/50">
                             {/* Shipment Row */}
-                            <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              {/* Photo Thumbnail */}
+                              {photos.length > 0 && (
+                                <button
+                                  onClick={() => {
+                                    setLightboxPhotos(photos);
+                                    setLightboxIndex(0);
+                                    setLightboxOpen(true);
+                                  }}
+                                  className="relative flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border border-slate-200 hover:border-slate-400 transition-colors group"
+                                >
+                                  <img
+                                    src={photos[0].startsWith('http') ? photos[0] : `${getBackendUrl()}${photos[0]}`}
+                                    alt=""
+                                    className="w-full h-full object-cover"
+                                  />
+                                  {photos.length > 1 && (
+                                    <div className="absolute bottom-0 right-0 bg-black/60 text-white text-[9px] px-1 rounded-tl">
+                                      +{photos.length - 1}
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
+                                    <PhotoIcon className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </button>
+                              )}
+                              
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-sm font-semibold text-slate-900">{shipment.referenceId}</span>
@@ -322,7 +357,7 @@ export const Shipments: React.FC = () => {
                                 <p className="text-xs text-slate-600 mt-0.5 truncate">{shipment.clientName}</p>
                                 
                                 {/* Info Row */}
-                                <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-500">
+                                <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-500 flex-wrap">
                                   <span className="flex items-center gap-1">
                                     <CubeIcon className="h-3 w-3" />
                                     {shipment.currentBoxCount}/{shipment.originalBoxCount}
@@ -335,10 +370,14 @@ export const Shipments: React.FC = () => {
                                     {days}d
                                   </span>
                                   {shipment.rackLocations && shipment.rackLocations !== 'N/A' && (
-                                    <span className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => firstRackId && navigate(`/racks?highlight=${firstRackId}`)}
+                                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                      title="Go to rack"
+                                    >
                                       <MapPinIcon className="h-3 w-3" />
                                       {shipment.rackLocations.split(',')[0]}
-                                    </span>
+                                    </button>
                                   )}
                                 </div>
                               </div>
@@ -440,6 +479,74 @@ export const Shipments: React.FC = () => {
         shipmentId={selectedShipment?.id || ''}
         shipmentRef={selectedShipment?.referenceId || ''}
       />
+
+      {/* Photo Lightbox Modal */}
+      {lightboxOpen && lightboxPhotos.length > 0 && (
+        <div 
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
+          onClick={() => setLightboxOpen(false)}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setLightboxOpen(false)}
+            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white bg-black/40 rounded-full z-10"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+
+          {/* Navigation - Previous */}
+          {lightboxPhotos.length > 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => (prev - 1 + lightboxPhotos.length) % lightboxPhotos.length); }}
+              className="absolute left-4 p-2 text-white/80 hover:text-white bg-black/40 rounded-full z-10"
+            >
+              <ChevronLeftIcon className="h-6 w-6" />
+            </button>
+          )}
+
+          {/* Main Image */}
+          <div className="max-w-[90vw] max-h-[85vh] relative" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={lightboxPhotos[lightboxIndex].startsWith('http') ? lightboxPhotos[lightboxIndex] : `${getBackendUrl()}${lightboxPhotos[lightboxIndex]}`}
+              alt={`Photo ${lightboxIndex + 1}`}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+            />
+            {/* Photo counter */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1 rounded-full">
+              {lightboxIndex + 1} / {lightboxPhotos.length}
+            </div>
+          </div>
+
+          {/* Navigation - Next */}
+          {lightboxPhotos.length > 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => (prev + 1) % lightboxPhotos.length); }}
+              className="absolute right-4 p-2 text-white/80 hover:text-white bg-black/40 rounded-full z-10"
+            >
+              <ChevronRightIcon className="h-6 w-6" />
+            </button>
+          )}
+
+          {/* Thumbnail strip */}
+          {lightboxPhotos.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 mt-4 bg-black/40 p-2 rounded-lg" style={{ marginBottom: '40px' }}>
+              {lightboxPhotos.map((photo, idx) => (
+                <button
+                  key={idx}
+                  onClick={(e) => { e.stopPropagation(); setLightboxIndex(idx); }}
+                  className={`w-10 h-10 rounded overflow-hidden border-2 transition-all ${idx === lightboxIndex ? 'border-white scale-110' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                >
+                  <img
+                    src={photo.startsWith('http') ? photo : `${getBackendUrl()}${photo}`}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
