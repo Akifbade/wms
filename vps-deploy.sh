@@ -18,7 +18,7 @@ echo "📦 Creating Backup in $BACKUP_DIR..."
 # Backup Database
 if docker ps | grep -q wms-database; then
     echo "  - Backing up database..."
-    docker exec wms-database mysqldump -u wms_user -pwmspassword123 warehouse_wms > "$BACKUP_DIR/db_backup.sql"
+    docker exec wms-database mysqldump -u wms_user -pwmspassword123 --no-tablespaces warehouse_wms > "$BACKUP_DIR/db_backup.sql"
 else
     echo "  ⚠️ Database container not running, skipping DB backup."
 fi

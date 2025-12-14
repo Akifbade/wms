@@ -16,11 +16,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD:-production_db_password}
       # Production settings
       MYSQL_INITDB_ARGS: >
-        --default-storage-engine=InnoDB
-        --character-set-server=utf8mb4
-        --collation-server=utf8mb4_unicode_ci
-        --max_connections=1000
-        --max_allowed_packet=1024M
+        --default-storage-engine=InnoDB --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --max_connections=1000 --max_allowed_packet=1024M
     ports:
       - "${DB_PORT:-3306}:3306"
     volumes:
@@ -29,7 +25,7 @@ services:
     networks:
       - wms-prod-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-production_root_secure_pass}"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-production_root_secure_pass}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -76,7 +72,7 @@ services:
     networks:
       - wms-prod-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health || exit 1"]
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/api/health || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -119,7 +115,7 @@ services:
     networks:
       - wms-prod-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/ || exit 1"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/ || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -129,34 +125,10 @@ services:
       - ALL
       - NET_RAW
 
-  # ===== DATABASE BACKUP SERVICE =====
-  db-backup:
-    image: alpine:3.18
-    container_name: wms-db-backup
-    restart: always
-    environment:
-      BACKUP_DIR: /backups
-    volumes:
-      - ./database-backups:/backups
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - wms-prod-network
-    command: sh -c "
-      apk add --no-cache mysql-client docker-cli &&
-      while true; do
-        TIMESTAMP=\$(date +\"%Y%m%d_%H%M%S\")
-        echo \"[Production] Backing up database at \$TIMESTAMP\" &&
-        docker exec wms-database mysqldump -u ${DB_USER:-wms_user} -p${DB_PASSWORD:-production_db_password} ${DB_NAME:-warehouse_wms} > /backups/prod_backup_\$TIMESTAMP.sql 2>/dev/null &&
-        echo \"[Production] Backup completed\" &&
-        # Keep only last 7 days
-        find /backups -name 'prod_backup_*.sql' -mtime +7 -delete 2>/dev/null &&
-        sleep 3600;
-      done
-    "
-    cap_drop:
-      - ALL
+    #   cap_drop:
+    #     - ALL
 
-  # ===== PORTAINER (Container Management) =====
+    # ===== PORTAINER (Container Management) =====
   portainer:
     image: portainer/portainer-ce:latest
     container_name: portainer
@@ -182,9 +154,8 @@ networks:
     driver_opts:
       com.docker.network.bridge.name: br-prod
       # Prevent inter-container discovery
-      com.docker.network.bridge.name: br-prod
 
-# ===== PRODUCTION VOLUMES =====
+      # ===== PRODUCTION VOLUMES =====
 volumes:
   mysql_prod_data:
     driver: local
