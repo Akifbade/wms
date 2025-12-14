@@ -39,6 +39,7 @@ type ApprovalDetailResponse =
     approval: MaterialApproval;
     materials: Array<{ name: string; unit: string; issued: number; used: number; returnedGood: number; damaged: number; totalCost: number }>;
     totals: { issued: number; used: number; returnedGood: number; damaged: number; totalCost: number };
+    physicalReports?: string[];
   };
 
 const ApprovalManager: React.FC = () => {
@@ -76,7 +77,7 @@ const ApprovalManager: React.FC = () => {
     setLoading(true);
     try {
       const res = await fetch('/api/materials/approvals', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
       });
 
       if (res.ok) {
@@ -93,8 +94,9 @@ const ApprovalManager: React.FC = () => {
   const fetchApprovalDetail = async (approvalId: string) => {
     setLoading(true);
     try {
+      const authToken = localStorage.getItem('authToken');
       const res = await fetch(`/api/materials/approvals/${approvalId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       });
 
       if (res.ok) {
@@ -131,7 +133,7 @@ const ApprovalManager: React.FC = () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
         },
         body: JSON.stringify({
           status: 'APPROVED',
@@ -161,7 +163,7 @@ const ApprovalManager: React.FC = () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
         },
         body: JSON.stringify({
           status: 'REJECTED',
@@ -419,6 +421,66 @@ const ApprovalManager: React.FC = () => {
                 {selectedApproval.job?.clientName ? `Customer: ${selectedApproval.job.clientName}` : ''}
               </p>
             </div>
+
+            {selectedDetail && (selectedDetail as any).physicalReports && (selectedDetail as any).physicalReports.length > 0 && (
+              <div style={{ marginBottom: '20px' }}>
+                <h5 style={{ marginBottom: '10px', color: '#16a34a' }}>📄 Physical Reports Uploaded</h5>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
+                  {(selectedDetail as any).physicalReports.map((reportUrl: string, idx: number) => {
+                    const normalizeReportUrl = (rawUrl: string) => {
+                      if (!rawUrl) return rawUrl;
+
+                      // Prefer current origin for relative paths.
+                      if (!rawUrl.startsWith('http')) {
+                        return `${window.location.origin}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+                      }
+
+                      // If backend returned a Docker-internal hostname (e.g. wms-backend), rewrite to current origin.
+                      try {
+                        const parsed = new URL(rawUrl);
+                        if (parsed.hostname === 'wms-backend' && parsed.pathname) {
+                          return `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+                        }
+                      } catch {
+                        // ignore
+                      }
+
+                      return rawUrl;
+                    };
+
+                    const fullUrl = normalizeReportUrl(reportUrl);
+                    const isPdf = /\.pdf($|\?)/i.test(fullUrl);
+                    return (
+                      <div
+                        key={idx}
+                        style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '2px solid #16a34a', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+                        onClick={() => window.open(fullUrl, '_blank')}
+                      >
+                        {isPdf ? (
+                          <div style={{ width: '100%', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0fdf4', color: '#166534', fontWeight: 'bold' }}>
+                            PDF Report
+                          </div>
+                        ) : (
+                          <img
+                            src={fullUrl}
+                            alt={`Physical Report ${idx + 1}`}
+                            style={{ width: '100%', height: '150px', objectFit: 'cover' }}
+                            onError={(e) => {
+                              console.error('Failed to load image:', fullUrl);
+                              (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23fee2e2" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23dc2626" font-family="Arial" font-size="11"%3EImage Error%3C/text%3E%3C/svg%3E';
+                            }}
+                          />
+                        )}
+                        <div style={{ position: 'absolute', top: '5px', right: '5px', background: 'rgba(22, 163, 74, 0.9)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                          Report #{idx + 1}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '8px', fontWeight: 'bold' }}>✅ Click any image to view full size in new tab</p>
+              </div>
+            )}
 
             {selectedDetail && (selectedDetail as any).materials && (
               <div style={{ marginBottom: '15px' }}>

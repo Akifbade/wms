@@ -70,6 +70,157 @@ router.get('/', auth_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch company profiles' });
     }
 });
+// Get analytics for ALL companies - for the Analytics page
+// IMPORTANT: This route must be BEFORE /:profileId to avoid matching 'all-analytics' as a profileId
+router.get('/all-analytics', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        if (!companyId) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+        const protocol = req.protocol || 'http';
+        const host = req.get('host');
+        const baseUrl = host ? `${protocol}://${host}` : null;
+        // Get all company profiles
+        const profiles = await prisma.companyProfile.findMany({
+            where: { companyId },
+            orderBy: { name: 'asc' }
+        });
+        // Get all shipments with their details
+        const allShipments = await prisma.shipment.findMany({
+            where: { companyId },
+            include: {
+                boxes: {
+                    include: {
+                        rack: true
+                    }
+                },
+                companyProfile: true,
+                invoices: {
+                    include: {
+                        payments: true
+                    }
+                }
+            }
+        });
+        // Get all racks with their boxes
+        const allRacks = await prisma.rack.findMany({
+            where: { companyId },
+            include: {
+                boxes: {
+                    include: {
+                        shipment: {
+                            include: {
+                                companyProfile: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        // Calculate per-company statistics
+        const companyStats = profiles.map(profile => {
+            // 🔧 FIX: Match shipments by BOTH companyProfileId AND customerName/clientName
+            // Many older shipments have companyProfileId = NULL but correct customerName
+            const profileNameLower = profile.name.toLowerCase();
+            const shipments = allShipments.filter(s => s.companyProfileId === profile.id ||
+                (s.companyProfileId === null && ((s.customerName && s.customerName.toLowerCase() === profileNameLower) ||
+                    (s.clientName && s.clientName.toLowerCase() === profileNameLower))));
+            const activeShipments = shipments.filter(s => s.status === 'IN_WAREHOUSE' || s.status === 'ACTIVE' || s.status === 'PARTIAL' || s.status === 'IN_STORAGE');
+            // Calculate boxes
+            const totalBoxes = shipments.reduce((sum, s) => sum + (s.originalBoxCount || 0), 0);
+            const currentBoxes = shipments.reduce((sum, s) => sum + (s.currentBoxCount || 0), 0);
+            // Calculate pallets from shipment's palletCount field
+            const totalPallets = shipments.reduce((sum, s) => sum + (s.palletCount || 0), 0);
+            const currentPallets = activeShipments.reduce((sum, s) => sum + (s.palletCount || 0), 0);
+            // Get rack locations from boxes
+            const allBoxes = shipments.flatMap(s => s.boxes || []);
+            const rackLocations = [...new Set(allBoxes
+                    .filter(b => b.rack && b.rack.code)
+                    .map(b => b.rack.code))];
+            // Calculate invoice totals
+            const invoices = shipments.flatMap(s => s.invoices || []);
+            const totalInvoiceAmount = invoices.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
+            const paidAmount = invoices.reduce((sum, inv) => {
+                const payments = inv.payments || [];
+                return sum + payments.reduce((pSum, p) => pSum + (Number(p.amount) || 0), 0);
+            }, 0);
+            return {
+                id: profile.id,
+                name: profile.name,
+                logoUrl: profile.logo && baseUrl ? `${baseUrl}${profile.logo}` : null,
+                contactPerson: profile.contactPerson,
+                totalShipments: shipments.length,
+                activeShipments: activeShipments.length,
+                releasedShipments: shipments.filter(s => s.status === 'RELEASED').length,
+                totalBoxes,
+                currentBoxes,
+                totalPallets,
+                currentPallets,
+                rackLocations,
+                totalInvoiceAmount,
+                outstandingBalance: totalInvoiceAmount - paidAmount
+            };
+        });
+        // Calculate overall statistics
+        const overall = {
+            totalCompanies: profiles.length,
+            totalShipments: allShipments.length,
+            activeShipments: allShipments.filter(s => s.status === 'IN_WAREHOUSE' || s.status === 'ACTIVE' || s.status === 'PARTIAL').length,
+            totalBoxes: allShipments.reduce((sum, s) => sum + (s.originalBoxCount || 0), 0),
+            currentBoxes: allShipments.reduce((sum, s) => sum + (s.currentBoxCount || 0), 0),
+            totalPallets: companyStats.reduce((sum, c) => sum + c.totalPallets, 0),
+            currentPallets: companyStats.reduce((sum, c) => sum + c.currentPallets, 0),
+            totalRevenue: companyStats.reduce((sum, c) => sum + c.totalInvoiceAmount, 0),
+            outstandingBalance: companyStats.reduce((sum, c) => sum + c.outstandingBalance, 0)
+        };
+        // Calculate rack locations with shipments
+        const rackLocations = allRacks
+            .filter(rack => rack.boxes && rack.boxes.length > 0)
+            .map(rack => {
+            const boxes = rack.boxes || [];
+            const shipmentMap = new Map();
+            boxes.forEach(box => {
+                if (box.shipment) {
+                    const key = box.shipment.id;
+                    if (!shipmentMap.has(key)) {
+                        shipmentMap.set(key, {
+                            referenceId: box.shipment.referenceId,
+                            clientName: box.shipment.clientName,
+                            companyName: box.shipment.companyProfile?.name || 'Unknown',
+                            boxes: 0,
+                            pallets: box.shipment.palletCount || 0
+                        });
+                    }
+                    const entry = shipmentMap.get(key);
+                    entry.boxes += 1;
+                }
+            });
+            const shipments = Array.from(shipmentMap.values());
+            // Sum up pallets from all shipments in this rack
+            const totalPallets = shipments.reduce((sum, s) => sum + (s.pallets || 0), 0);
+            return {
+                rackCode: rack.code,
+                zone: rack.zone || 'Default',
+                shipmentCount: shipments.length,
+                boxCount: boxes.length,
+                palletCount: totalPallets,
+                shipments
+            };
+        })
+            .filter(r => r.shipmentCount > 0)
+            .sort((a, b) => b.shipmentCount - a.shipmentCount);
+        res.json({
+            companies: companyStats,
+            overall,
+            rackLocations
+        });
+    }
+    catch (error) {
+        console.error('Error fetching all company analytics:', error);
+        res.status(500).json({ error: 'Failed to fetch company analytics' });
+    }
+});
 // Get single company profile
 router.get('/:profileId', auth_1.authenticateToken, async (req, res) => {
     try {

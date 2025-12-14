@@ -30,7 +30,6 @@ import { DebugLogin } from './pages/DebugLogin';
 import BackupManagement from './pages/BackupManagement/BackupManagement';
 import SystemMonitorEnhanced from './pages/Admin/SystemMonitorEnhanced';
 import CompanyAnalytics from './pages/Analytics/CompanyAnalytics';
-import MobileUploadPage from './pages/MobileUpload/MobileUploadPage';
 
 import { getAuthToken } from './services/api';
 import { PermissionProvider } from './contexts/PermissionContext';
@@ -88,7 +87,6 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/landing" element={<SwiftCargoLanding />} />
             <Route path="/debug-login" element={<DebugLogin />} />
-            <Route path="/mobile-upload/:token" element={<MobileUploadPage />} />
 
 
 

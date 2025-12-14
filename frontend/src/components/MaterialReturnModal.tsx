@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, Trash2, Upload, QrCode, CheckCircle } from 'lucide-react';
-import QRCode from 'qrcode';
+import { X, Camera, Trash2, Upload, CheckCircle } from 'lucide-react';
 
 interface MaterialReturnModalProps {
   isOpen: boolean;
@@ -39,14 +38,10 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
   const [returns, setReturns] = useState<Map<string, ReturnData>>(new Map());
   const [loading, setLoading] = useState(false);
   const [hasExistingReturns, setHasExistingReturns] = useState(false);
-  
+
   // Physical report upload states
   const [physicalReportFile, setPhysicalReportFile] = useState<File | null>(null);
   const [physicalReportPreview, setPhysicalReportPreview] = useState<string | null>(null);
-  const [uploadToken, setUploadToken] = useState<string | null>(null);
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
-  const [showQRCode, setShowQRCode] = useState(false);
-  const [uploadMethod, setUploadMethod] = useState<'pc' | 'mobile' | null>(null);
   const physicalReportInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -113,7 +108,7 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
   const handlePhysicalReportSelect = (files: FileList | null) => {
     if (files && files[0]) {
       const file = files[0];
-      
+
       // Validate file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
       if (!allowedTypes.includes(file.type)) {
@@ -128,7 +123,7 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
       }
 
       setPhysicalReportFile(file);
-      
+
       // Create preview for images
       if (file.type.startsWith('image/')) {
         const reader = new FileReader();
@@ -137,82 +132,13 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
       } else {
         setPhysicalReportPreview(null);
       }
-      
-      setUploadMethod('pc');
-    }
-  };
 
-  const generateQRCode = async () => {
-    try {
-      setLoading(true);
-      setUploadMethod('mobile');
-      
-      // Generate upload token
-      const token = await generateUploadToken();
-      if (!token) {
-        alert('Failed to generate upload token');
-        return;
-      }
-
-      setUploadToken(token);
-      
-      // Generate QR code
-      const baseUrl = window.location.origin;
-      const uploadUrl = `${baseUrl}/mobile-upload/${token}`;
-      
-      const qrDataUrl = await QRCode.toDataURL(uploadUrl, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
-      });
-      
-      setQrCodeDataUrl(qrDataUrl);
-      setShowQRCode(true);
-    } catch (error) {
-      console.error('QR generation error:', error);
-      alert('Failed to generate QR code');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateUploadToken = async (): Promise<string | null> => {
-    try {
-      const response = await fetch('/api/mobile-upload/generate-token', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          jobId,
-          companyId: JSON.parse(localStorage.getItem('user') || '{}').companyId,
-          userId: JSON.parse(localStorage.getItem('user') || '{}').id
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate token');
-      }
-
-      const data = await response.json();
-      return data.uploadToken;
-    } catch (error) {
-      console.error('Token generation error:', error);
-      return null;
     }
   };
 
   const clearPhysicalReport = () => {
     setPhysicalReportFile(null);
     setPhysicalReportPreview(null);
-    setUploadToken(null);
-    setQrCodeDataUrl(null);
-    setShowQRCode(false);
-    setUploadMethod(null);
   };
 
   const removePhoto = (issueId: string, index: number) => {
@@ -223,25 +149,49 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, returnIdOnly = false): Promise<string | null> => {
     e.preventDefault();
 
-    // Validate physical report is uploaded or ready
-    if (!physicalReportFile && !uploadToken) {
-      alert('❌ Please upload physical report or generate QR code for mobile upload before completing the job');
-      return;
-    }
+    // Physical report is now optional (removed QR requirement)
+    // Just proceed with submission
 
     setLoading(true);
 
     try {
+      let createdReturnId: string | null = null;
+      let physicalReportAttached = false; // Track if physical report has been attached
+
       // Submit each material return
       for (const [issueId, returnData] of returns.entries()) {
         const material = issuedMaterials.find(m => m.id === issueId);
         if (!material) continue;
 
-        // If a return already exists, reuse it instead of creating duplicates
+        // If a return already exists, update it instead of creating duplicates
         if (returnData.existingReturnId) {
+          try {
+            const updatePayload: any = {
+              quantityGood: String(Number(returnData.quantityGood)),
+              quantityDamaged: String(Number(returnData.quantityDamaged)),
+              notes: returnData.notes || ''
+            };
+            const updateRes = await fetch(`/api/materials/returns/${returnData.existingReturnId}`, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(updatePayload)
+            });
+            if (!updateRes.ok) {
+              const err = await updateRes.json();
+              throw new Error(err.error || 'Failed to update return');
+            }
+            // Use existing return ID for QR
+            if (!createdReturnId) createdReturnId = returnData.existingReturnId;
+          } catch (err: any) {
+            console.error('Failed to update existing return:', err);
+            throw err;
+          }
           continue;
         }
 
@@ -289,9 +239,22 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
         formData.append('quantityDamaged', String(Number(returnData.quantityDamaged)));
         formData.append('damageReason', returnData.damageReason);
         formData.append('notes', returnData.notes);
-        
-        // If using mobile upload, request token generation
-        formData.append('generateUploadToken', uploadMethod === 'mobile' ? 'true' : 'false');
+
+        // Add physical report file if selected (only attach once to first return)
+        if (physicalReportFile && !physicalReportAttached) {
+          console.log('[MaterialReturnModal] ATTEMPTING TO ATTACH PHYSICAL REPORT');
+          console.log('[MaterialReturnModal] File:', physicalReportFile.name, 'Size:', physicalReportFile.size, 'Type:', physicalReportFile.type);
+          formData.append('physicalReport', physicalReportFile);
+          physicalReportAttached = true;
+          console.log('[MaterialReturnModal] Physical report attached to FormData:', physicalReportFile.name);
+        } else {
+          if (!physicalReportFile) {
+            console.log('[MaterialReturnModal] ⚠️ NO PHYSICAL REPORT FILE SELECTED');
+          }
+          if (physicalReportAttached) {
+            console.log('[MaterialReturnModal] ⚠️ PHYSICAL REPORT ALREADY ATTACHED (skipping)');
+          }
+        }
 
         returnData.photos.forEach(photo => {
           formData.append('photos', photo);
@@ -310,14 +273,24 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
           const error = await response.json();
           throw new Error(error.error || 'Failed to record return');
         }
+
+        // Get the created return ID for QR generation
+        const result = await response.json();
+        if (result.id && !createdReturnId) {
+          createdReturnId = result.id;
+        }
       }
 
-      // Don't close modal here - let caller decide
-      // Just return success
-      return true;
+      // If called for QR generation, return the returnId
+      if (returnIdOnly) {
+        return createdReturnId;
+      }
+
+      // Otherwise return success
+      return createdReturnId || 'success';
     } catch (error: any) {
       alert(`❌ Error: ${error.message}`);
-      return false;
+      return null;
     } finally {
       setLoading(false);
     }
@@ -511,46 +484,14 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
           )}
 
           {/* 📄 PHYSICAL REPORT UPLOAD SECTION */}
-          <div className="mt-8 border-t-2 border-orange-200 pt-6">
-            <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-6 border-2 border-orange-300">
-              <h3 className="text-xl font-bold text-orange-900 mb-4 flex items-center gap-2">
-                📄 Physical Report Upload (Required)
+          <div className="mt-8 border-t-2 border-blue-200 pt-6">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-300">
+              <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center gap-2">
+                📄 Physical Report Upload (Optional)
               </h3>
-              <p className="text-sm text-orange-700 mb-4">
-                ⚠️ Upload a photo/scan of the physical return report before completing the job.
+              <p className="text-sm text-blue-700 mb-4">
+                Upload a photo/scan of the physical return report. This will be shown in the approval email.
               </p>
-
-              {/* Upload Method Selection */}
-              {!physicalReportFile && !uploadToken && (
-                <div className="grid grid-cols-2 gap-4">
-                  {/* PC Upload */}
-                  <button
-                    type="button"
-                    onClick={() => physicalReportInputRef.current?.click()}
-                    className="flex flex-col items-center justify-center gap-3 p-6 bg-white border-2 border-dashed border-blue-400 rounded-lg hover:bg-blue-50 hover:border-blue-600 transition group"
-                  >
-                    <Upload className="w-12 h-12 text-blue-600 group-hover:scale-110 transition" />
-                    <div className="text-center">
-                      <p className="font-bold text-blue-900">Upload from PC</p>
-                      <p className="text-xs text-gray-600 mt-1">Select PDF or Image</p>
-                    </div>
-                  </button>
-
-                  {/* Mobile QR Scanner */}
-                  <button
-                    type="button"
-                    onClick={generateQRCode}
-                    disabled={loading}
-                    className="flex flex-col items-center justify-center gap-3 p-6 bg-white border-2 border-dashed border-purple-400 rounded-lg hover:bg-purple-50 hover:border-purple-600 transition group disabled:opacity-50"
-                  >
-                    <QrCode className="w-12 h-12 text-purple-600 group-hover:scale-110 transition" />
-                    <div className="text-center">
-                      <p className="font-bold text-purple-900">Scan from Mobile</p>
-                      <p className="text-xs text-gray-600 mt-1">Generate QR Code</p>
-                    </div>
-                  </button>
-                </div>
-              )}
 
               {/* Hidden file input */}
               <input
@@ -561,16 +502,29 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
                 className="hidden"
               />
 
-              {/* PC Upload Preview */}
-              {physicalReportFile && uploadMethod === 'pc' && (
-                <div className="mt-4 bg-white rounded-lg p-4 border-2 border-green-400">
+              {/* Upload Button */}
+              {!physicalReportFile ? (
+                <button
+                  type="button"
+                  onClick={() => physicalReportInputRef.current?.click()}
+                  className="w-full flex flex-col items-center justify-center gap-3 p-8 bg-white border-2 border-dashed border-blue-400 rounded-lg hover:bg-blue-50 hover:border-blue-600 transition group"
+                >
+                  <Camera className="w-16 h-16 text-blue-600 group-hover:scale-110 transition" />
+                  <div className="text-center">
+                    <p className="font-bold text-blue-900 text-lg">Click to Upload Photo</p>
+                    <p className="text-sm text-gray-600 mt-1">JPEG, PNG, or PDF (max 10MB)</p>
+                  </div>
+                </button>
+              ) : (
+                <div className="bg-white rounded-lg p-4 border-2 border-green-400">
                   <div className="flex items-start gap-4">
                     <CheckCircle className="w-8 h-8 text-green-600 flex-shrink-0 mt-1" />
                     <div className="flex-1">
                       <p className="font-bold text-green-900">File Selected ✅</p>
                       <p className="text-sm text-gray-700 mt-1">{physicalReportFile.name}</p>
+                      <p className="text-xs text-gray-500">({(physicalReportFile.size / 1024).toFixed(1)} KB)</p>
                       {physicalReportPreview && (
-                        <img src={physicalReportPreview} alt="Preview" className="mt-3 max-w-full h-auto rounded border" />
+                        <img src={physicalReportPreview} alt="Preview" className="mt-3 max-h-40 rounded border" />
                       )}
                     </div>
                     <button
@@ -581,25 +535,6 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
                       <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
-                </div>
-              )}
-
-              {/* QR Code Display */}
-              {showQRCode && uploadToken && qrCodeDataUrl && (
-                <div className="mt-4 bg-white rounded-lg p-6 border-2 border-purple-400 text-center">
-                  <p className="font-bold text-purple-900 mb-3">📱 Scan this QR code with mobile</p>
-                  <img src={qrCodeDataUrl} alt="QR Code" className="mx-auto border-4 border-purple-200 rounded-lg shadow-lg" />
-                  <p className="text-sm text-gray-600 mt-4">
-                    Scan → Take Photo → Upload<br />
-                    <span className="text-xs text-purple-700">Token expires in 30 minutes</span>
-                  </p>
-                  <button
-                    type="button"
-                    onClick={clearPhysicalReport}
-                    className="mt-4 text-red-600 hover:bg-red-50 px-4 py-2 rounded transition"
-                  >
-                    Cancel Mobile Upload
-                  </button>
                 </div>
               )}
             </div>
@@ -617,7 +552,7 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
               <button
                 type="button"
                 onClick={async () => {
-                  const success = await handleSubmit({ preventDefault: () => {} } as any);
+                  const success = await handleSubmit({ preventDefault: () => { } } as any);
                   if (success) {
                     await onSuccess();
                     alert('✅ Material returns saved!');
@@ -633,9 +568,9 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
                 type="button"
                 onClick={async () => {
                   // First save all returns
-                  const success = await handleSubmit({ preventDefault: () => {} } as any);
+                  const success = await handleSubmit({ preventDefault: () => { } } as any);
                   if (!success) return;
-                  
+
                   // Then mark job as complete
                   try {
                     const response = await fetch(`/api/moving-jobs/${jobId}`, {

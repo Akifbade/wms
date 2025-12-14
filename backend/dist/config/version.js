@@ -8,7 +8,7 @@ exports.logVersionInfo = exports.getVersionInfo = exports.APP_VERSION = void 0;
 /**
  * Auto-incremented version (updated by pre-commit hook)
  */
-exports.APP_VERSION = 'v2.2.53';
+exports.APP_VERSION = 'v2.2.77';
 const getVersionInfo = () => {
     return {
         version: exports.APP_VERSION,

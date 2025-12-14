@@ -30,9 +30,11 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
+    "nodemailer": "^6.10.1",
     "qrcode": "^1.5.4",
     "sharp": "^0.32.6",
     "uuid": "^9.0.1",
+    "prisma": "^5.22.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
@@ -43,10 +45,10 @@
     "@types/morgan": "^1.9.7",
     "@types/node": "^20.19.23",
     "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^6.4.21",
     "@types/qrcode": "^1.5.5",
     "@types/uuid": "^9.0.7",
     "nodemon": "^3.0.1",
-    "prisma": "^5.22.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.2.2"
   }

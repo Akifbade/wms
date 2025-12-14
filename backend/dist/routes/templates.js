@@ -74,7 +74,7 @@ router.get('/', async (req, res) => {
     }
 });
 // PUT /api/template-settings - Update settings
-router.put('/', async (req, res) => {
+router.put('/', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const companyId = req.user.companyId;
         const settingsData = req.body;
@@ -99,7 +99,7 @@ router.put('/', async (req, res) => {
     }
 });
 // POST /api/template-settings/reset - Reset to defaults
-router.post('/reset', async (req, res) => {
+router.post('/reset', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const companyId = req.user.companyId;
         await prisma.templateSettings.delete({

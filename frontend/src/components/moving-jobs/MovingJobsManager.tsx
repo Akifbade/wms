@@ -35,7 +35,7 @@ const MovingJobsManager: React.FC = () => {
     setLoading(true);
     try {
       const response = await fetch('/api/moving-jobs', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
       });
       if (response.ok) {
         const data = await response.json();

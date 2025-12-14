@@ -1,14 +1,9 @@
 {
-  "version": "v2.2.69",
-  "buildDate": "Dec 10, 2025",
-  "buildTime": "18:30:00",
-  "commit": "contract-system",
+  "version": "v2.2.77",
+  "buildDate": "Dec 14, 2025",
+  "buildTime": "10:05:10",
+  "commit": "3199b76f6",
+  "commitMessage": "Auto-increment version to v2.2.77 (rebuild safety)",
   "author": "akifbade46-del",
-  "environment": "development",
-  "features": [
-    "Contract System (replaces Prepaid)",
-    "Monthly Rate with Payment Due Day",
-    "CBM and Storage Days Limits",
-    "Contract Validity Blocking"
-  ]
+  "environment": "local"
 }

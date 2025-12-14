@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const client_1 = require("@prisma/client");
 const auth_1 = require("../middleware/auth");
+const emailService_1 = require("../services/emailService");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 // Get all withdrawals (with filters)
@@ -86,7 +87,7 @@ router.post('/', auth_1.authenticateToken, async (req, res) => {
     try {
         const companyId = req.user.companyId;
         const userId = req.user.id;
-        const { shipmentId, withdrawnBoxCount, reason, notes, photos, withdrawnBy, receiptNumber, } = req.body;
+        const { shipmentId, withdrawnBoxCount, reason, notes, photos, withdrawnBy, driverName, receiptNumber, } = req.body;
         // Validate shipment
         const shipment = await prisma.shipment.findFirst({
             where: { id: shipmentId, companyId },
@@ -131,8 +132,63 @@ router.post('/', auth_1.authenticateToken, async (req, res) => {
                 releasedAt: remainingBoxCount === 0 ? new Date() : null,
             },
         });
+        // 📧 SEND EMAIL NOTIFICATION
+        let notificationSent = false;
+        try {
+            // Get company info for email
+            const company = await prisma.company.findUnique({ where: { id: companyId } });
+            // Get the user who released the shipment (the logged in admin/manager)
+            const releasedByUser = await prisma.user.findUnique({ where: { id: userId } });
+            // Calculate days stored
+            const arrivalDate = new Date(shipment.arrivalDate);
+            const daysStored = Math.ceil((new Date().getTime() - arrivalDate.getTime()) / (1000 * 60 * 60 * 24));
+            // Build full photo URLs if photos are provided
+            const fullPhotoUrls = photos?.map((photo) => {
+                if (photo.startsWith('http'))
+                    return photo;
+                return `${req.protocol}://${req.get('host')}${photo}`;
+            });
+            const emailResult = await (0, emailService_1.sendReleaseNotification)(companyId, {
+                shipmentId: shipment.id,
+                shipmentCode: shipment.referenceId,
+                clientName: shipment.clientName || 'Customer',
+                clientPhone: shipment.clientPhone || undefined,
+                boxesReleased: withdrawnBoxCount,
+                totalBoxes: shipment.originalBoxCount || shipment.currentBoxCount,
+                remainingBoxes: remainingBoxCount,
+                releaseType: remainingBoxCount === 0 ? 'FULL' : 'PARTIAL',
+                // releasedBy = actual admin/manager who processed the release
+                releasedBy: releasedByUser?.name || req.user?.name || 'Admin',
+                // receivedBy = collector/customer who picked up items
+                receivedBy: withdrawnBy || 'N/A',
+                // driverName = optional driver
+                driverName: driverName || undefined,
+                // reason for release
+                reason: reason || undefined,
+                // Additional professional details
+                cbm: shipment.cbm || undefined,
+                weight: shipment.weight || undefined,
+                receivedDate: shipment.arrivalDate?.toISOString(),
+                daysStored: daysStored,
+                photos: fullPhotoUrls,
+                description: shipment.description || undefined,
+                warehouseName: company?.name ? `${company.name} Warehouse` : undefined,
+                currency: 'KWD',
+            });
+            notificationSent = emailResult.success;
+            if (emailResult.success) {
+                console.log(`📧 Release email sent for shipment ${shipment.referenceId}`);
+            }
+            else {
+                console.log(`📧 Release email failed: ${emailResult.error}`);
+            }
+        }
+        catch (emailError) {
+            console.error('Email notification error:', emailError);
+        }
         res.status(201).json({
             withdrawal,
+            notificationSent,
             message: remainingBoxCount === 0
                 ? 'Shipment fully released'
                 : `Partial withdrawal completed. ${remainingBoxCount} boxes remaining.`

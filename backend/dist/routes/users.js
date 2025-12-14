@@ -39,6 +39,37 @@ router.get('/', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch users' });
     }
 });
+// GET /api/users/authorized - Get MANAGER and ADMIN users for authorization dropdowns
+router.get('/authorized', async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const authorizedUsers = await prisma.user.findMany({
+            where: {
+                companyId,
+                role: { in: ['ADMIN', 'MANAGER'] },
+                isActive: true
+            },
+            select: {
+                id: true,
+                name: true,
+                role: true,
+                avatar: true,
+            },
+            orderBy: [
+                { role: 'asc' }, // ADMIN first, then MANAGER
+                { name: 'asc' }
+            ],
+        });
+        res.json({
+            success: true,
+            users: authorizedUsers
+        });
+    }
+    catch (error) {
+        console.error('Error fetching authorized users:', error);
+        res.status(500).json({ error: 'Failed to fetch authorized users' });
+    }
+});
 // ===== USER PROFILE MANAGEMENT =====
 // Note: Profile routes MUST come before /:id to avoid route conflicts
 /**

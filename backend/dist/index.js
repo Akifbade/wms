@@ -17,6 +17,8 @@ const shipments_1 = __importDefault(require("./routes/shipments"));
 const racks_1 = __importDefault(require("./routes/racks"));
 const dashboard_1 = __importDefault(require("./routes/dashboard"));
 const billing_1 = __importDefault(require("./routes/billing"));
+const prepaid_1 = __importDefault(require("./routes/prepaid")); // Legacy prepaid (for backward compatibility)
+const contracts_1 = __importDefault(require("./routes/contracts")); // NEW: Contract management system
 const withdrawals_1 = __importDefault(require("./routes/withdrawals"));
 const expenses_1 = __importDefault(require("./routes/expenses"));
 const company_1 = __importDefault(require("./routes/company"));
@@ -43,6 +45,9 @@ const categories_1 = __importDefault(require("./routes/categories")); // NEW: Ca
 const companies_1 = __importDefault(require("./routes/companies")); // NEW: Company profiles management
 const backups_1 = __importDefault(require("./routes/backups")); // NEW: Backup management
 const system_1 = __importDefault(require("./routes/system")); // NEW: System monitoring
+const finance_1 = __importDefault(require("./routes/finance")); // NEW: Finance dashboard
+const email_1 = __importDefault(require("./routes/email")); // NEW: Email notification system
+const notificationJobs_1 = require("./cron/notificationJobs"); // NEW: Notification cron jobs
 // Load environment variables FIRST (but allow env vars to override .env)
 dotenv_1.default.config({ override: false });
 // Initialize Express app
@@ -67,6 +72,11 @@ app.use((req, res, next) => {
 });
 // Track user activity for all authenticated requests
 app.use('/api', activityTracker_1.activityTrackerMiddleware);
+// Debug: Log ALL incoming API requests
+app.use('/api', (req, res, next) => {
+    console.log(`[API-DEBUG] ${req.method} ${req.path} - Auth: ${req.headers.authorization ? 'YES' : 'NO'}`);
+    next();
+});
 // Smart static handler for company logos (fallback between legacy/new filenames)
 app.get('/uploads/company-logos/:name', (req, res, next) => {
     try {
@@ -132,10 +142,14 @@ app.get('/api/version', (req, res) => {
 });
 // API Routes
 app.use('/api/auth', auth_1.default);
+app.use('/api/finance', finance_1.default);
+app.use('/api/email', email_1.default); // NEW: Email notification system
 app.use('/api/shipments', shipments_1.default);
 app.use('/api/racks', racks_1.default);
 app.use('/api/dashboard', dashboard_1.default);
 app.use('/api/billing', billing_1.default);
+app.use('/api/prepaid', prepaid_1.default); // Legacy prepaid (backward compatibility)
+app.use('/api/contracts', contracts_1.default); // NEW: Contract management system
 app.use('/api/withdrawals', withdrawals_1.default);
 app.use('/api/expenses', expenses_1.default);
 app.use('/api/company', company_1.default);
@@ -178,6 +192,7 @@ const startServer = async () => {
     try {
         // 404 handler - registered AFTER plugins so their routes work
         app.use((req, res) => {
+            console.log(`❌ 404 Route not found: ${req.method} ${req.originalUrl}`);
             res.status(404).json({ error: 'Route not found' });
         });
     }
@@ -190,6 +205,8 @@ const startServer = async () => {
         console.log(`📊 Environment: ${process.env.NODE_ENV}`);
         console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}`);
         console.log(`🚛 Fleet Management: ${process.env.FLEET_ENABLED === 'true' ? '✅ ENABLED' : '❌ DISABLED'}`);
+        // Start notification cron jobs
+        (0, notificationJobs_1.startAllNotificationJobs)();
     });
 };
 startServer().catch((error) => {

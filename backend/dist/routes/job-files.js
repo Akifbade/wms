@@ -130,7 +130,7 @@ router.get('/:jobId', auth_1.authenticateToken, async (req, res) => {
  * DELETE /api/job-files/:fileId
  * Delete a file
  */
-router.delete('/:fileId', auth_1.authenticateToken, async (req, res) => {
+router.delete('/:fileId', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res) => {
     try {
         const { fileId } = req.params;
         const file = await prisma.jobFile.findFirst({

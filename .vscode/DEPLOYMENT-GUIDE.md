@@ -2,7 +2,8 @@
 
 **Last Updated:** November 22, 2025  
 **Production URL:** https://qgocargo.cloud  
-**Current Version:** v2.2.32
+**Version Proof:** https://qgocargo.cloud/version.json  
+**Backend Health:** https://qgocargo.cloud/api/health
 
 ---
 
@@ -93,9 +94,19 @@ docker-compose restart
 
 ### Manual Check:
 1. Open: https://qgocargo.cloud
-2. Check version in footer/about
+2. Check version proof: https://qgocargo.cloud/version.json
 3. Test material edit/delete features
 4. Verify billing calculations work
+
+---
+
+## 🧾 VERSION UPDATES (Avoid “Old Version” Confusion)
+
+The frontend build generates a fresh `version.json` on every build, so you can prove what is currently deployed.
+
+- Local: http://localhost/version.json
+- Production: https://qgocargo.cloud/version.json
+- Backend: https://qgocargo.cloud/api/health
 
 ---
 
@@ -130,6 +141,14 @@ STATUS: ✓ PRODUCTION MATCHES LOCALHOST!
 ├── docker-compose.yml    # Production containers config
 └── vps-auto-cleanup.sh   # Auto-cleanup cron job
 ```
+
+⚠️ Note: the VPS path contains a space (`/root/NEW START`). If SCP/SSH deployments are unreliable, create a no-space symlink once and use it in scripts:
+
+```bash
+ssh root@148.230.107.155 "ln -s '/root/NEW START' /root/wms"
+```
+
+Then prefer `/root/wms` for future deploy commands.
 
 ---
 

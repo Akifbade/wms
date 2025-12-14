@@ -38,7 +38,7 @@ const MaterialsManager: React.FC = () => {
   const fetchMaterials = async () => {
     try {
       const response = await fetch('/api/materials', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
       });
       if (response.ok) {
         const data = await response.json();

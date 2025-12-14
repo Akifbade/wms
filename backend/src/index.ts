@@ -44,7 +44,6 @@ import backupsRoutes from './routes/backups'; // NEW: Backup management
 import systemRoutes from './routes/system'; // NEW: System monitoring
 import financeRoutes from './routes/finance'; // NEW: Finance dashboard
 import emailRoutes from './routes/email'; // NEW: Email notification system
-import mobileUploadRoutes from './routes/mobile-upload'; // NEW: Mobile physical report upload
 import { startAllNotificationJobs } from './cron/notificationJobs'; // NEW: Notification cron jobs
 
 // Load environment variables FIRST (but allow env vars to override .env)
@@ -75,6 +74,12 @@ app.use((req, res, next) => {
 
 // Track user activity for all authenticated requests
 app.use('/api', activityTrackerMiddleware);
+
+// Debug: Log ALL incoming API requests
+app.use('/api', (req, res, next) => {
+  console.log(`[API-DEBUG] ${req.method} ${req.path} - Auth: ${req.headers.authorization ? 'YES' : 'NO'}`);
+  next();
+});
 
 // Smart static handler for company logos (fallback between legacy/new filenames)
 app.get('/uploads/company-logos/:name', (req, res, next) => {
@@ -151,7 +156,6 @@ app.get('/api/version', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/email', emailRoutes); // NEW: Email notification system
-app.use('/api/mobile-upload', mobileUploadRoutes); // NEW: Mobile physical report upload
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/racks', rackRoutes);
 app.use('/api/dashboard', dashboardRoutes);

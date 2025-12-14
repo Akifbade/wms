@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json.schemastore.org/mcp.json",
+  "description": "MCP Server Configuration for WMS Project",
+  "servers": {
+    "docker": {
+      "name": "Docker/Container MCP Server",
+      "description": "Manage Docker containers, images, volumes, networks directly from Copilot",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "ghcr.io/github/github-mcp-server:latest"],
+      "enabled": true,
+      "capabilities": [
+        "list_containers",
+        "list_images", 
+        "list_volumes",
+        "list_networks",
+        "start_container",
+        "stop_container",
+        "restart_container",
+        "remove_container",
+        "inspect_container",
+        "logs_for_container",
+        "run_container",
+        "pull_image",
+        "remove_image",
+        "tag_image",
+        "prune"
+      ]
+    },
+    "gitkraken": {
+      "name": "GitKraken MCP Server",
+      "description": "Git operations, PRs, issues, branches management",
+      "enabled": true,
+      "capabilities": [
+        "git_status",
+        "git_branch",
+        "git_checkout", 
+        "git_add_or_commit",
+        "git_push",
+        "git_stash",
+        "git_log_or_diff",
+        "git_blame",
+        "git_worktree",
+        "pull_request_create",
+        "pull_request_get_detail",
+        "pull_request_assigned_to_me",
+        "issues_assigned_to_me",
+        "issues_get_detail",
+        "issues_add_comment"
+      ]
+    }
+  },
+  "usage_instructions": {
+    "docker_examples": [
+      "List all containers: mcp_copilot_conta_list_containers",
+      "Start container: mcp_copilot_conta_act_container (action: start)",
+      "Stop container: mcp_copilot_conta_act_container (action: stop)",
+      "View logs: mcp_copilot_conta_logs_for_container",
+      "Run new container: mcp_copilot_conta_run_container",
+      "Prune unused: mcp_copilot_conta_prune"
+    ],
+    "git_examples": [
+      "Check status: mcp_gitkraken_git_status",
+      "Create branch: mcp_gitkraken_git_branch (action: create)",
+      "Commit changes: mcp_gitkraken_git_add_or_commit (action: commit)",
+      "Push: mcp_gitkraken_git_push",
+      "View diff: mcp_gitkraken_git_log_or_diff (action: diff)"
+    ]
+  },
+  "project_containers": {
+    "local": {
+      "backend": "wms-backend",
+      "frontend": "wms-frontend", 
+      "database": "wms-database",
+      "phpmyadmin": "wms-phpmyadmin"
+    },
+    "staging": {
+      "backend": "wms-staging-backend",
+      "frontend": "wms-staging-frontend",
+      "database": "wms-staging-db"
+    },
+    "production": {
+      "backend": "wms-backend",
+      "frontend": "wms-frontend",
+      "database": "wms-database"
+    }
+  }
+}

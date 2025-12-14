@@ -40,10 +40,10 @@ git fetch origin stable/prisma-mysql-production
 git reset --hard origin/stable/prisma-mysql-production
 
 # 3. REBUILD & RESTART
-echo "🏗️ Rebuilding Containers..."
+echo "🏗️ Restarting Containers with New Images..."
 # Ensure we are using the production compose file
 docker-compose -f docker-compose-production.yml down --remove-orphans
-docker-compose -f docker-compose-production.yml up -d --build
+docker-compose -f docker-compose-production.yml up -d
 
 # 4. CLEANUP
 echo "🧹 Cleaning up unused images..."

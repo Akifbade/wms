@@ -44,12 +44,7 @@ services:
 
   # ===== PRODUCTION BACKEND =====
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      args:
-        - NODE_ENV=production
-    image: wms-backend:latest
+    image: ghcr.io/akifbade/wms-backend:latest
     container_name: wms-backend
     restart: always
     environment:
@@ -87,14 +82,7 @@ services:
 
   # ===== PRODUCTION FRONTEND =====
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        - REACT_APP_API_URL=https://qgocargo.cloud/api
-        - VITE_API_URL=https://qgocargo.cloud/api
-        - NODE_ENV=production
-    image: wms-frontend:latest
+    image: ghcr.io/akifbade/wms-frontend:latest
     container_name: wms-frontend
     restart: always
     environment:
@@ -128,23 +116,7 @@ services:
     #   cap_drop:
     #     - ALL
 
-    # ===== PORTAINER (Container Management) =====
-  portainer:
-    image: portainer/portainer-ce:latest
-    container_name: portainer
-    restart: always
-    ports:
-      - "8000:8000"
-      - "9000:9000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - portainer_data:/data
-    networks:
-      - wms-prod-network
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
+
 
 # ===== PRODUCTION NETWORK - ISOLATED =====
 networks:
@@ -166,6 +138,4 @@ volumes:
       o: bind
       device: /var/lib/docker/volumes/mysql_prod_data/_data
 
-  portainer_data:
-    driver: local
-    name: portainer_data
+

@@ -8,6 +8,58 @@ const rackCapacity_1 = require("../utils/rackCapacity");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 router.use(auth_1.authenticateToken);
+// Bulk update CBM capacity for selected racks
+// MOVED TO TOP to avoid route conflicts
+router.post('/bulk-cbm-capacity', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
+    try {
+        console.log('📦 Bulk CBM update request received:', req.body);
+        const { rackIds, cbmCapacity, applyToAll } = req.body;
+        const companyId = req.user.companyId;
+        if (cbmCapacity === undefined || cbmCapacity === null) {
+            return res.status(400).json({ error: 'CBM capacity is required' });
+        }
+        const cbmValue = parseFloat(cbmCapacity);
+        if (isNaN(cbmValue) || cbmValue < 0) {
+            return res.status(400).json({ error: 'Invalid CBM capacity value' });
+        }
+        let updateResult;
+        if (applyToAll) {
+            // Apply to all racks in company (using any to bypass TypeScript until schema syncs)
+            updateResult = await prisma.rack.updateMany({
+                where: {
+                    companyId,
+                    deletedAt: null
+                },
+                data: { cbmCapacity: cbmValue }
+            });
+        }
+        else if (rackIds && Array.isArray(rackIds) && rackIds.length > 0) {
+            // Apply to selected racks only
+            updateResult = await prisma.rack.updateMany({
+                where: {
+                    id: { in: rackIds },
+                    companyId,
+                    deletedAt: null
+                },
+                data: { cbmCapacity: cbmValue }
+            });
+        }
+        else {
+            return res.status(400).json({ error: 'Either rackIds or applyToAll must be specified' });
+        }
+        console.log(`✅ Bulk CBM update: ${updateResult.count} racks updated to ${cbmValue} m³`);
+        res.json({
+            success: true,
+            message: `Updated CBM capacity for ${updateResult.count} racks`,
+            updatedCount: updateResult.count,
+            cbmCapacity: cbmValue
+        });
+    }
+    catch (error) {
+        console.error('Bulk CBM update error:', error);
+        res.status(500).json({ error: 'Failed to update CBM capacity' });
+    }
+});
 const rackSchema = zod_1.z.object({
     code: zod_1.z.string().min(1),
     rackType: zod_1.z.enum(['STORAGE', 'MATERIALS', 'EQUIPMENT']).optional(),
@@ -84,7 +136,19 @@ router.get('/', async (req, res) => {
             where.status = status;
         }
         if (search) {
-            where.code = { contains: search };
+            // Handle underscore/hyphen variations (GROUND_D -> GROUND-D and vice versa)
+            // MySQL is case-insensitive by default, so no mode needed
+            const searchStr = search.toUpperCase();
+            const searchWithHyphen = searchStr.replace(/_/g, '-');
+            const searchWithUnderscore = searchStr.replace(/-/g, '_');
+            where.OR = [
+                { code: { contains: searchStr } },
+                { code: { contains: searchWithHyphen } },
+                { code: { contains: searchWithUnderscore } },
+                { qrCode: { contains: searchStr } },
+                { qrCode: { contains: searchWithHyphen } },
+                { qrCode: { contains: searchWithUnderscore } },
+            ];
         }
         const racks = await prisma.rack.findMany({
             where,
@@ -112,7 +176,7 @@ router.get('/', async (req, res) => {
                 },
                 boxes: {
                     where: {
-                        status: { in: ['IN_STORAGE', 'STORED'] }, // Only count stored boxes
+                        status: { in: ['IN_STORAGE', 'IN_WAREHOUSE', 'STORED'] }, // Only count stored boxes
                         shipment: {
                             status: { notIn: ['RELEASED'] } // Exclude released shipments
                         }
@@ -140,15 +204,24 @@ router.get('/', async (req, res) => {
             },
             orderBy: { code: 'asc' },
         });
+        // Get CBM data for all racks via raw SQL (since not in Prisma schema)
+        const cbmData = await prisma.$queryRaw `
+      SELECT id, cbmCapacity, cbmUsed FROM racks WHERE companyId = ${companyId} AND deletedAt IS NULL
+    `;
+        const cbmMap = new Map(cbmData.map(r => [r.id, { cbmCapacity: Number(r.cbmCapacity) || 0, cbmUsed: Number(r.cbmUsed) || 0 }]));
         // Calculate utilization based on pallet usage rather than raw boxes
         const racksWithStats = racks.map((rack) => {
             const palletUsage = (0, rackCapacity_1.calculatePalletUsage)(rack.boxes || []);
+            const cbm = cbmMap.get(rack.id) || { cbmCapacity: 0, cbmUsed: 0 };
             return {
                 ...rack,
                 capacityUsed: palletUsage,
                 utilization: rack.capacityTotal > 0
                     ? Math.round((palletUsage / rack.capacityTotal) * 100)
                     : 0,
+                // CBM data from raw SQL
+                cbmCapacity: cbm.cbmCapacity,
+                cbmUsed: cbm.cbmUsed,
                 // Pass original DB status instead of overriding it
                 // Frontend handles 'FULL' display based on utilization
                 status: rack.status,
@@ -196,7 +269,7 @@ router.get('/:id', async (req, res) => {
                 },
                 boxes: {
                     where: {
-                        status: { in: ['IN_STORAGE', 'STORED'] }, // Only show boxes currently in storage
+                        status: { in: ['IN_STORAGE', 'IN_WAREHOUSE', 'STORED'] }, // Only show boxes currently in storage
                         shipment: {
                             status: { notIn: ['RELEASED'] } // Exclude released shipments
                         }
@@ -211,6 +284,9 @@ router.get('/:id', async (req, res) => {
                                 status: true,
                                 boxesPerPallet: true,
                                 palletCount: true,
+                                cbm: true,
+                                arrivalDate: true,
+                                clientPhone: true,
                                 companyProfile: {
                                     select: {
                                         id: true,
@@ -240,6 +316,11 @@ router.get('/:id', async (req, res) => {
         if (!rack) {
             return res.status(404).json({ error: 'Rack not found' });
         }
+        // Get CBM data via raw SQL (since not in Prisma schema)
+        const cbmData = await prisma.$queryRaw `
+      SELECT cbmCapacity, cbmUsed FROM racks WHERE id = ${id}
+    `;
+        const cbm = cbmData[0] || { cbmCapacity: 0, cbmUsed: 0 };
         // Calculate actual capacity used in pallet slots
         const palletUsage = (0, rackCapacity_1.calculatePalletUsage)(rack.boxes || []);
         const derivedStatus = palletUsage >= rack.capacityTotal ? 'FULL' : (rack.status || 'ACTIVE');
@@ -249,6 +330,8 @@ router.get('/:id', async (req, res) => {
             utilization: rack.capacityTotal > 0
                 ? Math.round((palletUsage / rack.capacityTotal) * 100)
                 : 0,
+            cbmCapacity: Number(cbm.cbmCapacity) || 0,
+            cbmUsed: Number(cbm.cbmUsed) || 0,
             status: derivedStatus,
         };
         res.json({ rack: rackWithStats });

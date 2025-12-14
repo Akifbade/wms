@@ -74,7 +74,7 @@ router.get('/shipments/:shipmentId/items', async (req, res) => {
     }
 });
 // Add item to shipment
-router.post('/shipments/:shipmentId/items', async (req, res) => {
+router.post('/shipments/:shipmentId/items', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res) => {
     try {
         const { shipmentId } = req.params;
         const companyId = req.user.companyId;
@@ -113,7 +113,7 @@ router.post('/shipments/:shipmentId/items', async (req, res) => {
     }
 });
 // Update item
-router.put('/items/:itemId', async (req, res) => {
+router.put('/items/:itemId', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res) => {
     try {
         const { itemId } = req.params;
         const companyId = req.user.companyId;
@@ -156,7 +156,7 @@ router.put('/items/:itemId', async (req, res) => {
     }
 });
 // Delete item
-router.delete('/items/:itemId', async (req, res) => {
+router.delete('/items/:itemId', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const { itemId } = req.params;
         const companyId = req.user.companyId;
@@ -218,7 +218,7 @@ router.get('/shipments/:shipmentId/items/summary', async (req, res) => {
     }
 });
 // Bulk add items
-router.post('/shipments/:shipmentId/items/bulk', async (req, res) => {
+router.post('/shipments/:shipmentId/items/bulk', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res) => {
     try {
         const { shipmentId } = req.params;
         const companyId = req.user.companyId;

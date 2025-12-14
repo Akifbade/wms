@@ -56,7 +56,7 @@ router.get('/detail/:categoryId', async (req, res) => {
     }
 });
 // Create category
-router.post('/', upload.single('logo'), async (req, res) => {
+router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), upload.single('logo'), async (req, res) => {
     try {
         const { companyId, name, description, color, icon } = req.body;
         // Validate required fields
@@ -94,7 +94,7 @@ router.post('/', upload.single('logo'), async (req, res) => {
     }
 });
 // Update category
-router.put('/:categoryId', upload.single('logo'), async (req, res) => {
+router.put('/:categoryId', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), upload.single('logo'), async (req, res) => {
     try {
         const { categoryId } = req.params;
         const { name, description, color, icon, isActive } = req.body;
@@ -126,7 +126,7 @@ router.put('/:categoryId', upload.single('logo'), async (req, res) => {
     }
 });
 // Delete category
-router.delete('/:categoryId', async (req, res) => {
+router.delete('/:categoryId', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const { categoryId } = req.params;
         // Check if category is used by any racks

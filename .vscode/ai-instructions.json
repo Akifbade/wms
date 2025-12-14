@@ -108,5 +108,62 @@
     "auto_rollback": "Triggers on any deployment failure",
     "health_checks": "Verify staging/production after deployment",
     "manual_production_approval": "No auto-production deployments allowed"
+  },
+
+  "MCP_SERVERS": {
+    "description": "Use MCP (Model Context Protocol) servers for Docker and Git operations",
+    "config_file": ".vscode/mcp.json",
+    "docker_operations": {
+      "list_containers": "mcp_copilot_conta_list_containers",
+      "start_container": "mcp_copilot_conta_act_container (action: start, containerNameOrId: xxx)",
+      "stop_container": "mcp_copilot_conta_act_container (action: stop, containerNameOrId: xxx)",
+      "restart_container": "mcp_copilot_conta_act_container (action: restart, containerNameOrId: xxx)",
+      "remove_container": "mcp_copilot_conta_act_container (action: remove, containerNameOrId: xxx)",
+      "view_logs": "mcp_copilot_conta_logs_for_container (containerNameOrId: xxx)",
+      "inspect_container": "mcp_copilot_conta_inspect_container (containerNameOrId: xxx)",
+      "list_images": "mcp_copilot_conta_list_images",
+      "pull_image": "mcp_copilot_conta_act_image (action: pull, imageNameOrId: xxx)",
+      "run_container": "mcp_copilot_conta_run_container (image, name, ports, etc.)",
+      "prune_unused": "mcp_copilot_conta_prune (pruneTarget: containers|images|volumes|networks|all)"
+    },
+    "git_operations": {
+      "status": "mcp_gitkraken_git_status (directory: path)",
+      "branch_list": "mcp_gitkraken_git_branch (directory: path, action: list)",
+      "branch_create": "mcp_gitkraken_git_branch (directory: path, action: create, branch_name: xxx)",
+      "checkout": "mcp_gitkraken_git_checkout (directory: path, branch: xxx)",
+      "add_files": "mcp_gitkraken_git_add_or_commit (directory: path, action: add, files: [...])",
+      "commit": "mcp_gitkraken_git_add_or_commit (directory: path, action: commit, message: xxx)",
+      "push": "mcp_gitkraken_git_push (directory: path)",
+      "stash": "mcp_gitkraken_git_stash (directory: path, name: optional)",
+      "log": "mcp_gitkraken_git_log_or_diff (directory: path, action: log)",
+      "diff": "mcp_gitkraken_git_log_or_diff (directory: path, action: diff)",
+      "blame": "mcp_gitkraken_git_blame (directory: path, file: xxx)"
+    },
+    "pr_and_issues": {
+      "my_prs": "mcp_gitkraken_pull_request_assigned_to_me (provider: github)",
+      "create_pr": "mcp_gitkraken_pull_request_create (provider: github, ...)",
+      "pr_details": "mcp_gitkraken_pull_request_get_detail (provider: github, pull_request_id: xxx, ...)",
+      "my_issues": "mcp_gitkraken_issues_assigned_to_me (provider: github)",
+      "issue_details": "mcp_gitkraken_issues_get_detail (provider: github, issue_id: xxx, ...)",
+      "add_comment": "mcp_gitkraken_issues_add_comment (provider: github, issue_id: xxx, comment: xxx)"
+    },
+    "project_containers": {
+      "local_backend": "wms-backend",
+      "local_frontend": "wms-frontend",
+      "local_database": "wms-database",
+      "local_phpmyadmin": "wms-phpmyadmin",
+      "staging_backend": "wms-staging-backend",
+      "staging_frontend": "wms-staging-frontend",
+      "staging_database": "wms-staging-db"
+    },
+    "ai_instructions": [
+      "✅ ALWAYS use MCP tools for Docker container operations instead of terminal commands",
+      "✅ Use mcp_copilot_conta_list_containers to see running containers",
+      "✅ Use mcp_copilot_conta_act_container for start/stop/restart/remove",
+      "✅ Use mcp_copilot_conta_logs_for_container to check container logs",
+      "✅ Use mcp_gitkraken_git_status instead of 'git status' in terminal",
+      "✅ Use mcp_gitkraken_git_add_or_commit for commits",
+      "❌ AVOID running docker commands in terminal when MCP tool is available"
+    ]
   }
 }

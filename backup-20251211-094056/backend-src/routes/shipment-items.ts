@@ -1,0 +1,305 @@
+import { Router, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { authenticateToken, authorizeRoles, AuthRequest } from '../middleware/auth';
+import { z } from 'zod';
+
+const router = Router();
+const prisma = new PrismaClient();
+
+// Apply authentication to all routes
+router.use(authenticateToken);
+
+// Validation schemas
+const createItemSchema = z.object({
+  itemName: z.string().min(1, 'Item name is required'),
+  itemDescription: z.string().optional(),
+  category: z.enum([
+    'BAGS',
+    'SHOES',
+    'ELECTRONICS',
+    'FURNITURE',
+    'CLOTHING',
+    'DOCUMENTS',
+    'FRAGILE',
+    'GENERAL',
+  ]),
+  quantity: z.number().int().positive('Quantity must be positive'),
+  weight: z.number().positive().optional(),
+  value: z.number().positive().optional(),
+  barcode: z.string().optional(),
+  photos: z.array(z.string()).optional(),
+  boxNumbers: z.array(z.number()).optional(),
+  customAttributes: z.record(z.any()).optional(),
+});
+
+const updateItemSchema = createItemSchema.partial();
+type ShipmentItemInput = z.infer<typeof createItemSchema>;
+
+const serializeItemInput = (input: ShipmentItemInput) => ({
+  itemName: input.itemName,
+  itemDescription: input.itemDescription ?? undefined,
+  category: input.category,
+  quantity: input.quantity,
+  weight: input.weight ?? null,
+  value: input.value ?? null,
+  barcode: input.barcode ?? undefined,
+  photos: input.photos ? JSON.stringify(input.photos) : null,
+  boxNumbers: input.boxNumbers ? JSON.stringify(input.boxNumbers) : null,
+  customAttributes: input.customAttributes ? JSON.stringify(input.customAttributes) : null,
+});
+
+// Get all items for a shipment
+router.get('/shipments/:shipmentId/items', async (req: AuthRequest, res: Response) => {
+  try {
+    const { shipmentId } = req.params;
+    const companyId = req.user!.companyId;
+
+    // Verify shipment belongs to company
+    const shipment = await prisma.shipment.findFirst({
+      where: { id: shipmentId, companyId },
+    });
+
+    if (!shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    const items = await prisma.shipmentItem.findMany({
+      where: { shipmentId, companyId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Parse JSON fields
+    const parsedItems = items.map(item => ({
+      ...item,
+      photos: item.photos ? JSON.parse(item.photos) : [],
+      boxNumbers: item.boxNumbers ? JSON.parse(item.boxNumbers) : [],
+      customAttributes: item.customAttributes ? JSON.parse(item.customAttributes) : {},
+    }));
+
+    res.json({ items: parsedItems });
+  } catch (error) {
+    console.error('Error fetching shipment items:', error);
+    res.status(500).json({ error: 'Failed to fetch items' });
+  }
+});
+
+// Add item to shipment
+router.post('/shipments/:shipmentId/items', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { shipmentId } = req.params;
+    const companyId = req.user!.companyId;
+
+    // Validate request body
+    const validatedData: ShipmentItemInput = createItemSchema.parse(req.body);
+
+    // Verify shipment belongs to company
+    const shipment = await prisma.shipment.findFirst({
+      where: { id: shipmentId, companyId },
+    });
+
+    if (!shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    // Create item with JSON fields
+    const item = await prisma.shipmentItem.create({
+      data: {
+        ...serializeItemInput(validatedData),
+        shipment: { connect: { id: shipmentId } },
+        company: { connect: { id: companyId } },
+      },
+    });
+
+    // Parse JSON fields for response
+    const parsedItem = {
+      ...item,
+      photos: item.photos ? JSON.parse(item.photos) : [],
+      boxNumbers: item.boxNumbers ? JSON.parse(item.boxNumbers) : [],
+      customAttributes: item.customAttributes ? JSON.parse(item.customAttributes) : {},
+    };
+
+    res.status(201).json({ item: parsedItem });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('Error creating shipment item:', error);
+    res.status(500).json({ error: 'Failed to create item' });
+  }
+});
+
+// Update item
+router.put('/items/:itemId', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { itemId } = req.params;
+    const companyId = req.user!.companyId;
+
+    // Validate request body
+    const validatedData = updateItemSchema.parse(req.body);
+
+    // Verify item belongs to company
+    const existingItem = await prisma.shipmentItem.findFirst({
+      where: { id: itemId, companyId },
+    });
+
+    if (!existingItem) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    // Update item
+    const item = await prisma.shipmentItem.update({
+      where: { id: itemId },
+      data: {
+        ...validatedData,
+        photos: validatedData.photos ? JSON.stringify(validatedData.photos) : undefined,
+        boxNumbers: validatedData.boxNumbers ? JSON.stringify(validatedData.boxNumbers) : undefined,
+        customAttributes: validatedData.customAttributes
+          ? JSON.stringify(validatedData.customAttributes)
+          : undefined,
+      },
+    });
+
+    // Parse JSON fields for response
+    const parsedItem = {
+      ...item,
+      photos: item.photos ? JSON.parse(item.photos) : [],
+      boxNumbers: item.boxNumbers ? JSON.parse(item.boxNumbers) : [],
+      customAttributes: item.customAttributes ? JSON.parse(item.customAttributes) : {},
+    };
+
+    res.json({ item: parsedItem });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('Error updating item:', error);
+    res.status(500).json({ error: 'Failed to update item' });
+  }
+});
+
+// Delete item
+router.delete('/items/:itemId', authorizeRoles('ADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { itemId } = req.params;
+    const companyId = req.user!.companyId;
+
+    // Verify item belongs to company
+    const item = await prisma.shipmentItem.findFirst({
+      where: { id: itemId, companyId },
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    await prisma.shipmentItem.delete({
+      where: { id: itemId },
+    });
+
+    res.json({ message: 'Item deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    res.status(500).json({ error: 'Failed to delete item' });
+  }
+});
+
+// Get items summary by category for a shipment
+router.get('/shipments/:shipmentId/items/summary', async (req: AuthRequest, res: Response) => {
+  try {
+    const { shipmentId } = req.params;
+    const companyId = req.user!.companyId;
+
+    // Verify shipment belongs to company
+    const shipment = await prisma.shipment.findFirst({
+      where: { id: shipmentId, companyId },
+    });
+
+    if (!shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    const items = await prisma.shipmentItem.findMany({
+      where: { shipmentId, companyId },
+    });
+
+    // Group by category
+    const summary = items.reduce((acc, item) => {
+      const category = item.category;
+      if (!acc[category]) {
+        acc[category] = {
+          category,
+          totalQuantity: 0,
+          totalWeight: 0,
+          totalValue: 0,
+          itemCount: 0,
+        };
+      }
+      acc[category].totalQuantity += item.quantity;
+      acc[category].totalWeight += item.weight || 0;
+      acc[category].totalValue += item.value || 0;
+      acc[category].itemCount += 1;
+      return acc;
+    }, {} as Record<string, any>);
+
+    res.json({ summary: Object.values(summary) });
+  } catch (error) {
+    console.error('Error fetching items summary:', error);
+    res.status(500).json({ error: 'Failed to fetch summary' });
+  }
+});
+
+// Bulk add items
+router.post('/shipments/:shipmentId/items/bulk', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { shipmentId } = req.params;
+    const companyId = req.user!.companyId;
+    const { items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Items array is required' });
+    }
+
+    // Verify shipment belongs to company
+    const shipment = await prisma.shipment.findFirst({
+      where: { id: shipmentId, companyId },
+    });
+
+    if (!shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    // Validate all items
+    const validatedItems: ShipmentItemInput[] = items.map(item => createItemSchema.parse(item));
+
+    // Create all items in a transaction
+    const createdItems = await prisma.$transaction(
+      validatedItems.map(item =>
+        prisma.shipmentItem.create({
+          data: {
+            ...serializeItemInput(item),
+            shipment: { connect: { id: shipmentId } },
+            company: { connect: { id: companyId } },
+          },
+        })
+      )
+    );
+
+    // Parse JSON fields
+    const parsedItems = createdItems.map(item => ({
+      ...item,
+      photos: item.photos ? JSON.parse(item.photos) : [],
+      boxNumbers: item.boxNumbers ? JSON.parse(item.boxNumbers) : [],
+      customAttributes: item.customAttributes ? JSON.parse(item.customAttributes) : {},
+    }));
+
+    res.status(201).json({ items: parsedItems });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('Error bulk creating items:', error);
+    res.status(500).json({ error: 'Failed to create items' });
+  }
+});
+
+export default router;

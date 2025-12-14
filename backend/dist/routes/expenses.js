@@ -81,7 +81,7 @@ router.get('/:id', async (req, res) => {
     }
 });
 // Create expense
-router.post('/', async (req, res) => {
+router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res) => {
     try {
         const companyId = req.user.companyId;
         const { title, category, amount, currency, description, receipts, expenseDate, } = req.body;
@@ -112,7 +112,7 @@ router.post('/', async (req, res) => {
     }
 });
 // Update expense
-router.put('/:id', async (req, res) => {
+router.put('/:id', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res) => {
     try {
         const { id } = req.params;
         const companyId = req.user.companyId;
@@ -157,15 +157,10 @@ router.put('/:id', async (req, res) => {
     }
 });
 // Delete expense
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const { id } = req.params;
         const companyId = req.user.companyId;
-        const userRole = req.user.role;
-        // Only ADMIN can delete expenses
-        if (userRole !== 'ADMIN') {
-            return res.status(403).json({ error: 'Only admins can delete expenses' });
-        }
         const existing = await prisma.expense.findFirst({
             where: { id, companyId },
         });

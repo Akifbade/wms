@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const client_1 = require("@prisma/client");
 const child_process_1 = require("child_process");
+const auth_1 = require("../middleware/auth");
 const util_1 = require("util");
 const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
@@ -30,7 +31,7 @@ async function ensureBackupDir() {
  * GET /api/backups
  * List all available backups (both quick and full system)
  */
-router.get('/', async (req, res) => {
+router.get('/', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         await ensureBackupDir();
         const backups = [];
@@ -101,7 +102,7 @@ router.get('/', async (req, res) => {
  * POST /api/backups/create
  * Create a new backup
  */
-router.post('/create', async (req, res) => {
+router.post('/create', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const backupName = `WMS_BACKUP_${timestamp}`;
@@ -251,7 +252,7 @@ router.get('/download/:filename', async (req, res) => {
  * DELETE /api/backups/:filename
  * Delete a backup file (from either quick or full backup directory)
  */
-router.delete('/:filename', async (req, res) => {
+router.delete('/:filename', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const { filename } = req.params;
         // Security: prevent directory traversal
@@ -299,7 +300,7 @@ router.delete('/:filename', async (req, res) => {
  * Returns instructions for creating a complete system backup from the host
  * (Cannot be done from Docker as it needs access to source code on host)
  */
-router.post('/create-full-system', async (req, res) => {
+router.post('/create-full-system', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         console.log('🚀 Starting complete system backup from WMS...');
         const scriptPath = path_1.default.join(__dirname, '..', '..', 'scripts', 'create-complete-backup.js');

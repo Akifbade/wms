@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
+import fs from "fs";
 import path from "path";
 import { authenticateToken, authorizeRoles, AuthRequest } from "../middleware/auth";
 import { emailTemplates, sendEmail, getNotificationRecipients, sendNotification } from "../services/emailService";
@@ -17,6 +18,32 @@ function parseEmailList(value: any): string[] {
   }
   return [];
 }
+
+// Build a browser-safe public URL for an uploaded file
+const buildPublicUrl = (req: AuthRequest, filePath: string | null | undefined) => {
+  if (!filePath) return '';
+  if (filePath.startsWith('http')) return filePath;
+  const base = `${req.protocol}://${req.get('host')}`;
+  return `${base}${filePath.startsWith('/') ? '' : '/'}${filePath}`;
+};
+
+// Resolve an uploaded file URL to an absolute filesystem path (for email attachments)
+const resolveUploadPath = (fileUrl: string | null | undefined) => {
+  if (!fileUrl) return null;
+  // Strip any host and leading slash
+  const cleaned = fileUrl.replace(/^https?:\/\/[^/]+/i, '').replace(/^\//, '');
+  const candidates = [
+    path.join(__dirname, '../../', cleaned),
+    path.join(process.cwd(), cleaned),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  console.warn(`[MovingJobs] Attachment missing on disk: ${fileUrl} (checked ${candidates.join(', ')})`);
+  return null;
+};
 
 /**
  * GET /api/moving-jobs
@@ -330,22 +357,53 @@ router.patch("/:jobId", authenticateToken as any, async (req: AuthRequest, res) 
             }
           }
 
-          const baseUrl = req.get('origin') || process.env.APP_PUBLIC_URL || '';
+          const baseUrl = process.env.APP_PUBLIC_URL || process.env.FRONTEND_URL || req.get('origin') || '';
+          console.log('\n[MovingJobs] ========== APPROVAL EMAIL PREP ==========');
+          console.log('[MovingJobs] baseUrl:', baseUrl);
+          console.log('[MovingJobs] Job ID:', updatedJob.id);
+
           const approvalUrl = baseUrl
             ? `${baseUrl.replace(/\/$/, '')}/approvals?approvalId=${encodeURIComponent(approval.id)}`
             : '#';
 
           // Get physical reports from material returns for this job
-          const materialReturns = await prisma.materialReturn.findMany({
+          console.log('[MovingJobs] Fetching physical reports for job:', updatedJob.id);
+          // NOTE: Prisma typing can lag behind schema changes in some dev setups.
+          // Use a narrow query + safe access to avoid compile-time blocking.
+          const materialReturns = await (prisma.materialReturn as any).findMany({
             where: { jobId: updatedJob.id, companyId, physicalReportUrl: { not: null } },
-            select: { physicalReportUrl: true }
+            select: { physicalReportUrl: true, id: true }
           });
-          
-          const physicalReportPaths = materialReturns
-            .filter(r => r.physicalReportUrl)
-            .map(r => path.join(__dirname, '../..', r.physicalReportUrl!));
 
-          // Send approval request email (manual recipients or configured recipients)
+          console.log('[MovingJobs] Found material returns with physicalReportUrl:', materialReturns.length);
+          materialReturns.forEach((mr, i) => {
+            console.log(`[MovingJobs] Return ${i}: URL = ${mr.physicalReportUrl}`);
+          });
+
+          const physicalReportsRelative = (materialReturns as any[])
+            .map(r => r?.physicalReportUrl)
+            .filter((url): url is string => typeof url === 'string' && url.length > 0);
+
+          // Build full URLs for physical reports (used for the click-through links)
+          const physicalReportUrls = physicalReportsRelative
+            .map(url => baseUrl ? `${baseUrl.replace(/\/$/, '')}${url}` : url);
+
+          // Attach images inline so previews work in email clients (Gmail often can't fetch localhost URLs).
+          const physicalReportAttachments = physicalReportsRelative.map((relativeUrl, idx) => {
+            const isPdf = /\.pdf($|\?)/i.test(relativeUrl);
+            const filePath = `/app${relativeUrl}`;
+            const ext = path.extname(relativeUrl) || '';
+            return {
+              filename: `physical-report-${idx + 1}${ext}`,
+              path: filePath,
+              cid: isPdf ? undefined : `physical-report-${idx + 1}`,
+            };
+          });
+
+          console.log('[MovingJobs] Final physicalReportUrls:', physicalReportUrls);
+          console.log('[MovingJobs] ==========================================\n');
+
+          // Send approval request email
           await sendNotification(companyId, 'JOB_COMPLETION_APPROVAL_REQUEST', {
             jobCode: updatedJob.jobCode,
             customerName: updatedJob.clientName,
@@ -355,7 +413,8 @@ router.patch("/:jobId", authenticateToken as any, async (req: AuthRequest, res) 
             approvalUrl,
             materials,
             totals,
-          }, physicalReportPaths.length > 0 ? physicalReportPaths.map(p => ({ path: p })) : undefined);
+            physicalReports: physicalReportUrls,
+          }, physicalReportAttachments);
 
           // If caller provided explicit emails, ensure they receive it even if notification settings are empty/disabled
           if (approvalNotifyEmailsOverride.length > 0) {
@@ -368,11 +427,13 @@ router.patch("/:jobId", authenticateToken as any, async (req: AuthRequest, res) 
               approvalUrl,
               materials,
               totals,
+              physicalReports: physicalReportUrls,
             });
             await sendEmail(companyId, {
               to: approvalNotifyEmailsOverride,
               subject: template.subject,
               html: template.html,
+              attachments: physicalReportAttachments as any,
             });
           }
         }

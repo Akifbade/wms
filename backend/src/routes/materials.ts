@@ -5,6 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { sendNotification } from "../services/emailService";
 
 const prisma = new PrismaClient();
@@ -52,7 +53,7 @@ async function buildJobMaterialsSummary(companyId: string, jobId: string) {
 
 async function applyDeferredReturnRestock(companyId: string, jobId: string) {
   console.log(`[RESTOCK] ============ START RESTOCK FOR JOB ${jobId} ============`);
-  
+
   const returns = await prisma.materialReturn.findMany({
     where: {
       companyId,
@@ -69,7 +70,7 @@ async function applyDeferredReturnRestock(companyId: string, jobId: string) {
   for (const r of returns) {
     const qty = r.quantityGood || 0;
     console.log(`[RESTOCK] Processing return ${r.id}: qty=${qty}, materialId=${r.materialId}, rackId=${r.rackId}`);
-    
+
     if (qty <= 0) {
       console.log(`[RESTOCK] Skipping return ${r.id} - quantity is 0`);
       continue;
@@ -86,13 +87,13 @@ async function applyDeferredReturnRestock(companyId: string, jobId: string) {
         select: { quantity: true }
       });
       console.log(`[RESTOCK] Rack stock BEFORE: ${rackBefore?.quantity || 0}`);
-      
+
       await prisma.rackStockLevel.upsert({
         where: { materialId_rackId_stockBatchId: { materialId: r.materialId, rackId: r.rackId!, stockBatchId: uniqueBatchId } },
         create: { materialId: r.materialId, rackId: r.rackId!, quantity: qty, companyId, stockBatchId: uniqueBatchId },
         update: { quantity: { increment: qty } },
       });
-      
+
       const rackAfter = await prisma.rackStockLevel.findUnique({
         where: { materialId_rackId_stockBatchId: { materialId: r.materialId, rackId: r.rackId!, stockBatchId: uniqueBatchId } },
         select: { quantity: true }
@@ -107,7 +108,7 @@ async function applyDeferredReturnRestock(companyId: string, jobId: string) {
       where: { id: r.materialId },
       data: { totalQuantity: { increment: qty } },
     });
-    
+
     const materialAfter = await prisma.packingMaterial.findUnique({ where: { id: r.materialId }, select: { totalQuantity: true } });
     console.log(`[RESTOCK] Material ${r.materialId} AFTER: totalQuantity=${materialAfter?.totalQuantity}`);
 
@@ -122,20 +123,33 @@ async function applyDeferredReturnRestock(companyId: string, jobId: string) {
   return { restockedCount: returns.length };
 }
 
+// Ensure upload directories exist
+const ensureUploadDirs = () => {
+  const dirs = ['uploads', 'uploads/physical-reports', 'uploads/damages'];
+  dirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`[Materials] Created directory: ${dir}`);
+    } else {
+      console.log(`[Materials] Directory already exists: ${dir}`);
+    }
+  });
+};
+ensureUploadDirs();
+
 // Configure multer for damage photo uploads
 const damagePhotoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = 'uploads/damages';
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    // Simple relative paths - Express will serve from process.cwd()/uploads
+    const uploadDir = file.fieldname === 'physicalReport' ? 'uploads/physical-reports' : 'uploads/damages';
+    console.log(`[Materials] Destination for ${file.fieldname}: ${uploadDir}`);
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
-    cb(null, `damage-${uniqueSuffix}${ext}`);
+    const prefix = file.fieldname === 'physicalReport' ? 'REPORT' : 'damage';
+    cb(null, `${prefix}-${uniqueSuffix}${ext}`);
   }
 });
 
@@ -143,14 +157,14 @@ const damagePhotoUpload = multer({
   storage: damagePhotoStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const allowedTypes = /jpeg|jpg|png|gif|webp|pdf/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    const mimetype = /jpeg|jpg|png|gif|webp|pdf|application\/pdf/.test(file.mimetype);
 
     if (mimetype && extname) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only image and PDF files are allowed'));
     }
   }
 });
@@ -269,14 +283,21 @@ router.get("/job-materials/:jobId", authenticateToken as any, async (req: AuthRe
         returns: {
           include: {
             damages: true // Include damage records with photos
-          },
-          orderBy: { recordedAt: 'desc' }
+          }
         }
       },
       orderBy: { issuedAt: "desc" },
     });
 
-    res.json(materials);
+    // Sort returns client-side to avoid Prisma nested orderBy issues
+    const materialsWithSortedReturns = materials.map(material => ({
+      ...material,
+      returns: material.returns.sort((a, b) =>
+        new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()
+      )
+    }));
+
+    res.json(materialsWithSortedReturns);
   } catch (error) {
     console.error("Error fetching job materials:", error);
     res.status(500).json({ error: "Failed to fetch job materials" });
@@ -1052,7 +1073,10 @@ router.delete("/issues/:id", authenticateToken as any, authorizeRoles('ADMIN'), 
 async function handleCreateReturn(req: AuthRequest, res: any) {
   try {
     const { companyId } = req.user!;
-    const { jobId, materialId, issueId, quantityGood, quantityDamaged, rackId, notes, generateUploadToken } = req.body;
+    const { jobId, materialId, issueId, quantityGood, quantityDamaged, rackId, notes } = req.body;
+
+    console.log('\n[Materials] ====== START HANDLE CREATE RETURN ======');
+    console.log('[Materials] Request body:', { jobId, materialId, issueId, quantityGood, quantityDamaged, rackId });
 
     if (!jobId || !materialId) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -1080,14 +1104,6 @@ async function handleCreateReturn(req: AuthRequest, res: any) {
     // ALWAYS defer restock if there's a pending approval (job can be PENDING_APPROVAL or COMPLETED)
     const shouldDeferRestock = Boolean(pendingJobCompletionApproval);
 
-    // Generate upload token if requested (for mobile upload)
-    const uploadToken = generateUploadToken === 'true' || generateUploadToken === true 
-      ? crypto.randomBytes(32).toString('hex') 
-      : null;
-    const uploadTokenExpiry = uploadToken 
-      ? new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
-      : null;
-
     const return_ = await prisma.materialReturn.create({
       data: {
         jobId,
@@ -1099,8 +1115,6 @@ async function handleCreateReturn(req: AuthRequest, res: any) {
         recordedById: req.user!.id,
         notes,
         companyId,
-        uploadToken,
-        uploadTokenExpiry,
         physicalReportUrl: null, // Will be set when file is uploaded
       },
       include: {
@@ -1113,11 +1127,41 @@ async function handleCreateReturn(req: AuthRequest, res: any) {
     // Restock will happen in approval endpoint when manager approves
     // (All returns now require approval before restocking)
 
-    // Handle any uploaded files for damaged items
+    // Handle uploaded files
+    const uploadedFiles = (req as any).files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    console.log('[Materials] ====== FILE UPLOAD DEBUG START ======');
+    console.log('[Materials] req.files keys:', uploadedFiles ? Object.keys(uploadedFiles) : 'UNDEFINED');
+    console.log('[Materials] Has physicalReport?:', Boolean(uploadedFiles?.physicalReport));
+    console.log('[Materials] PhysicalReport count:', uploadedFiles?.physicalReport?.length || 0);
+    console.log('[Materials] Photos count:', uploadedFiles?.photos?.length || 0);
+    if (uploadedFiles?.physicalReport) {
+      uploadedFiles.physicalReport.forEach((f, i) => {
+        console.log(`[Materials] PhysicalReport[${i}]: filename=${f.filename}, size=${f.size}, path=${f.path}, fieldname=${f.fieldname}`);
+      });
+    }
+    console.log('[Materials] ====== FILE UPLOAD DEBUG END ======');
+
+    // Handle physical report file (direct upload)
+    let physicalReportUrl: string | null = null;
+    if (uploadedFiles?.physicalReport && uploadedFiles.physicalReport.length > 0) {
+      const physicalFile = uploadedFiles.physicalReport[0];
+      physicalReportUrl = `/uploads/physical-reports/${physicalFile.filename}`;
+      console.log('[Materials] ✅ PHYSICAL REPORT SAVED WITH URL:', physicalReportUrl);
+
+      // Update the return with the physical report URL
+      const updated = await prisma.materialReturn.update({
+        where: { id: return_.id },
+        data: { physicalReportUrl }
+      });
+      console.log('[Materials] ✅ Updated return record with physicalReportUrl:', updated.physicalReportUrl);
+    } else {
+      console.log('[Materials] ❌ NO PHYSICAL REPORT FILES RECEIVED');
+    }
+
+    // Handle damage photos
     let photoUrls: string[] = [];
-    const files = (req as any).files as Express.Multer.File[] | undefined;
-    if (files && Array.isArray(files)) {
-      photoUrls = files.map(f => `/uploads/damages/${f.filename}`);
+    if (uploadedFiles?.photos && uploadedFiles.photos.length > 0) {
+      photoUrls = uploadedFiles.photos.map(f => `/uploads/damages/${f.filename}`);
     }
 
     if (parsedQuantityDamaged > 0) {
@@ -1177,11 +1221,9 @@ async function handleCreateReturn(req: AuthRequest, res: any) {
 
     res.status(201).json({
       ...return_,
+      physicalReportUrl,
       restockDeferred: shouldDeferRestock,
-      pendingApprovalId: pendingJobCompletionApproval?.id || null,
-      uploadToken, // For QR code generation
-      uploadTokenExpiry,
-      uploadUrl: uploadToken ? `/mobile-upload/${uploadToken}` : null,
+      pendingApprovalId: pendingJobCompletionApproval?.id || null
     });
   } catch (error) {
     console.error("Error creating material return:", error);
@@ -1189,7 +1231,13 @@ async function handleCreateReturn(req: AuthRequest, res: any) {
   }
 }
 
-router.post("/returns", authenticateToken as any, damagePhotoUpload.array('photos', 10), handleCreateReturn);
+// Use .fields() to accept both damage photos and physical report
+const returnUploadFields = damagePhotoUpload.fields([
+  { name: 'photos', maxCount: 10 },
+  { name: 'physicalReport', maxCount: 1 }
+]);
+
+router.post("/returns", authenticateToken as any, returnUploadFields, handleCreateReturn);
 
 // ==================== MATERIAL APPROVALS ====================
 
@@ -1253,7 +1301,20 @@ router.get("/approvals/:approvalId", authenticateToken as any, async (req: AuthR
 
     if (approval.approvalType === 'JOB_COMPLETION_REPORT') {
       const summary = await buildJobMaterialsSummary(companyId, approval.jobId);
-      return res.json({ approval, ...summary });
+
+      // Get physical report URLs from material returns
+      const materialReturns = await prisma.materialReturn.findMany({
+        where: { jobId: approval.jobId, companyId, physicalReportUrl: { not: null } },
+        select: { physicalReportUrl: true, id: true }
+      });
+
+      const physicalReports = materialReturns
+        .map(r => r.physicalReportUrl)
+        .filter((url): url is string => Boolean(url));
+
+      // Return relative URLs so the browser can resolve via the current origin.
+      // (Using req.get('host') can leak Docker-internal hostnames like wms-backend:5000.)
+      return res.json({ approval, ...summary, physicalReports });
     }
 
     return res.json({ approval });
@@ -2452,12 +2513,12 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
         if (ret.quantityGood > 0) {
           // Check if this return is waiting for approval
           const isPendingApproval = ret.restocked === false;
-          
+
           transactions.push({
             id: ret.id,
             date: ret.recordedAt,
             type: isPendingApproval ? 'RETURN_PENDING_APPROVAL' : 'RETURN',
-            description: isPendingApproval 
+            description: isPendingApproval
               ? `🕒 Returned from Job: ${ret.issue?.job?.jobCode || 'N/A'} (WAITING FOR APPROVAL)`
               : `Returned from Job: ${ret.issue?.job?.jobCode || 'N/A'} (Good condition)`,
             reference: ret.issue?.job?.jobCode || 'N/A',
@@ -2643,7 +2704,7 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
  * PUT /api/materials/returns/:id
  * Update a material return
  */
-router.put("/returns/:id", authenticateToken as any, authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
+router.put("/returns/:id", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
     const { id } = req.params;
@@ -2656,6 +2717,13 @@ router.put("/returns/:id", authenticateToken as any, authorizeRoles('ADMIN', 'MA
 
     if (!existingReturn) {
       return res.status(404).json({ error: "Return not found" });
+    }
+
+    // Authorization: allow ADMIN/MANAGER or the user who recorded the return
+    const userRole = req.user?.role || '';
+    const isAdminOrManager = userRole === 'ADMIN' || userRole === 'MANAGER';
+    if (!isAdminOrManager && existingReturn.recordedById !== req.user!.id) {
+      return res.status(403).json({ error: 'Forbidden: cannot edit this return' });
     }
 
     const oldQtyGood = existingReturn.quantityGood;

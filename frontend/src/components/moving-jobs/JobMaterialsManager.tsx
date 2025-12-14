@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Package, Plus, X, Save, ArrowLeftRight, Camera, Trash2, Edit2
+  Package, Plus, X, Save, ArrowLeftRight, Camera, Trash2, Edit2, Upload
 } from 'lucide-react';
 
 interface JobMaterialsManagerProps {
@@ -90,7 +90,8 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
     quantityDamaged: 0,
     damageReason: '',
     notes: '',
-    photos: [] as File[]
+    photos: [] as File[],
+    generateQR: false
   });
 
   // Edit Return State
@@ -101,6 +102,11 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
     quantityDamaged: 0,
     notes: ''
   });
+
+  // Physical Report Upload State
+  const [physicalReportFile, setPhysicalReportFile] = useState<File | null>(null);
+  const [physicalReportPreview, setPhysicalReportPreview] = useState<string | null>(null);
+  const physicalReportInputRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(false);
 
@@ -197,10 +203,15 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
       formData.append('damageReason', returnForm.damageReason);
     }
 
-    // Add photos
+    // Add damage photos
     returnForm.photos.forEach((photo) => {
       formData.append(`photos`, photo);
     });
+
+    // Add physical report file if selected
+    if (physicalReportFile) {
+      formData.append('physicalReport', physicalReportFile);
+    }
 
     try {
       const response = await fetch('/api/materials/returns', {
@@ -212,7 +223,10 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
       });
 
       if (response.ok) {
-        alert('Material return recorded! Stock updated.');
+        const data = await response.json();
+        console.log('[MaterialReturn] Response data:', data);
+        
+        alert('Material return recorded successfully!');
         setShowReturnForm(false);
         setReturnForm({
           issueId: '',
@@ -221,8 +235,14 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
           quantityDamaged: 0,
           damageReason: '',
           notes: '',
-          photos: []
+          photos: [],
+          generateQR: false
         });
+        
+        // Reset physical report upload
+        setPhysicalReportFile(null);
+        setPhysicalReportPreview(null);
+
         setSelectedIssue(null);
         loadData();
         onUpdate?.();
@@ -945,10 +965,84 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                 />
               </div>
 
+              {/* Physical Report Upload */}
+              <div className="bg-blue-50 border border-blue-300 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-blue-800 mb-3">
+                  <Upload className="w-5 h-5" />
+                  <div className="font-semibold">📄 Upload Physical Report (Optional)</div>
+                </div>
+                
+                <input
+                  type="file"
+                  ref={physicalReportInputRef}
+                  accept="image/jpeg,image/png,image/jpg,application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setPhysicalReportFile(file);
+                      if (file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => setPhysicalReportPreview(ev.target?.result as string);
+                        reader.readAsDataURL(file);
+                      } else {
+                        setPhysicalReportPreview(null);
+                      }
+                    }
+                  }}
+                />
+                
+                {!physicalReportFile ? (
+                  <button
+                    type="button"
+                    onClick={() => physicalReportInputRef.current?.click()}
+                    className="w-full border-2 border-dashed border-blue-400 rounded-lg p-4 text-center hover:bg-blue-100 transition-colors"
+                  >
+                    <Camera className="w-8 h-8 mx-auto text-blue-600 mb-2" />
+                    <p className="text-blue-700 font-medium">Click to select photo or PDF</p>
+                    <p className="text-sm text-blue-500">JPEG, PNG, PDF (max 10MB)</p>
+                  </button>
+                ) : (
+                  <div className="border rounded-lg p-3 bg-white">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {physicalReportPreview ? (
+                          <img src={physicalReportPreview} alt="Preview" className="w-16 h-16 object-cover rounded border" />
+                        ) : (
+                          <div className="w-16 h-16 bg-gray-100 rounded flex items-center justify-center">
+                            <span className="text-2xl">📄</span>
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-gray-800">{physicalReportFile.name}</p>
+                          <p className="text-sm text-gray-500">{(physicalReportFile.size / 1024).toFixed(1)} KB</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhysicalReportFile(null);
+                          setPhysicalReportPreview(null);
+                          if (physicalReportInputRef.current) physicalReportInputRef.current.value = '';
+                        }}
+                        className="text-red-600 hover:bg-red-50 p-2 rounded"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-blue-600 mt-2">This file will be shown in the Approval Manager and emailed to approvers.</p>
+              </div>
+
               <div className="flex gap-2 justify-end">
                 <button
                   type="button"
-                  onClick={() => setShowReturnForm(false)}
+                  onClick={() => {
+                    setShowReturnForm(false);
+                    setPhysicalReportFile(null);
+                    setPhysicalReportPreview(null);
+                  }}
                   className="px-4 py-2 border rounded hover:bg-gray-50"
                 >
                   Cancel

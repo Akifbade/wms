@@ -1,0 +1,266 @@
+{
+  "metadata": {
+    "exportDate": "2025-12-12",
+    "projectName": "Warehouse WMS - Moving Jobs Approval Workflow",
+    "sessionType": "Multi-phase implementation: email parity + moving jobs fraud-control approval system"
+  },
+  "projectOverview": {
+    "objectives": [
+      "Sync local and VPS environments 100% identical (email settings, DB credentials, accounts)",
+      "When creating a moving job: send detailed email to internal recipients",
+      "When job is completed: send full materials (issued/returned/damaged) report with approval link",
+      "Approval link must prevent fraud; show 'approved by XYZ' in WMS after approval",
+      "If approval not granted: send reminder after N days with approval link (requires login)",
+      "Emails are internal-only (admins/specific users), NOT customer-facing"
+    ],
+    "stack": {
+      "backend": "Node.js + Express + Prisma ORM + nodemailer + node-cron",
+      "frontend": "React + react-router",
+      "database": "MySQL (Docker)",
+      "email": "nodemailer with SMTP from email_settings table"
+    }
+  },
+  "architecturalDecisions": {
+    "approvalModel": "Use MaterialApproval table with approvalType='JOB_COMPLETION_REPORT' as fraud-control gate",
+    "stockRestock": "Defer physical restock from returns until approval is granted; apply restock auto-on-approve",
+    "emailRecipients": "Use notification_settings + notification_recipients for internal-only distribution; optional override for manual lists",
+    "approvalLink": "Deep-link via /approvals?approvalId=... (protected route, requires login)",
+    "reminders": "Scheduled daily cron job (11:30 AM) for pending approvals older than N days"
+  },
+  "implementedFiles": {
+    "backend": {
+      "prisma/schema.prisma": {
+        "change": "MaterialApproval model extended with reminder tracking",
+        "fields": [
+          "notifyEmails String? @db.Text (stores JSON array of internal recipients)",
+          "reminderCount Int @default(0)",
+          "lastReminderAt DateTime?",
+          "index: @@index([companyId, status, approvalType])"
+        ]
+      },
+      "prisma/migrations/20251212100000_add_material_approval_email_tracking/migration.sql": {
+        "change": "DB migration to add reminder columns + index to material_approvals table",
+        "status": "Applied successfully (exit code 0)"
+      },
+      "src/services/emailService.ts": {
+        "changes": [
+          "Added notification types: JOB_COMPLETION_APPROVAL_REQUEST, JOB_COMPLETION_APPROVAL_REMINDER",
+          "Added templates: jobCompletionApprovalRequest (with approvalUrl + materials table), jobCompletionApprovalReminder",
+          "Enhanced movingJobCreated template to support optional detail fields (phone, email, driver/vehicle, notes)",
+          "Enhanced movingJobCompleted to include approval metadata + full materials report table",
+          "Fixed shipment release template typing: 'reason' (was 'releaseReason')"
+        ]
+      },
+      "src/routes/email.ts": {
+        "change": "Exposed JOB_COMPLETION_APPROVAL_REQUEST and JOB_COMPLETION_APPROVAL_REMINDER in notification settings so admins can configure internal recipients"
+      },
+      "src/routes/moving-jobs.ts": {
+        "changes": [
+          "On job CREATE: sends MOVING_JOB_CREATED with richer fields; optional direct-send if notifyEmails override provided",
+          "On status change to COMPLETED: builds materials summary from MaterialIssue + MaterialReturn; creates/reuses MaterialApproval; sends JOB_COMPLETION_APPROVAL_REQUEST with approval link; optional direct-send override"
+        ]
+      },
+      "src/routes/materials.ts": {
+        "newHelpers": [
+          "buildJobMaterialsSummary(companyId, jobId) - returns materials + totals",
+          "applyDeferredReturnRestock(companyId, jobId) - restocks all un-restocked returns for job"
+        ],
+        "returns": "If job-completion approval pending, returns recorded but restock deferred (flag: restockDeferred)",
+        "approvals": [
+          "GET /api/materials/approvals/:approvalId - returns approval + materials summary (if JOB_COMPLETION_REPORT)",
+          "PATCH /api/materials/approvals/:approvalId - on APPROVED: applies deferred restock, sends MOVING_JOB_COMPLETED email with 'approved by' + materials report"
+        ]
+      },
+      "src/cron/notificationJobs.ts": {
+        "newJob": "startJobCompletionApprovalReminderJob()",
+        "schedule": "Daily at 11:30 AM",
+        "behavior": "Finds pending JOB_COMPLETION_REPORT approvals older than N days (configurable); sends reminder email/notification; updates reminderCount + lastReminderAt",
+        "envVars": [
+          "JOB_COMPLETION_APPROVAL_REMINDER_DAYS (default 2)",
+          "JOB_COMPLETION_APPROVAL_MAX_REMINDERS (default 5)",
+          "APP_PUBLIC_URL (required for approval link in emails; used by reminder cron)"
+        ],
+        "wiredInto": "startAllNotificationJobs() so it runs at backend startup"
+      },
+      "src/routes/shipments.ts": {
+        "change": "Fixed build error by removing non-existent rack?.name reference; now uses only rack?.code"
+      }
+    },
+    "frontend": {
+      "src/components/moving-jobs/ApprovalManager.tsx": {
+        "changes": [
+          "Deep-link support: reads ?approvalId query param on mount; fetches approval detail from GET /api/materials/approvals/:approvalId",
+          "Displays materials summary table if approval type is JOB_COMPLETION_REPORT",
+          "Fixed approve/reject payload: sends {status: 'APPROVED'|'REJECTED', notes} instead of {decision: ...}",
+          "Maps UI fields to backend schema: requestedBy, decisionBy, job.jobCode, etc.",
+          "After approve/reject: clears query param and navigates back to /approvals"
+        ]
+      }
+    }
+  },
+  "environmentSetup": {
+    "backend/.env": {
+      "DATABASE_URL": "mysql://wms_user:wmspassword123@localhost:3307/warehouse_wms",
+      "FRONTEND_URL": "http://localhost:3000",
+      "APP_PUBLIC_URL": "http://localhost:3000 (set to domain on VPS)",
+      "note": "Password must match workspace root .env (DB_PASSWORD=wmspassword123)"
+    },
+    "docker": {
+      "mysqlContainer": "wms-mysql (port 3307)",
+      "backendContainer": "wms-backend",
+      "frontendContainer": "wms-frontend",
+      "status": "All verified running"
+    }
+  },
+  "buildStatus": {
+    "backend": {
+      "command": "npm run build (TypeScript compilation)",
+      "result": "Success (exit code 0)",
+      "date": "2025-12-12"
+    },
+    "frontend": {
+      "command": "npm run build (Vite production build)",
+      "result": "Success (completed transformation of ~15k modules)",
+      "date": "2025-12-12"
+    },
+    "migrations": {
+      "command": "npx prisma migrate deploy",
+      "result": "Success - applied 20251212100000_add_material_approval_email_tracking",
+      "date": "2025-12-12"
+    }
+  },
+  "completedWorkflow": {
+    "step1": {
+      "trigger": "Moving job created",
+      "action": "Send MOVING_JOB_CREATED email to internal recipients with job details (phone, email, driver, vehicle, notes)",
+      "template": "movingJobCreated"
+    },
+    "step2": {
+      "trigger": "Job status changed to COMPLETED",
+      "action": "Build materials summary; create MaterialApproval (approvalType=JOB_COMPLETION_REPORT); send approval-request email",
+      "details": [
+        "Email includes full materials table (issued, returned, damaged, totals)",
+        "Email includes approval link: /approvals?approvalId=...",
+        "Stock restock from returns is DEFERRED (not applied yet)"
+      ],
+      "template": "jobCompletionApprovalRequest"
+    },
+    "step3": {
+      "trigger": "Approval marked as APPROVED",
+      "action": "Apply deferred restock; send MOVING_JOB_COMPLETED email with full report + 'approved by' metadata",
+      "details": [
+        "Shows: 'Approved by [name] on [date/time]'",
+        "Includes full materials report",
+        "Stock is now physically returned to inventory"
+      ],
+      "template": "movingJobCompleted"
+    },
+    "step4": {
+      "trigger": "Approval pending for > N days AND not reminded recently",
+      "action": "Cron job sends reminder email with approval link",
+      "schedule": "Daily at 11:30 AM",
+      "details": [
+        "Tracks reminderCount + lastReminderAt",
+        "Stops after MAX_REMINDERS reached"
+      ],
+      "template": "jobCompletionApprovalReminder"
+    }
+  },
+  "recentFixes": {
+    "issue1": {
+      "problem": "DB migration failed: authentication error for wms_user",
+      "rootCause": "backend/.env DATABASE_URL used wmspassword, but docker MySQL was created with wmspassword123",
+      "solution": "Updated DATABASE_URL password to wmspassword123 (matching workspace root .env)",
+      "status": "Fixed and verified"
+    },
+    "issue2": {
+      "problem": "Approval link in reminder cron had broken fallback logic",
+      "rootCause": "Used `|| fallbackUrl` which doesn't work as expected for URL construction",
+      "solution": "Simplified to use APP_PUBLIC_URL or FRONTEND_URL upfront; skip job if neither set",
+      "file": "backend/src/cron/notificationJobs.ts",
+      "status": "Fixed and verified"
+    },
+    "issue3": {
+      "problem": "Backend build error due to non-existent rack?.name reference",
+      "solution": "Removed rack?.name; uses only rack?.code for rackLocation",
+      "file": "backend/src/routes/shipments.ts",
+      "status": "Fixed"
+    }
+  },
+  "testingChecklist": {
+    "smoke_test": [
+      "Create a Moving Job → confirm MOVING_JOB_CREATED email sent to internal recipients",
+      "View email → verify job details are correct (phone, email, driver, vehicle, notes)",
+      "Mark job COMPLETED → confirm JOB_COMPLETION_APPROVAL_REQUEST email sent",
+      "View approval email → verify approval link is clickable and includes approvalId",
+      "Click approval link → navigate to /approvals?approvalId=... and login",
+      "View approval page → confirm materials summary table is displayed",
+      "Approve → confirm status changes to APPROVED, restock is applied, completion email is sent",
+      "View completion email → confirm 'approved by [name]' and full materials report"
+    ],
+    "reminder_test": [
+      "Wait/manually trigger daily cron (11:30 AM) or set approval createdAt to > 2 days ago",
+      "Confirm reminder email is sent with approval link",
+      "Verify reminderCount increments, lastReminderAt updates"
+    ]
+  },
+  "vpsDeployment": {
+    "preSteps": [
+      "Ensure VPS .env has identical DB credentials (or update backend/.env to match VPS DB)",
+      "Set APP_PUBLIC_URL=https://your-domain in backend .env on VPS"
+    ],
+    "deploySteps": [
+      "Pull latest code (includes schema changes, migrations, new cron job, new routes, UI fixes)",
+      "Run 'npx prisma migrate deploy' on VPS backend container",
+      "Restart backend container so it loads APP_PUBLIC_URL and new code",
+      "Verify cron job shows '🛡️ Job completion approval reminder cron scheduled' in backend logs"
+    ]
+  },
+  "pendingTasks": {
+    "local": [
+      "Restart backend container to pick up APP_PUBLIC_URL from updated .env",
+      "Run smoke tests to verify end-to-end workflow (job create → approval → restock → completion email)"
+    ],
+    "vps": [
+      "Ensure APP_PUBLIC_URL is set to production domain",
+      "Run prisma migrate deploy on VPS",
+      "Restart backend container",
+      "Test end-to-end with real VPS domain"
+    ]
+  },
+  "keyEnvironmentVariables": {
+    "APP_PUBLIC_URL": {
+      "purpose": "Base URL for approval deep-links in emails and reminder cron",
+      "local": "http://localhost:3000",
+      "vps": "https://your-domain.com"
+    },
+    "JOB_COMPLETION_APPROVAL_REMINDER_DAYS": {
+      "purpose": "Days to wait before sending first reminder",
+      "default": "2",
+      "type": "integer"
+    },
+    "JOB_COMPLETION_APPROVAL_MAX_REMINDERS": {
+      "purpose": "Max reminders to send before stopping",
+      "default": "5",
+      "type": "integer"
+    },
+    "DATABASE_URL": {
+      "purpose": "Prisma DB connection string (used by CLI and server)",
+      "format": "mysql://user:password@host:port/database",
+      "note": "Keep in sync with docker-compose DB_USER, DB_PASSWORD, DB_PORT"
+    }
+  },
+  "usefulLinks": {
+    "approvalPageRoute": "/approvals (protected, requires login)",
+    "approvalDeepLink": "/approvals?approvalId=... (from email link)",
+    "approvalDetailAPI": "GET /api/materials/approvals/:approvalId",
+    "approvalUpdateAPI": "PATCH /api/materials/approvals/:approvalId"
+  },
+  "notes": [
+    "All email templates support both direct-send (override recipients in request) and notification-settings-based distribution",
+    "Materials summary includes issued, returned, and damaged counts with totals",
+    "Approval workflow is integrated with existing notification infrastructure; admins can enable/disable via notification settings",
+    "Reminder cron is timezone-aware and scheduled at 11:30 AM server time daily",
+    "Stock restock is atomic: either fully applied on approval or fully deferred until approval"
+  ]
+}

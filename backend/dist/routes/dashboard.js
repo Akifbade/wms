@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const client_1 = require("@prisma/client");
 const auth_1 = require("../middleware/auth");
+const chargeCalculation_1 = require("../utils/chargeCalculation");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 router.use(auth_1.authenticateToken);
@@ -14,9 +15,9 @@ router.get('/stats', async (req, res) => {
         const [totalShipments, pendingShipments, inStorageShipments, releasedShipments, activeShipments, totalRacks, activeRacks, totalJobs, scheduledJobs, inProgressJobs, completedJobs,] = await Promise.all([
             prisma.shipment.count({ where: { companyId } }),
             prisma.shipment.count({ where: { companyId, status: 'PENDING' } }),
-            prisma.shipment.count({ where: { companyId, status: 'IN_STORAGE' } }),
+            prisma.shipment.count({ where: { companyId, status: { in: ['IN_STORAGE', 'IN_WAREHOUSE'] } } }),
             prisma.shipment.count({ where: { companyId, status: 'RELEASED' } }),
-            prisma.shipment.count({ where: { companyId, status: 'IN_STORAGE' } }), // Active = In Storage
+            prisma.shipment.count({ where: { companyId, status: { in: ['IN_STORAGE', 'IN_WAREHOUSE'] } } }), // Active = In Storage/Warehouse
             prisma.rack.count({ where: { companyId } }),
             prisma.rack.count({ where: { companyId, status: 'ACTIVE' } }),
             prisma.movingJob.count({ where: { companyId } }),
@@ -24,18 +25,23 @@ router.get('/stats', async (req, res) => {
             prisma.movingJob.count({ where: { companyId, status: 'IN_PROGRESS' } }),
             prisma.movingJob.count({ where: { companyId, status: 'COMPLETED' } }),
         ]);
-        // Get rack utilization
-        const racks = await prisma.rack.findMany({
-            where: { companyId, status: 'ACTIVE' },
-            select: {
-                capacityTotal: true,
-                capacityUsed: true,
-            },
-        });
-        const totalCapacity = racks.reduce((sum, r) => sum + r.capacityTotal, 0);
-        const usedCapacity = racks.reduce((sum, r) => sum + r.capacityUsed, 0);
+        // Get rack utilization (including CBM) using raw SQL to access cbmCapacity/cbmUsed
+        // Include all racks (ACTIVE, OCCUPIED, FULL) - not just ACTIVE
+        const racks = await prisma.$queryRaw `
+      SELECT capacityTotal, capacityUsed, cbmCapacity, cbmUsed 
+      FROM racks 
+      WHERE companyId = ${companyId} AND deletedAt IS NULL
+    `;
+        const totalCapacity = racks.reduce((sum, r) => sum + (r.capacityTotal || 0), 0);
+        const usedCapacity = racks.reduce((sum, r) => sum + (r.capacityUsed || 0), 0);
         const rackUtilization = totalCapacity > 0
             ? Math.round((usedCapacity / totalCapacity) * 100)
+            : 0;
+        // CBM totals from all racks
+        const totalCBMCapacity = racks.reduce((sum, r) => sum + (Number(r.cbmCapacity) || 0), 0);
+        const totalCBMUsed = racks.reduce((sum, r) => sum + (Number(r.cbmUsed) || 0), 0);
+        const cbmUtilization = totalCBMCapacity > 0
+            ? Math.round((totalCBMUsed / totalCBMCapacity) * 100)
             : 0;
         // Get revenue from job cost snapshots
         const costSnapshots = await prisma.jobCostSnapshot.findMany({
@@ -78,6 +84,36 @@ router.get('/stats', async (req, res) => {
                 withdrawalDate: { gte: firstDayOfMonth },
             },
         });
+        // 🎯 NEW: Get total CBM and estimated charges for in-storage shipments
+        const inStorageShipmentsData = await prisma.shipment.findMany({
+            where: { companyId, status: { in: ['IN_STORAGE', 'IN_WAREHOUSE'] } },
+            select: {
+                id: true,
+                cbm: true,
+                referenceId: true,
+            },
+        });
+        // Calculate total CBM in storage
+        const totalCBMInStorage = inStorageShipmentsData.reduce((sum, s) => sum + (parseFloat(s.cbm) || 0), 0);
+        // Calculate estimated charges for all in-storage shipments
+        let totalEstimatedCharges = 0;
+        try {
+            const chargePromises = inStorageShipmentsData.map(async (shipment) => {
+                try {
+                    const charges = await (0, chargeCalculation_1.calculateShipmentCharges)(prisma, shipment.id, companyId);
+                    return charges.totalCharge || 0;
+                }
+                catch (err) {
+                    console.error(`Error calculating charges for ${shipment.referenceId}:`, err);
+                    return 0;
+                }
+            });
+            const allCharges = await Promise.all(chargePromises);
+            totalEstimatedCharges = allCharges.reduce((sum, charge) => sum + charge, 0);
+        }
+        catch (err) {
+            console.error('Error calculating total estimated charges:', err);
+        }
         // Get top clients by invoice value
         const topClients = await prisma.invoice.groupBy({
             by: ['clientName'],
@@ -131,6 +167,12 @@ router.get('/stats', async (req, res) => {
                         used: usedCapacity,
                         available: totalCapacity - usedCapacity,
                     },
+                    cbm: {
+                        total: parseFloat(totalCBMCapacity.toFixed(3)),
+                        used: parseFloat(totalCBMUsed.toFixed(3)),
+                        available: parseFloat((totalCBMCapacity - totalCBMUsed).toFixed(3)),
+                        utilization: cbmUtilization,
+                    },
                 },
                 jobs: {
                     total: totalJobs,
@@ -163,6 +205,13 @@ router.get('/stats', async (req, res) => {
                     inStorage: inStorageShipments,
                     released: releasedShipments,
                     total: totalShipments,
+                },
+                // 🎯 NEW: CBM and Estimated Charges
+                storageAnalytics: {
+                    totalCBMInStorage: parseFloat(totalCBMInStorage.toFixed(3)),
+                    estimatedTotalCharges: parseFloat(totalEstimatedCharges.toFixed(3)),
+                    shipmentsCount: inStorageShipmentsData.length,
+                    currency: 'KWD',
                 },
             },
             topClients: topClients.map((client) => ({

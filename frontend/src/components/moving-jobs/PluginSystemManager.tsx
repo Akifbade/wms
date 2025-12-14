@@ -39,7 +39,7 @@ const PluginSystemManager: React.FC = () => {
     setLoading(true);
     try {
       const res = await fetch('/api/plugins', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
       });
 
       if (res.ok) {
@@ -413,12 +413,12 @@ const PluginSystemManager: React.FC = () => {
                                 log.action === 'INSTALLED'
                                   ? '#28a745'
                                   : log.action === 'ACTIVATED'
-                                  ? '#17a2b8'
-                                  : log.action === 'DEACTIVATED'
-                                  ? '#ffc107'
-                                  : log.action === 'UNINSTALLED'
-                                  ? '#dc3545'
-                                  : '#6c757d',
+                                    ? '#17a2b8'
+                                    : log.action === 'DEACTIVATED'
+                                      ? '#ffc107'
+                                      : log.action === 'UNINSTALLED'
+                                        ? '#dc3545'
+                                        : '#6c757d',
                               color: 'white',
                               padding: '4px 8px',
                               borderRadius: '3px',

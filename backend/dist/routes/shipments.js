@@ -45,6 +45,7 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const rackCapacity_1 = require("../utils/rackCapacity");
 const chargeCalculation_1 = require("../utils/chargeCalculation");
+const emailService_1 = require("../services/emailService");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 const parseOptionalInt = (value) => {
@@ -156,7 +157,13 @@ router.get('/', async (req, res) => {
         const companyId = req.user.companyId;
         const where = { companyId };
         if (status) {
-            where.status = status;
+            // Handle both single status and array of statuses
+            if (Array.isArray(status)) {
+                where.status = { in: status };
+            }
+            else {
+                where.status = status;
+            }
         }
         if (isWarehouseShipment !== undefined) {
             where.isWarehouseShipment = isWarehouseShipment === 'true';
@@ -170,19 +177,48 @@ router.get('/', async (req, res) => {
             where.customerName = { contains: customerName };
         }
         // NEW: Company profile filter (for company analytics page)
+        // 🔧 FIX: Also match by customerName/clientName when companyProfileId is NULL
         if (companyProfileId) {
-            where.companyProfileId = companyProfileId;
+            // First get the profile name to match against customerName/clientName
+            const profile = await prisma.companyProfile.findUnique({
+                where: { id: companyProfileId },
+                select: { name: true }
+            });
+            if (profile) {
+                // Match by companyProfileId OR by customerName/clientName containing profile name
+                where.OR = [
+                    { companyProfileId: companyProfileId },
+                    { customerName: { contains: profile.name } },
+                    { clientName: { contains: profile.name } }
+                ];
+            }
+            else {
+                where.companyProfileId = companyProfileId;
+            }
         }
+        // Handle search separately to avoid OR conflict
         if (search) {
-            where.OR = [
+            const searchConditions = [
                 { name: { contains: search } },
                 { referenceId: { contains: search } },
-                { qrCode: { contains: search } }, // ✅ FIX: Search by QR code
+                { qrCode: { contains: search } },
                 { clientName: { contains: search } },
                 { customerName: { contains: search } },
+                { companyProfile: { name: { contains: search } } },
                 { shipper: { contains: search } },
                 { awbNumber: { contains: search } },
             ];
+            // If companyProfileId filter is active, combine with AND
+            if (where.OR) {
+                where.AND = [
+                    { OR: where.OR },
+                    { OR: searchConditions }
+                ];
+                delete where.OR;
+            }
+            else {
+                where.OR = searchConditions;
+            }
         }
         const [shipments, total] = await Promise.all([
             prisma.shipment.findMany({
@@ -205,6 +241,7 @@ router.get('/', async (req, res) => {
                             },
                         },
                     },
+                    // Note: dimensions are fetched separately via /:shipmentId/dimensions endpoint
                     companyProfile: {
                         select: {
                             id: true,
@@ -249,6 +286,36 @@ router.get('/', async (req, res) => {
                 select: { code: true }
             }) : [];
             const rackCodes = racks.map(r => r.code).join(', ');
+            // 🔧 Check if shipment has move history
+            const moveHistoryCount = await prisma.rackActivity.count({
+                where: {
+                    companyId: req.user.companyId,
+                    activityType: 'MOVE',
+                    itemDetails: { contains: shipment.id }
+                }
+            });
+            const hasMoveHistory = moveHistoryCount > 0;
+            // 🔧 Get original rack from first MOVE activity if moved
+            let originalRack = null;
+            if (hasMoveHistory) {
+                const firstMove = await prisma.rackActivity.findFirst({
+                    where: {
+                        companyId: req.user.companyId,
+                        activityType: 'MOVE',
+                        itemDetails: { contains: shipment.id }
+                    },
+                    orderBy: { timestamp: 'asc' }
+                });
+                if (firstMove) {
+                    try {
+                        const details = JSON.parse(firstMove.itemDetails || '{}');
+                        if (details.direction === 'OUT') {
+                            originalRack = details.fromRack;
+                        }
+                    }
+                    catch (e) { }
+                }
+            }
             // 🔧 FIX: Parse pieceQR to get proper pallet/loose breakdown
             const boxesWithParsedQR = shipment.boxes.map((b) => {
                 try {
@@ -283,6 +350,8 @@ router.get('/', async (req, res) => {
                 inStorageBoxes,
                 rackLocations: rackCodes || null, // Comma-separated rack codes
                 shipmentPhotos: Array.from(shipmentPhotosSet), // 🔧 FIX: Add photos array
+                hasMoveHistory, // 🔧 NEW: Indicator if shipment was moved
+                originalRack, // 🔧 NEW: Original rack before any moves
                 // Don't override currentBoxCount - it's the source of truth from database
             };
         }));
@@ -740,13 +809,12 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
         if (palletUpdates.length > 0) {
             await prisma.$transaction(palletUpdates);
         }
-        // If rack assigned, recalculate capacity based on pallets
+        // If rack assigned, recalculate capacity based on pallets AND CBM
         if (data.rackId) {
-            const palletsUsed = await (0, rackCapacity_1.recomputeRackPalletUsage)(prisma, data.rackId, companyId);
+            await (0, rackCapacity_1.updateRackCapacityAndCBM)(prisma, data.rackId, companyId);
             await prisma.rack.update({
                 where: { id: data.rackId },
                 data: {
-                    capacityUsed: palletsUsed,
                     lastActivity: new Date(),
                 },
             });
@@ -773,6 +841,90 @@ router.post('/', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res
                     quantityAfter: totalBoxCount,
                 },
             });
+        }
+        // 📦 SAVE MULTI-DIMENSIONS if provided
+        if (data.dimensionsData) {
+            try {
+                const dimensionsArray = typeof data.dimensionsData === 'string'
+                    ? JSON.parse(data.dimensionsData)
+                    : data.dimensionsData;
+                if (Array.isArray(dimensionsArray) && dimensionsArray.length > 0) {
+                    for (const dim of dimensionsArray) {
+                        const length = parseFloat(dim.length) || 0;
+                        const width = parseFloat(dim.width) || 0;
+                        const height = parseFloat(dim.height) || 0;
+                        const quantity = parseInt(dim.qty) || parseInt(dim.quantity) || 1;
+                        const weight = parseFloat(dim.weight) || 0;
+                        const cbm = (length * width * height) / 1000000;
+                        const totalCBM = cbm * quantity;
+                        const totalWeight = weight * quantity;
+                        await prisma.$executeRaw `
+              INSERT INTO shipment_dimensions (
+                id, shipmentId, companyId, label, itemType, quantity,
+                length, width, height, cbm, totalCBM, weight, totalWeight, notes, createdAt, updatedAt
+              ) VALUES (
+                ${require('crypto').randomUUID()},
+                ${shipment.id},
+                ${companyId},
+                ${dim.label || 'Item'},
+                ${'BOX'},
+                ${quantity},
+                ${length},
+                ${width},
+                ${height},
+                ${cbm},
+                ${totalCBM},
+                ${weight},
+                ${totalWeight},
+                ${dim.notes || ''},
+                NOW(),
+                NOW()
+              )
+            `;
+                    }
+                    console.log(`✅ Saved ${dimensionsArray.length} dimensions for shipment ${shipment.referenceId}`);
+                }
+            }
+            catch (dimErr) {
+                console.error('Failed to save dimensions:', dimErr);
+                // Don't fail the whole request, just log
+            }
+        }
+        // 📧 SEND SHIPMENT INTAKE NOTIFICATION (Professional)
+        try {
+            const company = await prisma.company.findUnique({ where: { id: companyId } });
+            const receivedBy = await prisma.user.findUnique({ where: { id: userId } });
+            const rack = data.rackId ? await prisma.rack.findUnique({ where: { id: data.rackId } }) : null;
+            // Use the new professional shipment created notification
+            const emailResult = await (0, emailService_1.sendShipmentCreatedNotification)(companyId, {
+                shipmentId: shipment.id,
+                shipmentCode: shipment.referenceId,
+                clientName: data.clientName || companyProfileName || 'Unknown',
+                clientPhone: data.clientPhone || undefined,
+                boxCount: totalBoxCount,
+                cbm: data.cbm || undefined,
+                weight: data.weight || undefined,
+                rackLocation: rack?.code || undefined,
+                receivedDate: new Date().toISOString(),
+                receivedBy: receivedBy?.name || 'System',
+                description: data.description || undefined,
+                warehouseName: company?.name ? `${company.name} Warehouse` : undefined,
+                dimensions: data.length && data.width && data.height ? {
+                    length: data.length,
+                    width: data.width,
+                    height: data.height,
+                } : undefined,
+                customRate: data.customRateEnabled && data.customRatePerBoxPerDay ? data.customRatePerBoxPerDay : undefined,
+            });
+            if (emailResult.success) {
+                console.log(`📧 Shipment intake email sent for ${shipment.referenceId}`);
+            }
+            else {
+                console.log(`📧 Shipment intake email failed: ${emailResult.error}`);
+            }
+        }
+        catch (emailErr) {
+            console.error('Email notification error:', emailErr);
         }
         res.status(201).json({ shipment });
     }
@@ -950,7 +1102,7 @@ router.post('/:id/assign-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 
 async (req, res) => {
     try {
         const { id } = req.params;
-        const { rackId, boxNumbers } = req.body; // boxNumbers can be array or JSON string
+        const { rackId, boxNumbers, skipCBMValidation } = req.body; // boxNumbers can be array or JSON string
         const companyId = req.user.companyId;
         const uploadedFiles = req.files;
         if (!rackId || !boxNumbers) {
@@ -966,6 +1118,55 @@ async (req, res) => {
             .filter((value) => Number.isInteger(value) && value > 0);
         if (normalizedBoxNumbers.length === 0) {
             return res.status(400).json({ error: 'At least one box number required' });
+        }
+        // 🔒 CBM CAPACITY VALIDATION - Block assignment if rack doesn't have enough CBM space
+        const shipment = await prisma.shipment.findFirst({
+            where: { id, companyId },
+            select: { cbm: true, originalBoxCount: true, referenceId: true }
+        });
+        if (!shipment) {
+            return res.status(404).json({ error: 'Shipment not found' });
+        }
+        // Get rack CBM capacity and current usage
+        const rackCBM = await prisma.$queryRaw `
+        SELECT cbmCapacity, cbmUsed FROM racks WHERE id = ${rackId} AND companyId = ${companyId}
+      `;
+        if (rackCBM.length === 0) {
+            return res.status(404).json({ error: 'Rack not found' });
+        }
+        const rackCBMCapacity = Number(rackCBM[0].cbmCapacity) || 0;
+        const rackCBMUsed = Number(rackCBM[0].cbmUsed) || 0;
+        const rackCBMRemaining = rackCBMCapacity - rackCBMUsed;
+        // Calculate CBM for boxes being assigned
+        const shipmentCBM = Number(shipment.cbm) || 0;
+        const shipmentTotalBoxes = Number(shipment.originalBoxCount) || 1;
+        const cbmPerBox = shipmentCBM / shipmentTotalBoxes;
+        const assignmentCBM = cbmPerBox * normalizedBoxNumbers.length;
+        console.log('📦 CBM Assignment Check:', {
+            shipment: shipment.referenceId,
+            shipmentCBM,
+            totalBoxes: shipmentTotalBoxes,
+            cbmPerBox: cbmPerBox.toFixed(4),
+            boxesBeingAssigned: normalizedBoxNumbers.length,
+            assignmentCBM: assignmentCBM.toFixed(4),
+            rackCBMCapacity,
+            rackCBMUsed: rackCBMUsed.toFixed(4),
+            rackCBMRemaining: rackCBMRemaining.toFixed(4)
+        });
+        // Block if assignment would exceed rack capacity (only if rack has CBM capacity set)
+        if (rackCBMCapacity > 0 && assignmentCBM > rackCBMRemaining && !skipCBMValidation) {
+            return res.status(400).json({
+                error: `CBM capacity exceeded! Assignment needs ${assignmentCBM.toFixed(2)} m³ but rack only has ${rackCBMRemaining.toFixed(2)} m³ available.`,
+                code: 'CBM_EXCEEDED',
+                details: {
+                    assignmentCBM: assignmentCBM.toFixed(4),
+                    rackCBMCapacity,
+                    rackCBMUsed: rackCBMUsed.toFixed(4),
+                    rackCBMRemaining: rackCBMRemaining.toFixed(4),
+                    cbmPerBox: cbmPerBox.toFixed(4),
+                    boxesBeingAssigned: normalizedBoxNumbers.length
+                }
+            });
         }
         // Prepare photo URLs
         const photoUrls = uploadedFiles?.map(file => `/uploads/shipments/${file.filename}`) || [];
@@ -1013,12 +1214,12 @@ async (req, res) => {
             },
             data: boxUpdateData,
         });
-        const palletsUsed = await (0, rackCapacity_1.recomputeRackPalletUsage)(prisma, rackId, companyId);
-        // Update rack capacity based on pallet usage
+        // Update rack capacity (pallets AND CBM)
+        await (0, rackCapacity_1.updateRackCapacityAndCBM)(prisma, rackId, companyId);
+        // Update rack last activity
         await prisma.rack.update({
             where: { id: rackId },
             data: {
-                capacityUsed: palletsUsed,
                 lastActivity: new Date(),
             },
         });
@@ -1050,7 +1251,7 @@ async (req, res) => {
                 companyId,
                 activityType: 'ASSIGN',
                 itemDetails: `${normalizedBoxNumbers.length} boxes from shipment ${id}${photoUrls.length > 0 ? ` (${photoUrls.length} photos)` : ''}`,
-                quantityAfter: palletsUsed,
+                quantityAfter: assignedCount,
             },
         });
         res.json({
@@ -1060,7 +1261,6 @@ async (req, res) => {
             totalBoxes,
             remainingUnassigned,
             shipmentStatus: newStatus,
-            palletsUsed,
             photosUploaded: photoUrls.length,
             photoUrls
         });
@@ -1139,13 +1339,12 @@ router.post('/:id/release-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER')
                 rackId: null, // Remove from rack
             },
         });
-        // Update rack capacities using pallet-based calculations
+        // Update rack capacities using pallet-based calculations AND CBM
         for (const [rackId, count] of Object.entries(rackUpdates)) {
-            const palletsUsed = await (0, rackCapacity_1.recomputeRackPalletUsage)(prisma, rackId, companyId);
+            const { palletsUsed } = await (0, rackCapacity_1.updateRackCapacityAndCBM)(prisma, rackId, companyId);
             await prisma.rack.update({
                 where: { id: rackId },
                 data: {
-                    capacityUsed: palletsUsed,
                     lastActivity: new Date(),
                 },
             });
@@ -1188,12 +1387,61 @@ router.post('/:id/release-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER')
             totalCharges += boxesToRelease.length * settings.releasePerBoxFee;
             totalCharges += settings.releaseTransportFee;
         }
-        // ???? SEND NOTIFICATION IF ENABLED
+        // 📧 SEND EMAIL NOTIFICATION
         let notificationSent = false;
+        try {
+            // Get company info for email
+            const company = await prisma.company.findUnique({ where: { id: companyId } });
+            // Calculate days stored
+            const arrivalDate = new Date(shipment.arrivalDate);
+            const daysStored = Math.ceil((new Date().getTime() - arrivalDate.getTime()) / (1000 * 60 * 60 * 24));
+            // Get rack location for released boxes
+            const rackLocations = [...new Set(boxesToRelease.filter((b) => b.rack).map((b) => b.rack?.name))];
+            const rackLocation = rackLocations.length > 0 ? rackLocations.join(', ') : undefined;
+            // Build full photo URLs if releasePhotos are provided
+            const fullPhotoUrls = releasePhotos?.map((photo) => {
+                if (photo.startsWith('http'))
+                    return photo;
+                return `${req.protocol}://${req.get('host')}${photo}`;
+            });
+            // Send release notification email - uses notification settings for recipients
+            const emailResult = await (0, emailService_1.sendReleaseNotification)(companyId, {
+                shipmentId: shipment.id,
+                shipmentCode: shipment.referenceId,
+                clientName: shipment.clientName || 'Customer',
+                clientPhone: shipment.clientPhone || undefined,
+                boxesReleased: boxesToRelease.length,
+                totalBoxes: shipment.boxes.length,
+                remainingBoxes: remainingBoxes.length,
+                releaseType: releaseAll ? 'FULL' : 'PARTIAL',
+                releasedBy: req.user?.name || 'Admin',
+                totalCharges: settings.generateReleaseInvoice ? totalCharges : undefined,
+                // Additional professional details
+                cbm: shipment.cbm || undefined,
+                weight: shipment.weight || undefined,
+                rackLocation: rackLocation,
+                receivedDate: shipment.arrivalDate?.toISOString(),
+                daysStored: daysStored,
+                collectorID: collectorID || undefined,
+                photos: fullPhotoUrls,
+                description: shipment.description || undefined,
+                warehouseName: company?.name ? `${company.name} Warehouse` : undefined,
+                currency: 'KWD',
+            });
+            notificationSent = emailResult.success;
+            if (emailResult.success) {
+                console.log(`📧 Release email sent for shipment ${shipment.referenceId}`);
+            }
+            else {
+                console.log(`📧 Release email failed: ${emailResult.error}`);
+            }
+        }
+        catch (emailError) {
+            console.error('Email notification error:', emailError);
+        }
+        // Also send SMS if phone available
         if (settings.notifyClientOnRelease && shipment.clientPhone) {
-            // TODO: Integrate with notification service
-            notificationSent = true;
-            console.log(`???? Notification sent to ${shipment.clientPhone}: ${boxesToRelease.length} boxes released`);
+            console.log(`📱 SMS notification would be sent to ${shipment.clientPhone}: ${boxesToRelease.length} boxes released`);
         }
         res.json({
             success: true,
@@ -1300,14 +1548,13 @@ router.delete('/:id', (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
         await prisma.shipmentBox.deleteMany({
             where: { shipmentId: id }
         });
-        // 🔧 UPDATE RACK CAPACITIES (prevents capacity leak)
+        // 🔧 UPDATE RACK CAPACITIES AND CBM (prevents capacity leak)
         for (const rackId of affectedRackIds) {
             if (rackId) {
-                const palletsUsed = await (0, rackCapacity_1.recomputeRackPalletUsage)(prisma, rackId, companyId);
+                const { palletsUsed } = await (0, rackCapacity_1.updateRackCapacityAndCBM)(prisma, rackId, companyId);
                 await prisma.rack.update({
                     where: { id: rackId },
                     data: {
-                        capacityUsed: palletsUsed,
                         lastActivity: new Date()
                     }
                 });
@@ -1666,13 +1913,12 @@ router.post('/:shipmentId/assign-rack', (0, auth_1.authorizeRoles)('ADMIN', 'MAN
                 }
             });
         }));
-        // 🔧 CRITICAL FIX: Use ONLY recomputeRackPalletUsage for consistency
-        // This ensures all capacity calculations use the same method
-        const finalPalletsUsed = await (0, rackCapacity_1.recomputeRackPalletUsage)(prisma, rackId, req.user.companyId);
+        // 🔧 CRITICAL FIX: Use updateRackCapacityAndCBM for consistency
+        // This ensures all capacity calculations use the same method (pallets AND CBM)
+        const { palletsUsed: finalPalletsUsed } = await (0, rackCapacity_1.updateRackCapacityAndCBM)(prisma, rackId, req.user.companyId);
         await prisma.rack.update({
             where: { id: rackId },
             data: {
-                capacityUsed: finalPalletsUsed, // ✅ Use recomputed value, not manual calculation
                 lastActivity: new Date(),
                 status: finalPalletsUsed >= (rack.capacityTotal || 100) ? 'FULL' :
                     finalPalletsUsed > 0 ? 'OCCUPIED' : 'AVAILABLE'
@@ -1727,6 +1973,843 @@ router.post('/:shipmentId/assign-rack', (0, auth_1.authorizeRoles)('ADMIN', 'MAN
     catch (error) {
         console.error('❌ Assign-rack error:', error);
         res.status(500).json({ error: 'Failed to assign boxes to rack' });
+    }
+});
+// ==========================================
+// MOVE BOXES BETWEEN RACKS (with Audit Trail)
+// ==========================================
+router.post('/:shipmentId/move-boxes', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), async (req, res) => {
+    try {
+        const { shipmentId } = req.params;
+        const { sourceRackId, destinationRackId, boxIds, // Array of box IDs to move
+        reason, authorizedById, notes, photos // New photos taken during move
+         } = req.body;
+        console.log('🔄 Move-boxes request:', {
+            shipmentId,
+            sourceRackId,
+            destinationRackId,
+            boxIds: boxIds?.length,
+            reason,
+            authorizedById,
+            notes,
+            photos: photos?.length || 0
+        });
+        // Validation
+        if (!sourceRackId || !destinationRackId || !boxIds?.length || !reason || !authorizedById) {
+            return res.status(400).json({
+                error: 'Missing required fields: sourceRackId, destinationRackId, boxIds, reason, authorizedById'
+            });
+        }
+        if (sourceRackId === destinationRackId) {
+            return res.status(400).json({
+                error: 'Source and destination racks cannot be the same'
+            });
+        }
+        // Get shipment with boxes
+        const shipment = await prisma.shipment.findUnique({
+            where: { id: shipmentId },
+            include: {
+                boxes: {
+                    where: { id: { in: boxIds } }
+                }
+            }
+        });
+        if (!shipment) {
+            return res.status(404).json({ error: 'Shipment not found' });
+        }
+        // Verify all boxes belong to source rack
+        const invalidBoxes = shipment.boxes.filter((box) => box.rackId !== sourceRackId);
+        if (invalidBoxes.length > 0) {
+            return res.status(400).json({
+                error: `Some boxes are not in the source rack`,
+                invalidBoxIds: invalidBoxes.map((b) => b.id)
+            });
+        }
+        // Get source rack with current photos
+        const sourceRack = await prisma.rack.findUnique({
+            where: { id: sourceRackId }
+        });
+        if (!sourceRack) {
+            return res.status(404).json({ error: 'Source rack not found' });
+        }
+        // Get destination rack and check capacity
+        const destRack = await prisma.rack.findUnique({
+            where: { id: destinationRackId }
+        });
+        if (!destRack) {
+            return res.status(404).json({ error: 'Destination rack not found' });
+        }
+        // Get authorized user details
+        const authorizedUser = await prisma.user.findUnique({
+            where: { id: authorizedById },
+            select: { id: true, name: true, role: true }
+        });
+        if (!authorizedUser || !['ADMIN', 'MANAGER'].includes(authorizedUser.role)) {
+            return res.status(400).json({
+                error: 'Invalid authorized user. Must be ADMIN or MANAGER.'
+            });
+        }
+        // Get old photos from boxes (before move)
+        const oldPhotos = [];
+        shipment.boxes.forEach((box) => {
+            if (box.photos) {
+                try {
+                    const boxPhotos = JSON.parse(box.photos);
+                    oldPhotos.push(...boxPhotos);
+                }
+                catch (e) { }
+            }
+        });
+        // Calculate pallet usage for capacity check
+        const boxesPerPallet = shipment.boxesPerPallet || 0;
+        const palletsToMove = boxesPerPallet > 0
+            ? Math.ceil(boxIds.length / boxesPerPallet)
+            : 0;
+        // Check destination rack capacity
+        const destCurrentUsage = destRack.capacityUsed || 0;
+        const destMaxCapacity = destRack.capacityTotal || 100;
+        if (destCurrentUsage + palletsToMove > destMaxCapacity) {
+            return res.status(400).json({
+                error: `Destination rack capacity exceeded. Current: ${destCurrentUsage}, Adding: ${palletsToMove}, Max: ${destMaxCapacity}`
+            });
+        }
+        // Prepare move details for history (minimal data to avoid column overflow)
+        const moveDetails = {
+            shipmentId,
+            shipmentName: shipment.name,
+            customerName: shipment.clientName || shipment.customerName || 'Unknown',
+            fromRack: sourceRack.code,
+            toRack: destRack.code,
+            boxCount: boxIds.length,
+            reason,
+            authorizedBy: authorizedUser.name,
+            movedBy: req.user.name
+        };
+        const photosJson = photos && photos.length > 0 ? JSON.stringify(photos) : null;
+        // Execute move in transaction
+        await prisma.$transaction(async (tx) => {
+            // 1. Update boxes to new rack
+            await tx.shipmentBox.updateMany({
+                where: { id: { in: boxIds } },
+                data: {
+                    rackId: destinationRackId,
+                    photos: photosJson, // Update photos with new ones
+                    updatedAt: new Date()
+                }
+            });
+            // 2. Log RackActivity for SOURCE rack (MOVE OUT)
+            await tx.rackActivity.create({
+                data: {
+                    rackId: sourceRackId,
+                    userId: req.user.id,
+                    activityType: 'MOVE',
+                    itemDetails: JSON.stringify({
+                        ...moveDetails,
+                        direction: 'OUT',
+                        description: `Moved ${boxIds.length} boxes to ${destRack.code}`
+                    }),
+                    quantityBefore: sourceRack.capacityUsed || 0,
+                    quantityAfter: (sourceRack.capacityUsed || 0) - palletsToMove,
+                    photos: JSON.stringify({ old: oldPhotos, new: photos || [] }),
+                    notes: `Move to ${destRack.code}: ${reason}${notes ? ' - ' + notes : ''}`,
+                    companyId: req.user.companyId
+                }
+            });
+            // 3. Log RackActivity for DESTINATION rack (MOVE IN)
+            await tx.rackActivity.create({
+                data: {
+                    rackId: destinationRackId,
+                    userId: req.user.id,
+                    activityType: 'MOVE',
+                    itemDetails: JSON.stringify({
+                        ...moveDetails,
+                        direction: 'IN',
+                        description: `Received ${boxIds.length} boxes from ${sourceRack.code}`
+                    }),
+                    quantityBefore: destRack.capacityUsed || 0,
+                    quantityAfter: (destRack.capacityUsed || 0) + palletsToMove,
+                    photos: JSON.stringify({ old: oldPhotos, new: photos || [] }),
+                    notes: `Move from ${sourceRack.code}: ${reason}${notes ? ' - ' + notes : ''}`,
+                    companyId: req.user.companyId
+                }
+            });
+        });
+        // 4. Recompute capacities AND CBM for both racks
+        const { palletsUsed: sourceCapacity } = await (0, rackCapacity_1.updateRackCapacityAndCBM)(prisma, sourceRackId, req.user.companyId);
+        const { palletsUsed: destCapacity } = await (0, rackCapacity_1.updateRackCapacityAndCBM)(prisma, destinationRackId, req.user.companyId);
+        // 5. Update rack statuses
+        await prisma.rack.update({
+            where: { id: sourceRackId },
+            data: {
+                lastActivity: new Date(),
+                status: sourceCapacity >= (sourceRack.capacityTotal || 100) ? 'FULL' :
+                    sourceCapacity > 0 ? 'OCCUPIED' : 'AVAILABLE'
+            }
+        });
+        await prisma.rack.update({
+            where: { id: destinationRackId },
+            data: {
+                lastActivity: new Date(),
+                status: destCapacity >= (destRack.capacityTotal || 100) ? 'FULL' :
+                    destCapacity > 0 ? 'OCCUPIED' : 'AVAILABLE'
+            }
+        });
+        console.log('✅ Move completed successfully:', {
+            shipmentId,
+            from: sourceRack.code,
+            to: destRack.code,
+            boxesMoved: boxIds.length,
+            authorizedBy: authorizedUser.name
+        });
+        res.json({
+            success: true,
+            message: `Successfully moved ${boxIds.length} boxes from ${sourceRack.code} to ${destRack.code}`,
+            moveDetails: {
+                boxesMoved: boxIds.length,
+                from: { code: sourceRack.code, newCapacity: sourceCapacity },
+                to: { code: destRack.code, newCapacity: destCapacity },
+                reason,
+                authorizedBy: authorizedUser.name,
+                movedBy: req.user.name
+            }
+        });
+    }
+    catch (error) {
+        console.error('❌ Move-boxes error:', error);
+        res.status(500).json({ error: 'Failed to move boxes between racks' });
+    }
+});
+// ==========================================
+// GET MOVE HISTORY FOR SHIPMENT
+// ==========================================
+router.get('/:shipmentId/move-history', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), async (req, res) => {
+    try {
+        const { shipmentId } = req.params;
+        // Get all MOVE type activities related to this shipment
+        const moveActivities = await prisma.rackActivity.findMany({
+            where: {
+                companyId: req.user.companyId,
+                activityType: 'MOVE',
+                itemDetails: {
+                    contains: shipmentId
+                }
+            },
+            include: {
+                rack: {
+                    select: { id: true, code: true, zone: true, location: true }
+                },
+                user: {
+                    select: { id: true, name: true, role: true }
+                }
+            },
+            orderBy: { timestamp: 'desc' }
+        });
+        // Parse and format the history
+        const history = moveActivities.map(activity => {
+            let details = {};
+            let photos = {};
+            try {
+                details = JSON.parse(activity.itemDetails || '{}');
+                photos = JSON.parse(activity.photos || '{}');
+            }
+            catch (e) { }
+            return {
+                id: activity.id,
+                direction: details.direction, // 'IN' or 'OUT'
+                fromRack: details.fromRack,
+                toRack: details.toRack,
+                boxCount: details.boxCount,
+                boxNumbers: details.boxNumbers,
+                reason: details.reason,
+                notes: details.notes,
+                authorizedBy: details.authorizedBy,
+                movedBy: {
+                    id: activity.user.id,
+                    name: activity.user.name,
+                    role: activity.user.role
+                },
+                oldPhotos: photos.old || [],
+                newPhotos: photos.new || [],
+                timestamp: activity.timestamp
+            };
+        });
+        // Group by move operation (pair IN and OUT)
+        const groupedHistory = [];
+        const processedIds = new Set();
+        for (const item of history) {
+            if (processedIds.has(item.id))
+                continue;
+            // Find the pair (IN for OUT, OUT for IN) - comparing rack codes as strings
+            const pair = history.find(h => h.id !== item.id &&
+                h.fromRack === item.fromRack &&
+                h.toRack === item.toRack &&
+                Math.abs(new Date(h.timestamp).getTime() - new Date(item.timestamp).getTime()) < 5000 // within 5 seconds
+            );
+            if (pair) {
+                processedIds.add(pair.id);
+            }
+            processedIds.add(item.id);
+            // Use the OUT record as primary (has complete info)
+            const primary = item.direction === 'OUT' ? item : (pair?.direction === 'OUT' ? pair : item);
+            groupedHistory.push({
+                id: primary.id,
+                fromRack: { code: primary.fromRack },
+                toRack: { code: primary.toRack },
+                boxCount: primary.boxCount,
+                boxNumbers: primary.boxNumbers,
+                reason: primary.reason,
+                notes: primary.notes,
+                authorizedBy: { name: primary.authorizedBy, role: 'ADMIN' },
+                movedBy: primary.movedBy,
+                oldPhotos: primary.oldPhotos,
+                newPhotos: primary.newPhotos,
+                timestamp: primary.timestamp
+            });
+        }
+        res.json({
+            success: true,
+            history: groupedHistory
+        });
+    }
+    catch (error) {
+        console.error('❌ Get move history error:', error);
+        res.status(500).json({ error: 'Failed to fetch move history' });
+    }
+});
+// ============================================
+// SHIPMENT DIMENSIONS MANAGEMENT
+// Multiple dimensions per shipment (pallets, boxes, crates, etc.)
+// ============================================
+// Helper to generate unique ID
+const generateDimensionId = () => {
+    return 'dim_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+};
+// GET dimensions for a shipment
+router.get('/:shipmentId/dimensions', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER', 'SCANNER'), async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const { shipmentId } = req.params;
+        console.log(`📦 GET dimensions for shipment: ${shipmentId}, company: ${companyId}`);
+        // Verify shipment exists and belongs to company
+        const shipment = await prisma.shipment.findFirst({
+            where: { id: shipmentId, companyId }
+        });
+        if (!shipment) {
+            console.log(`❌ Shipment not found: ${shipmentId}`);
+            return res.status(404).json({ error: 'Shipment not found' });
+        }
+        const dimensions = await prisma.$queryRaw `
+      SELECT * FROM shipment_dimensions 
+      WHERE shipmentId = ${shipmentId} AND companyId = ${companyId}
+      ORDER BY createdAt ASC
+    `;
+        console.log(`📦 Found ${dimensions.length} dimensions for shipment ${shipmentId}`);
+        // Calculate totals
+        const totalCBM = dimensions.reduce((sum, d) => sum + (Number(d.totalCBM) || 0), 0);
+        const totalWeight = dimensions.reduce((sum, d) => sum + (Number(d.totalWeight) || 0), 0);
+        const totalItems = dimensions.reduce((sum, d) => sum + (Number(d.quantity) || 0), 0);
+        res.json({
+            success: true,
+            dimensions,
+            summary: {
+                totalCBM: parseFloat(totalCBM.toFixed(4)),
+                totalWeight: parseFloat(totalWeight.toFixed(2)),
+                totalItems,
+                dimensionCount: dimensions.length
+            }
+        });
+    }
+    catch (error) {
+        console.error('Get shipment dimensions error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// ADD dimension to shipment
+router.post('/:shipmentId/dimensions', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const { shipmentId } = req.params;
+        const { label, itemType, quantity, length, width, height, cbm, weight, notes } = req.body;
+        // Validate required fields
+        if (!length || !width || !height) {
+            return res.status(400).json({ error: 'Length, width, and height are required' });
+        }
+        // Verify shipment exists and belongs to company
+        const shipment = await prisma.shipment.findFirst({
+            where: { id: shipmentId, companyId }
+        });
+        if (!shipment) {
+            return res.status(404).json({ error: 'Shipment not found' });
+        }
+        // Calculate CBM if not provided
+        const calculatedCBM = cbm || (parseFloat(length) * parseFloat(width) * parseFloat(height)) / 1000000;
+        const qty = parseInt(quantity) || 1;
+        const totalCBMValue = calculatedCBM * qty;
+        const totalWeightValue = weight ? parseFloat(weight) * qty : null;
+        const dimensionId = generateDimensionId();
+        await prisma.$executeRaw `
+      INSERT INTO shipment_dimensions (
+        id, shipmentId, companyId, label, itemType, quantity,
+        length, width, height, cbm, totalCBM, weight, totalWeight, notes
+      ) VALUES (
+        ${dimensionId}, ${shipmentId}, ${companyId}, ${label || null}, ${itemType || 'BOX'}, ${qty},
+        ${parseFloat(length)}, ${parseFloat(width)}, ${parseFloat(height)},
+        ${parseFloat(calculatedCBM.toFixed(4))}, ${parseFloat(totalCBMValue.toFixed(4))},
+        ${weight ? parseFloat(weight) : null}, ${totalWeightValue ? parseFloat(totalWeightValue.toFixed(2)) : null},
+        ${notes || null}
+      )
+    `;
+        // Update shipment's main CBM field with total of all dimensions
+        await updateShipmentTotalCBMRaw(shipmentId, companyId);
+        res.status(201).json({
+            success: true,
+            message: 'Dimension added successfully',
+            dimension: {
+                id: dimensionId,
+                shipmentId,
+                label: label || null,
+                itemType: itemType || 'BOX',
+                quantity: qty,
+                length: parseFloat(length),
+                width: parseFloat(width),
+                height: parseFloat(height),
+                cbm: parseFloat(calculatedCBM.toFixed(4)),
+                totalCBM: parseFloat(totalCBMValue.toFixed(4)),
+                weight: weight ? parseFloat(weight) : null,
+                totalWeight: totalWeightValue ? parseFloat(totalWeightValue.toFixed(2)) : null,
+                notes: notes || null
+            }
+        });
+    }
+    catch (error) {
+        console.error('Add shipment dimension error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// UPDATE dimension
+router.put('/:shipmentId/dimensions/:dimensionId', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const { shipmentId, dimensionId } = req.params;
+        const { label, itemType, quantity, length, width, height, cbm, weight, notes } = req.body;
+        // Verify dimension exists
+        const existing = await prisma.$queryRaw `
+      SELECT * FROM shipment_dimensions 
+      WHERE id = ${dimensionId} AND shipmentId = ${shipmentId} AND companyId = ${companyId}
+    `;
+        if (!existing || existing.length === 0) {
+            return res.status(404).json({ error: 'Dimension not found' });
+        }
+        const current = existing[0];
+        // Calculate CBM if not provided
+        const finalLength = length !== undefined ? parseFloat(length) : Number(current.length);
+        const finalWidth = width !== undefined ? parseFloat(width) : Number(current.width);
+        const finalHeight = height !== undefined ? parseFloat(height) : Number(current.height);
+        const calculatedCBM = cbm !== undefined ? parseFloat(cbm) : (finalLength * finalWidth * finalHeight) / 1000000;
+        const qty = quantity !== undefined ? parseInt(quantity) : Number(current.quantity);
+        const totalCBMValue = calculatedCBM * qty;
+        const finalWeight = weight !== undefined ? (weight ? parseFloat(weight) : null) : current.weight;
+        const totalWeightValue = finalWeight ? finalWeight * qty : null;
+        await prisma.$executeRaw `
+      UPDATE shipment_dimensions SET
+        label = ${label !== undefined ? label : current.label},
+        itemType = ${itemType !== undefined ? itemType : current.itemType},
+        quantity = ${qty},
+        length = ${finalLength},
+        width = ${finalWidth},
+        height = ${finalHeight},
+        cbm = ${parseFloat(calculatedCBM.toFixed(4))},
+        totalCBM = ${parseFloat(totalCBMValue.toFixed(4))},
+        weight = ${finalWeight},
+        totalWeight = ${totalWeightValue ? parseFloat(totalWeightValue.toFixed(2)) : null},
+        notes = ${notes !== undefined ? notes : current.notes},
+        updatedAt = NOW()
+      WHERE id = ${dimensionId}
+    `;
+        // Update shipment's main CBM field
+        await updateShipmentTotalCBMRaw(shipmentId, companyId);
+        res.json({
+            success: true,
+            message: 'Dimension updated successfully'
+        });
+    }
+    catch (error) {
+        console.error('Update shipment dimension error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// DELETE dimension
+router.delete('/:shipmentId/dimensions/:dimensionId', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const { shipmentId, dimensionId } = req.params;
+        // Verify dimension exists
+        const existing = await prisma.$queryRaw `
+      SELECT * FROM shipment_dimensions 
+      WHERE id = ${dimensionId} AND shipmentId = ${shipmentId} AND companyId = ${companyId}
+    `;
+        if (!existing || existing.length === 0) {
+            return res.status(404).json({ error: 'Dimension not found' });
+        }
+        await prisma.$executeRaw `
+      DELETE FROM shipment_dimensions WHERE id = ${dimensionId}
+    `;
+        // Update shipment's main CBM field
+        await updateShipmentTotalCBMRaw(shipmentId, companyId);
+        res.json({
+            success: true,
+            message: 'Dimension deleted successfully'
+        });
+    }
+    catch (error) {
+        console.error('Delete shipment dimension error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// BULK save dimensions (replace all)
+router.post('/:shipmentId/dimensions/bulk', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const { shipmentId } = req.params;
+        const { dimensions } = req.body; // Array of dimension objects
+        if (!Array.isArray(dimensions)) {
+            return res.status(400).json({ error: 'dimensions must be an array' });
+        }
+        // Verify shipment exists
+        const shipment = await prisma.shipment.findFirst({
+            where: { id: shipmentId, companyId }
+        });
+        if (!shipment) {
+            return res.status(404).json({ error: 'Shipment not found' });
+        }
+        // Delete existing dimensions
+        await prisma.$executeRaw `
+      DELETE FROM shipment_dimensions WHERE shipmentId = ${shipmentId} AND companyId = ${companyId}
+    `;
+        // Create new dimensions
+        const createdDimensions = [];
+        for (const dim of dimensions) {
+            if (!dim.length || !dim.width || !dim.height) {
+                continue; // Skip invalid entries
+            }
+            const calculatedCBM = dim.cbm || (parseFloat(dim.length) * parseFloat(dim.width) * parseFloat(dim.height)) / 1000000;
+            const qty = parseInt(dim.quantity) || 1;
+            const totalCBMValue = calculatedCBM * qty;
+            const totalWeightValue = dim.weight ? parseFloat(dim.weight) * qty : null;
+            const dimensionId = dim.id || generateDimensionId();
+            await prisma.$executeRaw `
+        INSERT INTO shipment_dimensions (
+          id, shipmentId, companyId, label, itemType, quantity,
+          length, width, height, cbm, totalCBM, weight, totalWeight, notes
+        ) VALUES (
+          ${dimensionId}, ${shipmentId}, ${companyId}, ${dim.label || null}, ${dim.itemType || 'BOX'}, ${qty},
+          ${parseFloat(dim.length)}, ${parseFloat(dim.width)}, ${parseFloat(dim.height)},
+          ${parseFloat(calculatedCBM.toFixed(4))}, ${parseFloat(totalCBMValue.toFixed(4))},
+          ${dim.weight ? parseFloat(dim.weight) : null}, ${totalWeightValue ? parseFloat(totalWeightValue.toFixed(2)) : null},
+          ${dim.notes || null}
+        )
+      `;
+            createdDimensions.push({
+                id: dimensionId,
+                shipmentId,
+                label: dim.label || null,
+                itemType: dim.itemType || 'BOX',
+                quantity: qty,
+                length: parseFloat(dim.length),
+                width: parseFloat(dim.width),
+                height: parseFloat(dim.height),
+                cbm: parseFloat(calculatedCBM.toFixed(4)),
+                totalCBM: parseFloat(totalCBMValue.toFixed(4)),
+                weight: dim.weight ? parseFloat(dim.weight) : null,
+                totalWeight: totalWeightValue ? parseFloat(totalWeightValue.toFixed(2)) : null,
+                notes: dim.notes || null
+            });
+        }
+        // Update shipment's main CBM field
+        await updateShipmentTotalCBMRaw(shipmentId, companyId);
+        // Calculate totals
+        const totalCBM = createdDimensions.reduce((sum, d) => sum + (d.totalCBM || 0), 0);
+        const totalWeight = createdDimensions.reduce((sum, d) => sum + (d.totalWeight || 0), 0);
+        res.json({
+            success: true,
+            message: `${createdDimensions.length} dimension(s) saved`,
+            dimensions: createdDimensions,
+            summary: {
+                totalCBM: parseFloat(totalCBM.toFixed(4)),
+                totalWeight: parseFloat(totalWeight.toFixed(2)),
+                dimensionCount: createdDimensions.length
+            }
+        });
+    }
+    catch (error) {
+        console.error('Bulk save dimensions error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// Helper function to update shipment's total CBM from dimensions (raw SQL)
+async function updateShipmentTotalCBMRaw(shipmentId, companyId) {
+    const dimensions = await prisma.$queryRaw `
+    SELECT totalCBM FROM shipment_dimensions 
+    WHERE shipmentId = ${shipmentId} AND companyId = ${companyId}
+  `;
+    const totalCBM = dimensions.reduce((sum, d) => sum + (Number(d.totalCBM) || 0), 0);
+    // Update shipment's main CBM field (used for charge calculation)
+    await prisma.shipment.update({
+        where: { id: shipmentId },
+        data: { cbm: parseFloat(totalCBM.toFixed(4)) }
+    });
+    console.log(`📦 Updated shipment ${shipmentId} total CBM: ${totalCBM.toFixed(4)} m³`);
+}
+// ============================================
+// DIMENSION RACK ASSIGNMENT ROUTES
+// ============================================
+// Assign a dimension to a rack
+router.post('/:shipmentId/dimensions/:dimensionId/assign', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const { shipmentId, dimensionId } = req.params;
+        const { rackId } = req.body;
+        if (!rackId) {
+            return res.status(400).json({ error: 'rackId is required' });
+        }
+        // Get the dimension
+        const dimension = await prisma.$queryRaw `
+      SELECT * FROM shipment_dimensions 
+      WHERE id = ${dimensionId} AND shipmentId = ${shipmentId} AND companyId = ${companyId}
+    `;
+        if (!dimension.length) {
+            return res.status(404).json({ error: 'Dimension not found' });
+        }
+        const dim = dimension[0];
+        if (dim.status === 'ASSIGNED') {
+            return res.status(400).json({ error: 'Dimension already assigned to a rack' });
+        }
+        // Get the rack
+        const rack = await prisma.rack.findFirst({
+            where: { id: rackId, companyId }
+        });
+        if (!rack) {
+            return res.status(404).json({ error: 'Rack not found' });
+        }
+        // Update dimension
+        await prisma.$executeRaw `
+      UPDATE shipment_dimensions 
+      SET rackId = ${rackId}, status = 'ASSIGNED', assignedAt = NOW()
+      WHERE id = ${dimensionId}
+    `;
+        // Update rack CBM using raw SQL (cbmUsed may not be in Prisma schema yet)
+        await prisma.$executeRaw `
+      UPDATE racks SET cbmUsed = COALESCE(cbmUsed, 0) + ${dim.totalCBM || 0}
+      WHERE id = ${rackId}
+    `;
+        // Get updated rack data
+        const updatedRack = await prisma.$queryRaw `
+      SELECT id, code, cbmUsed, cbmCapacity FROM racks WHERE id = ${rackId}
+    `;
+        // Update shipment status if all dimensions assigned
+        const pendingDims = await prisma.$queryRaw `
+      SELECT COUNT(*) as count FROM shipment_dimensions 
+      WHERE shipmentId = ${shipmentId} AND status = 'PENDING'
+    `;
+        if (pendingDims[0].count == 0) {
+            await prisma.shipment.update({
+                where: { id: shipmentId },
+                data: { status: 'IN_WAREHOUSE' }
+            });
+        }
+        res.json({
+            success: true,
+            message: 'Dimension assigned to rack',
+            dimension: {
+                id: dimensionId,
+                rackId,
+                status: 'ASSIGNED',
+                totalCBM: dim.totalCBM
+            },
+            rack: {
+                id: rackId,
+                code: rack.code,
+                cbmUsed: updatedRack[0]?.cbmUsed || 0,
+                cbmCapacity: updatedRack[0]?.cbmCapacity || 0
+            }
+        });
+    }
+    catch (error) {
+        console.error('Assign dimension to rack error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// Release a dimension from rack
+router.post('/:shipmentId/dimensions/:dimensionId/release', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER'), async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const { shipmentId, dimensionId } = req.params;
+        // Get the dimension
+        const dimension = await prisma.$queryRaw `
+      SELECT * FROM shipment_dimensions 
+      WHERE id = ${dimensionId} AND shipmentId = ${shipmentId} AND companyId = ${companyId}
+    `;
+        if (!dimension.length) {
+            return res.status(404).json({ error: 'Dimension not found' });
+        }
+        const dim = dimension[0];
+        if (dim.status !== 'ASSIGNED') {
+            return res.status(400).json({ error: 'Dimension is not assigned to any rack' });
+        }
+        const rackId = dim.rackId;
+        // Update dimension
+        await prisma.$executeRaw `
+      UPDATE shipment_dimensions 
+      SET status = 'RELEASED', releasedAt = NOW()
+      WHERE id = ${dimensionId}
+    `;
+        // Update rack CBM using raw SQL
+        if (rackId) {
+            await prisma.$executeRaw `
+        UPDATE racks SET cbmUsed = GREATEST(0, COALESCE(cbmUsed, 0) - ${dim.totalCBM || 0})
+        WHERE id = ${rackId}
+      `;
+        }
+        // Check if all dimensions are released
+        const assignedDims = await prisma.$queryRaw `
+      SELECT COUNT(*) as count FROM shipment_dimensions 
+      WHERE shipmentId = ${shipmentId} AND status = 'ASSIGNED'
+    `;
+        if (assignedDims[0].count == 0) {
+            // All dimensions released - check if any still pending
+            const pendingDims = await prisma.$queryRaw `
+        SELECT COUNT(*) as count FROM shipment_dimensions 
+        WHERE shipmentId = ${shipmentId} AND status = 'PENDING'
+      `;
+            if (pendingDims[0].count == 0) {
+                // All dimensions released, none pending
+                await prisma.shipment.update({
+                    where: { id: shipmentId },
+                    data: { status: 'RELEASED', releasedAt: new Date() }
+                });
+            }
+        }
+        else {
+            // Some dimensions still assigned - mark as partial
+            await prisma.shipment.update({
+                where: { id: shipmentId },
+                data: { status: 'PARTIAL' }
+            });
+        }
+        res.json({
+            success: true,
+            message: 'Dimension released from rack',
+            dimension: {
+                id: dimensionId,
+                status: 'RELEASED',
+                totalCBM: dim.totalCBM
+            }
+        });
+    }
+    catch (error) {
+        console.error('Release dimension error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// Bulk assign multiple dimensions to a rack
+router.post('/:shipmentId/dimensions/bulk-assign', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER'), async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const { shipmentId } = req.params;
+        const { dimensionIds, rackId } = req.body;
+        if (!Array.isArray(dimensionIds) || !rackId) {
+            return res.status(400).json({ error: 'dimensionIds (array) and rackId are required' });
+        }
+        // Get the rack
+        const rack = await prisma.rack.findFirst({
+            where: { id: rackId, companyId }
+        });
+        if (!rack) {
+            return res.status(404).json({ error: 'Rack not found' });
+        }
+        let totalCBMAssigned = 0;
+        for (const dimensionId of dimensionIds) {
+            // Get the dimension
+            const dimension = await prisma.$queryRaw `
+        SELECT * FROM shipment_dimensions 
+        WHERE id = ${dimensionId} AND shipmentId = ${shipmentId} AND companyId = ${companyId} AND status = 'PENDING'
+      `;
+            if (dimension.length) {
+                const dim = dimension[0];
+                totalCBMAssigned += dim.totalCBM || 0;
+                // Update dimension
+                await prisma.$executeRaw `
+          UPDATE shipment_dimensions 
+          SET rackId = ${rackId}, status = 'ASSIGNED', assignedAt = NOW()
+          WHERE id = ${dimensionId}
+        `;
+            }
+        }
+        // Update rack CBM using raw SQL
+        await prisma.$executeRaw `
+      UPDATE racks SET cbmUsed = COALESCE(cbmUsed, 0) + ${totalCBMAssigned}
+      WHERE id = ${rackId}
+    `;
+        // Get updated rack data
+        const updatedRack = await prisma.$queryRaw `
+      SELECT id, code, cbmUsed, cbmCapacity FROM racks WHERE id = ${rackId}
+    `;
+        // Update shipment status
+        const pendingDims = await prisma.$queryRaw `
+      SELECT COUNT(*) as count FROM shipment_dimensions 
+      WHERE shipmentId = ${shipmentId} AND status = 'PENDING'
+    `;
+        if (pendingDims[0].count == 0) {
+            await prisma.shipment.update({
+                where: { id: shipmentId },
+                data: { status: 'IN_WAREHOUSE' }
+            });
+        }
+        res.json({
+            success: true,
+            message: `${dimensionIds.length} dimension(s) assigned to rack`,
+            totalCBMAssigned,
+            rack: {
+                id: rackId,
+                code: rack.code,
+                cbmUsed: updatedRack[0]?.cbmUsed || 0,
+                cbmCapacity: updatedRack[0]?.cbmCapacity || 0
+            }
+        });
+    }
+    catch (error) {
+        console.error('Bulk assign dimensions error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// Get dimensions with rack status
+router.get('/:shipmentId/dimensions/status', (0, auth_1.authorizeRoles)('ADMIN', 'MANAGER', 'WORKER', 'SCANNER'), async (req, res) => {
+    try {
+        const companyId = req.user.companyId;
+        const { shipmentId } = req.params;
+        const dimensions = await prisma.$queryRaw `
+      SELECT sd.*, r.code as rackCode, r.location as rackLocation
+      FROM shipment_dimensions sd
+      LEFT JOIN racks r ON sd.rackId = r.id
+      WHERE sd.shipmentId = ${shipmentId} AND sd.companyId = ${companyId}
+      ORDER BY sd.createdAt ASC
+    `;
+        const summary = {
+            pending: dimensions.filter(d => d.status === 'PENDING').length,
+            assigned: dimensions.filter(d => d.status === 'ASSIGNED').length,
+            released: dimensions.filter(d => d.status === 'RELEASED').length,
+            totalCBM: dimensions.reduce((sum, d) => sum + (Number(d.totalCBM) || 0), 0),
+            assignedCBM: dimensions.filter(d => d.status === 'ASSIGNED').reduce((sum, d) => sum + (Number(d.totalCBM) || 0), 0),
+            releasedCBM: dimensions.filter(d => d.status === 'RELEASED').reduce((sum, d) => sum + (Number(d.totalCBM) || 0), 0)
+        };
+        res.json({
+            dimensions,
+            summary
+        });
+    }
+    catch (error) {
+        console.error('Get dimensions status error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 exports.default = router;

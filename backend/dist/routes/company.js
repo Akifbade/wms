@@ -24,6 +24,10 @@ router.get('/branding', async (req, res) => {
                 loginBackgroundType: true,
                 loginBackgroundImage: true,
                 loginShowFeatures: true,
+                loginEnableCursor: true,
+                loginEnable3D: true,
+                loginBlurStrength: true,
+                loginThemeMode: true,
             },
         });
         if (!company) {
@@ -42,6 +46,10 @@ router.get('/branding', async (req, res) => {
                     loginBackgroundType: 'video',
                     loginBackgroundImage: null,
                     loginShowFeatures: true,
+                    loginEnableCursor: true,
+                    loginEnable3D: true,
+                    loginBlurStrength: 'medium',
+                    loginThemeMode: 'system',
                 }
             });
         }
@@ -65,6 +73,10 @@ router.get('/branding', async (req, res) => {
                 loginBackgroundType: company.loginBackgroundType || 'video',
                 loginBackgroundImage: company.loginBackgroundImage || null,
                 loginShowFeatures: company.loginShowFeatures !== false,
+                loginEnableCursor: company.loginEnableCursor !== false,
+                loginEnable3D: company.loginEnable3D !== false,
+                loginBlurStrength: company.loginBlurStrength || 'medium',
+                loginThemeMode: company.loginThemeMode || 'system',
             }
         });
     }
@@ -134,7 +146,7 @@ router.get('/', async (req, res) => {
 router.put('/', async (req, res) => {
     try {
         const companyId = req.user.companyId;
-        const { name, email, phone, website, address, logo, primaryColor, secondaryColor, accentColor, showCompanyName, loginVideoUrl, loginVideoEnabled, loginGlassEffect, loginBackgroundType, loginBackgroundImage, loginShowFeatures } = req.body;
+        const { name, email, phone, website, address, logo, primaryColor, secondaryColor, accentColor, showCompanyName, loginVideoUrl, loginVideoEnabled, loginGlassEffect, loginBackgroundType, loginBackgroundImage, loginShowFeatures, loginEnableCursor, loginEnable3D, loginBlurStrength, loginThemeMode } = req.body;
         // Validation
         if (!name || name.trim() === '') {
             return res.status(400).json({ error: 'Company name is required' });
@@ -186,6 +198,18 @@ router.put('/', async (req, res) => {
         }
         if (loginShowFeatures !== undefined) {
             updateData.loginShowFeatures = loginShowFeatures;
+        }
+        if (loginEnableCursor !== undefined) {
+            updateData.loginEnableCursor = loginEnableCursor;
+        }
+        if (loginEnable3D !== undefined) {
+            updateData.loginEnable3D = loginEnable3D;
+        }
+        if (loginBlurStrength !== undefined) {
+            updateData.loginBlurStrength = loginBlurStrength;
+        }
+        if (loginThemeMode !== undefined) {
+            updateData.loginThemeMode = loginThemeMode;
         }
         const company = await prisma.company.update({
             where: { id: companyId },
