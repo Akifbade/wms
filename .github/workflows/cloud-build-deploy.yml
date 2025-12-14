@@ -55,6 +55,17 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      - name: Check Secrets
+        env:
+          VPS_PASS: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          if [ -z "$VPS_PASS" ]; then
+            echo "::error::VPS_PASSWORD secret is NOT set! Go to Settings > Secrets > Actions and add it."
+            exit 1
+          else
+            echo "✅ VPS_PASSWORD is set (Length: ${#VPS_PASS})"
+          fi
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
