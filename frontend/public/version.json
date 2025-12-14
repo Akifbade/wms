@@ -1,8 +1,9 @@
 {
-  "version": "v2.2.85",
+  "version": "v2.2.86",
   "buildDate": "Dec 14, 2025",
-  "buildTime": "13:26:21",
-  "commit": "bc0ba6e2a",
+  "buildTime": "14:02:17",
+  "commit": "50f6e648d",
+  "commitMessage": "chore: sync all versions to v2.2.86 and verify physical report system",
   "author": "akifbade46-del",
-  "environment": "development"
+  "environment": "local"
 }

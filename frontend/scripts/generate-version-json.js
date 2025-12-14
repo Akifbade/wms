@@ -30,8 +30,9 @@ const publicVersionJsonPath = path.join(frontendRoot, 'public', 'version.json');
 
 const versionTs = fs.readFileSync(versionTsPath, 'utf8');
 
-// Supports both: export const APP_VERSION = '2.2.76'; and export const APP_VERSION = "2.2.76";
-const match = versionTs.match(/export\s+const\s+APP_VERSION\s*=\s*['\"](\d+\.\d+\.\d+)['\"]/);
+// Supports both: export const APP_VERSION = '2.2.76'; and export const APP_VERSION = "v2.2.76";
+// Also accepts optional 'v' prefix
+const match = versionTs.match(/export\s+const\s+APP_VERSION\s*=\s*['\"]v?(\d+\.\d+\.\d+)['\"]/);
 if (!match) {
   console.error(`[generate-version-json] Could not parse APP_VERSION in ${versionTsPath}`);
   process.exit(1);

@@ -1,9 +1,9 @@
 {
-  "version": "v2.2.77",
+  "version": "v2.2.86",
   "buildDate": "Dec 14, 2025",
-  "buildTime": "10:05:10",
-  "commit": "3199b76f6",
-  "commitMessage": "Auto-increment version to v2.2.77 (rebuild safety)",
+  "buildTime": "14:02:17",
+  "commit": "50f6e648d",
+  "commitMessage": "chore: sync all versions to v2.2.86 and verify physical report system",
   "author": "akifbade46-del",
   "environment": "local"
 }
