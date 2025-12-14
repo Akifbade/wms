@@ -1,0 +1,25 @@
+name: Direct VPS Deployment
+
+on:
+  push:
+    branches:
+      - stable/prisma-mysql-production
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute Deployment on VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: 148.230.107.155
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            cd "/root/NEW START"
+            # Ensure script is executable
+            chmod +x vps-deploy.sh
+            # Run the deployment script
+            ./vps-deploy.sh
