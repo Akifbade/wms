@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 14, 2025",
-  "buildTime": "22:01:44",
-  "commit": "4fe3f64a0",
-  "commitMessage": "v2.3.2 - Shipments page complete redesign: clean professional UI, removed duplicate filters, minimal icons/colors, all actions preserved (View, QR, Edit, Release, Report, Delete)",
+  "buildTime": "22:34:29",
+  "commit": "624996fec",
+  "commitMessage": "v2.3.3 - Photo viewer with lightbox zoom + clickable rack location navigation",
   "author": "akifbade46-del",
   "environment": "local"
 }
