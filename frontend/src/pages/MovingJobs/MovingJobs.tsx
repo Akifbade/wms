@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   PlusIcon,
   TruckIcon,
@@ -19,6 +20,8 @@ import MaterialReturnModal from '../../components/MaterialReturnModal';
 import JobFileManager from '../../components/moving-jobs/JobFileManager';
 
 export const MovingJobs: React.FC = () => {
+  const { jobId } = useParams<{ jobId?: string }>();
+  const navigate = useNavigate();
   const [filterStatus, setFilterStatus] = useState('all');
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +36,19 @@ export const MovingJobs: React.FC = () => {
   useEffect(() => {
     loadJobs();
   }, [filterStatus]);
+
+  // Auto-open job report if jobId is in URL
+  useEffect(() => {
+    if (jobId && jobs.length > 0) {
+      const job = jobs.find(j => j.id === jobId);
+      if (job) {
+        setSelectedJob(job);
+        setReportModalOpen(true);
+        // Clear the URL param after opening
+        navigate('/moving-jobs', { replace: true });
+      }
+    }
+  }, [jobId, jobs, navigate]);
 
   const loadJobs = async () => {
     try {

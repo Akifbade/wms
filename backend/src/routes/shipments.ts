@@ -1100,8 +1100,26 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
             name: true,
           },
         },
+        boxes: {
+          select: {
+            rackId: true,
+          },
+        },
       },
     });
+
+    // 🔧 FIX: Update rack CBM when shipment dimensions/CBM changes
+    const cbmChanged = cbm !== undefined || hasNewDimensions;
+    if (cbmChanged && shipment.boxes && shipment.boxes.length > 0) {
+      // Get unique rack IDs from shipment boxes
+      const rackIds = [...new Set(shipment.boxes.filter((b: any) => b.rackId).map((b: any) => b.rackId))];
+      
+      // Update each rack's CBM
+      for (const rackId of rackIds) {
+        await updateRackCapacityAndCBM(prisma, rackId, companyId);
+        console.log(`✅ Updated rack ${rackId} CBM after shipment ${id} dimension change`);
+      }
+    }
 
     res.json({ shipment });
   } catch (error) {

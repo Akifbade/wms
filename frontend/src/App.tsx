@@ -138,6 +138,11 @@ function App() {
                   <MovingJobs />
                 </ProtectedRoute>
               } />
+              <Route path="moving-jobs/:jobId" element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                  <MovingJobs />
+                </ProtectedRoute>
+              } />
               <Route path="job-reports" element={
                 <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                   <JobReportsDashboard />
