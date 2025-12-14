@@ -41,8 +41,12 @@ git reset --hard origin/stable/prisma-mysql-production
 
 # 3. REBUILD & RESTART
 echo "🏗️ Restarting Containers with New Images..."
+
+# Force remove old containers to prevent name conflicts
+echo "  - Removing old containers..."
+docker rm -f wms-backend wms-frontend wms-database || true
+
 # Ensure we are using the production compose file
-docker-compose -f docker-compose-production.yml down --remove-orphans
 docker-compose -f docker-compose-production.yml up -d
 
 # 4. CLEANUP
