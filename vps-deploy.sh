@@ -31,39 +31,41 @@ fi
 
 echo "✅ Backup Complete."
 
-# 2. SETUP NETWORK
-echo "🌐 Setting up Docker network..."
-docker network create wms-network 2>/dev/null || true
+# 2. CLEANUP OLD NETWORKS AND CONTAINERS
+echo "🧹 Cleaning up old resources..."
+docker stop wms-backend wms-frontend wms-database 2>/dev/null || true
+docker rm -f wms-backend wms-frontend wms-database 2>/dev/null || true
 
-# 3. STOP OLD CONTAINERS
-echo "🛑 Stopping old containers..."
-docker stop wms-backend wms-frontend 2>/dev/null || true
-docker rm -f wms-backend wms-frontend 2>/dev/null || true
+# Remove old/duplicate networks
+docker network rm newstart_wms-network 2>/dev/null || true
+docker network rm wms-prod-network 2>/dev/null || true
+docker network rm newstart_default 2>/dev/null || true
 
-# 4. CHECK IF DATABASE EXISTS
-if docker ps -q -f name=wms-database | grep -q .; then
-    echo "✅ Database already running, connecting to network..."
-    docker network connect wms-network wms-database 2>/dev/null || true
-else
-    echo "🗄️ Starting database..."
-    docker rm -f wms-database 2>/dev/null || true
-    docker volume create mysql_prod_data 2>/dev/null || true
-    docker run --rm -v mysql_prod_data:/var/lib/mysql alpine chown -R 999:999 /var/lib/mysql 2>/dev/null || true
-    
-    docker run -d --name wms-database \
-      --network wms-network \
-      -e MYSQL_ROOT_PASSWORD=rootpassword123 \
-      -e MYSQL_DATABASE=warehouse_wms \
-      -e MYSQL_USER=wms_user \
-      -e MYSQL_PASSWORD=wmspassword123 \
-      -p 3307:3306 \
-      -v mysql_prod_data:/var/lib/mysql \
-      --restart always \
-      mysql:8.0
-    
-    echo "⏳ Waiting 30s for database to initialize..."
-    sleep 30
-fi
+# Create fresh network
+docker network rm wms-network 2>/dev/null || true
+echo "🌐 Creating fresh Docker network..."
+docker network create wms-network
+
+# 3. FIX DATABASE VOLUME PERMISSIONS
+echo "🔧 Fixing database permissions..."
+docker volume create mysql_prod_data 2>/dev/null || true
+docker run --rm -v mysql_prod_data:/var/lib/mysql alpine chown -R 999:999 /var/lib/mysql 2>/dev/null || true
+
+# 4. START DATABASE
+echo "🗄️ Starting database..."
+docker run -d --name wms-database \
+  --network wms-network \
+  -e MYSQL_ROOT_PASSWORD=rootpassword123 \
+  -e MYSQL_DATABASE=warehouse_wms \
+  -e MYSQL_USER=wms_user \
+  -e MYSQL_PASSWORD=wmspassword123 \
+  -p 3307:3306 \
+  -v mysql_prod_data:/var/lib/mysql \
+  --restart always \
+  mysql:8.0
+
+echo "⏳ Waiting 20s for database..."
+sleep 20
 
 # 5. START BACKEND
 echo "⚙️ Starting backend..."
@@ -79,6 +81,9 @@ docker run -d --name wms-backend \
   --restart always \
   ghcr.io/akifbade/wms-backend:latest
 
+echo "⏳ Waiting 10s for backend..."
+sleep 10
+
 # 6. START FRONTEND
 echo "🌐 Starting frontend..."
 docker run -d --name wms-frontend \
@@ -91,30 +96,40 @@ docker run -d --name wms-frontend \
   --restart always \
   ghcr.io/akifbade/wms-frontend:latest
 
-# 7. WAIT AND VERIFY
-echo "⏳ Waiting 10 seconds for services to start..."
-sleep 10
+echo "⏳ Waiting 5s for frontend..."
+sleep 5
 
-# 8. HEALTH CHECK
-echo "🔍 Running health checks..."
+# 7. VERIFY NETWORK CONNECTIVITY
+echo "🔍 Verifying network connectivity..."
+docker network inspect wms-network --format '{{range .Containers}}{{.Name}} {{end}}'
+
+# Test from inside frontend
+echo "🔍 Testing frontend → backend connection..."
+if docker exec wms-frontend wget -q -O- http://wms-backend:5000/api/health 2>/dev/null | grep -q "ok"; then
+    echo "✅ Internal connectivity: OK"
+else
+    echo "❌ Internal connectivity: FAILED"
+    docker logs wms-backend --tail 20
+fi
+
+# 8. EXTERNAL HEALTH CHECK
+echo "🔍 Running external health checks..."
 if curl -s http://localhost:5000/api/health | grep -q "ok"; then
-    echo "✅ Backend: HEALTHY"
+    echo "✅ Backend API: HEALTHY"
 else
-    echo "❌ Backend: Check logs with 'docker logs wms-backend'"
+    echo "❌ Backend API: Check 'docker logs wms-backend'"
 fi
 
-if curl -s -o /dev/null -w '%{http_code}' http://localhost:80 | grep -q "200\|301\|302"; then
-    echo "✅ Frontend: HEALTHY"
-else
-    echo "❌ Frontend: Check logs with 'docker logs wms-frontend'"
-fi
-
-# 9. CLEANUP
+# 9. CLEANUP UNUSED
 echo "🧹 Cleaning up unused images..."
 docker image prune -f
+docker network prune -f 2>/dev/null || true
 
 echo ""
 echo "=========================================="
 echo "✅ DEPLOYMENT COMPLETE!"
 echo "=========================================="
 docker ps --format 'table {{.Names}}\t{{.Status}}'
+echo ""
+echo "Network containers:"
+docker network inspect wms-network --format '{{range .Containers}}  - {{.Name}}{{"\n"}}{{end}}'
