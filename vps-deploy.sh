@@ -46,6 +46,12 @@ echo "🏗️ Restarting Containers with New Images..."
 echo "  - Removing old containers..."
 docker rm -f wms-backend wms-frontend wms-database || true
 
+# Fix MySQL Volume Permissions (Critical for startup)
+echo "  - Fixing database permissions..."
+docker volume create mysql_prod_data || true
+# Run a temporary container to chown the volume data
+docker run --rm -v mysql_prod_data:/var/lib/mysql alpine chown -R 999:999 /var/lib/mysql
+
 # Ensure we are using the production compose file
 docker-compose -f docker-compose-production.yml up -d
 

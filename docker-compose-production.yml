@@ -128,12 +128,6 @@ networks:
       # ===== PRODUCTION VOLUMES =====
 volumes:
   mysql_prod_data:
-    driver: local
-    name: mysql_prod_data
-    # Production: Use local storage with backups
-    driver_opts:
-      type: none
-      o: bind
-      device: /var/lib/docker/volumes/mysql_prod_data/_data
+    external: true
 
 
