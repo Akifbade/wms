@@ -734,6 +734,16 @@ async function handleCreateIssue(req: AuthRequest, res: any) {
       return res.status(404).json({ error: "Material not found" });
     }
 
+    // Check if sufficient stock is available - PREVENT NEGATIVE STOCK
+    const availableStock = material.totalQuantity || 0;
+    if (quantity > availableStock) {
+      return res.status(400).json({ 
+        error: `Insufficient stock. Available: ${availableStock} ${material.unit || 'pcs'}, Requested: ${quantity}`,
+        availableStock,
+        requestedQuantity: quantity
+      });
+    }
+
     const unitCost = batch?.unitCost || material.unitCost || 0;
     const totalCost = quantity * unitCost;
 
@@ -2121,17 +2131,24 @@ router.get("/:materialId/history", authenticateToken as any, async (req: AuthReq
 
     for (const ret of returns) {
       if (ret.quantityGood > 0 && ret.issue) {
-        runningBalance += ret.quantityGood;
+        // Only add to running balance if return has been restocked (approved)
+        const isRestocked = ret.restocked === true;
+        if (isRestocked) {
+          runningBalance += ret.quantityGood;
+        }
         transactions.push({
           id: ret.id,
-          type: 'RETURN',
+          type: isRestocked ? 'RETURN' : 'RETURN_PENDING',
           quantity: ret.quantityGood,
           balanceAfter: runningBalance,
           date: ret.recordedAt,
           details: {
             jobCode: ret.issue.job.jobCode,
             jobTitle: ret.issue.job.jobTitle,
-            notes: ret.notes || 'Good condition materials returned to stock'
+            notes: isRestocked 
+              ? (ret.notes || 'Good condition materials returned to stock')
+              : '🕒 WAITING FOR APPROVAL - Not yet added to stock',
+            isPending: !isRestocked
           }
         });
       }
@@ -2140,13 +2157,16 @@ router.get("/:materialId/history", authenticateToken as any, async (req: AuthReq
     // Sort all transactions by date
     transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Calculate summary
+    // Calculate summary - only count restocked returns
+    const restockedReturns = returns.filter((r: any) => r.restocked === true);
+    const pendingReturns = returns.filter((r: any) => r.restocked === false);
     const summary = {
       currentStock: material.totalQuantity,
       totalPurchased: batches.reduce((sum: number, b: any) => sum + b.quantityPurchased, 0),
       totalIssued: issues.reduce((sum: number, i: any) => sum + i.quantity, 0),
-      totalReturned: returns.reduce((sum: number, r: any) => sum + r.quantityGood, 0),
-      totalDamaged: returns.reduce((sum: number, r: any) => sum + r.quantityDamaged, 0)
+      totalReturned: restockedReturns.reduce((sum: number, r: any) => sum + r.quantityGood, 0),
+      totalDamaged: returns.reduce((sum: number, r: any) => sum + r.quantityDamaged, 0),
+      pendingReturns: pendingReturns.reduce((sum: number, r: any) => sum + r.quantityGood, 0)
     };
 
     res.json({ transactions, summary });
