@@ -60,9 +60,19 @@ export const Shipments: React.FC = () => {
   const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
+  // Debounced search - wait 500ms after user stops typing
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     loadShipments();
-  }, [activeStatus, searchTerm, sortBy]);
+  }, [activeStatus, debouncedSearch, sortBy]);
 
   const loadShipments = async () => {
     try {
@@ -92,9 +102,9 @@ export const Shipments: React.FC = () => {
         filtered = allShipments.filter((s: any) => statusMap[activeStatus]?.includes(s.status));
       }
 
-      // Filter by search
-      if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase();
+      // Filter by search (using debounced value)
+      if (debouncedSearch.trim()) {
+        const q = debouncedSearch.toLowerCase();
         filtered = filtered.filter((s: any) =>
           s.clientName?.toLowerCase().includes(q) ||
           s.referenceId?.toLowerCase().includes(q) ||
@@ -189,13 +199,39 @@ export const Shipments: React.FC = () => {
     }
   };
 
-  // Group by company
+  // Group by company - items inside each folder are already sorted from loadShipments
   const groupedByCompany = shipments.reduce((acc: any, shipment: any) => {
     const company = shipment.companyProfile?.name || 'Unassigned';
     if (!acc[company]) acc[company] = [];
     acc[company].push(shipment);
     return acc;
-  }, {});
+  }, {}) as Record<string, any[]>;
+  
+  // Sort items within each folder based on sortBy
+  Object.keys(groupedByCompany).forEach(company => {
+    const getDate = (s: any) => new Date(s.arrivalDate || s.createdAt || 0).getTime();
+    const getDays = (s: any) => {
+      const src = s.arrivalDate || s.receivedDate || s.createdAt;
+      if (!src) return 0;
+      return Math.ceil((Date.now() - new Date(src).getTime()) / (1000 * 60 * 60 * 24));
+    };
+    
+    groupedByCompany[company].sort((a: any, b: any) => {
+      switch (sortBy) {
+        case 'date_desc': return getDate(b) - getDate(a);
+        case 'date_asc': return getDate(a) - getDate(b);
+        case 'name_asc': return (a.clientName || '').localeCompare(b.clientName || '');
+        case 'name_desc': return (b.clientName || '').localeCompare(a.clientName || '');
+        case 'cbm_desc': return (Number(b.cbm) || 0) - (Number(a.cbm) || 0);
+        case 'cbm_asc': return (Number(a.cbm) || 0) - (Number(b.cbm) || 0);
+        case 'duration_desc': return getDays(b) - getDays(a);
+        case 'duration_asc': return getDays(a) - getDays(b);
+        case 'pieces_desc': return (b.currentBoxCount || 0) - (a.currentBoxCount || 0);
+        case 'pieces_asc': return (a.currentBoxCount || 0) - (b.currentBoxCount || 0);
+        default: return getDate(b) - getDate(a);
+      }
+    });
+  });
 
   const toggleFolder = (name: string) => {
     const next = new Set(expandedFolders);

@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
-  "buildDate": "Dec 14, 2025",
-  "buildTime": "23:46:04",
-  "commit": "53205ed32",
-  "commitMessage": "feat: Add sort options (date/name/CBM/duration/pieces) - newest first default",
+  "buildDate": "Dec 15, 2025",
+  "buildTime": "00:10:04",
+  "commit": "4fac05b22",
+  "commitMessage": "fix: Sorting not working - use spread operator for React re-render",
   "author": "akifbade46-del",
   "environment": "local"
 }
