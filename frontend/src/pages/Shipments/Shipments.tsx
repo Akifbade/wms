@@ -550,9 +550,9 @@ export const Shipments: React.FC = () => {
         </div>
       </div>
 
-      {/* Folder View */}
+      {/* Folder View - Mobile Optimized */}
       {viewMode === 'folders' ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {Object.entries(groupedByCompany).map(([companyName, companyShipments]: [string, any]) => {
             const isExpanded = expandedFolders.has(companyName);
             const shipmentCount = companyShipments.length;
@@ -562,62 +562,47 @@ export const Shipments: React.FC = () => {
             const released = companyShipments.filter((s: any) => s.status === 'RELEASED').length;
 
             return (
-              <div key={companyName} className="bg-white rounded-lg shadow-sm border border-gray-300 overflow-hidden hover:shadow-md transition-shadow">
-                {/* Clean Folder Header */}
+              <div key={companyName} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                {/* Compact Folder Header */}
                 <button
                   onClick={() => toggleFolder(companyName)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group"
+                  className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="bg-gray-700 p-2.5 rounded-lg group-hover:bg-gray-800 transition-colors">
+                  <div className="flex items-center gap-2.5">
+                    <div className="bg-gray-700 p-1.5 rounded-md">
                       {isExpanded ? (
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
                         </svg>
                       ) : (
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                         </svg>
                       )}
                     </div>
                     <div className="text-left">
-                      <h3 className="text-lg font-bold text-gray-900">{companyName}</h3>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
-                        <span className="font-semibold">{shipmentCount} shipments</span>
-                        <span className="text-gray-400">•</span>
-                        <span className="font-semibold">{totalBoxes} boxes</span>
+                      <h3 className="text-sm font-bold text-gray-900">{companyName}</h3>
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                        <span className="font-semibold">{shipmentCount} ship</span>
+                        <span>•</span>
+                        <span className="font-semibold">{totalBoxes} box</span>
                         {inWarehouse > 0 && (
-                          <>
-                            <span className="text-gray-400">•</span>
-                            <span className="text-green-600 font-semibold">{inWarehouse} active</span>
-                          </>
-                        )}
-                        {partial > 0 && (
-                          <>
-                            <span className="text-gray-400">•</span>
-                            <span className="text-orange-600 font-semibold">{partial} partial</span>
-                          </>
-                        )}
-                        {released > 0 && (
-                          <>
-                            <span className="text-gray-400">•</span>
-                            <span className="text-gray-500 font-semibold">{released} released</span>
-                          </>
+                          <span className="text-green-600 font-bold">• {inWarehouse} ✓</span>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {/* Quick Stats */}
-                    <div className="hidden md:flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    {/* Compact Stats */}
+                    <div className="flex items-center gap-1 text-[10px]">
                       {inWarehouse > 0 && (
-                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded font-semibold">
-                          {inWarehouse} Active
+                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-bold">
+                          {inWarehouse}
                         </span>
                       )}
                       {partial > 0 && (
-                        <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded font-semibold">
-                          {partial} Partial
+                        <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-bold">
+                          {partial}
                         </span>
                       )}
                     </div>
@@ -648,94 +633,69 @@ export const Shipments: React.FC = () => {
                                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] md:text-xs font-semibold ${badge.color}`}>
                                       {badge.icon} {badge.label}
                                     </span>
-                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] md:text-xs font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
+                                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
                                       {storageBadge.icon} {storageBadge.badge}
                                     </span>
                                   </div>
-                                  <p className="text-sm text-gray-700 font-medium mt-1 truncate">{shipment.clientName}</p>
-                                </div>
-                                {/* Quick Action Buttons - Visible on Mobile */}
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => {
-                                      setSelectedShipment(shipment);
-                                      setDetailModalOpen(true);
-                                    }}
-                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                                    title="View"
-                                  >
-                                    <EyeIcon className="h-5 w-5" />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setSelectedShipment(shipment);
-                                      setEditModalOpen(true);
-                                    }}
-                                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg"
-                                    title="Edit"
-                                  >
-                                    <PencilIcon className="h-5 w-5" />
-                                  </button>
+                                  <p className="text-xs text-gray-700 font-medium mt-0.5 truncate">{shipment.clientName}</p>
                                 </div>
                               </div>
 
-                              {/* Key Info Row */}
-                              <div className="flex flex-wrap gap-2 text-xs">
-                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 text-purple-700 rounded">
-                                  📦 {shipment.currentBoxCount}/{shipment.originalBoxCount} boxes
+                              {/* Compact Info Pills */}
+                              <div className="flex flex-wrap gap-1 text-[10px]">
+                                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded font-medium">
+                                  📦 {shipment.currentBoxCount}/{shipment.originalBoxCount}
                                 </span>
-                                {shipment.clientPhone && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded">
-                                    📞 {shipment.clientPhone}
+                                {shipment.cbm > 0 && (
+                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded font-medium">
+                                    📐 {Number(shipment.cbm).toFixed(1)}
                                   </span>
                                 )}
-                                {shipment.cbm > 0 && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded">
-                                    📐 {Number(shipment.cbm).toFixed(2)} CBM
+                                {shipment.rackLocations && shipment.rackLocations !== 'N/A' && (
+                                  <span className="px-1.5 py-0.5 bg-gray-700 text-white rounded font-medium">
+                                    📍 {shipment.rackLocations.split(',')[0].trim()}
+                                    {shipment.rackLocations.split(',').length > 1 && ` +${shipment.rackLocations.split(',').length - 1}`}
                                   </span>
                                 )}
                               </div>
 
-                              {/* Rack Locations */}
-                              {shipment.rackLocations && shipment.rackLocations !== 'N/A' && (
-                                <div className="flex flex-wrap gap-1">
-                                  {shipment.rackLocations.split(',').slice(0, 3).map((rack: string, idx: number) => (
-                                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-700 text-white text-[10px] md:text-xs font-semibold">
-                                      📍 {rack.trim()}
-                                    </span>
-                                  ))}
-                                  {shipment.rackLocations.split(',').length > 3 && (
-                                    <span className="text-xs text-gray-500">+{shipment.rackLocations.split(',').length - 3} more</span>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Action Buttons Row - Desktop */}
-                              <div className="hidden md:flex items-center gap-2 pt-2 border-t border-gray-100">
+                              {/* ALL Action Buttons - Always Visible */}
+                              <div className="flex items-center gap-1 pt-1.5 border-t border-gray-100 overflow-x-auto no-scrollbar -mx-1 px-1">
                                 <button
-                                  onClick={() => {
-                                    setSelectedShipment(shipment);
-                                    setQrModalOpen(true);
-                                  }}
-                                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                                  onClick={() => { setSelectedShipment(shipment); setDetailModalOpen(true); }}
+                                  className="flex-shrink-0 flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md"
                                 >
-                                  <QrCodeIcon className="h-4 w-4" />
+                                  <EyeIcon className="h-3.5 w-3.5" />
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => { setSelectedShipment(shipment); setQrModalOpen(true); }}
+                                  className="flex-shrink-0 flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-md"
+                                >
+                                  <QrCodeIcon className="h-3.5 w-3.5" />
                                   QR
+                                </button>
+                                <button
+                                  onClick={() => { setSelectedShipment(shipment); setEditModalOpen(true); }}
+                                  className="flex-shrink-0 flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md"
+                                >
+                                  <PencilIcon className="h-3.5 w-3.5" />
+                                  Edit
                                 </button>
                                 {shipment.status !== 'RELEASED' && (
                                   <button
                                     onClick={() => handleReleaseClick(shipment)}
-                                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                                    className="flex-shrink-0 flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-semibold text-white bg-green-600 hover:bg-green-700 rounded-md"
                                   >
-                                    <ArrowRightOnRectangleIcon className="h-4 w-4" />
+                                    <ArrowRightOnRectangleIcon className="h-3.5 w-3.5" />
                                     Release
                                   </button>
                                 )}
                                 <button
                                   onClick={() => navigate(`/shipment/${shipment.id}`)}
-                                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                  className="flex-shrink-0 flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md"
                                 >
-                                  <DocumentTextIcon className="h-4 w-4" />
+                                  <DocumentTextIcon className="h-3.5 w-3.5" />
                                   Report
                                 </button>
                               </div>

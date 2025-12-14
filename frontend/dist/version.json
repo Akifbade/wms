@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 14, 2025",
-  "buildTime": "21:01:53",
-  "commit": "66d4fa61c",
-  "commitMessage": "fix: use code column in rack recalc",
+  "buildTime": "21:25:59",
+  "commit": "25bebd6d5",
+  "commitMessage": "v2.3.0 - Mobile UI Complete Overhaul: MobileNav, responsive pages",
   "author": "akifbade46-del",
   "environment": "local"
 }
