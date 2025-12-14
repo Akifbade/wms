@@ -1,9 +1,13 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.2.85**
-- **Released**: Dec 14, 2025 at 13:26:21
+## Current Version: **v2.2.86**
+- **Released**: Dec 14, 2025 at 16:30:00
 - **Author**: akifbade46-del
 - **Status**: Development
+
+### Changes in v2.2.86:
+- 🔧 Fixed version sync across all files (backend, frontend, VERSION.md)
+- 📧 Verified physical report email integration code
 
 ### Changes in v2.2.69:
 - 📄 **Contract System**: Replaced "Prepaid Balance" with "Contract System"
