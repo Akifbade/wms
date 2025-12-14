@@ -885,7 +885,7 @@ export const Shipments: React.FC = () => {
                                   <PencilIcon className="w-5 h-5 relative z-10" />
                                   <span className="relative z-10">Edit</span>
                                 </button>
-                                {(shipment.status === 'IN_WAREHOUSE' || shipment.status === 'PARTIAL') && (
+                                {(shipment.status === 'IN_WAREHOUSE' || shipment.status === 'IN_STORAGE' || shipment.status === 'PARTIAL' || shipment.status === 'ACTIVE' || shipment.status === 'STORED') && (
                                   <button
                                     onClick={() => handleReleaseClick(shipment)}
                                     className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
