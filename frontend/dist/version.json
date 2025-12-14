@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 14, 2025",
-  "buildTime": "21:25:59",
-  "commit": "25bebd6d5",
-  "commitMessage": "v2.3.0 - Mobile UI Complete Overhaul: MobileNav, responsive pages",
+  "buildTime": "21:50:37",
+  "commit": "aad83f9b6",
+  "commitMessage": "v2.3.1 - Super compact mobile UI: smaller fonts, all buttons visible, app-like navigation",
   "author": "akifbade46-del",
   "environment": "local"
 }

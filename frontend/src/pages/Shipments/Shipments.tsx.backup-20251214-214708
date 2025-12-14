@@ -1,0 +1,964 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  PlusIcon,
+  MagnifyingGlassIcon,
+  QrCodeIcon,
+  EyeIcon,
+  PencilIcon,
+  TrashIcon,
+  ArrowRightOnRectangleIcon,
+  BuildingStorefrontIcon,
+  HomeIcon,
+  FunnelIcon,
+  PrinterIcon,
+  DocumentTextIcon,
+  ArrowDownTrayIcon
+} from '@heroicons/react/24/outline';
+import { shipmentsAPI, getBackendUrl } from '../../services/api';
+import { ReleaseNoteModal } from '../../components/ReleaseNoteModal';
+import { WithdrawalModal } from '../../components/WithdrawalModal';
+import WHMShipmentModal from '../../components/WHMShipmentModal';
+import EditShipmentModal from '../../components/EditShipmentModal';
+import ShipmentDetailModal from '../../components/ShipmentDetailModal';
+import BoxQRModal from '../../components/BoxQRModal';
+import ShipmentsPrintReport from '../../components/ShipmentsPrintReport';
+import { ShipmentPhoto } from '../../components/ShipmentPhoto';
+
+export const Shipments: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'in_storage' | 'partial' | 'released'>('all');
+  const [warehouseFilter, setWarehouseFilter] = useState<'all' | 'regular' | 'warehouse'>('all');
+  const [shipments, setShipments] = useState<any[]>([]);
+  const [statusCounts, setStatusCounts] = useState({ all: 0, pending: 0, in_storage: 0, partial: 0, released: 0 });
+  const [warehouseCounts, setWarehouseCounts] = useState({ all: 0, regular: 0, warehouse: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
+  const [selectedShipment, setSelectedShipment] = useState<any>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [releaseNoteModalOpen, setReleaseNoteModalOpen] = useState(false);
+  const [releaseNoteData, setReleaseNoteData] = useState<any>(null);
+
+  useEffect(() => {
+    loadShipments();
+  }, [activeTab, warehouseFilter, searchTerm]);
+
+  const loadShipments = async () => {
+    try {
+      setLoading(true);
+
+      // Load all shipments first for counts (without filters)
+      // 🔧 FIX: Request high limit to get ALL shipments, not just first 50
+      const allData = await shipmentsAPI.getAll({ limit: 2000 });
+      const allShipments = allData.shipments || [];
+
+      // Calculate status counts (Schema: PENDING, IN_WAREHOUSE, PARTIAL, RELEASED)
+      const counts = {
+        all: allShipments.length,
+        pending: allShipments.filter((s: any) => s.status === 'PENDING').length,
+        in_storage: allShipments.filter((s: any) => s.status === 'IN_WAREHOUSE' || s.status === 'IN_STORAGE' || s.status === 'ACTIVE').length, // Support all variants
+        partial: allShipments.filter((s: any) => s.status === 'PARTIAL').length,
+        released: allShipments.filter((s: any) => s.status === 'RELEASED').length
+      };
+      setStatusCounts(counts);
+
+      // Calculate warehouse counts
+      const warehouseCounts = {
+        all: allShipments.length,
+        regular: allShipments.filter((s: any) => !s.isWarehouseShipment).length,
+        warehouse: allShipments.filter((s: any) => s.isWarehouseShipment).length
+      };
+      setWarehouseCounts(warehouseCounts);
+
+      // Now load filtered shipments for display
+      // 🔧 FIX: Request high limit to get ALL shipments for Folder View
+      const params: any = { limit: 2000 };
+      if (activeTab !== 'all') {
+        params.status = activeTab === 'in_storage' ? 'IN_WAREHOUSE' : activeTab.toUpperCase();
+      }
+      if (warehouseFilter === 'regular') {
+        params.isWarehouseShipment = false;
+      } else if (warehouseFilter === 'warehouse') {
+        params.isWarehouseShipment = true;
+      }
+      if (searchTerm) params.search = searchTerm;
+
+      const data = await shipmentsAPI.getAll(params);
+      const loadedShipments = data.shipments || [];
+
+      // 🔍 DEBUG: Log pallet breakdown data
+      console.log('📦 Shipments loaded with pallet data:', loadedShipments.map((s: any) => ({
+        id: s.referenceId,
+        status: s.status,
+        boxes: s.boxes?.length || 0,
+        photos: s.shipmentPhotos?.length || 0,
+        sampleBox: s.boxes?.[0] ? {
+          boxNum: s.boxes[0].boxNumber,
+          pieceQR: s.boxes[0].pieceQR
+        } : null
+      })));
+
+      setShipments(loadedShipments);
+    } catch (err: any) {
+      setError(err.message);
+      console.error('Load shipments error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const shipment = shipments.find(s => s.id === id);
+    const confirmMsg = `🚨 DELETE SHIPMENT\n\n` +
+      `Reference: ${shipment?.referenceId || 'N/A'}\n` +
+      `Client: ${shipment?.clientName || 'N/A'}\n` +
+      `Boxes: ${shipment?.currentBoxCount || 0}\n\n` +
+      `⚠️ This action CANNOT be undone!\n\n` +
+      `Are you sure you want to delete this shipment?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      await shipmentsAPI.delete(id);
+      alert('✅ Shipment deleted successfully!');
+      loadShipments(); // Reload list
+    } catch (err: any) {
+      alert('❌ Error deleting shipment: ' + err.message);
+    }
+  };
+
+  const handleReleaseClick = (shipment: any) => {
+    setSelectedShipment(shipment);
+    setWithdrawalModalOpen(true); // Opens WithdrawalModal → PaymentBeforeReleaseModal
+  };
+
+  const handlePrintReleaseNote = (shipment: any) => {
+    // Open release receipt page with shipment ID
+    window.open(`/release-receipt.html?shipmentId=${shipment.id}`, '_blank');
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'PENDING':
+        return { color: 'bg-yellow-100 text-yellow-800', icon: '⏳', label: 'Pending' };
+      case 'IN_WAREHOUSE':
+        return { color: 'bg-green-100 text-green-800', icon: '🏢', label: 'In Warehouse' };
+      case 'IN_STORAGE': // Legacy support
+        return { color: 'bg-green-100 text-green-800', icon: '🏢', label: 'In Warehouse' };
+      case 'ACTIVE': // Legacy support
+        return { color: 'bg-green-100 text-green-800', icon: '🏢', label: 'In Warehouse' };
+      case 'PARTIAL':
+        return { color: 'bg-orange-100 text-orange-800', icon: '⚠', label: 'Partial' };
+      case 'RELEASED':
+        return { color: 'bg-blue-100 text-blue-800', icon: '🔵', label: 'Released' };
+      default:
+        return { color: 'bg-gray-100 text-gray-800', icon: '⚪', label: status };
+    }
+  };
+
+  // Determine intake type based on pallet metadata
+  const getIntakeType = (shipment: any) => {
+    const palletCount = Number(shipment?.palletCount) || 0;
+    const boxesPerPallet = Number(shipment?.boxesPerPallet) || 0;
+    // Heuristic: any pallet structure => Pallet; otherwise Box
+    if (palletCount > 1) return 'PALLET';
+    if (palletCount === 1 && boxesPerPallet > 1) return 'PALLET';
+    return 'BOX';
+  };
+
+  // Compute days stored from arrivalDate (fallback to createdAt)
+  const getDaysStored = (shipment: any) => {
+    const src = shipment?.arrivalDate || shipment?.receivedDate || shipment?.createdAt;
+    if (!src) return 0;
+    const start = new Date(src);
+    if (Number.isNaN(start.getTime())) return 0;
+    const now = new Date();
+    const ms = now.getTime() - start.getTime();
+    const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
+    return Math.max(0, days);
+  };
+
+  // 🎯 NEW SAFE HELPER FUNCTIONS (UI only - no logic changes)
+  const getFormattedDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'N/A';
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  const getPalletInfo = (shipment: any) => {
+    const assigned = shipment.originalBoxCount - shipment.currentBoxCount;
+    const remaining = shipment.currentBoxCount;
+
+    if (shipment.status === 'PARTIAL' && assigned > 0) {
+      // Show clear assignment status for partial shipments
+      return `✅ ${assigned} assigned, ⏳ ${remaining} pending`;
+    }
+
+    if (shipment.palletCount > 0 && shipment.boxesPerPallet > 0) {
+      return `${shipment.palletCount} pallets × ${shipment.boxesPerPallet} boxes`;
+    }
+
+    return `${shipment.currentBoxCount || 0} boxes total`;
+  };
+
+  const getStorageBadge = (days: number) => {
+    if (days < 30) return { badge: `${days}d`, color: 'green', icon: '🟢', text: 'text-green-700', bg: 'bg-green-100' };
+    if (days < 60) return { badge: `${days}d`, color: 'yellow', icon: '🟡', text: 'text-yellow-700', bg: 'bg-yellow-100' };
+    return { badge: `${days}d`, color: 'red', icon: '🔴', text: 'text-red-700', bg: 'bg-red-100' };
+  };
+
+  // Calculate long-stay shipments for warning badges
+  const longStayCounts = {
+    warning: shipments.filter(s => {
+      const days = getDaysStored(s);
+      return days >= 30 && days < 60;
+    }).length,
+    urgent: shipments.filter(s => {
+      const days = getDaysStored(s);
+      return days >= 60;
+    }).length
+  };
+
+  // Track selected company filter
+  const [selectedCompany, setSelectedCompany] = useState<string>('');
+
+  // Client-side advanced filtering for instant search
+  const filteredShipments = shipments.filter((shipment: any) => {
+    // Company filter (if set)
+    if (selectedCompany && shipment.companyProfile?.name !== selectedCompany) {
+      return false;
+    }
+
+    // Search filter
+    if (!searchTerm.trim()) return true;
+
+    const searchLower = searchTerm.toLowerCase();
+
+    // Search across multiple fields
+    return (
+      shipment.clientName?.toLowerCase().includes(searchLower) ||
+      shipment.referenceId?.toLowerCase().includes(searchLower) ||
+      shipment.clientPhone?.toLowerCase().includes(searchLower) ||
+      shipment.companyProfile?.name?.toLowerCase().includes(searchLower) ||
+      shipment.barcode?.toLowerCase().includes(searchLower) ||
+      shipment.clientAddress?.toLowerCase().includes(searchLower) ||
+      shipment.status?.toLowerCase().includes(searchLower) ||
+      shipment.rackLocation?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Group shipments by company for folder view
+  const groupedByCompany = filteredShipments.reduce((acc: any, shipment: any) => {
+    const companyName = shipment.companyProfile?.name || 'No Company';
+    if (!acc[companyName]) {
+      acc[companyName] = [];
+    }
+    acc[companyName].push(shipment);
+    return acc;
+  }, {});
+
+  // Track expanded folders
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'table' | 'folders'>('folders'); // Default to folder view
+
+  const toggleFolder = (companyName: string) => {
+    const newExpanded = new Set(expandedFolders);
+    if (newExpanded.has(companyName)) {
+      newExpanded.delete(companyName);
+    } else {
+      newExpanded.add(companyName);
+    }
+    setExpandedFolders(newExpanded);
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading shipments...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-3 md:p-6 space-y-4 md:space-y-6 pb-20 md:pb-6">
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col gap-3 bg-white rounded-xl shadow-sm p-4 md:p-6 border border-slate-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl md:text-3xl font-semibold text-slate-900">
+              📦 Shipments
+            </h1>
+            <p className="text-sm text-slate-600 mt-1 hidden md:block">Complete warehouse management with intake, tracking, and release</p>
+          </div>
+          {/* Desktop buttons */}
+          <div className="hidden md:flex gap-3">
+            <ShipmentsPrintReport
+              shipments={filteredShipments}
+              searchTerm={searchTerm}
+              activeTab={activeTab}
+              warehouseFilter={warehouseFilter}
+            />
+            <button
+              onClick={() => setCreateModalOpen(true)}
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              <PlusIcon className="h-5 w-5 mr-2" />
+              New Shipment
+            </button>
+          </div>
+        </div>
+        {/* Mobile Quick Stats */}
+        <div className="flex md:hidden gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex-shrink-0 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-medium">
+            🏢 {statusCounts.in_storage} Active
+          </div>
+          <div className="flex-shrink-0 px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg text-xs font-medium">
+            ⏳ {statusCounts.pending} Pending
+          </div>
+          <div className="flex-shrink-0 px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-xs font-medium">
+            ⚠️ {statusCounts.partial} Partial
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile FAB for New Shipment */}
+      <button
+        onClick={() => setCreateModalOpen(true)}
+        className="md:hidden fab"
+      >
+        <PlusIcon className="h-6 w-6" />
+      </button>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {/* Warehouse Type Filter - Mobile Scroll */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6">
+        <div className="flex items-center gap-3 mb-3 md:mb-4">
+          <div className="p-2 bg-slate-900 rounded-lg">
+            <FunnelIcon className="h-4 w-4 md:h-5 md:w-5 text-white" />
+          </div>
+          <span className="text-sm md:text-lg font-semibold text-slate-800">Filter by Type</span>
+        </div>
+        <div className="flex gap-2 md:gap-3 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
+          <button
+            onClick={() => setWarehouseFilter('all')}
+            className={`flex-shrink-0 px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-colors ${warehouseFilter === 'all'
+              ? 'bg-slate-900 text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+          >
+            All ({warehouseCounts.all})
+          </button>
+          <button
+            onClick={() => setWarehouseFilter('regular')}
+            className={`flex-shrink-0 px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-1 md:gap-2 ${warehouseFilter === 'regular'
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+          >
+            <HomeIcon className="h-3 w-3 md:h-4 md:w-4" />
+            Regular ({warehouseCounts.regular})
+          </button>
+          <button
+            onClick={() => setWarehouseFilter('warehouse')}
+            className={`flex-shrink-0 px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-1 md:gap-2 ${warehouseFilter === 'warehouse'
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+          >
+            <BuildingStorefrontIcon className="h-3 w-3 md:h-4 md:w-4" />
+            Warehouse ({warehouseCounts.warehouse})
+          </button>
+          {longStayCounts.warning > 0 && (
+            <button
+              className="flex-shrink-0 px-3 md:px-5 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium bg-yellow-500 text-white flex items-center gap-1"
+            >
+              🟡 {longStayCounts.warning}
+            </button>
+          )}
+          {longStayCounts.urgent > 0 && (
+            <button
+              className="flex-shrink-0 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium bg-red-600 text-white flex items-center gap-1"
+            >
+              🔴 {longStayCounts.urgent}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Status Tabs - Mobile Optimized */}
+      <div className="bg-white rounded-xl md:rounded-2xl shadow-sm md:shadow-lg border border-gray-100 overflow-hidden">
+        <div className="border-b border-gray-200 overflow-x-auto no-scrollbar">
+          <nav className="flex min-w-max">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`flex-1 min-w-[80px] py-3 md:py-5 px-3 md:px-6 text-center font-semibold text-xs md:text-sm transition-all ${activeTab === 'all'
+                ? 'border-b-3 md:border-b-4 border-indigo-600 text-indigo-600 bg-indigo-50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+            >
+              <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2">
+                <span>All</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold bg-indigo-600 text-white">
+                  {statusCounts.all}
+                </span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`flex-1 min-w-[80px] py-3 md:py-5 px-3 md:px-6 text-center font-semibold text-xs md:text-sm transition-all ${activeTab === 'pending'
+                ? 'border-b-3 md:border-b-4 border-yellow-600 text-yellow-600 bg-yellow-50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+            >
+              <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2">
+                <span>⏳ Pending</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold bg-yellow-500 text-white">
+                  {statusCounts.pending}
+                </span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('in_storage')}
+              className={`flex-1 min-w-[80px] py-3 md:py-5 px-3 md:px-6 text-center font-semibold text-xs md:text-sm transition-all ${activeTab === 'in_storage'
+                ? 'border-b-3 md:border-b-4 border-green-600 text-green-600 bg-green-50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+            >
+              <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2">
+                <span>🏢 Active</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold bg-green-600 text-white">
+                  {statusCounts.in_storage}
+                </span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('partial')}
+              className={`flex-1 min-w-[80px] py-3 md:py-5 px-3 md:px-6 text-center font-semibold text-xs md:text-sm transition-all ${activeTab === 'partial'
+                ? 'border-b-3 md:border-b-4 border-orange-600 text-orange-600 bg-orange-50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+            >
+              <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2">
+                <span>⚠️ Partial</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold bg-orange-600 text-white">
+                  {statusCounts.partial}
+                </span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('released')}
+              className={`flex-1 min-w-[80px] py-3 md:py-4 px-3 md:px-6 text-center font-semibold text-xs md:text-sm transition-colors ${activeTab === 'released'
+                ? 'border-b-2 border-blue-500 text-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2">
+                <span>✅ Released</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold bg-blue-600 text-white">
+                  {statusCounts.released}
+                </span>
+              </div>
+            </button>
+          </nav>
+        </div>
+
+        {/* Advanced Search & Filters - Mobile Optimized */}
+        <div className="p-3 md:p-6 bg-gradient-to-r from-gray-50 to-blue-50 border-t border-gray-200">
+          {/* View Mode Toggle - Hidden on Mobile (uses cards by default) */}
+          <div className="hidden md:flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setViewMode('folders')}
+                className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all duration-300 text-sm ${viewMode === 'folders'
+                  ? 'bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-2 border-gray-300 shadow-sm'
+                  }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                Folder View
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all duration-300 text-sm ${viewMode === 'table'
+                  ? 'bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-2 border-gray-300 shadow-sm'
+                  }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Table View
+              </button>
+            </div>
+          </div>
+          
+          {/* Search Bar */}
+          <div className="relative">
+            <div className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 p-1.5 md:p-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg">
+              <MagnifyingGlassIcon className="h-4 w-4 md:h-5 md:w-5 text-white" />
+            </div>
+            <input
+              type="text"
+              placeholder="🔍 Search client, reference, phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 md:pl-16 pr-10 md:pr-12 py-3 md:py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium shadow-sm"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2 p-1.5 md:p-2 bg-red-500 text-white rounded-lg"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          
+          {/* Company Filter - Desktop Only */}
+          <div className="hidden md:block mt-4">
+            <select
+              value={selectedCompany}
+              onChange={(e) => setSelectedCompany(e.target.value)}
+              className="w-full md:w-auto px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 text-sm font-medium appearance-none bg-white"
+            >
+              <option value="">All Companies</option>
+              {[...new Set(shipments.map((s: any) => s.companyProfile?.name).filter(Boolean))].sort().map((company: any) => (
+                <option key={company} value={company}>{company}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Folder View - Mobile Optimized */}
+      {viewMode === 'folders' ? (
+        <div className="space-y-2">
+          {Object.entries(groupedByCompany).map(([companyName, companyShipments]: [string, any]) => {
+            const isExpanded = expandedFolders.has(companyName);
+            const shipmentCount = companyShipments.length;
+            const totalBoxes = companyShipments.reduce((sum: number, s: any) => sum + (s.currentBoxCount || 0), 0);
+            const inWarehouse = companyShipments.filter((s: any) => s.status === 'IN_WAREHOUSE').length;
+            const partial = companyShipments.filter((s: any) => s.status === 'PARTIAL').length;
+            const released = companyShipments.filter((s: any) => s.status === 'RELEASED').length;
+
+            return (
+              <div key={companyName} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                {/* Compact Folder Header */}
+                <button
+                  onClick={() => toggleFolder(companyName)}
+                  className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="bg-gray-700 p-1.5 rounded-md">
+                      {isExpanded ? (
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-sm font-bold text-gray-900">{companyName}</h3>
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                        <span className="font-semibold">{shipmentCount} ship</span>
+                        <span>•</span>
+                        <span className="font-semibold">{totalBoxes} box</span>
+                        {inWarehouse > 0 && (
+                          <span className="text-green-600 font-bold">• {inWarehouse} ✓</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {/* Compact Stats */}
+                    <div className="flex items-center gap-1 text-[10px]">
+                      {inWarehouse > 0 && (
+                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-bold">
+                          {inWarehouse}
+                        </span>
+                      )}
+                      {partial > 0 && (
+                        <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-bold">
+                          {partial}
+                        </span>
+                      )}
+                    </div>
+                    <svg className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+
+                {/* Clean Folder Contents - Mobile Optimized */}
+                {isExpanded && (
+                  <div className="border-t border-gray-200 bg-gray-50">
+                    <div className="p-2 md:p-4 space-y-2 md:space-y-3">
+                      {companyShipments.map((shipment: any) => {
+                        const badge = getStatusBadge(shipment.status);
+                        const days = getDaysStored(shipment);
+                        const storageBadge = getStorageBadge(days);
+
+                        return (
+                          <div key={shipment.id} className="bg-white rounded-lg p-3 md:p-4 border border-gray-200 hover:border-gray-400 hover:shadow-md transition-all">
+                            {/* Mobile Card Layout */}
+                            <div className="space-y-3">
+                              {/* Header Row - Always Visible */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm md:text-base font-bold text-gray-900">{shipment.referenceId}</span>
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] md:text-xs font-semibold ${badge.color}`}>
+                                      {badge.icon} {badge.label}
+                                    </span>
+                                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
+                                      {storageBadge.icon} {storageBadge.badge}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-700 font-medium mt-0.5 truncate">{shipment.clientName}</p>
+                                </div>
+                              </div>
+
+                              {/* Compact Info Pills */}
+                              <div className="flex flex-wrap gap-1 text-[10px]">
+                                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded font-medium">
+                                  📦 {shipment.currentBoxCount}/{shipment.originalBoxCount}
+                                </span>
+                                {shipment.cbm > 0 && (
+                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded font-medium">
+                                    📐 {Number(shipment.cbm).toFixed(1)}
+                                  </span>
+                                )}
+                                {shipment.rackLocations && shipment.rackLocations !== 'N/A' && (
+                                  <span className="px-1.5 py-0.5 bg-gray-700 text-white rounded font-medium">
+                                    📍 {shipment.rackLocations.split(',')[0].trim()}
+                                    {shipment.rackLocations.split(',').length > 1 && ` +${shipment.rackLocations.split(',').length - 1}`}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* ALL Action Buttons - Always Visible */}
+                              <div className="flex items-center gap-1 pt-1.5 border-t border-gray-100 overflow-x-auto no-scrollbar -mx-1 px-1">
+                                <button
+                                  onClick={() => { setSelectedShipment(shipment); setDetailModalOpen(true); }}
+                                  className="flex-shrink-0 flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md"
+                                >
+                                  <EyeIcon className="h-3.5 w-3.5" />
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => { setSelectedShipment(shipment); setQrModalOpen(true); }}
+                                  className="flex-shrink-0 flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-md"
+                                >
+                                  <QrCodeIcon className="h-3.5 w-3.5" />
+                                  QR
+                                </button>
+                                <button
+                                  onClick={() => { setSelectedShipment(shipment); setEditModalOpen(true); }}
+                                  className="flex-shrink-0 flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md"
+                                >
+                                  <PencilIcon className="h-3.5 w-3.5" />
+                                  Edit
+                                </button>
+                                {shipment.status !== 'RELEASED' && (
+                                  <button
+                                    onClick={() => handleReleaseClick(shipment)}
+                                    className="flex-shrink-0 flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-semibold text-white bg-green-600 hover:bg-green-700 rounded-md"
+                                  >
+                                    <ArrowRightOnRectangleIcon className="h-3.5 w-3.5" />
+                                    Release
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => navigate(`/shipment/${shipment.id}`)}
+                                  className="flex-shrink-0 flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md"
+                                >
+                                  <DocumentTextIcon className="h-3.5 w-3.5" />
+                                  Report
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Table View */
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Reference ID</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Client</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Company</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Contact</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Pieces</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Type</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Rack Location</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Storage Duration</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredShipments.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="px-6 py-12 text-center">
+                      <div className="text-gray-400">
+                        <MagnifyingGlassIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p className="text-lg font-medium">No shipments found</p>
+                        <p className="text-sm mt-1">Try adjusting your search or filters</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredShipments.map((shipment: any) => (
+                    <tr key={shipment.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <QrCodeIcon className="h-5 w-5 text-gray-400 mr-2" />
+                          <span className="text-sm font-medium text-gray-900">{shipment.referenceId}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{shipment.clientName}</div>
+                        <div className="text-xs text-gray-500">{getFormattedDate(shipment.receivedDate)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {shipment.companyProfile?.name ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                            🏢 {shipment.companyProfile.name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">No company</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {shipment.clientPhone}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            📦 {shipment.currentBoxCount} / {shipment.originalBoxCount} pieces
+                          </span>
+                          <span className="text-xs text-gray-500">{getPalletInfo(shipment)}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {getIntakeType(shipment) === 'PALLET' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                              🪵 Pallet
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                              📦 Box
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {shipment.status === 'RELEASED' ? (
+                          shipment.rackLocations && shipment.rackLocations !== 'N/A' ? (
+                            <span className="text-sm text-gray-500 italic">
+                              🚪 Was in: {shipment.rackLocations}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )
+                        ) : shipment.rackLocations && shipment.rackLocations !== 'N/A' ? (
+                          (() => {
+                            const racks = shipment.rackLocations.split(',').map((r: string) => r.trim()).filter(Boolean);
+                            if (racks.length > 1) {
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {racks.map((rack: string, idx: number) => (
+                                    <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">
+                                      📍 {rack}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return <span className="text-sm font-medium text-primary-600">{racks[0]}</span>;
+                          })()
+                        ) : (
+                          <span className="text-sm text-gray-400">Not Assigned</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {(() => {
+                          const days = getDaysStored(shipment);
+                          const storageBadge = getStorageBadge(days);
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
+                              {storageBadge.icon} {storageBadge.badge}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {(() => {
+                          const badge = getStatusBadge(shipment.status);
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${badge.color}`}>
+                              <span>{badge.icon}</span>
+                              <span>{badge.label}</span>
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          {/* QR Code button - show for ALL shipments */}
+                          <button
+                            onClick={() => {
+                              setSelectedShipment(shipment);
+                              setQrModalOpen(true);
+                            }}
+                            className="group relative p-2 bg-gradient-to-r from-gray-700 to-gray-800 text-white rounded-lg hover:from-gray-800 hover:to-gray-900 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
+                            title="View/Print QR Codes"
+                          >
+                            <QrCodeIcon className="h-5 w-5" />
+                          </button>
+
+                          {/* Release button - only for stored shipments with boxes */}
+                          {(shipment.status === 'IN_STORAGE' ||
+                            shipment.status === 'IN_WAREHOUSE' ||
+                            shipment.status === 'PARTIAL' ||
+                            shipment.status === 'STORED' ||
+                            shipment.status === 'ACTIVE') &&
+                            shipment.currentBoxCount > 0 && (
+                              <button
+                                onClick={() => handleReleaseClick(shipment)}
+                                className="group relative p-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
+                                title="Generate Invoice & Release"
+                              >
+                                <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                              </button>
+                            )}
+                          {shipment.status === 'RELEASED' && (
+                            <button
+                              onClick={() => handlePrintReleaseNote(shipment)}
+                              className="group relative p-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
+                              title="Print Release Note"
+                            >
+                              <PrinterIcon className="h-5 w-5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedShipment(shipment);
+                              setDetailModalOpen(true);
+                            }}
+                            className="group relative p-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
+                            title="View Details"
+                          >
+                            <EyeIcon className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedShipment(shipment);
+                              setEditModalOpen(true);
+                            }}
+                            className="group relative p-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
+                            title="Edit Shipment"
+                          >
+                            <PencilIcon className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(shipment.id)}
+                            className="group relative p-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-300 transform hover:scale-110 hover:shadow-lg"
+                            title="Delete"
+                          >
+                            <TrashIcon className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* WHM Shipment Modal */}
+      <WHMShipmentModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSuccess={loadShipments}
+      />
+
+      {/* Edit Shipment Modal */}
+      <EditShipmentModal
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        shipment={selectedShipment}
+        onSuccess={loadShipments}
+      />
+
+      {/* Shipment Detail Modal */}
+      <ShipmentDetailModal
+        isOpen={detailModalOpen}
+        onClose={() => setDetailModalOpen(false)}
+        shipmentId={selectedShipment?.id || ''}
+      />
+
+      {/* Withdrawal Modal with Payment Integration */}
+      <WithdrawalModal
+        isOpen={withdrawalModalOpen}
+        onClose={() => setWithdrawalModalOpen(false)}
+        shipment={selectedShipment}
+        onSuccess={loadShipments}
+      />
+
+      {/* Box QR Codes Modal */}
+      <BoxQRModal
+        isOpen={qrModalOpen}
+        onClose={() => setQrModalOpen(false)}
+        shipmentId={selectedShipment?.id || ''}
+        shipmentRef={selectedShipment?.referenceId || ''}
+      />
+
+      {/* Release Note Modal (for reprinting) */}
+      {releaseNoteModalOpen && releaseNoteData && (
+        <ReleaseNoteModal
+          isOpen={releaseNoteModalOpen}
+          onClose={() => setReleaseNoteModalOpen(false)}
+          releaseData={releaseNoteData}
+        />
+      )}
+    </div>
+  );
+};
