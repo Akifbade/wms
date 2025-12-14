@@ -76,18 +76,16 @@ jobs:
             echo "🚀 Starting Deployment..."
             cd "/root/NEW START"
             
-            # 1. Update Code (to get latest vps-deploy.sh)
+            # 1. Update Code
+            echo "📥 Pulling latest code..."
             git fetch origin stable/prisma-mysql-production
             git reset --hard origin/stable/prisma-mysql-production
             
-            # 2. Login to GitHub Container Registry
-            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            
-            # 3. Pull latest images
+            # 2. Pull latest images from GHCR (public registry, no login needed for akifbade)
             echo "⬇️ Pulling images..."
-            docker pull ghcr.io/akifbade/wms-backend:latest
-            docker pull ghcr.io/akifbade/wms-frontend:latest
+            docker pull ghcr.io/akifbade/wms-backend:latest || true
+            docker pull ghcr.io/akifbade/wms-frontend:latest || true
             
-            # 4. Run Deployment Script
+            # 3. Run Deployment Script
             chmod +x vps-deploy.sh
             ./vps-deploy.sh
