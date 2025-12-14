@@ -216,14 +216,14 @@ export const Shipments: React.FC = () => {
     const isContract = shipment.companyProfile?.hasContract; // Assuming this field exists or logic
     
     return (
-      <div className="relative bg-white rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-all p-4 overflow-hidden group">
+      <div className="relative bg-white rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-all p-2 md:p-4 overflow-hidden group">
         {/* Stamps & Badges */}
         {isReleased && <ReleasedStamp />}
         {isContract ? <ContractBadge /> : <PrepaidBadge />}
 
-        <div className="flex flex-col md:flex-row gap-4 relative z-10">
+        <div className="flex flex-col md:flex-row gap-2 md:gap-4 relative z-10">
           {/* Left: Photo & Basic Info */}
-          <div className="flex gap-4 md:w-1/3">
+          <div className="flex gap-2 md:gap-4 md:w-1/3">
             {/* Photo Thumbnail */}
             <button
               onClick={() => {
@@ -233,7 +233,7 @@ export const Shipments: React.FC = () => {
                   setLightboxOpen(true);
                 }
               }}
-              className="relative flex-shrink-0 w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 hover:border-blue-400 transition-colors group/photo"
+              className="relative flex-shrink-0 w-14 h-14 md:w-24 md:h-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 hover:border-blue-400 transition-colors group/photo"
             >
               {photos.length > 0 ? (
                 <>
@@ -259,13 +259,13 @@ export const Shipments: React.FC = () => {
             </button>
 
             <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-bold text-blue-900 truncate" title={shipment.clientName}>
+              <h3 className="text-sm md:text-lg font-bold text-blue-900 truncate" title={shipment.clientName}>
                 {shipment.clientName}
               </h3>
-              <p className="text-xs font-mono text-slate-500 mt-0.5">{shipment.referenceId}</p>
+              <p className="text-[10px] md:text-xs font-mono text-slate-500 mt-0.5">{shipment.referenceId}</p>
               
               {shipment.companyProfile && (
-                <div className="flex items-center gap-1 mt-2 text-xs text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded-md w-fit">
+                <div className="flex items-center gap-1 mt-1 md:mt-2 text-[10px] md:text-xs text-blue-600 font-medium bg-blue-50 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md w-fit">
                   <BuildingOfficeIcon className="h-3 w-3" />
                   {shipment.companyProfile.name}
                 </div>
@@ -274,7 +274,7 @@ export const Shipments: React.FC = () => {
           </div>
 
           {/* Middle: Detailed Stats Grid */}
-          <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-y-3 gap-x-4 text-xs border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4">
+          <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-y-1.5 md:gap-y-3 gap-x-2 md:gap-x-4 text-[10px] md:text-xs border-t md:border-t-0 md:border-l border-slate-100 pt-2 md:pt-0 md:pl-4">
             {/* Row 1 */}
             <div className="space-y-1">
               <p className="text-slate-400 flex items-center gap-1"><CubeIcon className="h-3 w-3" /> Pieces</p>
@@ -320,31 +320,31 @@ export const Shipments: React.FC = () => {
           </div>
 
           {/* Right: Actions */}
-          <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4 min-w-[140px]">
-            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusStyle(shipment.status)}`}>
+          <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-1.5 md:gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-2 md:pt-0 md:pl-4 min-w-[140px]">
+            <span className={`px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold border ${getStatusStyle(shipment.status)}`}>
               {getStatusLabel(shipment.status)}
             </span>
 
-            <div className="flex items-center gap-1">
-              <button onClick={() => { setSelectedShipment(shipment); setDetailModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View Details">
-                <EyeIcon className="h-5 w-5" />
+            <div className="flex items-center gap-0.5 md:gap-1">
+              <button onClick={() => { setSelectedShipment(shipment); setDetailModalOpen(true); }} className="p-1 md:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View Details">
+                <EyeIcon className="h-4 md:h-5 w-4 md:w-5" />
               </button>
-              <button onClick={() => { setSelectedShipment(shipment); setQrModalOpen(true); }} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="QR Codes">
-                <QrCodeIcon className="h-5 w-5" />
+              <button onClick={() => { setSelectedShipment(shipment); setQrModalOpen(true); }} className="p-1 md:p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="QR Codes">
+                <QrCodeIcon className="h-4 md:h-5 w-4 md:w-5" />
               </button>
-              <button onClick={() => { setSelectedShipment(shipment); setEditModalOpen(true); }} className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
-                <PencilIcon className="h-5 w-5" />
+              <button onClick={() => { setSelectedShipment(shipment); setEditModalOpen(true); }} className="p-1 md:p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
+                <PencilIcon className="h-4 md:h-5 w-4 md:w-5" />
               </button>
               {canRelease && (
-                <button onClick={() => handleReleaseClick(shipment)} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Release">
-                  <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                <button onClick={() => handleReleaseClick(shipment)} className="p-1 md:p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Release">
+                  <ArrowRightOnRectangleIcon className="h-4 md:h-5 w-4 md:w-5" />
                 </button>
               )}
-              <button onClick={() => navigate(`/shipment/${shipment.id}`)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Report">
-                <DocumentTextIcon className="h-5 w-5" />
+              <button onClick={() => navigate(`/shipment/${shipment.id}`)} className="p-1 md:p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Report">
+                <DocumentTextIcon className="h-4 md:h-5 w-4 md:w-5" />
               </button>
-              <button onClick={() => handleDelete(shipment.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
-                <TrashIcon className="h-5 w-5" />
+              <button onClick={() => handleDelete(shipment.id)} className="p-1 md:p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                <TrashIcon className="h-4 md:h-5 w-4 md:w-5" />
               </button>
             </div>
           </div>
@@ -368,82 +368,85 @@ export const Shipments: React.FC = () => {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b border-blue-100 sticky top-0 z-20 shadow-sm">
-        <div className="px-4 py-4 md:px-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-blue-900">Shipments</h1>
-              <p className="text-sm text-slate-500 mt-1">Manage intake, storage, and release operations</p>
+        <div className="px-2 py-2 md:px-6 md:py-4">
+          <div className="flex flex-row items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h1 className="text-lg md:text-2xl font-bold text-blue-900">Shipments</h1>
+              <p className="text-xs md:text-sm text-slate-500 hidden md:block">Manage intake, storage, and release operations</p>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 md:gap-3">
               {/* View Toggle */}
-              <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+              <div className="flex bg-slate-100 p-0.5 md:p-1 rounded-lg border border-slate-200">
                 <button
                   onClick={() => setViewMode('folders')}
-                  className={`p-2 rounded-md transition-all ${viewMode === 'folders' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`p-1.5 md:p-2 rounded-md transition-all ${viewMode === 'folders' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                   title="Folder View"
                 >
-                  <FolderIcon className="h-5 w-5" />
+                  <FolderIcon className="h-4 md:h-5 w-4 md:w-5" />
                 </button>
                 <button
                   onClick={() => setViewMode('table')}
-                  className={`p-2 rounded-md transition-all ${viewMode === 'table' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`p-1.5 md:p-2 rounded-md transition-all ${viewMode === 'table' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                   title="Table View"
                 >
-                  <TableCellsIcon className="h-5 w-5" />
+                  <TableCellsIcon className="h-4 md:h-5 w-4 md:w-5" />
                 </button>
               </div>
 
-              <ShipmentsPrintReport
-                shipments={shipments}
-                searchTerm={searchTerm}
-                activeTab={activeStatus}
-                warehouseFilter="all"
-              />
+              {/* Hide on mobile - only show on desktop */}
+              <div className="hidden md:block">
+                <ShipmentsPrintReport
+                  shipments={shipments}
+                  searchTerm={searchTerm}
+                  activeTab={activeStatus}
+                  warehouseFilter="all"
+                />
+              </div>
               
               <button
                 onClick={() => setCreateModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg active:scale-95"
+                className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2.5 bg-blue-600 text-white text-xs md:text-sm font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg active:scale-95"
               >
-                <PlusIcon className="h-5 w-5" />
-                <span className="hidden sm:inline">New Shipment</span>
+                <PlusIcon className="h-4 md:h-5 w-4 md:w-5" />
+                <span className="hidden sm:inline">New</span>
               </button>
             </div>
           </div>
 
           {/* Search & Filter Bar */}
-          <div className="mt-6 flex flex-col md:flex-row gap-4">
+          <div className="mt-2 md:mt-6 flex flex-col md:flex-row gap-2 md:gap-4">
             <div className="relative flex-1">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-blue-400" />
+              <MagnifyingGlassIcon className="absolute left-2 md:left-3 top-1/2 -translate-y-1/2 h-4 md:h-5 w-4 md:w-5 text-blue-400" />
               <input
                 type="text"
-                placeholder="Search by client, reference, phone, rack..."
+                placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                className="w-full pl-8 md:pl-10 pr-8 md:pr-10 py-2 md:py-3 text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
               {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <XMarkIcon className="h-5 w-5 text-slate-400 hover:text-slate-600" />
+                <button onClick={() => setSearchTerm('')} className="absolute right-2 md:right-3 top-1/2 -translate-y-1/2">
+                  <XMarkIcon className="h-4 md:h-5 w-4 md:w-5 text-slate-400 hover:text-slate-600" />
                 </button>
               )}
             </div>
           </div>
 
           {/* Status Tabs */}
-          <div className="mt-6 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          <div className="mt-2 md:mt-6 flex gap-1 md:gap-2 overflow-x-auto no-scrollbar pb-1">
             {tabs.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveStatus(tab.key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+                className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all whitespace-nowrap ${
                   activeStatus === tab.key
                     ? 'bg-blue-600 text-white shadow-md'
                     : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
                 }`}
               >
                 {tab.label}
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                <span className={`px-1 md:px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold ${
                   activeStatus === tab.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
                 }`}>
                   {tab.count}
@@ -455,7 +458,7 @@ export const Shipments: React.FC = () => {
       </div>
 
       {/* Content Area */}
-      <div className="p-4 md:p-6 pb-24">
+      <div className="p-2 md:p-6 pb-24">
         {error && (
           <div className="mb-6 bg-red-50 text-red-700 px-4 py-3 rounded-xl border border-red-100 flex items-center gap-2">
             <XMarkIcon className="h-5 w-5" />
@@ -465,7 +468,7 @@ export const Shipments: React.FC = () => {
 
         {viewMode === 'folders' ? (
           /* FOLDER VIEW */
-          <div className="space-y-4">
+          <div className="space-y-2 md:space-y-4">
             {Object.keys(groupedByCompany).length === 0 ? (
               <div className="text-center py-20">
                 <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -503,7 +506,7 @@ export const Shipments: React.FC = () => {
                     </button>
 
                     {isOpen && (
-                      <div className="border-t border-blue-50 bg-slate-50/50 p-4 space-y-4">
+                      <div className="border-t border-blue-50 bg-slate-50/50 p-2 md:p-4 space-y-2 md:space-y-4">
                         {items.map((shipment: any) => (
                           <ShipmentCard key={shipment.id} shipment={shipment} />
                         ))}
@@ -516,7 +519,7 @@ export const Shipments: React.FC = () => {
           </div>
         ) : (
           /* TABLE VIEW */
-          <div className="space-y-4">
+          <div className="space-y-2 md:space-y-4">
              {shipments.map((shipment: any) => (
                 <ShipmentCard key={shipment.id} shipment={shipment} />
              ))}

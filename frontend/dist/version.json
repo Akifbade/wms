@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 14, 2025",
-  "buildTime": "22:34:29",
-  "commit": "624996fec",
-  "commitMessage": "v2.3.3 - Photo viewer with lightbox zoom + clickable rack location navigation",
+  "buildTime": "23:02:18",
+  "commit": "1504dd9e3",
+  "commitMessage": "feat: Update Shipments page with view toggle, branding, and rich data display",
   "author": "akifbade46-del",
   "environment": "local"
 }
