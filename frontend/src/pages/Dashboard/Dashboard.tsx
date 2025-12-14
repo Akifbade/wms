@@ -143,21 +143,21 @@ export const Dashboard: React.FC = () => {
   }));
 
   return (
-    <div className="p-6 space-y-6 bg-slate-100 min-h-screen animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6 bg-slate-100 min-h-screen animate-fade-in pb-20 md:pb-6">
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-500 mt-1">Welcome back! Here's what's happening today.</p>
+          <h1 className="text-xl md:text-2xl font-bold text-slate-900">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-0.5 md:mt-1 hidden md:block">Welcome back! Here's what's happening today.</p>
         </div>
-        <div className="text-sm text-slate-600 font-medium bg-white/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-200/50 shadow-sm">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        <div className="text-xs md:text-sm text-slate-600 font-medium bg-white/80 backdrop-blur-sm px-3 py-1.5 md:px-4 md:py-2 rounded-xl border border-slate-200/50 shadow-sm self-start md:self-auto">
+          {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Mobile Scrollable */}
       {analyticsEnabled ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 animate-stagger">
+        <div className="mobile-scroll-x md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-5 animate-stagger -mx-3 px-3 md:mx-0 md:px-0">
           {statsCards.map((stat: any, index: number) => {
             const Icon = stat.icon;
             const colors = [
@@ -168,17 +168,17 @@ export const Dashboard: React.FC = () => {
             ];
             const color = colors[index % colors.length];
             return (
-              <div key={stat.name} className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/50 p-5 hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-500">{stat.name}</p>
-                    <p className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</p>
-                    <p className="text-sm text-slate-500 mt-1">
+              <div key={stat.name} className="flex-shrink-0 w-[200px] md:w-auto mr-3 md:mr-0 last:mr-0 bg-white/80 backdrop-blur-sm rounded-xl md:rounded-2xl border border-slate-200/50 p-4 md:p-5 hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm font-medium text-slate-500 truncate">{stat.name}</p>
+                    <p className="text-lg md:text-2xl font-bold text-slate-900 mt-0.5 md:mt-1">{stat.value}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 md:mt-1 truncate">
                       {stat.subtitle}
                     </p>
                   </div>
-                  <div className={`${color.bg} p-3 rounded-xl shadow-lg`}>
-                    <Icon className="h-5 w-5 text-white" />
+                  <div className={`${color.bg} p-2 md:p-3 rounded-lg md:rounded-xl shadow-lg flex-shrink-0`}>
+                    <Icon className="h-4 w-4 md:h-5 md:w-5 text-white" />
                   </div>
                 </div>
               </div>
@@ -194,18 +194,18 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Quick Stats - Mobile Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         {quickStats.map((stat: any) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.name} className="bg-white/80 backdrop-blur-sm rounded-xl border border-slate-200/50 p-4 hover:border-blue-200 transition-colors">
-              <div className="flex items-center space-x-3">
-                <Icon className="h-7 w-7 text-blue-500" />
-                <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">{stat.name}</p>
-                  <p className="text-xl font-bold text-slate-900">{stat.value}</p>
-                  <p className="text-xs text-slate-500">{stat.total}</p>
+            <div key={stat.name} className="bg-white/80 backdrop-blur-sm rounded-xl border border-slate-200/50 p-3 md:p-4 hover:border-blue-200 transition-colors">
+              <div className="flex items-center space-x-2 md:space-x-3">
+                <Icon className="h-5 w-5 md:h-7 md:w-7 text-blue-500 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider font-semibold truncate">{stat.name}</p>
+                  <p className="text-base md:text-xl font-bold text-slate-900">{stat.value}</p>
+                  <p className="text-[10px] md:text-xs text-slate-500 truncate">{stat.total}</p>
                 </div>
               </div>
             </div>
@@ -213,67 +213,47 @@ export const Dashboard: React.FC = () => {
         })}
       </div>
 
-      {/* Shipment Status Breakdown */}
+      {/* Shipment Status Breakdown - Mobile Optimized */}
       {analyticsEnabled && (
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/50 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
-            <CubeIcon className="h-5 w-5 mr-2 text-blue-500" />
-            Shipment Status Breakdown
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl md:rounded-2xl border border-slate-200/50 p-4 md:p-6 shadow-sm">
+          <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-3 md:mb-4 flex items-center">
+            <CubeIcon className="h-4 w-4 md:h-5 md:w-5 mr-2 text-blue-500" />
+            Shipment Status
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-slate-50 rounded-xl p-4 border-l-4 border-slate-400">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-slate-600 font-medium">Total Shipments</p>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats?.shipmentStatusBreakdown?.total || 0}</p>
-                </div>
-                <div className="text-4xl opacity-80"></div>
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+            <div className="bg-slate-50 rounded-lg md:rounded-xl p-3 md:p-4 border-l-4 border-slate-400">
+              <p className="text-[10px] md:text-sm text-slate-600 font-medium">Total</p>
+              <p className="text-xl md:text-2xl font-bold text-slate-900 mt-0.5 md:mt-1">{stats?.shipmentStatusBreakdown?.total || 0}</p>
             </div>
 
-            <div className="bg-amber-50/80 rounded-xl p-4 border-l-4 border-amber-500">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-amber-800 font-medium">Pending</p>
-                  <p className="text-2xl font-bold text-amber-700 mt-1">{stats?.shipmentStatusBreakdown?.pending || 0}</p>
-                  <p className="text-xs text-amber-600 mt-1">
-                    {stats?.shipmentStatusBreakdown?.total > 0
-                      ? Math.round((stats?.shipmentStatusBreakdown?.pending / stats?.shipmentStatusBreakdown?.total) * 100)
-                      : 0}% of total
-                  </p>
-                </div>
-                <div className="text-4xl opacity-80"></div>
-              </div>
+            <div className="bg-amber-50/80 rounded-lg md:rounded-xl p-3 md:p-4 border-l-4 border-amber-500">
+              <p className="text-[10px] md:text-sm text-amber-800 font-medium">Pending</p>
+              <p className="text-xl md:text-2xl font-bold text-amber-700 mt-0.5 md:mt-1">{stats?.shipmentStatusBreakdown?.pending || 0}</p>
+              <p className="text-[10px] text-amber-600 mt-0.5 hidden md:block">
+                {stats?.shipmentStatusBreakdown?.total > 0
+                  ? Math.round((stats?.shipmentStatusBreakdown?.pending / stats?.shipmentStatusBreakdown?.total) * 100)
+                  : 0}% of total
+              </p>
             </div>
 
-            <div className="bg-emerald-50/80 rounded-xl p-4 border-l-4 border-emerald-500">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-emerald-800 font-medium">In Storage</p>
-                  <p className="text-2xl font-bold text-emerald-700 mt-1">{stats?.shipmentStatusBreakdown?.inStorage || 0}</p>
-                  <p className="text-xs text-emerald-600 mt-1">
-                    {stats?.shipmentStatusBreakdown?.total > 0
-                      ? Math.round((stats?.shipmentStatusBreakdown?.inStorage / stats?.shipmentStatusBreakdown?.total) * 100)
-                      : 0}% of total
-                  </p>
-                </div>
-                <div className="text-4xl opacity-80"></div>
-              </div>
+            <div className="bg-emerald-50/80 rounded-lg md:rounded-xl p-3 md:p-4 border-l-4 border-emerald-500">
+              <p className="text-[10px] md:text-sm text-emerald-800 font-medium">In Storage</p>
+              <p className="text-xl md:text-2xl font-bold text-emerald-700 mt-0.5 md:mt-1">{stats?.shipmentStatusBreakdown?.inStorage || 0}</p>
+              <p className="text-[10px] text-emerald-600 mt-0.5 hidden md:block">
+                {stats?.shipmentStatusBreakdown?.total > 0
+                  ? Math.round((stats?.shipmentStatusBreakdown?.inStorage / stats?.shipmentStatusBreakdown?.total) * 100)
+                  : 0}% of total
+              </p>
             </div>
 
-            <div className="bg-blue-50/80 rounded-xl p-4 border-l-4 border-blue-500">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-blue-800 font-medium">Released</p>
-                  <p className="text-2xl font-bold text-blue-700 mt-1">{stats?.shipmentStatusBreakdown?.released || 0}</p>
-                  <p className="text-xs text-blue-600 mt-1">
-                    {stats?.shipmentStatusBreakdown?.total > 0
-                      ? Math.round((stats?.shipmentStatusBreakdown?.released / stats?.shipmentStatusBreakdown?.total) * 100)
-                      : 0}% of total
-                  </p>
-                </div>
-                <div className="text-4xl opacity-80"></div>
-              </div>
+            <div className="bg-blue-50/80 rounded-lg md:rounded-xl p-3 md:p-4 border-l-4 border-blue-500">
+              <p className="text-[10px] md:text-sm text-blue-800 font-medium">Released</p>
+              <p className="text-xl md:text-2xl font-bold text-blue-700 mt-0.5 md:mt-1">{stats?.shipmentStatusBreakdown?.released || 0}</p>
+              <p className="text-[10px] text-blue-600 mt-0.5 hidden md:block">
+                {stats?.shipmentStatusBreakdown?.total > 0
+                  ? Math.round((stats?.shipmentStatusBreakdown?.released / stats?.shipmentStatusBreakdown?.total) * 100)
+                  : 0}% of total
+              </p>
             </div>
           </div>
         </div>

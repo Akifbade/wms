@@ -1966,41 +1966,41 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   }, [activeTab]);
 
   return (
-    <div className="p-2 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-6 max-w-7xl mx-auto">
+    <div className="p-2 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-6 max-w-7xl mx-auto pb-20 md:pb-6">
       <div className="text-center">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">📱 Warehouse Scanner</h1>
-        <p className="text-gray-600 text-sm sm:text-base md:text-lg">مسح المستودع | مسح أو بحث يدوي</p>
+        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">📱 Scanner</h1>
+        <p className="text-gray-600 text-xs sm:text-base md:text-lg hidden sm:block">مسح المستودع | مسح أو بحث يدوي</p>
       </div>
 
       {/* Tab Navigation - MOBILE OPTIMIZED */}
-      <div className="flex gap-1 sm:gap-2 bg-white rounded-lg sm:rounded-xl p-1 sm:p-2 shadow-md border-2 border-gray-200">
+      <div className="flex gap-1 bg-white rounded-lg p-1 shadow-md border-2 border-gray-200">
         <button
           onClick={() => setActiveTab('scanner')}
-          className={`flex-1 py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 rounded-md sm:rounded-lg font-bold text-xs sm:text-sm md:text-lg transition-all ${activeTab === 'scanner'
+          className={`flex-1 py-2.5 px-2 rounded-md font-bold text-xs sm:text-sm transition-all ${activeTab === 'scanner'
             ? 'bg-primary-600 text-white shadow-lg'
             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
         >
-          <span className="block">📸 Scanner</span>
-          <span className="hidden sm:block text-xs font-normal mt-0.5">مسح QR</span>
+          <span className="block">📸</span>
+          <span className="text-[10px] sm:text-xs font-normal mt-0.5">Scan</span>
         </button>
         <button
           onClick={() => setActiveTab('list')}
-          className={`flex-1 py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 rounded-md sm:rounded-lg font-bold text-xs sm:text-sm md:text-lg transition-all ${activeTab === 'list'
+          className={`flex-1 py-2.5 px-2 rounded-md font-bold text-xs sm:text-sm transition-all ${activeTab === 'list'
             ? 'bg-primary-600 text-white shadow-lg'
             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
         >
-          <span className="block">📋 Pending List</span>
-          <span className="hidden sm:block text-xs font-normal mt-0.5">قائمة الانتظار</span>
+          <span className="block">📋</span>
+          <span className="text-[10px] sm:text-xs font-normal mt-0.5">Pending</span>
         </button>
         {/* Manual Move Button */}
         <button
           onClick={openManualMoveModal}
-          className="flex-1 py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 rounded-md sm:rounded-lg font-bold text-xs sm:text-sm md:text-lg transition-all bg-amber-500 text-white hover:bg-amber-600 shadow-lg"
+          className="flex-1 py-2.5 px-2 rounded-md font-bold text-xs sm:text-sm transition-all bg-amber-500 text-white hover:bg-amber-600 shadow-lg"
         >
-          <span className="block">🔄 Manual Move</span>
-          <span className="hidden sm:block text-xs font-normal mt-0.5">نقل يدوي</span>
+          <span className="block">🔄</span>
+          <span className="text-[10px] sm:text-xs font-normal mt-0.5">Move</span>
         </button>
       </div>
 

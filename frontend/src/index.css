@@ -232,3 +232,162 @@ code {
 .animation-delay-4000 {
   animation-delay: 4s;
 }
+
+/* ========================================
+   MOBILE-FIRST RESPONSIVE UTILITIES
+   ======================================== */
+
+/* Safe area padding for notched devices (iPhone X+) */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-area-left {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.safe-area-right {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Mobile bottom nav safe spacing */
+.pb-mobile-nav {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Hide scrollbar on mobile */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Touch-friendly buttons (min 44px tap target) */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Mobile card styling */
+.mobile-card {
+  @apply bg-white rounded-xl shadow-sm border border-slate-200/50 p-4;
+}
+
+/* Horizontal scroll container for mobile */
+.mobile-scroll-x {
+  @apply flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 snap-x snap-mandatory;
+  scroll-behavior: smooth;
+}
+.mobile-scroll-x > * {
+  @apply flex-shrink-0 snap-start;
+}
+
+/* Mobile table to card transformation */
+@media (max-width: 768px) {
+  .table-to-cards {
+    display: block !important;
+  }
+  .table-to-cards thead {
+    display: none !important;
+  }
+  .table-to-cards tbody {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+  .table-to-cards tr {
+    display: block !important;
+    background: white !important;
+    border-radius: 0.75rem !important;
+    padding: 1rem !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+  .table-to-cards td {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 0.5rem 0 !important;
+    border: none !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+  }
+  .table-to-cards td:last-child {
+    border-bottom: none !important;
+  }
+  .table-to-cards td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #475569;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+}
+
+/* Mobile-optimized inputs */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="tel"],
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+}
+
+/* Pull-to-refresh indicator */
+.pull-indicator {
+  @apply flex items-center justify-center py-4 text-slate-400;
+  transition: transform 0.2s ease;
+}
+
+/* Swipe action container */
+.swipe-container {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+.swipe-content {
+  scroll-snap-align: start;
+}
+
+/* Floating action button */
+.fab {
+  @apply fixed bottom-20 right-4 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center z-40;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.fab:hover, .fab:active {
+  transform: scale(1.1);
+  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.5);
+}
+
+/* Bottom sheet animation */
+.bottom-sheet {
+  @apply fixed inset-x-0 bottom-0 bg-white rounded-t-3xl shadow-2xl z-50 transform transition-transform duration-300;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.bottom-sheet-backdrop {
+  @apply fixed inset-0 bg-black/50 z-40 transition-opacity duration-300;
+}
+.bottom-sheet-handle {
+  @apply w-12 h-1.5 bg-slate-300 rounded-full mx-auto my-3;
+}
+
+/* Mobile page header */
+.mobile-header {
+  @apply sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200/50 px-4 py-3;
+}
+
+/* Hide on mobile / desktop utilities */
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+}
+@media (min-width: 769px) {
+  .hide-desktop { display: none !important; }
+  .mobile-only { display: none !important; }
+}

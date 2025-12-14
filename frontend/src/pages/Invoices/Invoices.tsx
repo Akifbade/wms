@@ -108,46 +108,46 @@ export const Invoices: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <DocumentTextIcon className="h-8 w-8 text-gray-700" />
-            Invoices & Billing
-          </h1>
-          <p className="text-gray-600 mt-1">Comprehensive invoice management and payment tracking</p>
+    <div className="min-h-screen bg-gray-50 p-3 md:p-6 space-y-4 md:space-y-6 pb-20 md:pb-6">
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col gap-3 bg-white rounded-lg shadow-sm p-4 md:p-6 border border-gray-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3">
+              <DocumentTextIcon className="h-6 w-6 md:h-8 md:w-8 text-gray-700" />
+              Invoices
+            </h1>
+            <p className="text-sm text-gray-600 mt-0.5 hidden md:block">Comprehensive invoice management and payment tracking</p>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <button className="inline-flex items-center px-5 py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all font-semibold shadow-sm">
-            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
-            Export to Excel
+        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
+          <button className="flex-shrink-0 inline-flex items-center px-3 md:px-5 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-semibold shadow-sm text-sm">
+            <ArrowDownTrayIcon className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Export</span>
           </button>
-          <button className="inline-flex items-center px-5 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all font-semibold shadow-sm">
-            <PrinterIcon className="h-5 w-5 mr-2" />
-            Print Report
+          <button className="flex-shrink-0 inline-flex items-center px-3 md:px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all font-semibold shadow-sm text-sm">
+            <PrinterIcon className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Print</span>
           </button>
         </div>
       </div>
 
-      {/* Enhanced Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-gray-100 rounded-lg">
-              <DocumentTextIcon className="h-7 w-7 text-gray-700" />
+      {/* Stats Cards - Mobile Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <div className="p-2 md:p-3 bg-gray-100 rounded-lg">
+              <DocumentTextIcon className="h-5 w-5 md:h-7 md:w-7 text-gray-700" />
             </div>
-            <ChartBarIcon className="h-5 w-5 text-gray-400" />
           </div>
-          <p className="text-sm font-medium text-gray-600 mb-1">Total Invoices</p>
-          <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
-          <p className="text-xs text-gray-500 mt-2">All time invoices</p>
+          <p className="text-xs md:text-sm font-medium text-gray-600 mb-0.5 md:mb-1">Total</p>
+          <p className="text-xl md:text-3xl font-bold text-gray-900">{stats.total}</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-gray-100 rounded-lg">
-              <CurrencyDollarIcon className="h-7 w-7 text-gray-700" />
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <div className="p-2 md:p-3 bg-gray-100 rounded-lg">
+              <CurrencyDollarIcon className="h-5 w-5 md:h-7 md:w-7 text-gray-700" />
             </div>
             <BanknotesIcon className="h-5 w-5 text-gray-400" />
           </div>

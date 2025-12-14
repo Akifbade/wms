@@ -73,21 +73,22 @@ export const FinanceDashboard = () => {
     const allTabs = categories.flatMap(cat => cat.tabs);
 
     return (
-        <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 to-gray-100">
-            {/* Glass Header */}
+        <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 to-gray-100 pb-16 md:pb-0">
+            {/* Glass Header - Mobile Optimized */}
             <div className="bg-white/80 backdrop-blur-md shadow-lg border-b border-white/20">
-                <div className="px-4 py-3">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                                <span className="text-2xl">💎</span>
-                                Finance Hub
+                <div className="px-3 md:px-4 py-2 md:py-3">
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                            <h1 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
+                                <span className="text-xl md:text-2xl">💎</span>
+                                Finance
                             </h1>
-                            <p className="text-xs text-gray-600 mt-0.5">
+                            <p className="text-[10px] md:text-xs text-gray-600 mt-0.5 hidden md:block">
                                 Complete financial management & analytics platform
                             </p>
                         </div>
-                        <div className="flex gap-2">
+                        {/* Category Pills - Mobile Scrollable */}
+                        <div className="flex gap-1.5 md:gap-2 overflow-x-auto no-scrollbar">
                             {categories.map((category) => (
                                 <button
                                     key={category.id}
@@ -96,37 +97,38 @@ export const FinanceDashboard = () => {
                                         setActiveTab(category.tabs[0].id);
                                     }}
                                     className={`
-                                        px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 transform
+                                        flex-shrink-0 px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-medium transition-all duration-300
                                         ${activeCategory === category.id
-                                            ? 'bg-blue-600/90 text-white shadow-lg shadow-blue-500/30 scale-105 backdrop-blur-sm'
-                                            : 'bg-white/60 backdrop-blur-sm text-gray-700 hover:bg-white/80 hover:scale-102 border border-gray-200/50'
+                                            ? 'bg-blue-600/90 text-white shadow-lg shadow-blue-500/30'
+                                            : 'bg-white/60 text-gray-700 hover:bg-white/80 border border-gray-200/50'
                                         }
                                     `}
                                 >
-                                    {category.name}
+                                    <span className="md:hidden">{category.name.split(' ')[0]}</span>
+                                    <span className="hidden md:inline">{category.name}</span>
                                 </button>
                             ))}
                         </div>
                     </div>
                 </div>
 
-                {/* Glass Tabs */}
-                <div className="px-4">
-                    <div className="flex gap-1 overflow-x-auto pb-2">
+                {/* Glass Tabs - Mobile Scrollable */}
+                <div className="px-2 md:px-4">
+                    <div className="flex gap-1 overflow-x-auto no-scrollbar pb-2">
                         {categories.find(c => c.id === activeCategory)?.tabs.map((tab) => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`
-                                    inline-flex items-center px-4 py-2 text-xs font-medium whitespace-nowrap rounded-t-lg
-                                    transition-all duration-300 transform relative overflow-hidden
+                                    flex-shrink-0 inline-flex items-center px-3 md:px-4 py-1.5 md:py-2 text-[10px] md:text-xs font-medium whitespace-nowrap rounded-t-lg
+                                    transition-all duration-300 relative
                                     ${activeTab === tab.id
-                                        ? 'bg-white/90 backdrop-blur-md text-blue-600 shadow-lg scale-105'
-                                        : 'bg-white/40 backdrop-blur-sm text-gray-600 hover:bg-white/60 hover:scale-102'
+                                        ? 'bg-white/90 text-blue-600 shadow-lg'
+                                        : 'bg-white/40 text-gray-600 hover:bg-white/60'
                                     }
                                 `}
                             >
-                                <tab.icon className={`mr-1.5 h-4 w-4 transition-transform duration-300 ${activeTab === tab.id ? 'scale-110' : ''}`} />
+                                <tab.icon className={`mr-1 md:mr-1.5 h-3.5 w-3.5 md:h-4 md:w-4 ${activeTab === tab.id ? 'scale-110' : ''}`} />
                                 {tab.name}
                                 {activeTab === tab.id && (
                                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />

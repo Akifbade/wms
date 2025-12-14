@@ -113,58 +113,58 @@ export const MovingJobs: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6 pb-20 md:pb-6">
+      {/* Header - Mobile Optimized */}
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Moving Jobs</h1>
-          <p className="text-gray-600 mt-1">Schedule and manage moving operations</p>
+          <h1 className="text-xl md:text-3xl font-bold text-gray-900">Moving Jobs</h1>
+          <p className="text-sm text-gray-600 mt-0.5 hidden md:block">Schedule and manage moving operations</p>
         </div>
         <button 
           onClick={() => setCreateModalOpen(true)}
-          className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          className="inline-flex items-center px-3 md:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm md:text-base"
         >
-          <PlusIcon className="h-5 w-5 mr-2" />
-          New Job
+          <PlusIcon className="h-5 w-5 md:mr-2" />
+          <span className="hidden md:inline">New Job</span>
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      {/* Stats - Mobile Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Total Jobs</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{jobs.length}</p>
+              <p className="text-xs md:text-sm font-medium text-gray-500">Total</p>
+              <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">{jobs.length}</p>
             </div>
-            <TruckIcon className="h-10 w-10 text-primary-500" />
+            <TruckIcon className="h-6 w-6 md:h-10 md:w-10 text-primary-500" />
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">In Progress</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">
+              <p className="text-xs md:text-sm font-medium text-gray-500">Active</p>
+              <p className="text-xl md:text-3xl font-bold text-green-600 mt-1 md:mt-2">
                 {jobs.filter((j: any) => j.status === 'IN_PROGRESS').length}
               </p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Scheduled</p>
-              <p className="text-3xl font-bold text-blue-600 mt-2">
+              <p className="text-xs md:text-sm font-medium text-gray-500">Scheduled</p>
+              <p className="text-xl md:text-3xl font-bold text-blue-600 mt-1 md:mt-2">
                 {jobs.filter((j: any) => j.status === 'SCHEDULED' || j.status === 'PLANNED').length}
               </p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Completed</p>
-              <p className="text-xl font-bold text-gray-900 mt-2">
+              <p className="text-xs md:text-sm font-medium text-gray-500">Completed</p>
+              <p className="text-xl md:text-xl font-bold text-gray-900 mt-1 md:mt-2">
                 {jobs.filter((j: any) => j.status === 'COMPLETED').length}
               </p>
             </div>
@@ -172,20 +172,20 @@ export const MovingJobs: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center space-x-2">
+      {/* Filters - Mobile Scrollable */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
+        <div className="flex items-center overflow-x-auto no-scrollbar gap-2 -mx-1 px-1">
           <button
             onClick={() => setFilterStatus('all')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`flex-shrink-0 px-3 md:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filterStatus === 'all' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            All Jobs
+            All
           </button>
           <button
             onClick={() => setFilterStatus('scheduled')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`flex-shrink-0 px-3 md:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filterStatus === 'scheduled' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -193,7 +193,7 @@ export const MovingJobs: React.FC = () => {
           </button>
           <button
             onClick={() => setFilterStatus('inprogress')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`flex-shrink-0 px-3 md:px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
               filterStatus === 'inprogress' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -201,7 +201,7 @@ export const MovingJobs: React.FC = () => {
           </button>
           <button
             onClick={() => setFilterStatus('completed')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`flex-shrink-0 px-3 md:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filterStatus === 'completed' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -210,14 +210,14 @@ export const MovingJobs: React.FC = () => {
         </div>
       </div>
 
-      {/* Jobs Grid */}
+      {/* Jobs Grid - Mobile Optimized */}
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading jobs...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
           {jobs.map((job: any) => (
             <div key={job.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all relative">
               {/* Full red overlay for rejected jobs */}

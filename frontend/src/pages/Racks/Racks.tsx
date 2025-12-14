@@ -458,123 +458,120 @@ export const Racks: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-gray-900">Warehouse Racks</h1>
-            <span className="px-3 py-1 bg-gradient-to-r from-green-500 to-blue-500 text-white text-xs font-bold rounded-full animate-pulse">
-              ✨ ZONE VIEW
-            </span>
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6 pb-20 md:pb-6">
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl md:text-3xl font-bold text-gray-900">Racks</h1>
+            <p className="text-sm text-gray-600 mt-0.5 hidden md:block">Monitor and manage warehouse storage racks</p>
           </div>
-          <p className="text-gray-600 mt-1">Monitor and manage warehouse storage racks - Now with Zone Organization!</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* View Toggle */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+          {/* View Toggle - Compact */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
             <button
               onClick={() => setViewMode('zones')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'zones'
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === 'zones'
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
-              🏢 Zones
+              🏢
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'grid'
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === 'grid'
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
-              📦 Grid
+              📦
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        
+        {/* Action Buttons - Mobile Scrollable */}
+        <div className="flex items-center overflow-x-auto no-scrollbar gap-2 -mx-3 px-3 md:mx-0 md:px-0">
           <button
             onClick={handleBulkQrOpen}
-            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-md"
+            className="flex-shrink-0 inline-flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors shadow-sm"
           >
-            <CameraIcon className="h-5 w-5 mr-2" />
-            Bulk QR
+            <CameraIcon className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Bulk QR</span>
           </button>
           <button
             onClick={() => setBulkCbmModalOpen(true)}
-            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-colors shadow-md"
+            className="flex-shrink-0 inline-flex items-center px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-sm font-medium hover:from-purple-700 hover:to-pink-700 transition-colors shadow-sm"
           >
-            <CubeIcon className="h-5 w-5 mr-2" />
-            Set CBM
+            <CubeIcon className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Set CBM</span>
           </button>
           <button
             onClick={() => setBulkAddModalOpen(true)}
-            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors shadow-md"
+            className="flex-shrink-0 inline-flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:from-blue-700 hover:to-purple-700 transition-colors shadow-sm"
           >
-            <SparklesIcon className="h-5 w-5 mr-2" />
-            Bulk Add
+            <SparklesIcon className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Bulk Add</span>
           </button>
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-md"
+            className="flex-shrink-0 inline-flex items-center px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors shadow-sm"
           >
-            <PlusIcon className="h-5 w-5 mr-2" />
-            Add Rack
+            <PlusIcon className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Add Rack</span>
           </button>
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats - Mobile Grid */}
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Total Racks</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">{racks.length}</p>
+                  <p className="text-xs md:text-sm font-medium text-gray-500">Total</p>
+                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">{racks.length}</p>
                 </div>
-                <CubeIcon className="h-10 w-10 text-primary-500" />
+                <CubeIcon className="h-6 w-6 md:h-10 md:w-10 text-primary-500" />
               </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Total Capacity</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">
+                  <p className="text-xs md:text-sm font-medium text-gray-500">Capacity</p>
+                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">
                     {racks.reduce((sum: number, r: any) => sum + r.capacityTotal, 0)}
                   </p>
                 </div>
-                <ChartBarIcon className="h-10 w-10 text-blue-500" />
+                <ChartBarIcon className="h-6 w-6 md:h-10 md:w-10 text-blue-500" />
               </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Occupied</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">
+                  <p className="text-xs md:text-sm font-medium text-gray-500">Occupied</p>
+                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">
                     {racks.reduce((sum: number, r: any) => sum + r.capacityUsed, 0)}
                   </p>
                 </div>
-                <div className="text-green-600 text-sm font-medium">
+                <div className="text-green-600 text-xs md:text-sm font-medium">
                   {racks.length > 0 ? Math.round((racks.reduce((sum: number, r: any) => sum + r.capacityUsed, 0) / racks.reduce((sum: number, r: any) => sum + r.capacityTotal, 0)) * 100) : 0}%
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Available</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">
+                  <p className="text-xs md:text-sm font-medium text-gray-500">Available</p>
+                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">
                     {racks.reduce((sum: number, r: any) => sum + (r.capacityTotal - r.capacityUsed), 0)}
                   </p>
                 </div>
-                <div className="text-blue-600 text-sm font-medium">
+                <div className="text-blue-600 text-xs md:text-sm font-medium">
                   {racks.length > 0 ? Math.round((racks.reduce((sum: number, r: any) => sum + (r.capacityTotal - r.capacityUsed), 0) / racks.reduce((sum: number, r: any) => sum + r.capacityTotal, 0)) * 100) : 0}%
                 </div>
               </div>
@@ -583,65 +580,65 @@ export const Racks: React.FC = () => {
         </>
       )}
 
-      {/* Section Filter */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      {/* Section Filter - Mobile Scrollable */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
         <div className="space-y-3">
           {/* Section Buttons */}
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1">
               <MapPinIcon className="h-4 w-4" /> SECTION
             </p>
-            <div className="flex items-center flex-wrap gap-2">
+            <div className="flex items-center overflow-x-auto no-scrollbar gap-2 -mx-1 px-1">
               <button
                 onClick={() => setSelectedSection('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedSection === 'all' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                className={`flex-shrink-0 px-3 md:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedSection === 'all' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
               >
-                All Sections
+                All
               </button>
               {['A', 'B', 'C'].map((section) => (
                 <button
                   key={section}
                   onClick={() => setSelectedSection(section)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedSection === section ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  className={`flex-shrink-0 px-3 md:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedSection === section ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                 >
-                  Section {section}
+                  {section}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Category Buttons */}
+          {/* Category Buttons - Mobile Scrollable */}
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1">
               <TagIcon className="h-4 w-4" /> CATEGORY
             </p>
-            <div className="flex items-center flex-wrap gap-2">
+            <div className="flex items-center overflow-x-auto no-scrollbar gap-2 -mx-1 px-1">
               <button
                 onClick={() => setSelectedCategory('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === 'all' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                className={`flex-shrink-0 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${selectedCategory === 'all' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
               >
-                All Categories
+                All
               </button>
               <button
                 onClick={() => setSelectedCategory('DIOR')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === 'DIOR' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                className={`flex-shrink-0 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${selectedCategory === 'DIOR' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
                   }`}
               >
                 Dior
               </button>
               <button
                 onClick={() => setSelectedCategory('COMPANY_MATERIAL')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === 'COMPANY_MATERIAL' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                className={`flex-shrink-0 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${selectedCategory === 'COMPANY_MATERIAL' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
                   }`}
               >
-                Company Material
+                Company
               </button>
               <button
                 onClick={() => setSelectedCategory('JAZEERA')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === 'JAZEERA' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'
+                className={`flex-shrink-0 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${selectedCategory === 'JAZEERA' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'
                   }`}
               >
                 Jazeera

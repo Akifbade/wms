@@ -21,6 +21,7 @@ import {
   CpuChipIcon
 } from '@heroicons/react/24/outline';
 import { VersionBadgeHeader } from '../VersionBadgeHeader';
+import MobileNav from './MobileNav';
 
 // Role-based navigation configuration
 const navigationConfig = {
@@ -234,9 +235,15 @@ export const Layout: React.FC = () => {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-slate-100 p-6">
+        <main className="flex-1 overflow-y-auto bg-slate-100 p-4 md:p-6 pb-20 md:pb-6">
           <Outlet />
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <MobileNav 
+          onMenuClick={() => setSidebarOpen(true)} 
+          userRole={currentUser?.role}
+        />
       </div>
     </div>
   );

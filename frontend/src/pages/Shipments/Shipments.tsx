@@ -293,34 +293,54 @@ export const Shipments: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-        <div>
-          <h1 className="text-3xl font-semibold text-slate-900">
-            📦 Warehouse Shipments
-          </h1>
-          <p className="text-slate-600 mt-2">Complete warehouse management with intake, tracking, and release</p>
+    <div className="min-h-screen bg-slate-50 p-3 md:p-6 space-y-4 md:space-y-6 pb-20 md:pb-6">
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col gap-3 bg-white rounded-xl shadow-sm p-4 md:p-6 border border-slate-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl md:text-3xl font-semibold text-slate-900">
+              📦 Shipments
+            </h1>
+            <p className="text-sm text-slate-600 mt-1 hidden md:block">Complete warehouse management with intake, tracking, and release</p>
+          </div>
+          {/* Desktop buttons */}
+          <div className="hidden md:flex gap-3">
+            <ShipmentsPrintReport
+              shipments={filteredShipments}
+              searchTerm={searchTerm}
+              activeTab={activeTab}
+              warehouseFilter={warehouseFilter}
+            />
+            <button
+              onClick={() => setCreateModalOpen(true)}
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              <PlusIcon className="h-5 w-5 mr-2" />
+              New Shipment
+            </button>
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Print Report Buttons */}
-          <ShipmentsPrintReport
-            shipments={filteredShipments}
-            searchTerm={searchTerm}
-            activeTab={activeTab}
-            warehouseFilter={warehouseFilter}
-          />
-
-          {/* New Shipment Button */}
-          <button
-            onClick={() => setCreateModalOpen(true)}
-            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-          >
-            <PlusIcon className="h-5 w-5 mr-2" />
-            New Shipment Intake
-          </button>
+        {/* Mobile Quick Stats */}
+        <div className="flex md:hidden gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex-shrink-0 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-medium">
+            🏢 {statusCounts.in_storage} Active
+          </div>
+          <div className="flex-shrink-0 px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg text-xs font-medium">
+            ⏳ {statusCounts.pending} Pending
+          </div>
+          <div className="flex-shrink-0 px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-xs font-medium">
+            ⚠️ {statusCounts.partial} Partial
+          </div>
         </div>
       </div>
+
+      {/* Mobile FAB for New Shipment */}
+      <button
+        onClick={() => setCreateModalOpen(true)}
+        className="md:hidden fab"
+      >
+        <PlusIcon className="h-6 w-6" />
+      </button>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
@@ -328,157 +348,146 @@ export const Shipments: React.FC = () => {
         </div>
       )}
 
-      {/* Warehouse Type Filter */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <div className="flex items-center gap-3 mb-4">
+      {/* Warehouse Type Filter - Mobile Scroll */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6">
+        <div className="flex items-center gap-3 mb-3 md:mb-4">
           <div className="p-2 bg-slate-900 rounded-lg">
-            <FunnelIcon className="h-5 w-5 text-white" />
+            <FunnelIcon className="h-4 w-4 md:h-5 md:w-5 text-white" />
           </div>
-          <span className="text-lg font-semibold text-slate-800">Shipment Type</span>
+          <span className="text-sm md:text-lg font-semibold text-slate-800">Filter by Type</span>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 md:gap-3 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
           <button
             onClick={() => setWarehouseFilter('all')}
-            className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${warehouseFilter === 'all'
+            className={`flex-shrink-0 px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-colors ${warehouseFilter === 'all'
               ? 'bg-slate-900 text-white'
               : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
           >
-            All Types ({warehouseCounts.all})
+            All ({warehouseCounts.all})
           </button>
           <button
             onClick={() => setWarehouseFilter('regular')}
-            className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${warehouseFilter === 'regular'
+            className={`flex-shrink-0 px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-1 md:gap-2 ${warehouseFilter === 'regular'
               ? 'bg-blue-600 text-white'
               : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
           >
-            <HomeIcon className="h-4 w-4" />
+            <HomeIcon className="h-3 w-3 md:h-4 md:w-4" />
             Regular ({warehouseCounts.regular})
           </button>
           <button
             onClick={() => setWarehouseFilter('warehouse')}
-            className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${warehouseFilter === 'warehouse'
+            className={`flex-shrink-0 px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-1 md:gap-2 ${warehouseFilter === 'warehouse'
               ? 'bg-blue-600 text-white'
               : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
           >
-            <BuildingStorefrontIcon className="h-4 w-4" />
+            <BuildingStorefrontIcon className="h-3 w-3 md:h-4 md:w-4" />
             Warehouse ({warehouseCounts.warehouse})
           </button>
           {longStayCounts.warning > 0 && (
             <button
-              className="px-5 py-2.5 rounded-lg text-sm font-medium bg-yellow-500 text-white flex items-center gap-2 transition-colors"
-              title="Shipments stored 30-60 days"
+              className="flex-shrink-0 px-3 md:px-5 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium bg-yellow-500 text-white flex items-center gap-1"
             >
-              🟡 Warning: {longStayCounts.warning}
+              🟡 {longStayCounts.warning}
             </button>
           )}
           {longStayCounts.urgent > 0 && (
             <button
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white border border-red-700 flex items-center gap-2"
-              title="Shipments stored over 60 days"
+              className="flex-shrink-0 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium bg-red-600 text-white flex items-center gap-1"
             >
-              🔴 Urgent: {longStayCounts.urgent}
+              🔴 {longStayCounts.urgent}
             </button>
           )}
         </div>
       </div>
 
-      {/* Status Tabs */}
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
+      {/* Status Tabs - Mobile Optimized */}
+      <div className="bg-white rounded-xl md:rounded-2xl shadow-sm md:shadow-lg border border-gray-100 overflow-hidden">
+        <div className="border-b border-gray-200 overflow-x-auto no-scrollbar">
+          <nav className="flex min-w-max">
             <button
               onClick={() => setActiveTab('all')}
-              className={`group flex-1 py-5 px-6 text-center font-bold text-sm transition-all duration-300 ${activeTab === 'all'
-                ? 'border-b-4 border-indigo-600 text-indigo-600 bg-indigo-50'
+              className={`flex-1 min-w-[80px] py-3 md:py-5 px-3 md:px-6 text-center font-semibold text-xs md:text-sm transition-all ${activeTab === 'all'
+                ? 'border-b-3 md:border-b-4 border-indigo-600 text-indigo-600 bg-indigo-50'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-base">All Shipments</span>
-                {statusCounts.all > 0 && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md">
-                    {statusCounts.all}
-                  </span>
-                )}
+              <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2">
+                <span>All</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold bg-indigo-600 text-white">
+                  {statusCounts.all}
+                </span>
               </div>
             </button>
             <button
               onClick={() => setActiveTab('pending')}
-              className={`group flex-1 py-5 px-6 text-center font-bold text-sm transition-all duration-300 ${activeTab === 'pending'
-                ? 'border-b-4 border-yellow-600 text-yellow-600 bg-yellow-50'
+              className={`flex-1 min-w-[80px] py-3 md:py-5 px-3 md:px-6 text-center font-semibold text-xs md:text-sm transition-all ${activeTab === 'pending'
+                ? 'border-b-3 md:border-b-4 border-yellow-600 text-yellow-600 bg-yellow-50'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-base">⏳ Pending</span>
-                {statusCounts.pending > 0 && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-md">
-                    {statusCounts.pending}
-                  </span>
-                )}
+              <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2">
+                <span>⏳ Pending</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold bg-yellow-500 text-white">
+                  {statusCounts.pending}
+                </span>
               </div>
             </button>
             <button
               onClick={() => setActiveTab('in_storage')}
-              className={`group flex-1 py-5 px-6 text-center font-bold text-sm transition-all duration-300 ${activeTab === 'in_storage'
-                ? 'border-b-4 border-green-600 text-green-600 bg-green-50'
+              className={`flex-1 min-w-[80px] py-3 md:py-5 px-3 md:px-6 text-center font-semibold text-xs md:text-sm transition-all ${activeTab === 'in_storage'
+                ? 'border-b-3 md:border-b-4 border-green-600 text-green-600 bg-green-50'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-base">🏢 In Warehouse</span>
-                {statusCounts.in_storage > 0 && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-green-600 to-green-700 text-white shadow-md">
-                    {statusCounts.in_storage}
-                  </span>
-                )}
+              <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2">
+                <span>🏢 Active</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold bg-green-600 text-white">
+                  {statusCounts.in_storage}
+                </span>
               </div>
             </button>
             <button
               onClick={() => setActiveTab('partial')}
-              className={`group flex-1 py-5 px-6 text-center font-bold text-sm transition-all duration-300 ${activeTab === 'partial'
-                ? 'border-b-4 border-orange-600 text-orange-600 bg-orange-50'
+              className={`flex-1 min-w-[80px] py-3 md:py-5 px-3 md:px-6 text-center font-semibold text-xs md:text-sm transition-all ${activeTab === 'partial'
+                ? 'border-b-3 md:border-b-4 border-orange-600 text-orange-600 bg-orange-50'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-base">⚠️ Partial</span>
-                {statusCounts.partial > 0 && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-orange-600 to-orange-700 text-white shadow-md">
-                    {statusCounts.partial}
-                  </span>
-                )}
+              <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2">
+                <span>⚠️ Partial</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold bg-orange-600 text-white">
+                  {statusCounts.partial}
+                </span>
               </div>
             </button>
             <button
               onClick={() => setActiveTab('released')}
-              className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${activeTab === 'released'
+              className={`flex-1 min-w-[80px] py-3 md:py-4 px-3 md:px-6 text-center font-semibold text-xs md:text-sm transition-colors ${activeTab === 'released'
                 ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'text-gray-500 hover:text-gray-700'
                 }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-base">✅ Released</span>
-                {statusCounts.released > 0 && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
-                    {statusCounts.released}
-                  </span>
-                )}
+              <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2">
+                <span>✅ Released</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold bg-blue-600 text-white">
+                  {statusCounts.released}
+                </span>
               </div>
             </button>
           </nav>
         </div>
 
-        {/* Advanced Search & Filters */}
-        <div className="p-6 bg-gradient-to-r from-gray-50 to-blue-50 border-t border-gray-200">
-          <div className="flex items-center justify-between mb-4">
+        {/* Advanced Search & Filters - Mobile Optimized */}
+        <div className="p-3 md:p-6 bg-gradient-to-r from-gray-50 to-blue-50 border-t border-gray-200">
+          {/* View Mode Toggle - Hidden on Mobile (uses cards by default) */}
+          <div className="hidden md:flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setViewMode('folders')}
-                className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all duration-300 text-sm transform hover:scale-105 ${viewMode === 'folders'
+                className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all duration-300 text-sm ${viewMode === 'folders'
                   ? 'bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-lg'
                   : 'bg-white text-gray-600 hover:bg-gray-100 border-2 border-gray-300 shadow-sm'
                   }`}
@@ -490,7 +499,7 @@ export const Shipments: React.FC = () => {
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all duration-300 text-sm transform hover:scale-105 ${viewMode === 'table'
+                className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all duration-300 text-sm ${viewMode === 'table'
                   ? 'bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-lg'
                   : 'bg-white text-gray-600 hover:bg-gray-100 border-2 border-gray-300 shadow-sm'
                   }`}
@@ -502,43 +511,41 @@ export const Shipments: React.FC = () => {
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Search Bar */}
-            <div className="relative md:col-span-2">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg">
-                <MagnifyingGlassIcon className="h-5 w-5 text-white" />
-              </div>
-              <input
-                type="text"
-                placeholder="🔍 Search client name, reference ID, phone..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-16 pr-12 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-300 font-bold shadow-md"
-                  title="Clear search"
-                >
-                  ✕
-                </button>
-              )}
+          
+          {/* Search Bar */}
+          <div className="relative">
+            <div className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 p-1.5 md:p-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg">
+              <MagnifyingGlassIcon className="h-4 w-4 md:h-5 md:w-5 text-white" />
             </div>
-
-            {/* Company Filter */}
-            <div className="relative">
-              <select
-                value={selectedCompany}
-                onChange={(e) => setSelectedCompany(e.target.value)}
-                className="w-full px-4 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium appearance-none bg-white shadow-sm hover:shadow-md transition-all duration-300"
+            <input
+              type="text"
+              placeholder="🔍 Search client, reference, phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 md:pl-16 pr-10 md:pr-12 py-3 md:py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium shadow-sm"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2 p-1.5 md:p-2 bg-red-500 text-white rounded-lg"
               >
-                <option value="">All Companies</option>
-                {[...new Set(shipments.map((s: any) => s.companyProfile?.name).filter(Boolean))].sort().map((company: any) => (
-                  <option key={company} value={company}>{company}</option>
-                ))}
-              </select>
-            </div>
+                ✕
+              </button>
+            )}
+          </div>
+          
+          {/* Company Filter - Desktop Only */}
+          <div className="hidden md:block mt-4">
+            <select
+              value={selectedCompany}
+              onChange={(e) => setSelectedCompany(e.target.value)}
+              className="w-full md:w-auto px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 text-sm font-medium appearance-none bg-white"
+            >
+              <option value="">All Companies</option>
+              {[...new Set(shipments.map((s: any) => s.companyProfile?.name).filter(Boolean))].sort().map((company: any) => (
+                <option key={company} value={company}>{company}</option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -620,301 +627,116 @@ export const Shipments: React.FC = () => {
                   </div>
                 </button>
 
-                {/* Clean Folder Contents */}
+                {/* Clean Folder Contents - Mobile Optimized */}
                 {isExpanded && (
                   <div className="border-t border-gray-200 bg-gray-50">
-                    <div className="p-4 space-y-3">
+                    <div className="p-2 md:p-4 space-y-2 md:space-y-3">
                       {companyShipments.map((shipment: any) => {
                         const badge = getStatusBadge(shipment.status);
                         const days = getDaysStored(shipment);
                         const storageBadge = getStorageBadge(days);
 
                         return (
-                          <div key={shipment.id} className="bg-white rounded-lg p-4 border border-gray-200 hover:border-gray-400 hover:shadow-md transition-all">
-                            <div className="flex items-start justify-between gap-4">
-                              {/* Left: Shipment Info */}
-                              <div className="flex-1 space-y-3">
-                                {/* Header Row */}
-                                <div className="flex items-center gap-3 pb-2 border-b">
-                                  <span className="text-base font-bold text-gray-900">{shipment.referenceId}</span>
-                                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${badge.color}`}>
-                                    {badge.icon} {badge.label}
-                                  </span>
-                                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
-                                    {storageBadge.icon} {storageBadge.badge}
-                                  </span>
-                                </div>
-
-                                {/* Info Grid */}
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm bg-gray-50 p-3 rounded-lg">
-                                  <div className="flex items-center gap-2">
-                                    <div className="bg-blue-100 p-2 rounded-lg">
-                                      <svg className="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                      </svg>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs text-gray-500">Client</p>
-                                      <p className="font-bold text-gray-900">{shipment.clientName}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="bg-green-100 p-2 rounded-lg">
-                                      <svg className="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                      </svg>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs text-gray-500">Contact</p>
-                                      <p className="font-bold text-gray-900">{shipment.clientPhone || '-'}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="bg-purple-100 p-2 rounded-lg">
-                                      <svg className="w-4 h-4 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                      </svg>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs text-gray-500">Boxes</p>
-                                      <p className="font-bold text-gray-900">{shipment.currentBoxCount} / {shipment.originalBoxCount}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="bg-orange-100 p-2 rounded-lg">
-                                      <svg className="w-4 h-4 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-                                      </svg>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs text-gray-500">Weight</p>
-                                      <p className="font-bold text-gray-900">{shipment.totalWeight ? `${shipment.totalWeight} kg` : '-'}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="bg-indigo-100 p-2 rounded-lg">
-                                      <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                      </svg>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs text-gray-500">Arrival Date</p>
-                                      <p className="font-bold text-gray-900">
-                                        {shipment.arrivalDate && !isNaN(new Date(shipment.arrivalDate).getTime())
-                                          ? new Date(shipment.arrivalDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                                          : shipment.receivedAt && !isNaN(new Date(shipment.receivedAt).getTime())
-                                            ? new Date(shipment.receivedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                                            : '-'}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="bg-gray-200 p-2 rounded-lg">
-                                      <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                      </svg>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs text-gray-500">Created By</p>
-                                      <p className="font-bold text-gray-900">
-                                        {shipment.createdBy
-                                          ? (typeof shipment.createdBy === 'object'
-                                            ? shipment.createdBy.name || shipment.createdBy.email
-                                            : shipment.createdBy)
-                                          : 'N/A'}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  {shipment.assignedBy && (
-                                    <div className="flex items-center gap-2">
-                                      <div className="bg-indigo-100 p-2 rounded-lg">
-                                        <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                                        </svg>
-                                      </div>
-                                      <div>
-                                        <p className="text-xs text-gray-500">Assigned By</p>
-                                        <p className="font-bold text-gray-900">
-                                          {typeof shipment.assignedBy === 'object'
-                                            ? shipment.assignedBy.name || shipment.assignedBy.email
-                                            : shipment.assignedBy}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Rack Locations with Move Indicator */}
-                                {shipment.rackLocations && shipment.rackLocations !== 'N/A' && (
-                                  <div className="flex items-center gap-2 text-sm flex-wrap">
-                                    <span className="text-xs text-gray-600 font-semibold">Racks:</span>
-                                    <div className="flex flex-wrap gap-1">
-                                      {shipment.rackLocations.split(',').map((rack: string, idx: number) => (
-                                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-700 text-white text-xs font-semibold">
-                                          📍 {rack.trim()}
-                                        </span>
-                                      ))}
-                                    </div>
-                                    {/* Move History Indicator */}
-                                    {shipment.hasMoveHistory && (
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs font-semibold border border-purple-300">
-                                        🔄 Moved
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                {/* Original Rack if Moved */}
-                                {shipment.originalRack && shipment.originalRack !== shipment.rackLocations && (
-                                  <div className="flex items-center gap-2 text-xs text-gray-500 bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                                    <span>📦 Originally in:</span>
-                                    <span className="font-semibold text-amber-700">{shipment.originalRack}</span>
-                                    <span>→</span>
-                                    <span className="font-semibold text-green-700">{shipment.rackLocations}</span>
-                                  </div>
-                                )}
-
-                                {/* Pallet & Loose Box Breakdown */}
-                                <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
-                                  {(() => {
-                                    // 🔧 DEBUG: Log boxes data
-                                    if (!shipment.boxes || shipment.boxes.length === 0) {
-                                      console.warn(`⚠️ No boxes data for shipment ${shipment.referenceId}`, shipment);
-                                    }
-
-                                    const palletBoxes = shipment.boxes?.filter((b: any) => b.pieceQR?.palletNumber > 0) || [];
-                                    const looseBoxes = shipment.boxes?.filter((b: any) => !b.pieceQR?.palletNumber || b.pieceQR?.palletNumber === 0) || [];
-                                    const uniquePallets = [...new Set(palletBoxes.map((b: any) => b.pieceQR?.palletNumber))].sort((a, b) => a - b);
-
-                                    return (
-                                      <>
-                                        {uniquePallets.length > 0 && uniquePallets.map((palletNum, idx) => {
-                                          const count = palletBoxes.filter((b: any) => b.pieceQR?.palletNumber === palletNum).length;
-                                          return (
-                                            <span key={idx} className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-100 text-blue-900 rounded-lg text-xs font-bold border-2 border-blue-300">
-                                              📦 Pallet #{palletNum} ({count} pcs)
-                                            </span>
-                                          );
-                                        })}
-                                        {looseBoxes.length > 0 && (
-                                          <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-100 text-orange-900 rounded-lg text-xs font-bold border-2 border-orange-300">
-                                            📦 Loose ({looseBoxes.length} pcs)
-                                          </span>
-                                        )}
-                                      </>
-                                    );
-                                  })()}
-                                </div>
-
-                                {/* Shipment Photos - Direct Display with RELEASED Stamp */}
-                                {shipment.shipmentPhotos && shipment.shipmentPhotos.length > 0 && (
-                                  <div className="space-y-2 pt-2 border-t">
-                                    <span className="text-xs text-gray-600 font-semibold">
-                                      Shipment Photos ({shipment.shipmentPhotos.length})
-                                      {shipment.status === 'RELEASED' && (
-                                        <span className="ml-2 text-red-600 font-bold">● RELEASED</span>
-                                      )}
+                          <div key={shipment.id} className="bg-white rounded-lg p-3 md:p-4 border border-gray-200 hover:border-gray-400 hover:shadow-md transition-all">
+                            {/* Mobile Card Layout */}
+                            <div className="space-y-3">
+                              {/* Header Row - Always Visible */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm md:text-base font-bold text-gray-900">{shipment.referenceId}</span>
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] md:text-xs font-semibold ${badge.color}`}>
+                                      {badge.icon} {badge.label}
                                     </span>
-                                    <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
-                                      {shipment.shipmentPhotos.map((photo: string, idx: number) => (
-                                        <ShipmentPhoto
-                                          key={idx}
-                                          photoUrl={photo}
-                                          index={idx}
-                                          status={shipment.status}
-                                          showStamp={true}
-                                        />
-                                      ))}
-                                    </div>
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] md:text-xs font-semibold ${storageBadge.bg} ${storageBadge.text}`}>
+                                      {storageBadge.icon} {storageBadge.badge}
+                                    </span>
                                   </div>
-                                )}
+                                  <p className="text-sm text-gray-700 font-medium mt-1 truncate">{shipment.clientName}</p>
+                                </div>
+                                {/* Quick Action Buttons - Visible on Mobile */}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedShipment(shipment);
+                                      setDetailModalOpen(true);
+                                    }}
+                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                                    title="View"
+                                  >
+                                    <EyeIcon className="h-5 w-5" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedShipment(shipment);
+                                      setEditModalOpen(true);
+                                    }}
+                                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg"
+                                    title="Edit"
+                                  >
+                                    <PencilIcon className="h-5 w-5" />
+                                  </button>
+                                </div>
+                              </div>
 
-                                {/* Notes Preview */}
-                                {shipment.notes && (
-                                  <div className="text-xs text-gray-600 bg-yellow-50 border-l-2 border-yellow-400 px-2 py-1">
-                                    <span className="font-semibold">Note:</span> {shipment.notes.substring(0, 100)}{shipment.notes.length > 100 ? '...' : ''}
-                                  </div>
+                              {/* Key Info Row */}
+                              <div className="flex flex-wrap gap-2 text-xs">
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 text-purple-700 rounded">
+                                  📦 {shipment.currentBoxCount}/{shipment.originalBoxCount} boxes
+                                </span>
+                                {shipment.clientPhone && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded">
+                                    📞 {shipment.clientPhone}
+                                  </span>
+                                )}
+                                {shipment.cbm > 0 && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded">
+                                    📐 {Number(shipment.cbm).toFixed(2)} CBM
+                                  </span>
                                 )}
                               </div>
 
-                              {/* Right: Action Buttons */}
-                              <div className="flex flex-col gap-2 min-w-[140px]">
-                                <button
-                                  onClick={() => {
-                                    window.open(`/shipment-report/${shipment.id}`, '_blank');
-                                  }}
-                                  className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl hover:from-indigo-700 hover:to-indigo-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
-                                  title="View Full Report"
-                                >
-                                  <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
-                                  <DocumentTextIcon className="w-5 h-5 relative z-10" />
-                                  <span className="relative z-10">Report</span>
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setSelectedShipment(shipment);
-                                    setDetailModalOpen(true);
-                                  }}
-                                  className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
-                                  title="View Details"
-                                >
-                                  <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
-                                  <EyeIcon className="w-5 h-5 relative z-10" />
-                                  <span className="relative z-10">View</span>
-                                </button>
+                              {/* Rack Locations */}
+                              {shipment.rackLocations && shipment.rackLocations !== 'N/A' && (
+                                <div className="flex flex-wrap gap-1">
+                                  {shipment.rackLocations.split(',').slice(0, 3).map((rack: string, idx: number) => (
+                                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-700 text-white text-[10px] md:text-xs font-semibold">
+                                      📍 {rack.trim()}
+                                    </span>
+                                  ))}
+                                  {shipment.rackLocations.split(',').length > 3 && (
+                                    <span className="text-xs text-gray-500">+{shipment.rackLocations.split(',').length - 3} more</span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Action Buttons Row - Desktop */}
+                              <div className="hidden md:flex items-center gap-2 pt-2 border-t border-gray-100">
                                 <button
                                   onClick={() => {
                                     setSelectedShipment(shipment);
                                     setQrModalOpen(true);
                                   }}
-                                  className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-gray-700 to-gray-800 text-white rounded-xl hover:from-gray-800 hover:to-gray-900 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
-                                  title="View QR Codes"
+                                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
                                 >
-                                  <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
-                                  <QrCodeIcon className="w-5 h-5 relative z-10" />
-                                  <span className="relative z-10">QR Codes</span>
+                                  <QrCodeIcon className="h-4 w-4" />
+                                  QR
                                 </button>
-                                <button
-                                  onClick={() => {
-                                    setSelectedShipment(shipment);
-                                    setEditModalOpen(true);
-                                  }}
-                                  className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
-                                  title="Edit"
-                                >
-                                  <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
-                                  <PencilIcon className="w-5 h-5 relative z-10" />
-                                  <span className="relative z-10">Edit</span>
-                                </button>
-                                {(shipment.status === 'IN_WAREHOUSE' || shipment.status === 'IN_STORAGE' || shipment.status === 'PARTIAL' || shipment.status === 'ACTIVE' || shipment.status === 'STORED') && (
+                                {shipment.status !== 'RELEASED' && (
                                   <button
                                     onClick={() => handleReleaseClick(shipment)}
-                                    className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
-                                    title="Release"
+                                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
                                   >
-                                    <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
-                                    <ArrowRightOnRectangleIcon className="w-5 h-5 relative z-10" />
-                                    <span className="relative z-10">Release</span>
-                                  </button>
-                                )}
-                                {shipment.status === 'RELEASED' && (
-                                  <button
-                                    onClick={() => handlePrintReleaseNote(shipment)}
-                                    className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
-                                    title="Download Release Receipt"
-                                  >
-                                    <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
-                                    <ArrowDownTrayIcon className="w-5 h-5 relative z-10" />
-                                    <span className="relative z-10">Release Receipt</span>
+                                    <ArrowRightOnRectangleIcon className="h-4 w-4" />
+                                    Release
                                   </button>
                                 )}
                                 <button
-                                  onClick={() => handleDelete(shipment.id)}
-                                  className="group relative flex items-center justify-start gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-sm font-semibold overflow-hidden"
-                                  title="Delete"
+                                  onClick={() => navigate(`/shipment/${shipment.id}`)}
+                                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                                 >
-                                  <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
-                                  <TrashIcon className="w-5 h-5 relative z-10" />
-                                  <span className="relative z-10">Delete</span>
+                                  <DocumentTextIcon className="h-4 w-4" />
+                                  Report
                                 </button>
                               </div>
                             </div>

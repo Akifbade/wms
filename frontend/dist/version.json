@@ -1,9 +1,9 @@
 {
-  "version": "v2.2.86",
+  "version": "v2.3.0",
   "buildDate": "Dec 14, 2025",
-  "buildTime": "18:20:52",
-  "commit": "d3f3ad03e",
-  "commitMessage": "fix: show Release button for IN_STORAGE shipments (same as IN_WAREHOUSE)",
+  "buildTime": "21:01:53",
+  "commit": "66d4fa61c",
+  "commitMessage": "fix: use code column in rack recalc",
   "author": "akifbade46-del",
   "environment": "local"
 }
