@@ -3,14 +3,14 @@
  * DO NOT EDIT MANUALLY - This file is auto-generated
  */
 
-export const APP_VERSION = 'v2.2.87';
+export const APP_VERSION = 'v2.2.88';
 
 export const VERSION_INFO = {
-  version: 'v2.2.87',
+  version: 'v2.2.88',
   environment: import.meta.env.VITE_APP_ENV || 'development',
   buildDate: new Date().toISOString(),
   commitHash: import.meta.env.VITE_APP_COMMIT_HASH || 'local-dev',
-  commitMessage: 'Fix: Job click in Material Report, Individual Rack CBM, Old returns restocked',
+  commitMessage: 'Fix: Job link from Material Report, CBM update on shipment edit',
   stage: 'local', // local, staging, or production
 };
 

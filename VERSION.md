@@ -1,19 +1,20 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.2.87**
-- **Released**: Dec 14, 2025 at 19:30:00
+## Current Version: **v2.2.88**
+- **Released**: Jan 15, 2025 at 12:30:00
 - **Author**: akifbade46-del
-- **Status**: Development
+- **Status**: Production
+
+### Changes in v2.2.88:
+- 🔧 Fix: Job link from Material Report now opens job properly
+- 📦 Fix: CBM recalculates when editing old shipment dimensions
+- 🔢 Fix: Auto-version now syncs VERSION.md + version.ts together
 
 ### Changes in v2.2.87:
 - 🔧 Fix: Job click in Material Report opens job instead of scanner
 - 📦 Feature: Individual Rack CBM setting (Ground=40, others=5)
 - ✅ Fix: Old returns marked as restocked (before approval system)
 - 📊 Fix: LARGE CARTON balance recalculated correctly (36)
-
-### Changes in v2.2.86:
-- 🔧 Fixed version sync across all files (backend, frontend, VERSION.md)
-- 📧 Verified physical report email integration code
 
 ### Changes in v2.2.69:
 - 📄 **Contract System**: Replaced "Prepaid Balance" with "Contract System"
