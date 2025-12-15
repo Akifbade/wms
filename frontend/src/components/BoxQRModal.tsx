@@ -374,7 +374,7 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
               </div>
 
               {/* QR Codes Grid (Pallets + Loose Boxes) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div id="qr-print-area" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {printUnits.map(unit => {
                   const isSelected = selectedUnits.has(unit.key);
                   return (
@@ -422,21 +422,23 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
                         />
                       )}
 
-                      {/* Brand mark on label - LOGO ONLY (smaller) */}
-                      <div className="flex items-center justify-center gap-2 mb-3">
+                      {/* Brand mark on label - QGO CARGO BRANDING */}
+                      <div className="flex items-center justify-center gap-2 mb-3 py-2 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-lg">
                         {branding?.logoUrl ? (
                           <img
                             src={branding.logoUrl}
-                            alt="Logo"
-                            className="h-8 w-auto object-contain"
+                            alt="QGO Cargo"
+                            className="h-10 w-auto object-contain"
                             onError={(e) => {
                               console.error('❌ Logo failed to load:', branding.logoUrl);
                               (e.target as HTMLImageElement).style.display = 'none';
                             }}
                           />
-                        ) : (
-                          <span className="text-sm font-black text-indigo-700">QGO</span>
-                        )}
+                        ) : null}
+                        <div className="text-center">
+                          <div className="text-lg font-black text-indigo-700">QGO CARGO</div>
+                          <div className="text-[10px] text-gray-500">Warehouse Storage • Kuwait</div>
+                        </div>
                       </div>
 
                       {/* Details - BIGGER TEXT */}
@@ -518,37 +520,45 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
         </div>
       </div>
 
-      {/* Print Styles - FIXED: Properly hide background page */}
+      {/* Print Styles - FIXED: Use ID to target modal content */}
       <style>{`
         @media print {
-          /* Hide everything first */
-          body > * {
-            display: none !important;
+          /* Hide everything */
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
           }
           
-          /* Show only this modal */
-          body > div:last-child {
-            display: block !important;
+          body * {
+            visibility: hidden !important;
           }
           
-          .fixed {
-            position: relative !important;
+          /* Show only print area and ALL its children */
+          #qr-print-area,
+          #qr-print-area *,
+          #qr-print-area img {
+            visibility: visible !important;
+          }
+          
+          #qr-print-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
             background: white !important;
           }
           
-          .fixed > div {
-            box-shadow: none !important;
-            max-height: none !important;
-            overflow: visible !important;
-          }
-          
-          .fixed img {
-            max-width: 100%;
-            height: auto;
+          /* Make sure images print */
+          #qr-print-area img {
+            max-width: 100% !important;
+            height: auto !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           
           .print\\:hidden {
             display: none !important;
+            visibility: hidden !important;
           }
           
           .print\\:border {
@@ -561,7 +571,7 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
           }
           
           /* Grid for print - 2 per row */
-          .grid {
+          #qr-print-area .grid {
             display: grid !important;
             grid-template-columns: repeat(2, 1fr) !important;
             gap: 1rem !important;
