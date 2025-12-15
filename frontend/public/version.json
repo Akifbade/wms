@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 15, 2025",
-  "buildTime": "00:10:04",
-  "commit": "4fac05b22",
-  "commitMessage": "fix: Sorting not working - use spread operator for React re-render",
+  "buildTime": "07:30:22",
+  "commit": "fe0958aa7",
+  "commitMessage": "fix: Folder mode sorting + debounce search (500ms delay)",
   "author": "akifbade46-del",
   "environment": "local"
 }

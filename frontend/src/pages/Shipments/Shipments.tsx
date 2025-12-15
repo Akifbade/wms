@@ -114,9 +114,12 @@ export const Shipments: React.FC = () => {
         );
       }
 
-      // Sort shipments (default: newest first) - Create new array to trigger React re-render
+      // Sort shipments (default: newest first by createdAt) - Create new array to trigger React re-render
       const sorted = [...filtered].sort((a: any, b: any) => {
-        const getDate = (s: any) => new Date(s.arrivalDate || s.createdAt || 0).getTime();
+        // Use createdAt as primary (when shipment was added to system)
+        const getCreatedAt = (s: any) => new Date(s.createdAt || 0).getTime();
+        // Use arrivalDate for "arrival" sorting if needed
+        const getArrivalDate = (s: any) => new Date(s.arrivalDate || s.createdAt || 0).getTime();
         const getDays = (s: any) => {
           const src = s.arrivalDate || s.receivedDate || s.createdAt;
           if (!src) return 0;
@@ -124,8 +127,8 @@ export const Shipments: React.FC = () => {
         };
         
         switch (sortBy) {
-          case 'date_desc': return getDate(b) - getDate(a); // Newest first
-          case 'date_asc': return getDate(a) - getDate(b); // Oldest first
+          case 'date_desc': return getCreatedAt(b) - getCreatedAt(a); // Newest added first
+          case 'date_asc': return getCreatedAt(a) - getCreatedAt(b); // Oldest added first
           case 'name_asc': return (a.clientName || '').localeCompare(b.clientName || '');
           case 'name_desc': return (b.clientName || '').localeCompare(a.clientName || '');
           case 'cbm_desc': return (Number(b.cbm) || 0) - (Number(a.cbm) || 0);
@@ -209,7 +212,8 @@ export const Shipments: React.FC = () => {
   
   // Sort items within each folder based on sortBy
   Object.keys(groupedByCompany).forEach(company => {
-    const getDate = (s: any) => new Date(s.arrivalDate || s.createdAt || 0).getTime();
+    // Use createdAt (when added to system) for date sorting
+    const getCreatedAt = (s: any) => new Date(s.createdAt || 0).getTime();
     const getDays = (s: any) => {
       const src = s.arrivalDate || s.receivedDate || s.createdAt;
       if (!src) return 0;
@@ -218,8 +222,8 @@ export const Shipments: React.FC = () => {
     
     groupedByCompany[company].sort((a: any, b: any) => {
       switch (sortBy) {
-        case 'date_desc': return getDate(b) - getDate(a);
-        case 'date_asc': return getDate(a) - getDate(b);
+        case 'date_desc': return getCreatedAt(b) - getCreatedAt(a);
+        case 'date_asc': return getCreatedAt(a) - getCreatedAt(b);
         case 'name_asc': return (a.clientName || '').localeCompare(b.clientName || '');
         case 'name_desc': return (b.clientName || '').localeCompare(a.clientName || '');
         case 'cbm_desc': return (Number(b.cbm) || 0) - (Number(a.cbm) || 0);
@@ -228,7 +232,7 @@ export const Shipments: React.FC = () => {
         case 'duration_asc': return getDays(a) - getDays(b);
         case 'pieces_desc': return (b.currentBoxCount || 0) - (a.currentBoxCount || 0);
         case 'pieces_asc': return (a.currentBoxCount || 0) - (b.currentBoxCount || 0);
-        default: return getDate(b) - getDate(a);
+        default: return getCreatedAt(b) - getCreatedAt(a);
       }
     });
   });
