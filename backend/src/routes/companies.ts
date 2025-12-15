@@ -926,88 +926,64 @@ router.post('/:profileId/send-statement', authenticateToken, async (req: AuthReq
     const outstandingBalance = totalInvoiceAmount - totalPaidAmount;
     const netBalance = outstandingBalance - advanceBalance;
 
-    // Calculate monthly trends (last 6 months)
-    const monthlyData: { month: string; charges: number; cbm: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      const monthName = date.toLocaleString('default', { month: 'short' });
-      monthlyData.push({
-        month: monthName,
-        charges: totalDailyCharge * 30 * (1 + (Math.random() * 0.2 - 0.1)), // Simulated variation
-        cbm: totalCBM * (1 + (Math.random() * 0.15 - 0.075))
-      });
-    }
-    const maxCharges = Math.max(...monthlyData.map(m => m.charges));
+    // QGO Logo URL
+    const logoUrl = 'http://qgocargo.com/logo.png';
 
-    // QGO Logo as Base64 (small navy blue logo)
-    const qgoLogoSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" width="120" height="40">
-      <rect width="120" height="40" rx="6" fill="#1e3a5f"/>
-      <text x="60" y="28" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="white" text-anchor="middle">QGO</text>
-    </svg>`;
-    const logoBase64 = Buffer.from(qgoLogoSvg).toString('base64');
-
-    // Generate professional HTML email with Outlook compatibility
+    // Generate clean, modern HTML email
     const htmlContent = `
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Storage Statement - ${profile.name}</title>
-  <!--[if mso]>
-  <style type="text/css">
-    table { border-collapse: collapse; }
-    td, th { padding: 8px 12px; }
-  </style>
-  <![endif]-->
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background-color: #f0f4f8; -webkit-font-smoothing: antialiased;">
+<body style="margin:0; padding:0; background-color:#f4f7fa; font-family: Arial, Helvetica, sans-serif;">
   
-  <!-- Main Container -->
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f0f4f8;">
+  <!-- Wrapper Table -->
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f7fa; padding:30px 0;">
     <tr>
-      <td align="center" style="padding: 20px 10px;">
+      <td align="center">
         
-        <!-- Email Content -->
-        <table role="presentation" cellpadding="0" cellspacing="0" width="700" style="max-width: 700px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+        <!-- Main Container -->
+        <table width="650" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:16px; overflow:hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
           
-          <!-- Header with Logo -->
+          <!-- HEADER with Logo -->
           <tr>
-            <td style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 50%, #1e3a5f 100%); padding: 30px 40px; border-radius: 12px 12px 0 0;">
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+            <td style="background: #0f172a; padding:25px 35px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td>
-                    <img src="data:image/svg+xml;base64,${logoBase64}" alt="QGO Cargo" width="100" height="35" style="display: block;" />
+                  <td width="140">
+                    <img src="${logoUrl}" alt="QGO Cargo" width="120" height="auto" style="display:block; max-height:50px;" />
                   </td>
-                  <td align="right" style="color: #ffffff;">
-                    <p style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 1px;">STORAGE STATEMENT</p>
-                    <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.8; text-transform: uppercase;">Comprehensive Analytics Report</p>
+                  <td align="right">
+                    <p style="margin:0; color:#94a3b8; font-size:12px; text-transform:uppercase; letter-spacing:1px;">Storage Statement</p>
+                    <p style="margin:5px 0 0; color:#ffffff; font-size:20px; font-weight:bold;">${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
 
-          <!-- Company Info Banner -->
+          <!-- Customer Info Bar -->
           <tr>
-            <td style="background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); padding: 25px 40px; border-bottom: 3px solid #1e3a5f;">
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+            <td style="background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%); padding:20px 35px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td>
-                    <p style="margin: 0; font-size: 22px; font-weight: 700; color: #1e3a5f;">📋 ${profile.name}</p>
-                    <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">
-                      <strong>Statement Period:</strong> ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    <p style="margin:0; color:#ffffff; font-size:18px; font-weight:bold;">📋 ${profile.name}</p>
+                    <p style="margin:5px 0 0; color:#dbeafe; font-size:13px;">
+                      ${profile.contactPerson ? `👤 ${profile.contactPerson}` : ''} 
+                      ${profile.contactPhone ? ` • 📞 ${profile.contactPhone}` : ''}
                     </p>
-                    ${profile.contactPerson ? `<p style="margin: 3px 0 0; font-size: 13px; color: #64748b;">👤 Contact: ${profile.contactPerson} ${profile.contactPhone ? `| 📞 ${profile.contactPhone}` : ''}</p>` : ''}
                   </td>
-                  <td align="right" valign="top">
-                    <table role="presentation" cellpadding="0" cellspacing="0" style="background: #1e3a5f; border-radius: 8px; padding: 12px 20px;">
+                  <td align="right">
+                    <table cellpadding="0" cellspacing="0" style="background:${netBalance > 0 ? '#ef4444' : '#22c55e'}; border-radius:8px; padding:10px 20px;">
                       <tr>
-                        <td style="color: #ffffff; text-align: center;">
-                          <p style="margin: 0; font-size: 10px; text-transform: uppercase; opacity: 0.8;">Account Status</p>
-                          <p style="margin: 5px 0 0; font-size: 16px; font-weight: 700;">${netBalance > 0 ? '⚠️ DUE' : '✅ CLEAR'}</p>
-                        </td>
+                        <td style="color:#ffffff; font-size:11px; text-transform:uppercase;">Status</td>
+                      </tr>
+                      <tr>
+                        <td style="color:#ffffff; font-size:16px; font-weight:bold;">${netBalance > 0 ? '⚠️ AMOUNT DUE' : '✅ ALL CLEAR'}</td>
                       </tr>
                     </table>
                   </td>
@@ -1016,108 +992,58 @@ router.post('/:profileId/send-statement', authenticateToken, async (req: AuthReq
             </td>
           </tr>
 
-          <!-- Quick Stats Grid -->
+          <!-- MAIN STATS - 4 Colored Cards -->
           <tr>
-            <td style="padding: 30px 40px;">
-              <p style="margin: 0 0 20px; font-size: 16px; font-weight: 700; color: #1e3a5f; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">📊 QUICK OVERVIEW</p>
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+            <td style="padding:30px 35px 20px;">
+              <p style="margin:0 0 15px; color:#1e293b; font-size:14px; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px;">📊 Storage Overview</p>
+              <table width="100%" cellpadding="0" cellspacing="10">
                 <tr>
-                  <td width="25%" style="padding: 8px;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); border-radius: 10px; padding: 20px; text-align: center;">
-                      <tr><td style="color: #ffffff; font-size: 28px; font-weight: 700;">${allShipments.length}</td></tr>
-                      <tr><td style="color: #ffffff; font-size: 11px; text-transform: uppercase; opacity: 0.9; padding-top: 5px;">Shipments</td></tr>
-                    </table>
+                  <!-- Shipments -->
+                  <td width="25%" style="background:#3b82f6; border-radius:12px; padding:20px 15px; text-align:center;">
+                    <p style="margin:0; color:#ffffff; font-size:28px; font-weight:bold;">${allShipments.length}</p>
+                    <p style="margin:5px 0 0; color:#dbeafe; font-size:11px; text-transform:uppercase;">📦 Shipments</p>
                   </td>
-                  <td width="25%" style="padding: 8px;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%); border-radius: 10px; padding: 20px; text-align: center;">
-                      <tr><td style="color: #ffffff; font-size: 28px; font-weight: 700;">${totalCBM.toFixed(1)}</td></tr>
-                      <tr><td style="color: #ffffff; font-size: 11px; text-transform: uppercase; opacity: 0.9; padding-top: 5px;">Total CBM</td></tr>
-                    </table>
+                  <!-- Total CBM -->
+                  <td width="25%" style="background:#8b5cf6; border-radius:12px; padding:20px 15px; text-align:center;">
+                    <p style="margin:0; color:#ffffff; font-size:28px; font-weight:bold;">${totalCBM.toFixed(2)}</p>
+                    <p style="margin:5px 0 0; color:#e9d5ff; font-size:11px; text-transform:uppercase;">📐 Total CBM</p>
                   </td>
-                  <td width="25%" style="padding: 8px;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%); border-radius: 10px; padding: 20px; text-align: center;">
-                      <tr><td style="color: #ffffff; font-size: 28px; font-weight: 700;">${totalBoxes}</td></tr>
-                      <tr><td style="color: #ffffff; font-size: 11px; text-transform: uppercase; opacity: 0.9; padding-top: 5px;">Total Boxes</td></tr>
-                    </table>
+                  <!-- Total Boxes -->
+                  <td width="25%" style="background:#f59e0b; border-radius:12px; padding:20px 15px; text-align:center;">
+                    <p style="margin:0; color:#ffffff; font-size:28px; font-weight:bold;">${totalBoxes}</p>
+                    <p style="margin:5px 0 0; color:#fef3c7; font-size:11px; text-transform:uppercase;">📦 Boxes</p>
                   </td>
-                  <td width="25%" style="padding: 8px;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 10px; padding: 20px; text-align: center;">
-                      <tr><td style="color: #ffffff; font-size: 28px; font-weight: 700;">${totalPallets}</td></tr>
-                      <tr><td style="color: #ffffff; font-size: 11px; text-transform: uppercase; opacity: 0.9; padding-top: 5px;">Pallets</td></tr>
-                    </table>
+                  <!-- Pallets -->
+                  <td width="25%" style="background:#10b981; border-radius:12px; padding:20px 15px; text-align:center;">
+                    <p style="margin:0; color:#ffffff; font-size:28px; font-weight:bold;">${totalPallets}</p>
+                    <p style="margin:5px 0 0; color:#d1fae5; font-size:11px; text-transform:uppercase;">🎨 Pallets</p>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
 
-          <!-- Financial Summary with Chart -->
+          <!-- BILLING RATES BOX -->
           <tr>
-            <td style="padding: 0 40px 30px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+            <td style="padding:0 35px 20px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef3c7; border:2px solid #f59e0b; border-radius:12px;">
                 <tr>
-                  <!-- Left: Billing Rate Card -->
-                  <td width="48%" valign="top" style="padding-right: 15px;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 10px; border: 1px solid #f59e0b;">
+                  <td style="padding:20px;">
+                    <p style="margin:0 0 15px; color:#92400e; font-size:14px; font-weight:bold;">💰 YOUR BILLING RATES</p>
+                    <table width="100%" cellpadding="5" cellspacing="0">
                       <tr>
-                        <td style="padding: 20px;">
-                          <p style="margin: 0 0 15px; font-size: 14px; font-weight: 700; color: #92400e;">💰 BILLING RATES</p>
-                          <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                            <tr>
-                              <td style="padding: 5px 0; font-size: 13px; color: #78350f;">Billing Type:</td>
-                              <td align="right" style="font-weight: 600; color: #92400e;">${billingType.replace('_', ' ')}</td>
-                            </tr>
-                            <tr>
-                              <td style="padding: 5px 0; font-size: 13px; color: #78350f;">Rate per CBM/Day:</td>
-                              <td align="right" style="font-weight: 600; color: #92400e;">${cbmRatePerDay} KWD</td>
-                            </tr>
-                            <tr>
-                              <td style="padding: 5px 0; font-size: 13px; color: #78350f;">Free Storage Days:</td>
-                              <td align="right" style="font-weight: 600; color: #92400e;">${freeStorageDays} days</td>
-                            </tr>
-                            ${minimumCharge > 0 ? `<tr>
-                              <td style="padding: 5px 0; font-size: 13px; color: #78350f;">Minimum Charge:</td>
-                              <td align="right" style="font-weight: 600; color: #92400e;">${minimumCharge} KWD</td>
-                            </tr>` : ''}
-                          </table>
-                        </td>
+                        <td style="color:#78350f; font-size:13px;">📋 Billing Type:</td>
+                        <td align="right" style="color:#92400e; font-size:13px; font-weight:bold;">${billingType.replace('_', ' ')}</td>
+                        <td width="30"></td>
+                        <td style="color:#78350f; font-size:13px;">💵 Rate per CBM/Day:</td>
+                        <td align="right" style="color:#92400e; font-size:13px; font-weight:bold;">${cbmRatePerDay} KWD</td>
                       </tr>
-                    </table>
-                  </td>
-                  
-                  <!-- Right: Charge Projections -->
-                  <td width="52%" valign="top">
-                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); border-radius: 10px;">
                       <tr>
-                        <td style="padding: 20px;">
-                          <p style="margin: 0 0 15px; font-size: 14px; font-weight: 700; color: #ffffff;">📈 CHARGE PROJECTIONS</p>
-                          <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                            <tr>
-                              <td style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.2);">
-                                <span style="font-size: 12px; color: rgba(255,255,255,0.8);">Per Day</span>
-                              </td>
-                              <td align="right" style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.2);">
-                                <span style="font-size: 16px; font-weight: 700; color: #ffffff;">${totalDailyCharge.toFixed(3)} KWD</span>
-                              </td>
-                            </tr>
-                            <tr>
-                              <td style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.2);">
-                                <span style="font-size: 12px; color: rgba(255,255,255,0.8);">Per Month (30 days)</span>
-                              </td>
-                              <td align="right" style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.2);">
-                                <span style="font-size: 16px; font-weight: 700; color: #fbbf24;">${monthlyCharge.toFixed(3)} KWD</span>
-                              </td>
-                            </tr>
-                            <tr>
-                              <td style="padding: 8px 0;">
-                                <span style="font-size: 12px; color: rgba(255,255,255,0.8);">Per Year (365 days)</span>
-                              </td>
-                              <td align="right" style="padding: 8px 0;">
-                                <span style="font-size: 16px; font-weight: 700; color: #34d399;">${yearlyCharge.toFixed(3)} KWD</span>
-                              </td>
-                            </tr>
-                          </table>
-                        </td>
+                        <td style="color:#78350f; font-size:13px;">🆓 Free Storage Days:</td>
+                        <td align="right" style="color:#92400e; font-size:13px; font-weight:bold;">${freeStorageDays} days</td>
+                        <td width="30"></td>
+                        <td style="color:#78350f; font-size:13px;">📉 Minimum Charge:</td>
+                        <td align="right" style="color:#92400e; font-size:13px; font-weight:bold;">${minimumCharge} KWD</td>
                       </tr>
                     </table>
                   </td>
@@ -1126,65 +1052,62 @@ router.post('/:profileId/send-statement', authenticateToken, async (req: AuthReq
             </td>
           </tr>
 
-          <!-- Monthly Trend Chart (CSS-based) -->
+          <!-- CHARGE PROJECTIONS - 3 Cards -->
           <tr>
-            <td style="padding: 0 40px 30px;">
-              <p style="margin: 0 0 15px; font-size: 14px; font-weight: 700; color: #1e3a5f;">📊 MONTHLY CHARGE TREND</p>
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background: #f8fafc; border-radius: 10px; padding: 20px;">
+            <td style="padding:0 35px 25px;">
+              <p style="margin:0 0 15px; color:#1e293b; font-size:14px; font-weight:bold; text-transform:uppercase;">📈 Charge Projections (Based on Current Storage)</p>
+              <table width="100%" cellpadding="0" cellspacing="10">
                 <tr>
-                  ${monthlyData.map(m => {
-      const barHeight = Math.round((m.charges / maxCharges) * 80);
-      return `<td width="16.66%" align="center" valign="bottom" style="padding: 10px 5px;">
-                      <table role="presentation" cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td style="height: 80px; vertical-align: bottom;">
-                            <div style="width: 40px; height: ${barHeight}px; background: linear-gradient(180deg, #1e3a5f 0%, #3b82f6 100%); border-radius: 4px 4px 0 0;"></div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding-top: 8px; font-size: 11px; font-weight: 600; color: #64748b;">${m.month}</td>
-                        </tr>
-                        <tr>
-                          <td style="font-size: 10px; color: #94a3b8;">${m.charges.toFixed(0)}</td>
-                        </tr>
-                      </table>
-                    </td>`;
-    }).join('')}
+                  <!-- Per Day -->
+                  <td width="33%" style="background:#0f172a; border-radius:12px; padding:20px; text-align:center;">
+                    <p style="margin:0; color:#94a3b8; font-size:11px; text-transform:uppercase;">⏱️ Per Day</p>
+                    <p style="margin:8px 0 0; color:#ffffff; font-size:24px; font-weight:bold;">${totalDailyCharge.toFixed(3)}</p>
+                    <p style="margin:0; color:#64748b; font-size:12px;">KWD</p>
+                  </td>
+                  <!-- Per Month -->
+                  <td width="33%" style="background:#1e40af; border-radius:12px; padding:20px; text-align:center;">
+                    <p style="margin:0; color:#93c5fd; font-size:11px; text-transform:uppercase;">📅 Per Month (30 Days)</p>
+                    <p style="margin:8px 0 0; color:#fbbf24; font-size:24px; font-weight:bold;">${monthlyCharge.toFixed(3)}</p>
+                    <p style="margin:0; color:#93c5fd; font-size:12px;">KWD</p>
+                  </td>
+                  <!-- Per Year -->
+                  <td width="33%" style="background:#059669; border-radius:12px; padding:20px; text-align:center;">
+                    <p style="margin:0; color:#d1fae5; font-size:11px; text-transform:uppercase;">📆 Per Year (365 Days)</p>
+                    <p style="margin:8px 0 0; color:#ffffff; font-size:24px; font-weight:bold;">${yearlyCharge.toFixed(3)}</p>
+                    <p style="margin:0; color:#a7f3d0; font-size:12px;">KWD</p>
+                  </td>
                 </tr>
               </table>
             </td>
           </tr>
 
-          <!-- Balance Summary -->
+          <!-- BALANCE SUMMARY - Big Box -->
           <tr>
-            <td style="padding: 0 40px 30px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background: ${netBalance > 0 ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #ef4444;' : 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #22c55e;'} border-radius: 10px;">
+            <td style="padding:0 35px 25px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:${netBalance > 0 ? '#fef2f2' : '#f0fdf4'}; border:3px solid ${netBalance > 0 ? '#ef4444' : '#22c55e'}; border-radius:12px;">
                 <tr>
-                  <td style="padding: 25px;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                      <tr>
-                        <td width="50%">
-                          <p style="margin: 0 0 5px; font-size: 12px; color: #64748b; text-transform: uppercase;">Current Storage Charges</p>
-                          <p style="margin: 0; font-size: 24px; font-weight: 700; color: #1e3a5f;">${totalCurrentCharges.toFixed(3)} KWD</p>
-                        </td>
-                        <td width="50%" style="border-left: 2px solid ${netBalance > 0 ? '#fca5a5' : '#86efac'}; padding-left: 25px;">
-                          <p style="margin: 0 0 5px; font-size: 12px; color: #64748b; text-transform: uppercase;">Outstanding Balance</p>
-                          <p style="margin: 0; font-size: 24px; font-weight: 700; color: ${netBalance > 0 ? '#dc2626' : '#16a34a'};">${outstandingBalance.toFixed(3)} KWD</p>
-                        </td>
+                  <td style="padding:25px;">
+                    <p style="margin:0 0 20px; color:#1e293b; font-size:14px; font-weight:bold; text-transform:uppercase;">💳 PAYMENT SUMMARY</p>
+                    <table width="100%" cellpadding="8" cellspacing="0">
+                      <tr style="background:#ffffff; border-radius:8px;">
+                        <td style="color:#64748b; font-size:13px; padding:12px; border-bottom:1px solid #e2e8f0;">📦 Current Storage Charges</td>
+                        <td align="right" style="color:#1e293b; font-size:16px; font-weight:bold; padding:12px; border-bottom:1px solid #e2e8f0;">${totalCurrentCharges.toFixed(3)} KWD</td>
                       </tr>
-                      <tr>
-                        <td colspan="2" style="padding-top: 20px;">
-                          <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                            <tr>
-                              <td style="font-size: 13px; color: #64748b;">Advance Balance:</td>
-                              <td align="right" style="font-size: 13px; font-weight: 600; color: #059669;">${advanceBalance.toFixed(3)} KWD</td>
-                            </tr>
-                            <tr>
-                              <td style="font-size: 14px; font-weight: 700; color: #1e3a5f; padding-top: 10px;">NET BALANCE:</td>
-                              <td align="right" style="font-size: 18px; font-weight: 700; color: ${netBalance > 0 ? '#dc2626' : '#16a34a'}; padding-top: 10px;">${netBalance.toFixed(3)} KWD</td>
-                            </tr>
-                          </table>
-                        </td>
+                      <tr style="background:#ffffff;">
+                        <td style="color:#64748b; font-size:13px; padding:12px; border-bottom:1px solid #e2e8f0;">🧾 Total Invoiced</td>
+                        <td align="right" style="color:#1e293b; font-size:16px; font-weight:bold; padding:12px; border-bottom:1px solid #e2e8f0;">${totalInvoiceAmount.toFixed(3)} KWD</td>
+                      </tr>
+                      <tr style="background:#ffffff;">
+                        <td style="color:#64748b; font-size:13px; padding:12px; border-bottom:1px solid #e2e8f0;">✅ Total Paid</td>
+                        <td align="right" style="color:#22c55e; font-size:16px; font-weight:bold; padding:12px; border-bottom:1px solid #e2e8f0;">${totalPaidAmount.toFixed(3)} KWD</td>
+                      </tr>
+                      <tr style="background:#ffffff;">
+                        <td style="color:#64748b; font-size:13px; padding:12px; border-bottom:1px solid #e2e8f0;">💰 Advance Balance</td>
+                        <td align="right" style="color:#3b82f6; font-size:16px; font-weight:bold; padding:12px; border-bottom:1px solid #e2e8f0;">${advanceBalance.toFixed(3)} KWD</td>
+                      </tr>
+                      <tr style="background:${netBalance > 0 ? '#ef4444' : '#22c55e'};">
+                        <td style="color:#ffffff; font-size:15px; font-weight:bold; padding:15px; border-radius:0 0 0 8px;">⚡ NET BALANCE TO PAY</td>
+                        <td align="right" style="color:#ffffff; font-size:22px; font-weight:bold; padding:15px; border-radius:0 0 8px 0;">${netBalance.toFixed(3)} KWD</td>
                       </tr>
                     </table>
                   </td>
@@ -1194,41 +1117,39 @@ router.post('/:profileId/send-statement', authenticateToken, async (req: AuthReq
           </tr>
 
           ${includeShipments && shipmentCharges.length > 0 ? `
-          <!-- Shipments Table -->
+          <!-- SHIPMENTS TABLE -->
           <tr>
-            <td style="padding: 0 40px 30px;">
-              <p style="margin: 0 0 15px; font-size: 14px; font-weight: 700; color: #1e3a5f;">📦 ACTIVE SHIPMENTS DETAIL</p>
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                <tr style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);">
-                  <th style="padding: 12px 10px; text-align: left; font-size: 11px; color: #ffffff; text-transform: uppercase;">Reference</th>
-                  <th style="padding: 12px 10px; text-align: left; font-size: 11px; color: #ffffff; text-transform: uppercase;">Client</th>
-                  <th style="padding: 12px 8px; text-align: center; font-size: 11px; color: #ffffff; text-transform: uppercase;">Boxes</th>
-                  <th style="padding: 12px 8px; text-align: center; font-size: 11px; color: #ffffff; text-transform: uppercase;">Pallets</th>
-                  <th style="padding: 12px 8px; text-align: center; font-size: 11px; color: #ffffff; text-transform: uppercase;">CBM</th>
-                  <th style="padding: 12px 8px; text-align: center; font-size: 11px; color: #ffffff; text-transform: uppercase;">Days</th>
-                  <th style="padding: 12px 10px; text-align: right; font-size: 11px; color: #ffffff; text-transform: uppercase;">Daily</th>
-                  <th style="padding: 12px 10px; text-align: right; font-size: 11px; color: #ffffff; text-transform: uppercase;">Total</th>
+            <td style="padding:0 35px 25px;">
+              <p style="margin:0 0 15px; color:#1e293b; font-size:14px; font-weight:bold; text-transform:uppercase;">📦 SHIPMENT DETAILS</p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+                <tr style="background:#0f172a;">
+                  <td style="color:#ffffff; font-size:11px; font-weight:bold; padding:12px 10px; text-transform:uppercase;">Ref #</td>
+                  <td style="color:#ffffff; font-size:11px; font-weight:bold; padding:12px 8px; text-transform:uppercase;">Client</td>
+                  <td align="center" style="color:#ffffff; font-size:11px; font-weight:bold; padding:12px 8px; text-transform:uppercase;">📦 Boxes</td>
+                  <td align="center" style="color:#ffffff; font-size:11px; font-weight:bold; padding:12px 8px; text-transform:uppercase;">🎨 Pallets</td>
+                  <td align="center" style="color:#ffffff; font-size:11px; font-weight:bold; padding:12px 8px; text-transform:uppercase;">📐 CBM</td>
+                  <td align="center" style="color:#ffffff; font-size:11px; font-weight:bold; padding:12px 8px; text-transform:uppercase;">⏱️ Days</td>
+                  <td align="right" style="color:#ffffff; font-size:11px; font-weight:bold; padding:12px 10px; text-transform:uppercase;">💵 Charge</td>
                 </tr>
                 ${shipmentCharges.map((s, i) => `
-                <tr style="background: ${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-                  <td style="padding: 10px; font-size: 12px; font-weight: 600; color: #1e3a5f;">${s.referenceId}</td>
-                  <td style="padding: 10px; font-size: 12px; color: #64748b;">${s.clientName || '-'}</td>
-                  <td style="padding: 10px; text-align: center; font-size: 12px; color: #64748b;">${s.currentBoxCount}</td>
-                  <td style="padding: 10px; text-align: center; font-size: 12px; color: #7c3aed; font-weight: 600;">${s.palletCount || '-'}</td>
-                  <td style="padding: 10px; text-align: center; font-size: 12px; color: #0891b2; font-weight: 600;">${s.cbm}</td>
-                  <td style="padding: 10px; text-align: center; font-size: 12px; color: #64748b;">${s.daysStored}</td>
-                  <td style="padding: 10px; text-align: right; font-size: 12px; color: #64748b;">${s.dailyCharge}</td>
-                  <td style="padding: 10px; text-align: right; font-size: 13px; font-weight: 700; color: #1e3a5f;">${s.currentCharge}</td>
+                <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                  <td style="color:#3b82f6; font-size:12px; font-weight:bold; padding:10px;">${s.referenceId}</td>
+                  <td style="color:#64748b; font-size:12px; padding:10px 8px;">${s.clientName || '-'}</td>
+                  <td align="center" style="color:#64748b; font-size:12px; padding:10px 8px;">${s.currentBoxCount}</td>
+                  <td align="center" style="color:#8b5cf6; font-size:12px; font-weight:bold; padding:10px 8px;">${s.palletCount || '-'}</td>
+                  <td align="center" style="color:#0891b2; font-size:12px; font-weight:bold; padding:10px 8px;">${s.cbm}</td>
+                  <td align="center" style="color:#64748b; font-size:12px; padding:10px 8px;">${s.daysStored}</td>
+                  <td align="right" style="color:#1e293b; font-size:13px; font-weight:bold; padding:10px;">${s.currentCharge} KWD</td>
                 </tr>
-                ${s.notes ? `<tr style="background: ${i % 2 === 0 ? '#fffbeb' : '#fef3c7'};">
-                  <td colspan="8" style="padding: 8px 10px 8px 20px; font-size: 11px; color: #92400e;">📝 <em>${s.notes}</em></td>
+                ${s.notes ? `<tr style="background:#fffbeb;">
+                  <td colspan="7" style="color:#92400e; font-size:11px; padding:8px 10px;">📝 Note: ${s.notes}</td>
                 </tr>` : ''}
                 `).join('')}
-                <tr style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);">
-                  <td colspan="5" style="padding: 12px 10px; font-size: 13px; font-weight: 700; color: #ffffff;">TOTAL</td>
-                  <td style="padding: 12px 10px; text-align: center; font-size: 12px; color: #ffffff;">${shipmentCharges.reduce((sum, s) => sum + s.daysStored, 0)} days</td>
-                  <td style="padding: 12px 10px; text-align: right; font-size: 12px; color: #fbbf24;">${totalDailyCharge.toFixed(3)}</td>
-                  <td style="padding: 12px 10px; text-align: right; font-size: 14px; font-weight: 700; color: #ffffff;">${totalCurrentCharges.toFixed(3)} KWD</td>
+                <tr style="background:#0f172a;">
+                  <td colspan="4" style="color:#ffffff; font-size:13px; font-weight:bold; padding:12px 10px;">TOTAL</td>
+                  <td align="center" style="color:#fbbf24; font-size:13px; font-weight:bold; padding:12px 8px;">${totalCBM.toFixed(3)}</td>
+                  <td align="center" style="color:#94a3b8; font-size:12px; padding:12px 8px;">-</td>
+                  <td align="right" style="color:#ffffff; font-size:15px; font-weight:bold; padding:12px 10px;">${totalCurrentCharges.toFixed(3)} KWD</td>
                 </tr>
               </table>
             </td>
@@ -1236,28 +1157,26 @@ router.post('/:profileId/send-statement', authenticateToken, async (req: AuthReq
           ` : ''}
 
           ${includeInvoices && allInvoices.length > 0 ? `
-          <!-- Invoices Table -->
+          <!-- INVOICES TABLE -->
           <tr>
-            <td style="padding: 0 40px 30px;">
-              <p style="margin: 0 0 15px; font-size: 14px; font-weight: 700; color: #1e3a5f;">🧾 RECENT INVOICES</p>
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                <tr style="background: #64748b;">
-                  <th style="padding: 10px; text-align: left; font-size: 11px; color: #ffffff; text-transform: uppercase;">Invoice #</th>
-                  <th style="padding: 10px; text-align: left; font-size: 11px; color: #ffffff; text-transform: uppercase;">Date</th>
-                  <th style="padding: 10px; text-align: right; font-size: 11px; color: #ffffff; text-transform: uppercase;">Amount</th>
-                  <th style="padding: 10px; text-align: right; font-size: 11px; color: #ffffff; text-transform: uppercase;">Paid</th>
-                  <th style="padding: 10px; text-align: right; font-size: 11px; color: #ffffff; text-transform: uppercase;">Balance</th>
-                  <th style="padding: 10px; text-align: center; font-size: 11px; color: #ffffff; text-transform: uppercase;">Status</th>
+            <td style="padding:0 35px 25px;">
+              <p style="margin:0 0 15px; color:#1e293b; font-size:14px; font-weight:bold; text-transform:uppercase;">🧾 RECENT INVOICES</p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+                <tr style="background:#475569;">
+                  <td style="color:#ffffff; font-size:11px; font-weight:bold; padding:10px; text-transform:uppercase;">Invoice #</td>
+                  <td style="color:#ffffff; font-size:11px; font-weight:bold; padding:10px; text-transform:uppercase;">Date</td>
+                  <td align="right" style="color:#ffffff; font-size:11px; font-weight:bold; padding:10px; text-transform:uppercase;">Amount</td>
+                  <td align="right" style="color:#ffffff; font-size:11px; font-weight:bold; padding:10px; text-transform:uppercase;">Paid</td>
+                  <td align="center" style="color:#ffffff; font-size:11px; font-weight:bold; padding:10px; text-transform:uppercase;">Status</td>
                 </tr>
-                ${allInvoices.slice(0, 10).map((inv, i) => `
-                <tr style="background: ${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-                  <td style="padding: 10px; font-size: 12px; font-weight: 600; color: #1e3a5f;">${inv.invoiceNumber}</td>
-                  <td style="padding: 10px; font-size: 12px; color: #64748b;">${new Date(inv.invoiceDate).toLocaleDateString()}</td>
-                  <td style="padding: 10px; text-align: right; font-size: 12px; font-weight: 600; color: #1e3a5f;">${(inv.totalAmount || 0).toFixed(3)}</td>
-                  <td style="padding: 10px; text-align: right; font-size: 12px; color: #059669;">${(inv.paidAmount || 0).toFixed(3)}</td>
-                  <td style="padding: 10px; text-align: right; font-size: 12px; color: #dc2626;">${((inv.totalAmount || 0) - (inv.paidAmount || 0)).toFixed(3)}</td>
-                  <td style="padding: 10px; text-align: center;">
-                    <span style="padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 600; background: ${inv.paymentStatus === 'PAID' ? '#dcfce7' : inv.paymentStatus === 'PARTIAL' ? '#fef3c7' : '#fee2e2'}; color: ${inv.paymentStatus === 'PAID' ? '#16a34a' : inv.paymentStatus === 'PARTIAL' ? '#d97706' : '#dc2626'};">${inv.paymentStatus}</span>
+                ${allInvoices.slice(0, 8).map((inv, i) => `
+                <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                  <td style="color:#3b82f6; font-size:12px; font-weight:bold; padding:10px;">${inv.invoiceNumber}</td>
+                  <td style="color:#64748b; font-size:12px; padding:10px;">${new Date(inv.invoiceDate).toLocaleDateString('en-GB')}</td>
+                  <td align="right" style="color:#1e293b; font-size:12px; font-weight:bold; padding:10px;">${(inv.totalAmount || 0).toFixed(3)}</td>
+                  <td align="right" style="color:#22c55e; font-size:12px; padding:10px;">${(inv.paidAmount || 0).toFixed(3)}</td>
+                  <td align="center" style="padding:10px;">
+                    <span style="display:inline-block; padding:4px 12px; border-radius:20px; font-size:10px; font-weight:bold; background:${inv.paymentStatus === 'PAID' ? '#dcfce7' : inv.paymentStatus === 'PARTIAL' ? '#fef3c7' : '#fee2e2'}; color:${inv.paymentStatus === 'PAID' ? '#16a34a' : inv.paymentStatus === 'PARTIAL' ? '#d97706' : '#dc2626'};">${inv.paymentStatus}</span>
                   </td>
                 </tr>
                 `).join('')}
@@ -1266,22 +1185,27 @@ router.post('/:profileId/send-statement', authenticateToken, async (req: AuthReq
           </tr>
           ` : ''}
 
-          <!-- Footer -->
+          <!-- FOOTER -->
           <tr>
-            <td style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px 40px; border-radius: 0 0 12px 12px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+            <td style="background:#0f172a; padding:30px 35px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
-                    <img src="data:image/svg+xml;base64,${logoBase64}" alt="QGO Cargo" width="80" height="28" style="display: block; margin-bottom: 15px;" />
-                    <p style="margin: 0 0 5px; font-size: 14px; font-weight: 600; color: #ffffff;">${company?.name || 'QGO Cargo Warehouse Management'}</p>
-                    <p style="margin: 0 0 15px; font-size: 12px; color: rgba(255,255,255,0.7);">Professional Warehouse & Storage Solutions</p>
-                    <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 15px 0;" />
-                    <p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.6);">
-                      This is an automated statement generated on ${new Date().toLocaleString()}
-                    </p>
-                    <p style="margin: 5px 0 0; font-size: 11px; color: rgba(255,255,255,0.6);">
-                      For queries, please contact your account manager or reply to this email.
-                    </p>
+                    <img src="${logoUrl}" alt="QGO Cargo" width="100" height="auto" style="display:block; margin-bottom:15px; max-height:40px;" />
+                    <p style="margin:0 0 5px; color:#ffffff; font-size:14px; font-weight:bold;">${company?.name || 'QGO Cargo'}</p>
+                    <p style="margin:0 0 15px; color:#94a3b8; font-size:12px;">Professional Warehouse & Storage Solutions</p>
+                    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                      <tr>
+                        <td style="padding:0 10px;">
+                          <a href="https://qgocargo.com" style="color:#3b82f6; font-size:12px; text-decoration:none;">🌐 Website</a>
+                        </td>
+                        <td style="padding:0 10px;">
+                          <a href="mailto:info@qgocargo.com" style="color:#3b82f6; font-size:12px; text-decoration:none;">📧 Email</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:20px 0 0; color:#64748b; font-size:11px;">This is an automated statement generated on ${new Date().toLocaleString()}</p>
+                    <p style="margin:5px 0 0; color:#64748b; font-size:11px;">For queries, please contact your account manager.</p>
                   </td>
                 </tr>
               </table>
@@ -1301,7 +1225,7 @@ router.post('/:profileId/send-statement', authenticateToken, async (req: AuthReq
     // Send email
     await sendEmail(companyId, {
       to: emails.join(', '),
-      subject: subject || `📊 Storage Statement - ${profile.name} - ${new Date().toLocaleDateString()}`,
+      subject: subject || `📊 Storage Statement - ${profile.name} - ${new Date().toLocaleDateString('en-GB')}`,
       html: htmlContent
     });
 

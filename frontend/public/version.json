@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 15, 2025",
-  "buildTime": "16:43:11",
-  "commit": "def95c1f3",
-  "commitMessage": "v2.3.1: Fix CBM dimensions not saving + Company profile enhancements",
+  "buildTime": "17:07:56",
+  "commit": "cc1814904",
+  "commitMessage": "v2.3.0: Enhanced email statement with QGO branding, charts, analytics, pallets, notes, per day/month/year charges",
   "author": "akifbade46-del",
   "environment": "local"
 }
