@@ -22,6 +22,9 @@ import {
   MagnifyingGlassIcon,
   PencilSquareIcon,
   ExclamationTriangleIcon,
+  CubeIcon,
+  ScaleIcon,
+  CalculatorIcon,
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -38,6 +41,10 @@ interface CompanyAnalytics {
     createdAt: string;
     isPlaceholder?: boolean;
     placeholderMessage?: string;
+    // NEW: CBM Charging Settings
+    cbmRatePerDay?: number;
+    freeStorageDays?: number;
+    minimumCharge?: number;
   };
   stats: {
     totalShipments: number;
@@ -47,6 +54,11 @@ interface CompanyAnalytics {
     totalBoxes: number;
     currentBoxes: number;
     avgStorageDays: number;
+    // NEW: CBM stats
+    totalCBM?: number;
+    totalCurrentCharges?: number;
+    total30DayCharges?: number;
+    // Invoice stats
     totalInvoices: number;
     totalInvoiceAmount: number;
     paidInvoices: number;
@@ -58,6 +70,20 @@ interface CompanyAnalytics {
     totalPayments: number;
     avgInvoiceAmount: number;
   };
+  // NEW: Per-shipment charges
+  shipmentCharges?: Array<{
+    id: string;
+    referenceId: string;
+    clientName: string;
+    status: string;
+    cbm: number;
+    daysStored: number;
+    chargeableDays: number;
+    currentCharge: number;
+    charge30Days: number;
+    arrivalDate: string;
+    currentBoxCount: number;
+  }>;
   paymentMethods: Record<string, number>;
   monthlyRevenue: Array<{
     month: string;
@@ -163,6 +189,15 @@ export const CompanyProfile: React.FC = () => {
   const [paymentReceiptNumber, setPaymentReceiptNumber] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [customExtendDays, setCustomExtendDays] = useState(0); // 0 means auto-calculate
+
+  // CBM Rate Settings state
+  const [showCBMSettingsModal, setShowCBMSettingsModal] = useState(false);
+  const [cbmSettings, setCbmSettings] = useState({
+    cbmRatePerDay: 0.5,
+    freeStorageDays: 0,
+    minimumCharge: 0
+  });
+  const [savingCBMSettings, setSavingCBMSettings] = useState(false);
 
   // Edit Contract Modal state
   const [showEditContractModal, setShowEditContractModal] = useState(false);
@@ -314,6 +349,42 @@ export const CompanyProfile: React.FC = () => {
     }
   };
 
+  // Save CBM Rate Settings
+  const handleSaveCBMSettings = async () => {
+    try {
+      setSavingCBMSettings(true);
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${getBackendUrl()}/api/companies/${profileId}`,
+        {
+          cbmRatePerDay: parseFloat(String(cbmSettings.cbmRatePerDay)) || 0.5,
+          freeStorageDays: parseInt(String(cbmSettings.freeStorageDays)) || 0,
+          minimumCharge: parseFloat(String(cbmSettings.minimumCharge)) || 0
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setShowCBMSettingsModal(false);
+      await loadCompanyAnalytics(); // Reload data
+      alert('CBM settings updated successfully!');
+    } catch (error: any) {
+      console.error('Failed to update CBM settings:', error);
+      alert(error.response?.data?.error || 'Failed to update CBM settings');
+    } finally {
+      setSavingCBMSettings(false);
+    }
+  };
+
+  // Open CBM Settings Modal
+  const openCBMSettingsModal = () => {
+    setCbmSettings({
+      cbmRatePerDay: data?.profile?.cbmRatePerDay || 0.5,
+      freeStorageDays: data?.profile?.freeStorageDays || 0,
+      minimumCharge: data?.profile?.minimumCharge || 0
+    });
+    setShowCBMSettingsModal(true);
+  };
+
   const handleSaveContract = async () => {
     if (!contract) return;
 
@@ -384,6 +455,19 @@ export const CompanyProfile: React.FC = () => {
         paymentMethods: normalizedPaymentMethods,
         monthlyRevenue: normalizedMonthlyRevenue,
       });
+
+      // Pre-populate shipment charges from analytics data
+      if (response.data?.shipmentCharges) {
+        const chargesMap: ShipmentCharges = {};
+        response.data.shipmentCharges.forEach((sc: any) => {
+          chargesMap[sc.id] = {
+            totalCharge: sc.currentCharge || 0,
+            daysStored: sc.daysStored || 0,
+            loading: false
+          };
+        });
+        setShipmentCharges(chargesMap);
+      }
     } catch (error) {
       console.error('Error loading company analytics:', error);
     } finally {
@@ -588,6 +672,13 @@ export const CompanyProfile: React.FC = () => {
             Back
           </button>
           <div className="flex gap-3">
+            <button
+              onClick={openCBMSettingsModal}
+              className="inline-flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-semibold shadow-sm"
+            >
+              <CalculatorIcon className="h-5 w-5 mr-2" />
+              CBM Rate Settings
+            </button>
             <button className="inline-flex items-center px-4 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold shadow-sm">
               <PrinterIcon className="h-5 w-5 mr-2" />
               Print Report
@@ -700,6 +791,51 @@ export const CompanyProfile: React.FC = () => {
           <p className="text-3xl font-bold text-gray-900">{stats.currentBoxes}</p>
           <p className="text-xs text-gray-500 mt-2">
             Total stored: {stats.totalBoxes} boxes
+          </p>
+        </div>
+
+        {/* Total CBM */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-cyan-50 rounded-lg">
+              <CubeIcon className="h-7 w-7 text-cyan-600" />
+            </div>
+            <ChartBarIcon className="h-5 w-5 text-gray-400" />
+          </div>
+          <p className="text-sm font-medium text-gray-600 mb-1">Total CBM</p>
+          <p className="text-3xl font-bold text-cyan-600">{formatNumber(stats.totalCBM || 0)} m³</p>
+          <p className="text-xs text-gray-500 mt-2">
+            Rate: {formatNumber(data?.profile?.cbmRatePerDay || 0.5)} KWD/CBM/day
+          </p>
+        </div>
+
+        {/* Current Storage Charges */}
+        <div className="bg-white rounded-lg shadow-sm border-2 border-orange-200 p-6 hover:shadow-md transition-shadow bg-orange-50">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-orange-100 rounded-lg">
+              <CurrencyDollarIcon className="h-7 w-7 text-orange-600" />
+            </div>
+            <ClockIcon className="h-5 w-5 text-orange-400" />
+          </div>
+          <p className="text-sm font-medium text-orange-700 mb-1">Current Charges</p>
+          <p className="text-3xl font-bold text-orange-600">{formatNumber(stats.totalCurrentCharges || 0)} KWD</p>
+          <p className="text-xs text-orange-500 mt-2">
+            Based on days stored
+          </p>
+        </div>
+
+        {/* 30-Day Estimate */}
+        <div className="bg-white rounded-lg shadow-sm border-2 border-amber-200 p-6 hover:shadow-md transition-shadow bg-amber-50">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-amber-100 rounded-lg">
+              <CalendarIcon className="h-7 w-7 text-amber-600" />
+            </div>
+            <ChartBarIcon className="h-5 w-5 text-amber-400" />
+          </div>
+          <p className="text-sm font-medium text-amber-700 mb-1">30-Day Estimate</p>
+          <p className="text-3xl font-bold text-amber-600">{formatNumber(stats.total30DayCharges || 0)} KWD</p>
+          <p className="text-xs text-amber-500 mt-2">
+            Per month storage cost
           </p>
         </div>
 
@@ -1881,6 +2017,121 @@ export const CompanyProfile: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+
+      {/* CBM Rate Settings Modal */}
+      {showCBMSettingsModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <CalculatorIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">CBM Rate Settings</h3>
+                </div>
+                <button
+                  onClick={() => setShowCBMSettingsModal(false)}
+                  className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <XCircleIcon className="h-6 w-6 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <p className="text-sm text-orange-800">
+                  Set storage charges for <strong>{profile?.name}</strong>. These rates will be used to calculate storage charges for all shipments.
+                </p>
+              </div>
+
+              {/* CBM Rate Per Day */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  CBM Rate Per Day (KWD)
+                </label>
+                <input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={cbmSettings.cbmRatePerDay}
+                  onChange={(e) => setCbmSettings(prev => ({ ...prev, cbmRatePerDay: parseFloat(e.target.value) || 0 }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  placeholder="0.500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Charge per cubic meter per day</p>
+              </div>
+
+              {/* Free Storage Days */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Free Storage Days
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={cbmSettings.freeStorageDays}
+                  onChange={(e) => setCbmSettings(prev => ({ ...prev, freeStorageDays: parseInt(e.target.value) || 0 }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">Number of days before charges start</p>
+              </div>
+
+              {/* Minimum Charge */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Minimum Charge (KWD)
+                </label>
+                <input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={cbmSettings.minimumCharge}
+                  onChange={(e) => setCbmSettings(prev => ({ ...prev, minimumCharge: parseFloat(e.target.value) || 0 }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  placeholder="0.000"
+                />
+                <p className="text-xs text-gray-500 mt-1">Minimum charge per shipment</p>
+              </div>
+
+              {/* Preview Calculation */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">Example Calculation:</p>
+                <p className="text-xs text-gray-600">
+                  1 CBM × {cbmSettings.cbmRatePerDay} KWD × 30 days = <strong className="text-orange-600">{(1 * cbmSettings.cbmRatePerDay * 30).toFixed(3)} KWD</strong> per month
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={() => setShowCBMSettingsModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveCBMSettings}
+                disabled={savingCBMSettings}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-orange-300 transition-colors flex items-center gap-2"
+              >
+                {savingCBMSettings ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>Save Settings</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}    </div>
   );
 };

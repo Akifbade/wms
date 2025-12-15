@@ -238,6 +238,12 @@ model CompanyProfile {
   contractStatus   String   @default("ACTIVE") // ACTIVE, INACTIVE, EXPIRED, PENDING
   isActive         Boolean  @default(true)
   companyId        String   // Parent company
+  
+  // NEW: CBM Charging Settings
+  cbmRatePerDay    Float    @default(0.5) // KWD per CBM per day
+  minimumCharge    Float    @default(0) // Minimum charge per shipment
+  freeStorageDays  Int      @default(0) // Free storage days before charging
+  
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

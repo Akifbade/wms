@@ -368,17 +368,54 @@ router.get('/:profileId/analytics', authenticateToken, async (req: AuthRequest, 
       }
     });
 
+    // Get CBM rate from profile
+    const cbmRatePerDay = (profile as any).cbmRatePerDay || 0.5;
+    const freeStorageDays = (profile as any).freeStorageDays || 0;
+    const minimumCharge = (profile as any).minimumCharge || 0;
+
     // Calculate shipment statistics
     const totalShipments = allShipments.length;
-    const activeShipments = allShipments.filter(s =>
-      s.status === 'IN_WAREHOUSE' || s.status === 'ACTIVE' || s.status === 'PARTIAL'
-    ).length;
+    const activeShipmentsArr = allShipments.filter(s =>
+      s.status === 'IN_WAREHOUSE' || s.status === 'ACTIVE' || s.status === 'PARTIAL' || s.status === 'IN_STORAGE'
+    );
+    const activeShipments = activeShipmentsArr.length;
     const releasedShipments = allShipments.filter(s => s.status === 'RELEASED').length;
     const pendingShipments = allShipments.filter(s => s.status === 'PENDING').length;
 
     // Calculate box statistics
     const totalBoxes = allShipments.reduce((sum, s) => sum + (s.originalBoxCount || 0), 0);
     const currentBoxes = allShipments.reduce((sum, s) => sum + (s.currentBoxCount || 0), 0);
+
+    // Calculate total CBM for active shipments
+    const totalCBM = activeShipmentsArr.reduce((sum, s) => sum + (Number((s as any).cbm) || 0), 0);
+
+    // Calculate charges for each shipment
+    const shipmentCharges = activeShipmentsArr.map(s => {
+      const cbm = Number((s as any).cbm) || 0;
+      const arrival = s.arrivalDate ? new Date(s.arrivalDate) : new Date(s.createdAt);
+      const daysStored = Math.max(0, Math.floor((Date.now() - arrival.getTime()) / (1000 * 60 * 60 * 24)));
+      const chargeableDays = Math.max(0, daysStored - freeStorageDays);
+      const currentCharge = Math.max(minimumCharge, cbm * cbmRatePerDay * chargeableDays);
+      const charge30Days = Math.max(minimumCharge, cbm * cbmRatePerDay * 30);
+      
+      return {
+        id: s.id,
+        referenceId: s.referenceId,
+        clientName: s.clientName,
+        status: s.status,
+        cbm: cbm,
+        daysStored: daysStored,
+        chargeableDays: chargeableDays,
+        currentCharge: parseFloat(currentCharge.toFixed(3)),
+        charge30Days: parseFloat(charge30Days.toFixed(3)),
+        arrivalDate: s.arrivalDate,
+        currentBoxCount: s.currentBoxCount
+      };
+    });
+
+    // Calculate total current charges and 30-day estimate
+    const totalCurrentCharges = shipmentCharges.reduce((sum, s) => sum + s.currentCharge, 0);
+    const total30DayCharges = shipmentCharges.reduce((sum, s) => sum + s.charge30Days, 0);
 
     // Calculate storage duration
     const storageDays = allShipments
@@ -464,7 +501,11 @@ router.get('/:profileId/analytics', authenticateToken, async (req: AuthRequest, 
         isPlaceholder: Boolean(placeholderProfile),
         placeholderMessage: placeholderProfile
           ? 'Company profile record is missing in the database; analytics is built from shipment history.'
-          : undefined
+          : undefined,
+        // CBM Charging Settings
+        cbmRatePerDay,
+        freeStorageDays,
+        minimumCharge
       },
       stats: {
         // Shipment stats
@@ -477,6 +518,11 @@ router.get('/:profileId/analytics', authenticateToken, async (req: AuthRequest, 
         totalBoxes,
         currentBoxes,
         avgStorageDays,
+
+        // CBM & Charges stats
+        totalCBM: parseFloat(totalCBM.toFixed(3)),
+        totalCurrentCharges: parseFloat(totalCurrentCharges.toFixed(3)),
+        total30DayCharges: parseFloat(total30DayCharges.toFixed(3)),
 
         // Invoice stats
         totalInvoices,
@@ -492,6 +538,8 @@ router.get('/:profileId/analytics', authenticateToken, async (req: AuthRequest, 
         totalPayments,
         avgInvoiceAmount: totalInvoices > 0 ? parseFloat((totalInvoiceAmount / totalInvoices).toFixed(3)) : 0
       },
+      // NEW: CBM charges per shipment
+      shipmentCharges,
       paymentMethods,
       monthlyRevenue,
       recentActivity: {
@@ -615,7 +663,10 @@ router.post('/', authenticateToken, upload.single('logo'), async (req: AuthReque
 router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: AuthRequest, res: Response) => {
   try {
     const { profileId } = req.params;
-    const { name, description, contactPerson, contactPhone, contractStatus, isActive } = req.body;
+    const { 
+      name, description, contactPerson, contactPhone, contractStatus, isActive,
+      cbmRatePerDay, freeStorageDays, minimumCharge // NEW: CBM charging fields
+    } = req.body;
     const companyId = req.user?.companyId;
 
     if (!companyId) {
@@ -670,7 +721,11 @@ router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: 
         contactPhone: contactPhone?.trim(),
         logo: logoPath,
         contractStatus: contractStatus || profile.contractStatus,
-        isActive: isActive !== undefined ? parseBoolean(isActive, profile.isActive) : profile.isActive
+        isActive: isActive !== undefined ? parseBoolean(isActive, profile.isActive) : profile.isActive,
+        // NEW: CBM charging fields
+        cbmRatePerDay: cbmRatePerDay !== undefined ? parseFloat(cbmRatePerDay) : undefined,
+        freeStorageDays: freeStorageDays !== undefined ? parseInt(freeStorageDays) : undefined,
+        minimumCharge: minimumCharge !== undefined ? parseFloat(minimumCharge) : undefined
       }
     });
 

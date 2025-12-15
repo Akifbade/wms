@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 15, 2025",
-  "buildTime": "09:48:57",
-  "commit": "77dc49161",
-  "commitMessage": "fix: QR print with QGO branding and proper print CSS",
+  "buildTime": "13:43:46",
+  "commit": "535c711a5",
+  "commitMessage": "fix: Folder view sorted by arrival date (latest first), QR logo smaller",
   "author": "akifbade46-del",
   "environment": "local"
 }

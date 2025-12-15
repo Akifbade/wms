@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { XMarkIcon, CameraIcon, UserIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, CameraIcon, UserIcon, DocumentTextIcon, CurrencyDollarIcon, ClockIcon, CubeIcon } from '@heroicons/react/24/outline';
 import { PaymentBeforeReleaseModal } from './PaymentBeforeReleaseModal';
+import { getBackendUrl } from '../services/api';
 
 interface WithdrawalModalProps {
   isOpen: boolean;
@@ -29,6 +30,58 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
   // Photo upload state
   const [photos, setPhotos] = useState<string[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
+
+  // Storage charges state
+  const [storageCharges, setStorageCharges] = useState<{
+    cbm: number;
+    daysStored: number;
+    cbmRatePerDay: number;
+    currentCharge: number;
+    loading: boolean;
+  } | null>(null);
+
+  // Fetch storage charges when modal opens
+  useEffect(() => {
+    if (isOpen && shipment?.id) {
+      fetchStorageCharges();
+    }
+  }, [isOpen, shipment?.id]);
+
+  const fetchStorageCharges = async () => {
+    try {
+      setStorageCharges({ cbm: 0, daysStored: 0, cbmRatePerDay: 0, currentCharge: 0, loading: true });
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${getBackendUrl()}/api/billing/shipments/${shipment.id}/live-charges`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setStorageCharges({
+          cbm: shipment?.cbm || 0,
+          daysStored: data?.daysStored || 0,
+          cbmRatePerDay: data?.cbmRatePerDay || 0.5,
+          currentCharge: data?.totalCharge || 0,
+          loading: false
+        });
+      } else {
+        // Calculate locally if API fails
+        const arrivalDate = shipment?.arrivalDate || shipment?.createdAt;
+        const daysStored = arrivalDate ? Math.floor((Date.now() - new Date(arrivalDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+        const cbm = shipment?.cbm || 0;
+        const rate = 0.5; // Default rate
+        setStorageCharges({
+          cbm,
+          daysStored,
+          cbmRatePerDay: rate,
+          currentCharge: cbm * rate * daysStored,
+          loading: false
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching storage charges:', error);
+      setStorageCharges(null);
+    }
+  };
 
   // Reset form when modal opens or shipment changes
   useEffect(() => {
@@ -120,9 +173,52 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
             </div>
             <div>
               <p className="text-sm text-gray-600">Rack Location</p>
-              <p className="font-bold text-gray-900">{shipment?.rack?.code || 'N/A'}</p>
+              <p className="font-bold text-gray-900">{shipment?.rack?.code || shipment?.rackLocations || 'N/A'}</p>
             </div>
           </div>
+        </div>
+
+        {/* Storage Charges Section */}
+        <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-b border-orange-200">
+          <div className="flex items-center gap-2 mb-3">
+            <CurrencyDollarIcon className="h-5 w-5 text-orange-600" />
+            <h3 className="font-bold text-orange-800">Storage Charges</h3>
+          </div>
+          {storageCharges?.loading ? (
+            <div className="flex items-center gap-2 text-gray-500">
+              <div className="animate-spin h-4 w-4 border-2 border-orange-500 border-t-transparent rounded-full"></div>
+              Calculating charges...
+            </div>
+          ) : storageCharges ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white p-3 rounded-lg shadow-sm">
+                <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+                  <CubeIcon className="h-3 w-3" /> CBM
+                </div>
+                <p className="font-bold text-gray-900">{(storageCharges.cbm || 0).toFixed(3)} m³</p>
+              </div>
+              <div className="bg-white p-3 rounded-lg shadow-sm">
+                <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+                  <ClockIcon className="h-3 w-3" /> Days Stored
+                </div>
+                <p className="font-bold text-gray-900">{storageCharges.daysStored} days</p>
+              </div>
+              <div className="bg-white p-3 rounded-lg shadow-sm">
+                <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+                  Rate/CBM/Day
+                </div>
+                <p className="font-bold text-gray-900">{storageCharges.cbmRatePerDay.toFixed(3)} KWD</p>
+              </div>
+              <div className="bg-orange-100 p-3 rounded-lg shadow-sm border-2 border-orange-300">
+                <div className="flex items-center gap-1 text-xs text-orange-600 mb-1">
+                  <CurrencyDollarIcon className="h-3 w-3" /> Total Charge
+                </div>
+                <p className="font-bold text-orange-700 text-xl">{storageCharges.currentCharge.toFixed(3)} KWD</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">Charges not available</p>
+          )}
         </div>
 
         {/* Form */}
