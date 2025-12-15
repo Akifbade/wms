@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 15, 2025",
-  "buildTime": "07:53:04",
-  "commit": "e156000ba",
-  "commitMessage": "fix: Sort by createdAt (system date) not arrivalDate (user entered)",
+  "buildTime": "08:38:22",
+  "commit": "6cd9874dc",
+  "commitMessage": "fix: Folder view - use already sorted shipments array, no extra sorting",
   "author": "akifbade46-del",
   "environment": "local"
 }

@@ -518,34 +518,53 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
         </div>
       </div>
 
-      {/* Print Styles */}
+      {/* Print Styles - FIXED: Properly hide background page */}
       <style>{`
         @media print {
-          body * {
-            visibility: hidden;
+          /* Hide everything first */
+          body > * {
+            display: none !important;
           }
-          .fixed, .fixed * {
-            visibility: visible !important;
+          
+          /* Show only this modal */
+          body > div:last-child {
+            display: block !important;
           }
+          
           .fixed {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
+            position: relative !important;
+            background: white !important;
           }
+          
+          .fixed > div {
+            box-shadow: none !important;
+            max-height: none !important;
+            overflow: visible !important;
+          }
+          
           .fixed img {
-            visibility: visible !important;
             max-width: 100%;
             height: auto;
           }
+          
           .print\\:hidden {
             display: none !important;
           }
+          
           .print\\:border {
             border: 1px solid #000 !important;
           }
+          
           .print\\:break-inside-avoid {
             page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          
+          /* Grid for print - 2 per row */
+          .grid {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 1rem !important;
           }
         }
       `}</style>
