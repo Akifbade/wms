@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 15, 2025",
-  "buildTime": "17:07:56",
-  "commit": "cc1814904",
-  "commitMessage": "v2.3.0: Enhanced email statement with QGO branding, charts, analytics, pallets, notes, per day/month/year charges",
+  "buildTime": "17:58:36",
+  "commit": "3495bdf29",
+  "commitMessage": "v2.3.1: Fixed email statement template - proper logo URL and modern design",
   "author": "akifbade46-del",
   "environment": "local"
 }
