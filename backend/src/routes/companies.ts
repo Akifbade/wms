@@ -1225,8 +1225,8 @@ router.post('/:profileId/send-statement', authenticateToken, async (req: AuthReq
 </html>
     `;
 
-    // Generate high-quality screenshot of HTML email using Puppeteer
-    let screenshotBuffer: Buffer | null = null;
+    // Generate PDF from HTML using Puppeteer (A4 pages with exact HTML look)
+    let pdfBuffer: Buffer | null = null;
     try {
       const browser = await puppeteer.launch({
         headless: true,
@@ -1236,49 +1236,48 @@ router.post('/:profileId/send-statement', authenticateToken, async (req: AuthReq
       
       const page = await browser.newPage();
       
-      // Set viewport for high-quality image
-      await page.setViewport({
-        width: 700,
-        height: 1200,
-        deviceScaleFactor: 2 // 2x for high resolution
-      });
-      
       // Load the HTML content
       await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
       
       // Wait a bit for any images to load
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Take full-page screenshot
-      screenshotBuffer = await page.screenshot({
-        type: 'png',
-        fullPage: true,
-        omitBackground: false
+      // Generate PDF with A4 pages - exact HTML rendering
+      pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: {
+          top: '10mm',
+          right: '10mm',
+          bottom: '10mm',
+          left: '10mm'
+        },
+        preferCSSPageSize: false
       }) as Buffer;
       
       await browser.close();
       
-      console.log('Screenshot generated successfully, size:', screenshotBuffer.length);
-    } catch (screenshotError) {
-      console.warn('Screenshot generation failed, sending email without attachment:', screenshotError);
+      console.log('PDF generated successfully, size:', pdfBuffer.length);
+    } catch (pdfError) {
+      console.warn('PDF generation failed, sending email without attachment:', pdfError);
     }
 
-    // Send email with screenshot attachment
+    // Send email with PDF attachment
     await sendEmail(companyId, {
       to: emails.join(', '),
       subject: subject || `📊 Storage Statement - ${profile.name} - ${new Date().toLocaleDateString('en-GB')}`,
       html: htmlContent,
-      attachments: screenshotBuffer ? [{
-        filename: `Statement_${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.png`,
-        content: screenshotBuffer
+      attachments: pdfBuffer ? [{
+        filename: `Statement_${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
+        content: pdfBuffer
       }] : undefined
     });
 
     res.json({
       success: true,
-      message: `Statement sent to ${emails.length} email(s)${screenshotBuffer ? ' with image attachment' : ''}`,
+      message: `Statement sent to ${emails.length} email(s)${pdfBuffer ? ' with PDF attachment' : ''}`,
       emailsSent: emails,
-      imageAttached: !!screenshotBuffer
+      pdfAttached: !!pdfBuffer
     });
 
   } catch (error: any) {
