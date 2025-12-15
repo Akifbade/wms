@@ -4,8 +4,32 @@ FROM node:18-slim
 
 WORKDIR /app
 
-# Install OpenSSL for Prisma and MySQL client for backups
-RUN apt-get update -y && apt-get install -y openssl default-mysql-client && rm -rf /var/lib/apt/lists/*
+# Install OpenSSL for Prisma, MySQL client for backups, and Chromium for Puppeteer
+RUN apt-get update -y && apt-get install -y \
+    openssl \
+    default-mysql-client \
+    chromium \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Tell Puppeteer to use installed Chromium instead of downloading
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Clean any existing node_modules and dist folder
 RUN rm -rf node_modules package-lock.json dist 2>/dev/null || true

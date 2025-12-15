@@ -6,18 +6,8 @@ import fs from 'fs';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { sendEmail } from '../services/emailService';
 
-// PDF Generation with pdfmake
-const PdfPrinter = require('pdfmake');
-
-// Standard fonts for pdfmake (use Helvetica as fallback - no external files needed)
-const pdfFonts = {
-  Helvetica: {
-    normal: 'Helvetica',
-    bold: 'Helvetica-Bold',
-    italics: 'Helvetica-Oblique',
-    bolditalics: 'Helvetica-BoldOblique'
-  }
-};
+// Puppeteer for HTML screenshot
+import puppeteer from 'puppeteer';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -1235,318 +1225,60 @@ router.post('/:profileId/send-statement', authenticateToken, async (req: AuthReq
 </html>
     `;
 
-    // Generate PDF using pdfmake with built-in Helvetica fonts
-    const printer = new PdfPrinter(pdfFonts);
-    
-    // Create PDF document definition
-    const pdfDocDefinition: any = {
-      pageSize: 'A4',
-      pageMargins: [40, 60, 40, 60],
-      
-      // Header
-      header: {
-        columns: [
-          { text: 'QGO CARGO', style: 'headerLogo', margin: [40, 20, 0, 0] },
-          { text: 'STORAGE STATEMENT', style: 'headerTitle', alignment: 'right', margin: [0, 20, 40, 0] }
-        ]
-      },
-      
-      // Footer
-      footer: function(currentPage: number, pageCount: number) {
-        return {
-          columns: [
-            { text: 'QGO Cargo - Professional Warehouse Solutions', style: 'footerText', margin: [40, 0, 0, 0] },
-            { text: 'Page ' + currentPage + ' of ' + pageCount, alignment: 'right', style: 'footerText', margin: [0, 0, 40, 0] }
-          ],
-          margin: [0, 20, 0, 0]
-        };
-      },
-      
-      content: [
-        // Company Info Header
-        {
-          table: {
-            widths: ['*', 'auto'],
-            body: [
-              [
-                {
-                  stack: [
-                    { text: profile.name, style: 'companyName' },
-                    { text: `${profile.contactPerson || ''} ${profile.contactPhone ? '• ' + profile.contactPhone : ''}`, style: 'contactInfo' }
-                  ]
-                },
-                {
-                  stack: [
-                    { text: 'Statement Date', style: 'labelSmall' },
-                    { text: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), style: 'dateValue' }
-                  ],
-                  alignment: 'right'
-                }
-              ]
-            ]
-          },
-          layout: 'noBorders',
-          margin: [0, 0, 0, 20]
-        },
-        
-        // Quick Stats
-        { text: 'STORAGE OVERVIEW', style: 'sectionHeader' },
-        {
-          table: {
-            widths: ['*', '*', '*', '*'],
-            body: [
-              [
-                { text: '📦 SHIPMENTS', style: 'statLabel', alignment: 'center' },
-                { text: '📐 TOTAL CBM', style: 'statLabel', alignment: 'center' },
-                { text: '📦 BOXES', style: 'statLabel', alignment: 'center' },
-                { text: '🎨 PALLETS', style: 'statLabel', alignment: 'center' }
-              ],
-              [
-                { text: allShipments.length.toString(), style: 'statValue', alignment: 'center' },
-                { text: totalCBM.toFixed(2), style: 'statValue', alignment: 'center' },
-                { text: totalBoxes.toString(), style: 'statValue', alignment: 'center' },
-                { text: totalPallets.toString(), style: 'statValue', alignment: 'center' }
-              ]
-            ]
-          },
-          layout: {
-            fillColor: function(rowIndex: number) { return rowIndex === 0 ? '#f1f5f9' : null; },
-            hLineColor: function() { return '#e2e8f0'; },
-            vLineColor: function() { return '#e2e8f0'; }
-          },
-          margin: [0, 0, 0, 20]
-        },
-        
-        // Billing Rates
-        { text: 'BILLING RATES', style: 'sectionHeader' },
-        {
-          table: {
-            widths: ['*', 'auto', 40, '*', 'auto'],
-            body: [
-              [
-                { text: 'Billing Type:', style: 'tableLabel' },
-                { text: billingType.replace('_', ' '), style: 'tableValue' },
-                { text: '' },
-                { text: 'Rate per CBM/Day:', style: 'tableLabel' },
-                { text: cbmRatePerDay + ' KWD', style: 'tableValue' }
-              ],
-              [
-                { text: 'Free Storage Days:', style: 'tableLabel' },
-                { text: freeStorageDays + ' days', style: 'tableValue' },
-                { text: '' },
-                { text: 'Minimum Charge:', style: 'tableLabel' },
-                { text: minimumCharge + ' KWD', style: 'tableValue' }
-              ]
-            ]
-          },
-          layout: 'noBorders',
-          margin: [0, 0, 0, 20]
-        },
-        
-        // Charge Projections
-        { text: 'CHARGE PROJECTIONS', style: 'sectionHeader' },
-        {
-          table: {
-            widths: ['*', '*', '*'],
-            body: [
-              [
-                { text: '⏱️ PER DAY', style: 'projLabel', alignment: 'center' },
-                { text: '📅 PER MONTH', style: 'projLabel', alignment: 'center' },
-                { text: '📆 PER YEAR', style: 'projLabel', alignment: 'center' }
-              ],
-              [
-                { text: totalDailyCharge.toFixed(3) + ' KWD', style: 'projValue', alignment: 'center' },
-                { text: monthlyCharge.toFixed(3) + ' KWD', style: 'projValue', alignment: 'center' },
-                { text: yearlyCharge.toFixed(3) + ' KWD', style: 'projValue', alignment: 'center' }
-              ]
-            ]
-          },
-          layout: {
-            fillColor: function(rowIndex: number) { return rowIndex === 0 ? '#1e3a5f' : '#f8fafc'; },
-            hLineColor: function() { return '#e2e8f0'; },
-            vLineColor: function() { return '#e2e8f0'; }
-          },
-          margin: [0, 0, 0, 20]
-        },
-        
-        // Payment Summary
-        { text: 'PAYMENT SUMMARY', style: 'sectionHeader' },
-        {
-          table: {
-            widths: ['*', 'auto'],
-            body: [
-              [{ text: 'Current Storage Charges', style: 'summaryLabel' }, { text: totalCurrentCharges.toFixed(3) + ' KWD', style: 'summaryValue', alignment: 'right' }],
-              [{ text: 'Total Invoiced', style: 'summaryLabel' }, { text: totalInvoiceAmount.toFixed(3) + ' KWD', style: 'summaryValue', alignment: 'right' }],
-              [{ text: 'Total Paid', style: 'summaryLabel' }, { text: totalPaidAmount.toFixed(3) + ' KWD', style: 'summaryValueGreen', alignment: 'right' }],
-              [{ text: 'Advance Balance', style: 'summaryLabel' }, { text: advanceBalance.toFixed(3) + ' KWD', style: 'summaryValueBlue', alignment: 'right' }],
-              [
-                { text: 'NET BALANCE', style: 'netBalanceLabel', fillColor: netBalance > 0 ? '#fee2e2' : '#dcfce7' },
-                { text: netBalance.toFixed(3) + ' KWD', style: netBalance > 0 ? 'netBalanceRed' : 'netBalanceGreen', fillColor: netBalance > 0 ? '#fee2e2' : '#dcfce7', alignment: 'right' }
-              ]
-            ]
-          },
-          layout: {
-            hLineColor: function() { return '#e2e8f0'; },
-            vLineColor: function() { return '#e2e8f0'; },
-            paddingTop: function() { return 8; },
-            paddingBottom: function() { return 8; }
-          },
-          margin: [0, 0, 0, 20]
-        },
-        
-        // Shipments Table (if included)
-        ...(includeShipments && shipmentCharges.length > 0 ? [
-          { text: 'SHIPMENT DETAILS', style: 'sectionHeader' },
-          {
-            table: {
-              headerRows: 1,
-              widths: ['auto', '*', 'auto', 'auto', 'auto', 'auto', 'auto'],
-              body: [
-                [
-                  { text: 'Ref #', style: 'tableHeaderCell' },
-                  { text: 'Client', style: 'tableHeaderCell' },
-                  { text: 'Boxes', style: 'tableHeaderCell', alignment: 'center' },
-                  { text: 'Pallets', style: 'tableHeaderCell', alignment: 'center' },
-                  { text: 'CBM', style: 'tableHeaderCell', alignment: 'center' },
-                  { text: 'Days', style: 'tableHeaderCell', alignment: 'center' },
-                  { text: 'Charge', style: 'tableHeaderCell', alignment: 'right' }
-                ],
-                ...shipmentCharges.map((s, i) => [
-                  { text: s.referenceId, style: 'tableCell', fillColor: i % 2 === 0 ? null : '#f8fafc' },
-                  { text: s.clientName || '-', style: 'tableCell', fillColor: i % 2 === 0 ? null : '#f8fafc' },
-                  { text: s.currentBoxCount.toString(), style: 'tableCell', alignment: 'center', fillColor: i % 2 === 0 ? null : '#f8fafc' },
-                  { text: (s.palletCount || 0).toString(), style: 'tableCell', alignment: 'center', fillColor: i % 2 === 0 ? null : '#f8fafc' },
-                  { text: s.cbm, style: 'tableCell', alignment: 'center', fillColor: i % 2 === 0 ? null : '#f8fafc' },
-                  { text: s.daysStored.toString(), style: 'tableCell', alignment: 'center', fillColor: i % 2 === 0 ? null : '#f8fafc' },
-                  { text: s.currentCharge + ' KWD', style: 'tableCellBold', alignment: 'right', fillColor: i % 2 === 0 ? null : '#f8fafc' }
-                ]),
-                [
-                  { text: 'TOTAL', style: 'tableTotalCell', colSpan: 4, fillColor: '#1e3a5f' },
-                  {}, {}, {},
-                  { text: totalCBM.toFixed(3), style: 'tableTotalCell', alignment: 'center', fillColor: '#1e3a5f' },
-                  { text: '-', style: 'tableTotalCell', alignment: 'center', fillColor: '#1e3a5f' },
-                  { text: totalCurrentCharges.toFixed(3) + ' KWD', style: 'tableTotalCell', alignment: 'right', fillColor: '#1e3a5f' }
-                ]
-              ]
-            },
-            layout: {
-              hLineColor: function() { return '#e2e8f0'; },
-              vLineColor: function() { return '#e2e8f0'; }
-            },
-            margin: [0, 0, 0, 20]
-          }
-        ] : []),
-        
-        // Invoices Table (if included)
-        ...(includeInvoices && allInvoices.length > 0 ? [
-          { text: 'RECENT INVOICES', style: 'sectionHeader' },
-          {
-            table: {
-              headerRows: 1,
-              widths: ['auto', 'auto', 'auto', 'auto', 'auto'],
-              body: [
-                [
-                  { text: 'Invoice #', style: 'tableHeaderCell' },
-                  { text: 'Date', style: 'tableHeaderCell' },
-                  { text: 'Amount', style: 'tableHeaderCell', alignment: 'right' },
-                  { text: 'Paid', style: 'tableHeaderCell', alignment: 'right' },
-                  { text: 'Status', style: 'tableHeaderCell', alignment: 'center' }
-                ],
-                ...allInvoices.slice(0, 8).map((inv, i) => [
-                  { text: inv.invoiceNumber, style: 'tableCell', fillColor: i % 2 === 0 ? null : '#f8fafc' },
-                  { text: new Date(inv.invoiceDate).toLocaleDateString('en-GB'), style: 'tableCell', fillColor: i % 2 === 0 ? null : '#f8fafc' },
-                  { text: (inv.totalAmount || 0).toFixed(3) + ' KWD', style: 'tableCellBold', alignment: 'right', fillColor: i % 2 === 0 ? null : '#f8fafc' },
-                  { text: (inv.paidAmount || 0).toFixed(3) + ' KWD', style: 'tableCell', alignment: 'right', fillColor: i % 2 === 0 ? null : '#f8fafc' },
-                  { text: inv.paymentStatus, style: inv.paymentStatus === 'PAID' ? 'statusPaid' : inv.paymentStatus === 'PARTIAL' ? 'statusPartial' : 'statusUnpaid', alignment: 'center', fillColor: i % 2 === 0 ? null : '#f8fafc' }
-                ])
-              ]
-            },
-            layout: {
-              hLineColor: function() { return '#e2e8f0'; },
-              vLineColor: function() { return '#e2e8f0'; }
-            },
-            margin: [0, 0, 0, 20]
-          }
-        ] : []),
-        
-        // Footer note
-        {
-          text: `This statement was generated on ${new Date().toLocaleString()}. For queries, please contact your account manager.`,
-          style: 'footerNote',
-          margin: [0, 20, 0, 0]
-        }
-      ],
-      
-      // Styles
-      styles: {
-        headerLogo: { fontSize: 18, bold: true, color: '#1e3a5f' },
-        headerTitle: { fontSize: 14, bold: true, color: '#64748b' },
-        companyName: { fontSize: 20, bold: true, color: '#1e3a5f', margin: [0, 0, 0, 5] },
-        contactInfo: { fontSize: 11, color: '#64748b' },
-        labelSmall: { fontSize: 9, color: '#94a3b8' },
-        dateValue: { fontSize: 14, bold: true, color: '#1e3a5f' },
-        sectionHeader: { fontSize: 12, bold: true, color: '#1e3a5f', margin: [0, 10, 0, 10] },
-        statLabel: { fontSize: 9, bold: true, color: '#64748b' },
-        statValue: { fontSize: 22, bold: true, color: '#1e3a5f' },
-        tableLabel: { fontSize: 11, color: '#64748b' },
-        tableValue: { fontSize: 11, bold: true, color: '#1e3a5f' },
-        projLabel: { fontSize: 9, bold: true, color: '#ffffff' },
-        projValue: { fontSize: 16, bold: true, color: '#1e3a5f' },
-        summaryLabel: { fontSize: 11, color: '#64748b', margin: [0, 4, 0, 4] },
-        summaryValue: { fontSize: 12, bold: true, color: '#1e3a5f' },
-        summaryValueGreen: { fontSize: 12, bold: true, color: '#22c55e' },
-        summaryValueBlue: { fontSize: 12, bold: true, color: '#3b82f6' },
-        netBalanceLabel: { fontSize: 13, bold: true, color: '#1e3a5f' },
-        netBalanceRed: { fontSize: 16, bold: true, color: '#dc2626' },
-        netBalanceGreen: { fontSize: 16, bold: true, color: '#16a34a' },
-        tableHeaderCell: { fontSize: 10, bold: true, color: '#ffffff', fillColor: '#1e3a5f' },
-        tableCell: { fontSize: 10, color: '#374151' },
-        tableCellBold: { fontSize: 10, bold: true, color: '#1e3a5f' },
-        tableTotalCell: { fontSize: 11, bold: true, color: '#ffffff' },
-        statusPaid: { fontSize: 9, bold: true, color: '#16a34a' },
-        statusPartial: { fontSize: 9, bold: true, color: '#d97706' },
-        statusUnpaid: { fontSize: 9, bold: true, color: '#dc2626' },
-        footerText: { fontSize: 9, color: '#94a3b8' },
-        footerNote: { fontSize: 9, color: '#94a3b8', italics: true, alignment: 'center' }
-      },
-      
-      defaultStyle: {
-        font: 'Helvetica'
-      }
-    };
-
-    // Generate PDF buffer
-    let pdfBuffer: Buffer | null = null;
+    // Generate high-quality screenshot of HTML email using Puppeteer
+    let screenshotBuffer: Buffer | null = null;
     try {
-      const pdfDoc = printer.createPdfKitDocument(pdfDocDefinition);
-      const chunks: Buffer[] = [];
-      
-      pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
-        pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
-        pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-        pdfDoc.on('error', reject);
-        pdfDoc.end();
+      const browser = await puppeteer.launch({
+        headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
       });
-    } catch (pdfError) {
-      console.warn('PDF generation failed, sending email without attachment:', pdfError);
+      
+      const page = await browser.newPage();
+      
+      // Set viewport for high-quality image
+      await page.setViewport({
+        width: 700,
+        height: 1200,
+        deviceScaleFactor: 2 // 2x for high resolution
+      });
+      
+      // Load the HTML content
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      
+      // Wait a bit for any images to load
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Take full-page screenshot
+      screenshotBuffer = await page.screenshot({
+        type: 'png',
+        fullPage: true,
+        omitBackground: false
+      }) as Buffer;
+      
+      await browser.close();
+      
+      console.log('Screenshot generated successfully, size:', screenshotBuffer.length);
+    } catch (screenshotError) {
+      console.warn('Screenshot generation failed, sending email without attachment:', screenshotError);
     }
 
-    // Send email with PDF attachment
+    // Send email with screenshot attachment
     await sendEmail(companyId, {
       to: emails.join(', '),
       subject: subject || `📊 Storage Statement - ${profile.name} - ${new Date().toLocaleDateString('en-GB')}`,
       html: htmlContent,
-      attachments: pdfBuffer ? [{
-        filename: `Statement_${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
-        content: pdfBuffer
+      attachments: screenshotBuffer ? [{
+        filename: `Statement_${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.png`,
+        content: screenshotBuffer
       }] : undefined
     });
 
     res.json({
       success: true,
-      message: `Statement sent to ${emails.length} email(s)${pdfBuffer ? ' with PDF attachment' : ''}`,
+      message: `Statement sent to ${emails.length} email(s)${screenshotBuffer ? ' with image attachment' : ''}`,
       emailsSent: emails,
-      pdfAttached: !!pdfBuffer
+      imageAttached: !!screenshotBuffer
     });
 
   } catch (error: any) {
