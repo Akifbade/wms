@@ -29,6 +29,7 @@ import {
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { getBackendUrl } from '../../services/api';
+import { RecordPaymentModal } from '../../components/RecordPaymentModal';
 
 interface CompanyAnalytics {
   profile: {
@@ -48,6 +49,7 @@ interface CompanyAnalytics {
     freeStorageDays?: number;
     minimumCharge?: number;
     advanceBalance?: number;
+    statementEmails?: string; // Default email recipients for statements
   };
   stats: {
     totalShipments: number;
@@ -153,7 +155,8 @@ export const CompanyProfile: React.FC = () => {
   const [invoicesLoading, setInvoicesLoading] = useState(false);
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<string>('all');
   const [invoiceSearchTerm, setInvoiceSearchTerm] = useState('');
-
+  const [invoicePaymentModalOpen, setInvoicePaymentModalOpen] = useState(false);
+  const [selectedInvoiceForInvoicePayment, setSelectedInvoiceForInvoicePayment] = useState<any>(null);
   // Contract Payment History state
   const [contractPaymentHistory, setContractPaymentHistory] = useState<{
     invoices: any[];
@@ -201,9 +204,27 @@ export const CompanyProfile: React.FC = () => {
     monthlyContractAmount: 0,
     freeStorageDays: 0,
     minimumCharge: 0,
-    advanceBalance: 0
+    advanceBalance: 0,
+    statementEmails: '' // Default email recipients for statements
   });
   const [savingCBMSettings, setSavingCBMSettings] = useState(false);
+
+  // Advance Payment Modal state
+  const [showAdvancePaymentModal, setShowAdvancePaymentModal] = useState(false);
+  const [advancePaymentAmount, setAdvancePaymentAmount] = useState(0);
+  const [advancePaymentNote, setAdvancePaymentNote] = useState('');
+  const [savingAdvancePayment, setSavingAdvancePayment] = useState(false);
+
+  // Email Statement Modal state
+  const [showEmailStatementModal, setShowEmailStatementModal] = useState(false);
+  const [emailStatementData, setEmailStatementData] = useState({
+    emails: '',
+    subject: '',
+    includeShipments: true,
+    includeInvoices: true,
+    includeCharges: true
+  });
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Edit Contract Modal state
   const [showEditContractModal, setShowEditContractModal] = useState(false);
@@ -368,7 +389,8 @@ export const CompanyProfile: React.FC = () => {
           monthlyContractAmount: parseFloat(String(cbmSettings.monthlyContractAmount)) || 0,
           freeStorageDays: parseInt(String(cbmSettings.freeStorageDays)) || 0,
           minimumCharge: parseFloat(String(cbmSettings.minimumCharge)) || 0,
-          advanceBalance: parseFloat(String(cbmSettings.advanceBalance)) || 0
+          advanceBalance: parseFloat(String(cbmSettings.advanceBalance)) || 0,
+          statementEmails: cbmSettings.statementEmails || ''
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -392,9 +414,85 @@ export const CompanyProfile: React.FC = () => {
       monthlyContractAmount: data?.profile?.monthlyContractAmount || 0,
       freeStorageDays: data?.profile?.freeStorageDays || 0,
       minimumCharge: data?.profile?.minimumCharge || 0,
-      advanceBalance: data?.profile?.advanceBalance || 0
+      advanceBalance: data?.profile?.advanceBalance || 0,
+      statementEmails: data?.profile?.statementEmails || ''
     });
     setShowCBMSettingsModal(true);
+  };
+
+  // Record Advance Payment
+  const handleRecordAdvancePayment = async () => {
+    if (advancePaymentAmount <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    try {
+      setSavingAdvancePayment(true);
+      const token = localStorage.getItem('token');
+      const currentBalance = data?.profile?.advanceBalance || 0;
+      const newBalance = currentBalance + advancePaymentAmount;
+      
+      await axios.put(
+        `${getBackendUrl()}/api/companies/${profileId}`,
+        { advanceBalance: newBalance },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setShowAdvancePaymentModal(false);
+      setAdvancePaymentAmount(0);
+      setAdvancePaymentNote('');
+      await loadCompanyAnalytics();
+      alert(`✅ Advance payment of ${advancePaymentAmount.toFixed(3)} KWD recorded!\n\nNew balance: ${newBalance.toFixed(3)} KWD`);
+    } catch (error: any) {
+      console.error('Failed to record advance payment:', error);
+      alert(error.response?.data?.error || 'Failed to record advance payment');
+    } finally {
+      setSavingAdvancePayment(false);
+    }
+  };
+
+  // Open Email Statement Modal
+  const openEmailStatementModal = () => {
+    setEmailStatementData({
+      emails: data?.profile?.statementEmails || '', // Pre-populate with default recipients
+      subject: `Storage Statement - ${profile?.name} - ${new Date().toLocaleDateString()}`,
+      includeShipments: true,
+      includeInvoices: true,
+      includeCharges: true
+    });
+    setShowEmailStatementModal(true);
+  };
+
+  // Send Email Statement
+  const handleSendEmailStatement = async () => {
+    if (!emailStatementData.emails.trim()) {
+      alert('Please enter at least one email address');
+      return;
+    }
+
+    try {
+      setSendingEmail(true);
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${getBackendUrl()}/api/companies/${profileId}/send-statement`,
+        {
+          emails: emailStatementData.emails.split(',').map(e => e.trim()).filter(e => e),
+          subject: emailStatementData.subject,
+          includeShipments: emailStatementData.includeShipments,
+          includeInvoices: emailStatementData.includeInvoices,
+          includeCharges: emailStatementData.includeCharges
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setShowEmailStatementModal(false);
+      alert('Statement sent successfully!');
+    } catch (error: any) {
+      console.error('Failed to send statement:', error);
+      alert(error.response?.data?.error || 'Failed to send statement email');
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const handleSaveContract = async () => {
@@ -683,13 +781,27 @@ export const CompanyProfile: React.FC = () => {
             <ArrowLeftIcon className="h-5 w-5" />
             Back
           </button>
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap justify-end">
             <button
               onClick={openCBMSettingsModal}
-              className="inline-flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-semibold shadow-sm"
+              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow-sm"
             >
               <CalculatorIcon className="h-5 w-5 mr-2" />
-              CBM Rate Settings
+              Billing Settings
+            </button>
+            <button
+              onClick={() => setShowAdvancePaymentModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold shadow-sm"
+            >
+              <BanknotesIcon className="h-5 w-5 mr-2" />
+              Record Advance
+            </button>
+            <button
+              onClick={openEmailStatementModal}
+              className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold shadow-sm"
+            >
+              <EnvelopeIcon className="h-5 w-5 mr-2" />
+              Send Statement Email
             </button>
             <button className="inline-flex items-center px-4 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold shadow-sm">
               <PrinterIcon className="h-5 w-5 mr-2" />
@@ -1502,12 +1614,26 @@ export const CompanyProfile: React.FC = () => {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <button
-                                onClick={() => navigate(`/invoices/${invoice.id}`)}
-                                className="text-sm font-semibold text-gray-900 hover:text-gray-600 underline"
-                              >
-                                View Details
-                              </button>
+                              <div className="flex items-center gap-2">
+                                {outstanding > 0 && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedInvoiceForInvoicePayment(invoice);
+                                      setInvoicePaymentModalOpen(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 flex items-center gap-1"
+                                  >
+                                    <CurrencyDollarIcon className="h-4 w-4" />
+                                    Pay
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => navigate(`/invoices/${invoice.id}`)}
+                                  className="text-sm font-semibold text-gray-900 hover:text-gray-600 underline"
+                                >
+                                  View
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -2172,6 +2298,21 @@ export const CompanyProfile: React.FC = () => {
                 <p className="text-xs text-gray-500 mt-1">Current advance payment balance for this customer</p>
               </div>
 
+              {/* Statement Email Recipients */}
+              <div className="border-t pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  📧 Default Statement Email Recipients
+                </label>
+                <input
+                  type="text"
+                  value={cbmSettings.statementEmails}
+                  onChange={(e) => setCbmSettings(prev => ({ ...prev, statementEmails: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="email1@example.com, email2@example.com"
+                />
+                <p className="text-xs text-gray-500 mt-1">Comma-separated list of emails to receive monthly statements</p>
+              </div>
+
               {/* Preview Calculation */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <p className="text-sm font-medium text-gray-700 mb-2">Billing Summary:</p>
@@ -2215,6 +2356,257 @@ export const CompanyProfile: React.FC = () => {
             </div>
           </div>
         </div>
-      )}    </div>
+      )}
+
+      {/* Email Statement Modal */}
+      {showEmailStatementModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <EnvelopeIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Send Statement Email</h3>
+                </div>
+                <button
+                  onClick={() => setShowEmailStatementModal(false)}
+                  className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <XCircleIcon className="h-6 w-6 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                <p className="text-sm text-emerald-800">
+                  Send a professional statement report for <strong>{profile?.name}</strong> via email. The report will include all analytics data in HTML format.
+                </p>
+              </div>
+
+              {/* Email Addresses */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Addresses <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={emailStatementData.emails}
+                  onChange={(e) => setEmailStatementData(prev => ({ ...prev, emails: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="email1@example.com, email2@example.com"
+                />
+                <p className="text-xs text-gray-500 mt-1">Separate multiple emails with commas</p>
+              </div>
+
+              {/* Subject */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Subject
+                </label>
+                <input
+                  type="text"
+                  value={emailStatementData.subject}
+                  onChange={(e) => setEmailStatementData(prev => ({ ...prev, subject: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="Storage Statement"
+                />
+              </div>
+
+              {/* Include Options */}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Include in Report
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={emailStatementData.includeShipments}
+                      onChange={(e) => setEmailStatementData(prev => ({ ...prev, includeShipments: e.target.checked }))}
+                      className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                    />
+                    <span className="text-sm text-gray-700">Shipments Summary</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={emailStatementData.includeInvoices}
+                      onChange={(e) => setEmailStatementData(prev => ({ ...prev, includeInvoices: e.target.checked }))}
+                      className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                    />
+                    <span className="text-sm text-gray-700">Invoice Details</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={emailStatementData.includeCharges}
+                      onChange={(e) => setEmailStatementData(prev => ({ ...prev, includeCharges: e.target.checked }))}
+                      className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                    />
+                    <span className="text-sm text-gray-700">Storage Charges Breakdown</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Preview Info */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">Report Preview:</p>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <p>• Company: <strong>{profile?.name}</strong></p>
+                  <p>• Active Shipments: <strong>{data?.stats?.activeShipments || 0}</strong></p>
+                  <p>• Total CBM: <strong>{formatNumber(data?.stats?.totalCBM || 0)} m³</strong></p>
+                  <p>• Current Charges: <strong>{formatNumber(data?.stats?.totalCurrentCharges || 0)} KWD</strong></p>
+                  <p>• Outstanding Balance: <strong>{formatNumber(data?.stats?.outstandingBalance || 0)} KWD</strong></p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={() => setShowEmailStatementModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendEmailStatement}
+                disabled={sendingEmail || !emailStatementData.emails.trim()}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-emerald-300 transition-colors flex items-center gap-2"
+              >
+                {sendingEmail ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <EnvelopeIcon className="h-4 w-4" />
+                    Send Statement
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record Payment Modal for Invoices Tab */}
+      {invoicePaymentModalOpen && selectedInvoiceForInvoicePayment && (
+        <RecordPaymentModal
+          isOpen={invoicePaymentModalOpen}
+          onClose={() => {
+            setInvoicePaymentModalOpen(false);
+            setSelectedInvoiceForInvoicePayment(null);
+          }}
+          invoice={selectedInvoiceForInvoicePayment}
+          onSuccess={() => {
+            loadCompanyInvoices();
+            loadCompanyAnalytics();
+          }}
+        />
+      )}
+
+      {/* Record Advance Payment Modal */}
+      {showAdvancePaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+            <div className="bg-gradient-to-r from-green-600 to-emerald-700 px-6 py-4 rounded-t-xl">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-white">💰 Record Advance Payment</h3>
+                <button
+                  onClick={() => setShowAdvancePaymentModal(false)}
+                  className="text-white hover:text-green-200 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Current Balance Display */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-sm text-green-700">Current Advance Balance</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {(data?.profile?.advanceBalance || 0).toFixed(3)} KWD
+                </p>
+              </div>
+
+              {/* Payment Amount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Payment Amount (KWD)
+                </label>
+                <input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={advancePaymentAmount}
+                  onChange={(e) => setAdvancePaymentAmount(parseFloat(e.target.value) || 0)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-xl font-bold"
+                  placeholder="0.000"
+                />
+              </div>
+
+              {/* Note */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Note (Optional)
+                </label>
+                <textarea
+                  value={advancePaymentNote}
+                  onChange={(e) => setAdvancePaymentNote(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  rows={2}
+                  placeholder="e.g., Bank transfer, cash deposit..."
+                />
+              </div>
+
+              {/* New Balance Preview */}
+              {advancePaymentAmount > 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-600">New Balance After Payment</p>
+                  <p className="text-xl font-bold text-green-600">
+                    {((data?.profile?.advanceBalance || 0) + advancePaymentAmount).toFixed(3)} KWD
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 rounded-b-xl">
+              <button
+                onClick={() => setShowAdvancePaymentModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRecordAdvancePayment}
+                disabled={savingAdvancePayment || advancePaymentAmount <= 0}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-300 transition-colors flex items-center gap-2"
+              >
+                {savingAdvancePayment ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Recording...
+                  </>
+                ) : (
+                  <>
+                    <BanknotesIcon className="h-4 w-4" />
+                    Record Payment
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };

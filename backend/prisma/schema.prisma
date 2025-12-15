@@ -247,6 +247,9 @@ model CompanyProfile {
   minimumCharge         Float    @default(0) // Minimum charge per shipment/month
   advanceBalance        Float    @default(0) // Current advance payment balance
   
+  // EMAIL SETTINGS (Statement Recipients)
+  statementEmails       String?  // Comma-separated default email recipients for statements
+  
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

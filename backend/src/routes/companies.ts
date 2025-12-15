@@ -4,6 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { sendEmail } from '../services/emailService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -689,7 +690,9 @@ router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: 
     const { 
       name, description, contactPerson, contactPhone, contractStatus, isActive,
       // UNIFIED BILLING FIELDS
-      billingType, cbmRatePerDay, monthlyContractAmount, freeStorageDays, minimumCharge, advanceBalance
+      billingType, cbmRatePerDay, monthlyContractAmount, freeStorageDays, minimumCharge, advanceBalance,
+      // EMAIL SETTINGS
+      statementEmails
     } = req.body;
     const companyId = req.user?.companyId;
 
@@ -752,7 +755,9 @@ router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: 
         monthlyContractAmount: monthlyContractAmount !== undefined ? parseFloat(monthlyContractAmount) : undefined,
         freeStorageDays: freeStorageDays !== undefined ? parseInt(freeStorageDays) : undefined,
         minimumCharge: minimumCharge !== undefined ? parseFloat(minimumCharge) : undefined,
-        advanceBalance: advanceBalance !== undefined ? parseFloat(advanceBalance) : undefined
+        advanceBalance: advanceBalance !== undefined ? parseFloat(advanceBalance) : undefined,
+        // EMAIL SETTINGS
+        statementEmails: statementEmails !== undefined ? statementEmails : undefined
       }
     });
 
@@ -816,6 +821,296 @@ router.delete('/:profileId', authenticateToken, async (req: AuthRequest, res: Re
   } catch (error: any) {
     console.error('Error deleting company profile:', error);
     res.status(500).json({ error: 'Failed to delete company profile' });
+  }
+});
+
+// Send Statement Email to company profile
+router.post('/:profileId/send-statement', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { profileId } = req.params;
+    const { emails, subject, includeShipments, includeInvoices, includeCharges } = req.body;
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    if (!emails || !Array.isArray(emails) || emails.length === 0) {
+      return res.status(400).json({ error: 'At least one email address is required' });
+    }
+
+    // Get company profile
+    const profile = await prisma.companyProfile.findFirst({
+      where: { id: profileId, companyId }
+    });
+
+    if (!profile) {
+      return res.status(404).json({ error: 'Company profile not found' });
+    }
+
+    // Get company info for branding
+    const company = await prisma.company.findUnique({
+      where: { id: companyId }
+    });
+
+    // Get all shipments for this company profile
+    const allShipments = await prisma.shipment.findMany({
+      where: {
+        companyId,
+        companyProfileId: profileId,
+        status: { in: ['IN_WAREHOUSE', 'ACTIVE', 'PARTIAL', 'IN_STORAGE'] }
+      },
+      include: {
+        boxes: true
+      }
+    });
+
+    // Get all invoices for this company profile
+    const allInvoices = await prisma.invoice.findMany({
+      where: {
+        shipment: { companyProfileId: profileId }
+      },
+      include: {
+        payments: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20
+    });
+
+    // Calculate stats
+    const totalCBM = allShipments.reduce((sum, s) => sum + (Number((s as any).cbm) || 0), 0);
+    const billingType = (profile as any).billingType || 'PER_CBM';
+    const cbmRatePerDay = (profile as any).cbmRatePerDay || 0.5;
+    const freeStorageDays = (profile as any).freeStorageDays || 0;
+    const minimumCharge = (profile as any).minimumCharge || 0;
+
+    // Calculate charges for each shipment
+    const shipmentCharges = allShipments.map(s => {
+      const cbm = Number((s as any).cbm) || 0;
+      const arrival = s.arrivalDate ? new Date(s.arrivalDate) : new Date(s.createdAt);
+      const daysStored = Math.max(0, Math.floor((Date.now() - arrival.getTime()) / (1000 * 60 * 60 * 24)));
+      const chargeableDays = Math.max(0, daysStored - freeStorageDays);
+      const currentCharge = Math.max(minimumCharge, cbm * cbmRatePerDay * chargeableDays);
+      
+      return {
+        referenceId: s.referenceId,
+        clientName: s.clientName,
+        cbm: cbm.toFixed(3),
+        daysStored,
+        chargeableDays,
+        currentCharge: currentCharge.toFixed(3),
+        arrivalDate: s.arrivalDate ? new Date(s.arrivalDate).toLocaleDateString() : 'N/A',
+        currentBoxCount: s.currentBoxCount
+      };
+    });
+
+    const totalCurrentCharges = shipmentCharges.reduce((sum, s) => sum + parseFloat(s.currentCharge), 0);
+    const totalInvoiceAmount = allInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+    const totalPaidAmount = allInvoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+    const outstandingBalance = totalInvoiceAmount - totalPaidAmount;
+
+    // Generate professional HTML email
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Storage Statement - ${profile.name}</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: #fff; }
+    .header { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white; padding: 30px; text-align: center; }
+    .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
+    .header p { margin: 10px 0 0; opacity: 0.9; font-size: 14px; }
+    .company-info { background: #f8fafc; padding: 20px 30px; border-bottom: 1px solid #e2e8f0; }
+    .company-info h2 { margin: 0 0 10px; color: #1e3a5f; font-size: 22px; }
+    .company-info p { margin: 5px 0; color: #64748b; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 25px 30px; background: #fff; }
+    .stat-card { background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); padding: 20px; border-radius: 10px; text-align: center; }
+    .stat-card.primary { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white; }
+    .stat-card.success { background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; }
+    .stat-card.warning { background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%); color: white; }
+    .stat-card.danger { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); color: white; }
+    .stat-card h3 { margin: 0; font-size: 28px; font-weight: 700; }
+    .stat-card p { margin: 5px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; }
+    .section { padding: 25px 30px; border-bottom: 1px solid #e2e8f0; }
+    .section h2 { margin: 0 0 20px; color: #1e3a5f; font-size: 18px; border-bottom: 2px solid #1e3a5f; padding-bottom: 10px; display: inline-block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th { background: #1e3a5f; color: white; padding: 12px 15px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 12px 15px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    tr:nth-child(even) { background: #f8fafc; }
+    tr:hover { background: #f1f5f9; }
+    .amount { font-weight: 600; color: #1e3a5f; }
+    .footer { background: #1e3a5f; color: white; padding: 25px 30px; text-align: center; }
+    .footer p { margin: 5px 0; font-size: 13px; opacity: 0.9; }
+    .billing-info { background: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px; padding: 15px 20px; margin: 15px 0; }
+    .billing-info h4 { margin: 0 0 10px; color: #92400e; }
+    .billing-info p { margin: 5px 0; color: #78350f; font-size: 14px; }
+    @media (max-width: 600px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>${company?.name || 'QGO Cargo'}</h1>
+      <p>Storage Statement Report</p>
+    </div>
+    
+    <div class="company-info">
+      <h2>${profile.name}</h2>
+      <p><strong>Statement Date:</strong> ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      ${profile.contactPerson ? `<p><strong>Contact:</strong> ${profile.contactPerson}</p>` : ''}
+      ${profile.contactPhone ? `<p><strong>Phone:</strong> ${profile.contactPhone}</p>` : ''}
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card primary">
+        <h3>${allShipments.length}</h3>
+        <p>Active Shipments</p>
+      </div>
+      <div class="stat-card">
+        <h3>${totalCBM.toFixed(2)}</h3>
+        <p>Total CBM</p>
+      </div>
+      <div class="stat-card warning">
+        <h3>${totalCurrentCharges.toFixed(3)}</h3>
+        <p>Current Charges (KWD)</p>
+      </div>
+      <div class="stat-card ${outstandingBalance > 0 ? 'danger' : 'success'}">
+        <h3>${outstandingBalance.toFixed(3)}</h3>
+        <p>Outstanding Balance</p>
+      </div>
+    </div>
+
+    <div class="billing-info">
+      <h4>📊 Billing Information</h4>
+      <p><strong>Billing Type:</strong> ${billingType.replace('_', ' ')}</p>
+      <p><strong>Rate:</strong> ${cbmRatePerDay} KWD per CBM per day</p>
+      <p><strong>Free Storage Days:</strong> ${freeStorageDays} days</p>
+      ${minimumCharge > 0 ? `<p><strong>Minimum Charge:</strong> ${minimumCharge} KWD</p>` : ''}
+    </div>
+
+    ${includeShipments ? `
+    <div class="section">
+      <h2>📦 Active Shipments</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Reference ID</th>
+            <th>Client Name</th>
+            <th>Boxes</th>
+            <th>CBM</th>
+            <th>Arrival Date</th>
+            <th>Days Stored</th>
+            <th>Current Charge</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${shipmentCharges.map(s => `
+          <tr>
+            <td><strong>${s.referenceId}</strong></td>
+            <td>${s.clientName || '-'}</td>
+            <td>${s.currentBoxCount}</td>
+            <td>${s.cbm} m³</td>
+            <td>${s.arrivalDate}</td>
+            <td>${s.daysStored} days</td>
+            <td class="amount">${s.currentCharge} KWD</td>
+          </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    ` : ''}
+
+    ${includeInvoices && allInvoices.length > 0 ? `
+    <div class="section">
+      <h2>🧾 Recent Invoices</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Invoice #</th>
+            <th>Date</th>
+            <th>Total Amount</th>
+            <th>Paid</th>
+            <th>Balance</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${allInvoices.slice(0, 10).map(inv => `
+          <tr>
+            <td><strong>${inv.invoiceNumber}</strong></td>
+            <td>${new Date(inv.invoiceDate).toLocaleDateString()}</td>
+            <td class="amount">${(inv.totalAmount || 0).toFixed(3)} KWD</td>
+            <td>${(inv.paidAmount || 0).toFixed(3)} KWD</td>
+            <td class="amount">${((inv.totalAmount || 0) - (inv.paidAmount || 0)).toFixed(3)} KWD</td>
+            <td><span style="padding: 3px 8px; border-radius: 4px; font-size: 11px; background: ${inv.paymentStatus === 'PAID' ? '#d1fae5' : inv.paymentStatus === 'PARTIAL' ? '#fef3c7' : '#fee2e2'}; color: ${inv.paymentStatus === 'PAID' ? '#059669' : inv.paymentStatus === 'PARTIAL' ? '#d97706' : '#dc2626'};">${inv.paymentStatus}</span></td>
+          </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    ` : ''}
+
+    ${includeCharges ? `
+    <div class="section">
+      <h2>💰 Charges Summary</h2>
+      <table>
+        <tbody>
+          <tr>
+            <td><strong>Total CBM in Storage</strong></td>
+            <td class="amount">${totalCBM.toFixed(3)} m³</td>
+          </tr>
+          <tr>
+            <td><strong>Current Storage Charges</strong></td>
+            <td class="amount">${totalCurrentCharges.toFixed(3)} KWD</td>
+          </tr>
+          <tr>
+            <td><strong>Total Invoiced Amount</strong></td>
+            <td class="amount">${totalInvoiceAmount.toFixed(3)} KWD</td>
+          </tr>
+          <tr>
+            <td><strong>Total Paid</strong></td>
+            <td class="amount" style="color: #059669;">${totalPaidAmount.toFixed(3)} KWD</td>
+          </tr>
+          <tr style="background: #1e3a5f; color: white;">
+            <td><strong>Outstanding Balance</strong></td>
+            <td class="amount" style="color: white; font-size: 16px;">${outstandingBalance.toFixed(3)} KWD</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    ` : ''}
+
+    <div class="footer">
+      <p><strong>${company?.name || 'QGO Cargo'}</strong></p>
+      <p>This is an automated statement. For any queries, please contact us.</p>
+      <p>Generated on ${new Date().toLocaleString()}</p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    // Send email
+    await sendEmail(companyId, {
+      to: emails.join(', '),
+      subject: subject || `Storage Statement - ${profile.name}`,
+      html: htmlContent
+    });
+
+    res.json({ 
+      success: true, 
+      message: `Statement sent to ${emails.length} email(s)`,
+      emailsSent: emails
+    });
+
+  } catch (error: any) {
+    console.error('Error sending statement email:', error);
+    res.status(500).json({ error: error.message || 'Failed to send statement email' });
   }
 });
 

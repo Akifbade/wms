@@ -409,7 +409,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
       });
 
       // Prepare update data with converted numbers + new warehouse fields
-      const updateData = {
+      const updateData: any = {
         clientName: formData.clientName,
         clientPhone: formData.clientPhone,
         clientEmail: formData.clientEmail,
@@ -430,12 +430,18 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         shipperPhone: formData.shipperPhone || null,
         consigneePhone: formData.consigneePhone || null,
         specialInstructions: formData.specialInstructions || null,
-        // 📏 Dimensions - send both L×W×H and CBM
-        length: getSafeNumber(formData.length) || null,
-        width: getSafeNumber(formData.width) || null,
-        height: getSafeNumber(formData.height) || null,
-        cbm: finalCBM || null,
       };
+
+      // 📏 Dimensions - Only send if using single dimension mode (not multi-dimensions)
+      // If multi-dimensions exist, they will update the CBM via saveDimensionsBulk
+      if (dimensions.length === 0) {
+        // Single dimension mode - send L×W×H and CBM
+        updateData.length = getSafeNumber(formData.length) || null;
+        updateData.width = getSafeNumber(formData.width) || null;
+        updateData.height = getSafeNumber(formData.height) || null;
+        updateData.cbm = finalCBM || null;
+      }
+      // If dimensions exist, skip dimension fields - they'll be updated by saveDimensionsBulk
 
       await shipmentsAPI.update(shipment.id, updateData);
 
@@ -466,11 +472,16 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
             parseFloat(d.length) > 0 && parseFloat(d.width) > 0 && parseFloat(d.height) > 0
           );
           if (validDimensions.length > 0) {
-            await shipmentsAPI.saveDimensionsBulk(shipment.id, validDimensions);
-            console.log('📏 Dimensions saved:', validDimensions.length);
+            console.log('📏 Saving dimensions to API:', validDimensions);
+            const dimResult = await shipmentsAPI.saveDimensionsBulk(shipment.id, validDimensions);
+            console.log('📏 Dimensions saved successfully:', dimResult);
+          } else {
+            console.log('📏 No valid dimensions to save (all have 0 values)');
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error('Failed to save dimensions:', err);
+          // Show error to user but don't block shipment save
+          alert(`⚠️ Shipment updated but dimensions failed to save: ${err.message || 'Unknown error'}`);
         }
       }
 

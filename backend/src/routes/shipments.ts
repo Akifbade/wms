@@ -1069,11 +1069,12 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
     }
     if (palletCount !== undefined) updateData.palletCount = parseOptionalInt(palletCount);
     if (boxesPerPallet !== undefined) updateData.boxesPerPallet = parseOptionalInt(boxesPerPallet);
-    if (length !== undefined) updateData.length = parseFloat(length);
-    if (width !== undefined) updateData.width = parseFloat(width);
-    if (height !== undefined) updateData.height = parseFloat(height);
-    if (cbm !== undefined) updateData.cbm = parseFloat(cbm);
-    if (weight !== undefined) updateData.weight = parseFloat(weight);
+    // Handle dimensions - allow null to clear values
+    if (length !== undefined) updateData.length = length !== null ? parseFloat(length) : null;
+    if (width !== undefined) updateData.width = width !== null ? parseFloat(width) : null;
+    if (height !== undefined) updateData.height = height !== null ? parseFloat(height) : null;
+    if (cbm !== undefined) updateData.cbm = cbm !== null ? parseFloat(cbm) : null;
+    if (weight !== undefined) updateData.weight = weight !== null ? parseFloat(weight) : null;
 
     // 🎯 AUTO-CALCULATE CBM if dimensions changed but CBM not explicitly set
     const hasNewDimensions = length !== undefined || width !== undefined || height !== undefined;
