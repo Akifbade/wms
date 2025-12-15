@@ -422,23 +422,21 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
                         />
                       )}
 
-                      {/* Brand mark on label - QGO CARGO BRANDING */}
-                      <div className="flex items-center justify-center gap-2 mb-3 py-2 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-lg">
+                      {/* Brand mark on label - LOGO ONLY */}
+                      <div className="flex items-center justify-center mb-2">
                         {branding?.logoUrl ? (
                           <img
                             src={branding.logoUrl}
-                            alt="QGO Cargo"
-                            className="h-10 w-auto object-contain"
+                            alt="Logo"
+                            className="h-6 w-auto object-contain"
                             onError={(e) => {
                               console.error('❌ Logo failed to load:', branding.logoUrl);
                               (e.target as HTMLImageElement).style.display = 'none';
                             }}
                           />
-                        ) : null}
-                        <div className="text-center">
-                          <div className="text-lg font-black text-indigo-700">QGO CARGO</div>
-                          <div className="text-[10px] text-gray-500">Warehouse Storage • Kuwait</div>
-                        </div>
+                        ) : (
+                          <span className="text-xs font-bold text-indigo-600">QGO</span>
+                        )}
                       </div>
 
                       {/* Details - BIGGER TEXT */}

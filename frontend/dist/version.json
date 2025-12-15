@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 15, 2025",
-  "buildTime": "08:55:34",
-  "commit": "4573f3aa4",
-  "commitMessage": "fix: QR print CSS - hide background page, only show modal content",
+  "buildTime": "09:48:57",
+  "commit": "77dc49161",
+  "commitMessage": "fix: QR print with QGO branding and proper print CSS",
   "author": "akifbade46-del",
   "environment": "local"
 }

@@ -202,14 +202,27 @@ export const Shipments: React.FC = () => {
     }
   };
 
-  // Group by company - shipments array is already sorted from loadShipments
-  // So items within each group maintain the same order
-  const groupedByCompany = shipments.reduce((acc: any, shipment: any) => {
+  // Group by company - sort by latest arrival date first
+  // First sort shipments by arrivalDate descending for folder view
+  const sortedForFolders = [...shipments].sort((a: any, b: any) => {
+    const dateA = new Date(a.arrivalDate || a.createdAt || 0).getTime();
+    const dateB = new Date(b.arrivalDate || b.createdAt || 0).getTime();
+    return dateB - dateA; // Latest arrival first
+  });
+  
+  const groupedByCompany = sortedForFolders.reduce((acc: any, shipment: any) => {
     const company = shipment.companyProfile?.name || 'Unassigned';
     if (!acc[company]) acc[company] = [];
     acc[company].push(shipment);
     return acc;
   }, {}) as Record<string, any[]>;
+  
+  // Sort folders by their latest shipment's arrival date
+  const sortedFolderNames = Object.keys(groupedByCompany).sort((a, b) => {
+    const latestA = Math.max(...groupedByCompany[a].map((s: any) => new Date(s.arrivalDate || s.createdAt || 0).getTime()));
+    const latestB = Math.max(...groupedByCompany[b].map((s: any) => new Date(s.arrivalDate || s.createdAt || 0).getTime()));
+    return latestB - latestA; // Folders with latest arrivals first
+  });
 
   const toggleFolder = (name: string) => {
     const next = new Set(expandedFolders);
@@ -539,7 +552,8 @@ export const Shipments: React.FC = () => {
                 <p className="text-slate-500">Try adjusting your search or filters</p>
               </div>
             ) : (
-              Object.entries(groupedByCompany).sort((a, b) => a[0].localeCompare(b[0])).map(([company, items]: [string, any]) => {
+              sortedFolderNames.map((company) => {
+                const items = groupedByCompany[company];
                 const isOpen = expandedFolders.has(company);
                 const stored = items.filter((s: any) => ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE'].includes(s.status)).length;
                 const totalBoxes = items.reduce((sum: number, s: any) => sum + (s.currentBoxCount || 0), 0);
