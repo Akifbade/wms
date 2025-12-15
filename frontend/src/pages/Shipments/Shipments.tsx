@@ -202,40 +202,14 @@ export const Shipments: React.FC = () => {
     }
   };
 
-  // Group by company - items inside each folder are already sorted from loadShipments
+  // Group by company - shipments array is already sorted from loadShipments
+  // So items within each group maintain the same order
   const groupedByCompany = shipments.reduce((acc: any, shipment: any) => {
     const company = shipment.companyProfile?.name || 'Unassigned';
     if (!acc[company]) acc[company] = [];
     acc[company].push(shipment);
     return acc;
   }, {}) as Record<string, any[]>;
-  
-  // Sort items within each folder based on sortBy
-  Object.keys(groupedByCompany).forEach(company => {
-    // Use createdAt (when added to system) for date sorting
-    const getCreatedAt = (s: any) => new Date(s.createdAt || 0).getTime();
-    const getDays = (s: any) => {
-      const src = s.arrivalDate || s.receivedDate || s.createdAt;
-      if (!src) return 0;
-      return Math.ceil((Date.now() - new Date(src).getTime()) / (1000 * 60 * 60 * 24));
-    };
-    
-    groupedByCompany[company].sort((a: any, b: any) => {
-      switch (sortBy) {
-        case 'date_desc': return getCreatedAt(b) - getCreatedAt(a);
-        case 'date_asc': return getCreatedAt(a) - getCreatedAt(b);
-        case 'name_asc': return (a.clientName || '').localeCompare(b.clientName || '');
-        case 'name_desc': return (b.clientName || '').localeCompare(a.clientName || '');
-        case 'cbm_desc': return (Number(b.cbm) || 0) - (Number(a.cbm) || 0);
-        case 'cbm_asc': return (Number(a.cbm) || 0) - (Number(b.cbm) || 0);
-        case 'duration_desc': return getDays(b) - getDays(a);
-        case 'duration_asc': return getDays(a) - getDays(b);
-        case 'pieces_desc': return (b.currentBoxCount || 0) - (a.currentBoxCount || 0);
-        case 'pieces_asc': return (a.currentBoxCount || 0) - (b.currentBoxCount || 0);
-        default: return getCreatedAt(b) - getCreatedAt(a);
-      }
-    });
-  });
 
   const toggleFolder = (name: string) => {
     const next = new Set(expandedFolders);

@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 15, 2025",
-  "buildTime": "07:30:22",
-  "commit": "fe0958aa7",
-  "commitMessage": "fix: Folder mode sorting + debounce search (500ms delay)",
+  "buildTime": "07:53:04",
+  "commit": "e156000ba",
+  "commitMessage": "fix: Sort by createdAt (system date) not arrivalDate (user entered)",
   "author": "akifbade46-del",
   "environment": "local"
 }
