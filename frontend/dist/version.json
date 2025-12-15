@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 15, 2025",
-  "buildTime": "13:43:46",
-  "commit": "535c711a5",
-  "commitMessage": "fix: Folder view sorted by arrival date (latest first), QR logo smaller",
+  "buildTime": "14:18:16",
+  "commit": "c6a834296",
+  "commitMessage": "feat: CBM charging system for company profiles - Rate per day, free days, minimum charge settings - Analytics shows total CBM, current charges, 30-day estimate - Per-shipment charges display - WithdrawalModal shows storage charges before release",
   "author": "akifbade46-del",
   "environment": "local"
 }

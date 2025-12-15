@@ -41,10 +41,13 @@ interface CompanyAnalytics {
     createdAt: string;
     isPlaceholder?: boolean;
     placeholderMessage?: string;
-    // NEW: CBM Charging Settings
+    // UNIFIED BILLING SETTINGS
+    billingType?: 'PER_CBM' | 'FIXED_MONTHLY' | 'PER_BOX';
     cbmRatePerDay?: number;
+    monthlyContractAmount?: number;
     freeStorageDays?: number;
     minimumCharge?: number;
+    advanceBalance?: number;
   };
   stats: {
     totalShipments: number;
@@ -190,12 +193,15 @@ export const CompanyProfile: React.FC = () => {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [customExtendDays, setCustomExtendDays] = useState(0); // 0 means auto-calculate
 
-  // CBM Rate Settings state
+  // UNIFIED BILLING Settings state
   const [showCBMSettingsModal, setShowCBMSettingsModal] = useState(false);
   const [cbmSettings, setCbmSettings] = useState({
+    billingType: 'PER_CBM' as 'PER_CBM' | 'FIXED_MONTHLY' | 'PER_BOX',
     cbmRatePerDay: 0.5,
+    monthlyContractAmount: 0,
     freeStorageDays: 0,
-    minimumCharge: 0
+    minimumCharge: 0,
+    advanceBalance: 0
   });
   const [savingCBMSettings, setSavingCBMSettings] = useState(false);
 
@@ -349,7 +355,7 @@ export const CompanyProfile: React.FC = () => {
     }
   };
 
-  // Save CBM Rate Settings
+  // Save UNIFIED Billing Settings
   const handleSaveCBMSettings = async () => {
     try {
       setSavingCBMSettings(true);
@@ -357,30 +363,36 @@ export const CompanyProfile: React.FC = () => {
       await axios.put(
         `${getBackendUrl()}/api/companies/${profileId}`,
         {
+          billingType: cbmSettings.billingType,
           cbmRatePerDay: parseFloat(String(cbmSettings.cbmRatePerDay)) || 0.5,
+          monthlyContractAmount: parseFloat(String(cbmSettings.monthlyContractAmount)) || 0,
           freeStorageDays: parseInt(String(cbmSettings.freeStorageDays)) || 0,
-          minimumCharge: parseFloat(String(cbmSettings.minimumCharge)) || 0
+          minimumCharge: parseFloat(String(cbmSettings.minimumCharge)) || 0,
+          advanceBalance: parseFloat(String(cbmSettings.advanceBalance)) || 0
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       setShowCBMSettingsModal(false);
       await loadCompanyAnalytics(); // Reload data
-      alert('CBM settings updated successfully!');
+      alert('Billing settings updated successfully!');
     } catch (error: any) {
-      console.error('Failed to update CBM settings:', error);
-      alert(error.response?.data?.error || 'Failed to update CBM settings');
+      console.error('Failed to update billing settings:', error);
+      alert(error.response?.data?.error || 'Failed to update billing settings');
     } finally {
       setSavingCBMSettings(false);
     }
   };
 
-  // Open CBM Settings Modal
+  // Open Billing Settings Modal
   const openCBMSettingsModal = () => {
     setCbmSettings({
+      billingType: data?.profile?.billingType || 'PER_CBM',
       cbmRatePerDay: data?.profile?.cbmRatePerDay || 0.5,
+      monthlyContractAmount: data?.profile?.monthlyContractAmount || 0,
       freeStorageDays: data?.profile?.freeStorageDays || 0,
-      minimumCharge: data?.profile?.minimumCharge || 0
+      minimumCharge: data?.profile?.minimumCharge || 0,
+      advanceBalance: data?.profile?.advanceBalance || 0
     });
     setShowCBMSettingsModal(true);
   };
@@ -2018,18 +2030,18 @@ export const CompanyProfile: React.FC = () => {
         </div>
       )}
 
-      {/* CBM Rate Settings Modal */}
+      {/* UNIFIED Billing Settings Modal */}
       {showCBMSettingsModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg">
                     <CalculatorIcon className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="text-lg font-semibold text-white">CBM Rate Settings</h3>
+                  <h3 className="text-lg font-semibold text-white">Billing Settings</h3>
                 </div>
                 <button
                   onClick={() => setShowCBMSettingsModal(false)}
@@ -2041,41 +2053,86 @@ export const CompanyProfile: React.FC = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-5">
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <p className="text-sm text-orange-800">
-                  Set storage charges for <strong>{profile?.name}</strong>. These rates will be used to calculate storage charges for all shipments.
+            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                <p className="text-sm text-indigo-800">
+                  Configure billing for <strong>{profile?.name}</strong>. Choose billing type and set rates accordingly.
                 </p>
               </div>
 
-              {/* CBM Rate Per Day */}
+              {/* Billing Type Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  CBM Rate Per Day (KWD)
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Billing Type
                 </label>
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  value={cbmSettings.cbmRatePerDay}
-                  onChange={(e) => setCbmSettings(prev => ({ ...prev, cbmRatePerDay: parseFloat(e.target.value) || 0 }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  placeholder="0.500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Charge per cubic meter per day</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'PER_CBM', label: 'Per CBM', desc: 'CBM × Rate × Days' },
+                    { value: 'FIXED_MONTHLY', label: 'Fixed Monthly', desc: 'Fixed amount/month' },
+                    { value: 'PER_BOX', label: 'Per Box', desc: 'Boxes × Rate × Days' }
+                  ].map(type => (
+                    <button
+                      key={type.value}
+                      onClick={() => setCbmSettings(prev => ({ ...prev, billingType: type.value as any }))}
+                      className={`p-3 rounded-lg border-2 transition-all text-center ${
+                        cbmSettings.billingType === type.value
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="font-medium text-sm">{type.label}</p>
+                      <p className="text-xs text-gray-500 mt-1">{type.desc}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Conditional Fields based on Billing Type */}
+              {cbmSettings.billingType === 'FIXED_MONTHLY' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Monthly Contract Amount (KWD)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={cbmSettings.monthlyContractAmount}
+                    onChange={(e) => setCbmSettings(prev => ({ ...prev, monthlyContractAmount: parseFloat(e.target.value) || 0 }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="500.00"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Fixed monthly charge for this customer</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {cbmSettings.billingType === 'PER_BOX' ? 'Rate Per Box Per Day' : 'Rate Per CBM Per Day'} (KWD)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={cbmSettings.cbmRatePerDay}
+                    onChange={(e) => setCbmSettings(prev => ({ ...prev, cbmRatePerDay: parseFloat(e.target.value) || 0 }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="0.500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Charge per {cbmSettings.billingType === 'PER_BOX' ? 'box' : 'CBM'} per day</p>
+                </div>
+              )}
 
               {/* Free Storage Days */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Free Storage Days
+                  Free Storage Days (Grace Period)
                 </label>
                 <input
                   type="number"
                   min="0"
                   value={cbmSettings.freeStorageDays}
                   onChange={(e) => setCbmSettings(prev => ({ ...prev, freeStorageDays: parseInt(e.target.value) || 0 }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="0"
                 />
                 <p className="text-xs text-gray-500 mt-1">Number of days before charges start</p>
@@ -2092,18 +2149,44 @@ export const CompanyProfile: React.FC = () => {
                   min="0"
                   value={cbmSettings.minimumCharge}
                   onChange={(e) => setCbmSettings(prev => ({ ...prev, minimumCharge: parseFloat(e.target.value) || 0 }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="0.000"
                 />
-                <p className="text-xs text-gray-500 mt-1">Minimum charge per shipment</p>
+                <p className="text-xs text-gray-500 mt-1">Minimum charge per shipment/month</p>
+              </div>
+
+              {/* Advance Balance */}
+              <div className="border-t pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Advance Payment Balance (KWD)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={cbmSettings.advanceBalance}
+                  onChange={(e) => setCbmSettings(prev => ({ ...prev, advanceBalance: parseFloat(e.target.value) || 0 }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-gray-500 mt-1">Current advance payment balance for this customer</p>
               </div>
 
               {/* Preview Calculation */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Example Calculation:</p>
-                <p className="text-xs text-gray-600">
-                  1 CBM × {cbmSettings.cbmRatePerDay} KWD × 30 days = <strong className="text-orange-600">{(1 * cbmSettings.cbmRatePerDay * 30).toFixed(3)} KWD</strong> per month
-                </p>
+                <p className="text-sm font-medium text-gray-700 mb-2">Billing Summary:</p>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <p>• Type: <strong className="text-indigo-600">{cbmSettings.billingType.replace('_', ' ')}</strong></p>
+                  {cbmSettings.billingType === 'FIXED_MONTHLY' ? (
+                    <p>• Monthly: <strong className="text-indigo-600">{cbmSettings.monthlyContractAmount.toFixed(3)} KWD</strong></p>
+                  ) : (
+                    <p>• Rate: <strong className="text-indigo-600">{cbmSettings.cbmRatePerDay.toFixed(3)} KWD/{cbmSettings.billingType === 'PER_BOX' ? 'box' : 'CBM'}/day</strong></p>
+                  )}
+                  <p>• Grace Period: <strong>{cbmSettings.freeStorageDays} days</strong></p>
+                  {cbmSettings.advanceBalance > 0 && (
+                    <p>• Advance Balance: <strong className="text-green-600">{cbmSettings.advanceBalance.toFixed(3)} KWD</strong></p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2118,7 +2201,7 @@ export const CompanyProfile: React.FC = () => {
               <button
                 onClick={handleSaveCBMSettings}
                 disabled={savingCBMSettings}
-                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-orange-300 transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-300 transition-colors flex items-center gap-2"
               >
                 {savingCBMSettings ? (
                   <>

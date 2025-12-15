@@ -239,10 +239,13 @@ model CompanyProfile {
   isActive         Boolean  @default(true)
   companyId        String   // Parent company
   
-  // NEW: CBM Charging Settings
-  cbmRatePerDay    Float    @default(0.5) // KWD per CBM per day
-  minimumCharge    Float    @default(0) // Minimum charge per shipment
-  freeStorageDays  Int      @default(0) // Free storage days before charging
+  // BILLING SETTINGS (Unified - No Confusion!)
+  billingType           String   @default("PER_CBM") // PER_CBM, FIXED_MONTHLY, PER_BOX
+  cbmRatePerDay         Float    @default(0.5) // KWD per CBM per day (used if billingType = PER_CBM)
+  monthlyContractAmount Float    @default(0) // Fixed monthly amount (used if billingType = FIXED_MONTHLY)
+  freeStorageDays       Int      @default(0) // Free storage days before charging starts
+  minimumCharge         Float    @default(0) // Minimum charge per shipment/month
+  advanceBalance        Float    @default(0) // Current advance payment balance
   
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

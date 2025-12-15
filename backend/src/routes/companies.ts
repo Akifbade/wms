@@ -368,10 +368,13 @@ router.get('/:profileId/analytics', authenticateToken, async (req: AuthRequest, 
       }
     });
 
-    // Get CBM rate from profile
+    // Get CBM rate from profile - UNIFIED BILLING
+    const billingType = (profile as any).billingType || 'PER_CBM';
     const cbmRatePerDay = (profile as any).cbmRatePerDay || 0.5;
+    const monthlyContractAmount = (profile as any).monthlyContractAmount || 0;
     const freeStorageDays = (profile as any).freeStorageDays || 0;
     const minimumCharge = (profile as any).minimumCharge || 0;
+    const advanceBalance = (profile as any).advanceBalance || 0;
 
     // Calculate shipment statistics
     const totalShipments = allShipments.length;
@@ -389,14 +392,31 @@ router.get('/:profileId/analytics', authenticateToken, async (req: AuthRequest, 
     // Calculate total CBM for active shipments
     const totalCBM = activeShipmentsArr.reduce((sum, s) => sum + (Number((s as any).cbm) || 0), 0);
 
-    // Calculate charges for each shipment
+    // Calculate charges for each shipment - BASED ON BILLING TYPE
     const shipmentCharges = activeShipmentsArr.map(s => {
       const cbm = Number((s as any).cbm) || 0;
       const arrival = s.arrivalDate ? new Date(s.arrivalDate) : new Date(s.createdAt);
       const daysStored = Math.max(0, Math.floor((Date.now() - arrival.getTime()) / (1000 * 60 * 60 * 24)));
       const chargeableDays = Math.max(0, daysStored - freeStorageDays);
-      const currentCharge = Math.max(minimumCharge, cbm * cbmRatePerDay * chargeableDays);
-      const charge30Days = Math.max(minimumCharge, cbm * cbmRatePerDay * 30);
+      
+      let currentCharge = 0;
+      let charge30Days = 0;
+      
+      if (billingType === 'FIXED_MONTHLY') {
+        // Fixed monthly - divide among active shipments
+        const shipmentShare = monthlyContractAmount / (activeShipmentsArr.length || 1);
+        currentCharge = (chargeableDays / 30) * shipmentShare;
+        charge30Days = shipmentShare;
+      } else if (billingType === 'PER_BOX') {
+        // Per box charging
+        const boxCount = s.currentBoxCount || 1;
+        currentCharge = Math.max(minimumCharge, boxCount * cbmRatePerDay * chargeableDays);
+        charge30Days = Math.max(minimumCharge, boxCount * cbmRatePerDay * 30);
+      } else {
+        // Default: PER_CBM
+        currentCharge = Math.max(minimumCharge, cbm * cbmRatePerDay * chargeableDays);
+        charge30Days = Math.max(minimumCharge, cbm * cbmRatePerDay * 30);
+      }
       
       return {
         id: s.id,
@@ -502,10 +522,13 @@ router.get('/:profileId/analytics', authenticateToken, async (req: AuthRequest, 
         placeholderMessage: placeholderProfile
           ? 'Company profile record is missing in the database; analytics is built from shipment history.'
           : undefined,
-        // CBM Charging Settings
+        // UNIFIED BILLING SETTINGS
+        billingType,
         cbmRatePerDay,
+        monthlyContractAmount,
         freeStorageDays,
-        minimumCharge
+        minimumCharge,
+        advanceBalance
       },
       stats: {
         // Shipment stats
@@ -665,7 +688,8 @@ router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: 
     const { profileId } = req.params;
     const { 
       name, description, contactPerson, contactPhone, contractStatus, isActive,
-      cbmRatePerDay, freeStorageDays, minimumCharge // NEW: CBM charging fields
+      // UNIFIED BILLING FIELDS
+      billingType, cbmRatePerDay, monthlyContractAmount, freeStorageDays, minimumCharge, advanceBalance
     } = req.body;
     const companyId = req.user?.companyId;
 
@@ -722,10 +746,13 @@ router.put('/:profileId', authenticateToken, upload.single('logo'), async (req: 
         logo: logoPath,
         contractStatus: contractStatus || profile.contractStatus,
         isActive: isActive !== undefined ? parseBoolean(isActive, profile.isActive) : profile.isActive,
-        // NEW: CBM charging fields
+        // UNIFIED BILLING FIELDS
+        billingType: billingType || undefined,
         cbmRatePerDay: cbmRatePerDay !== undefined ? parseFloat(cbmRatePerDay) : undefined,
+        monthlyContractAmount: monthlyContractAmount !== undefined ? parseFloat(monthlyContractAmount) : undefined,
         freeStorageDays: freeStorageDays !== undefined ? parseInt(freeStorageDays) : undefined,
-        minimumCharge: minimumCharge !== undefined ? parseFloat(minimumCharge) : undefined
+        minimumCharge: minimumCharge !== undefined ? parseFloat(minimumCharge) : undefined,
+        advanceBalance: advanceBalance !== undefined ? parseFloat(advanceBalance) : undefined
       }
     });
 
