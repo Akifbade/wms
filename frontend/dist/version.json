@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 15, 2025",
-  "buildTime": "15:24:28",
-  "commit": "35650918f",
-  "commitMessage": "feat: Unified billing system - PER_CBM, FIXED_MONTHLY, PER_BOX types - Advance balance tracking - No more billing confusion",
+  "buildTime": "16:43:11",
+  "commit": "def95c1f3",
+  "commitMessage": "v2.3.1: Fix CBM dimensions not saving + Company profile enhancements",
   "author": "akifbade46-del",
   "environment": "local"
 }
