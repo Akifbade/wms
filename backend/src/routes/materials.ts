@@ -2149,7 +2149,7 @@ router.get("/:materialId/history", authenticateToken as any, async (req: AuthReq
         }
         transactions.push({
           id: ret.id,
-          type: isRestocked ? 'RETURN' : 'RETURN_PENDING',
+          type: isRestocked ? 'RETURN' : 'RETURN_PENDING_APPROVAL',
           quantity: ret.quantityGood,
           balanceAfter: runningBalance,
           date: ret.recordedAt,

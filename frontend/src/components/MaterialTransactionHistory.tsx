@@ -10,7 +10,7 @@ interface MaterialTransactionHistoryProps {
 
 interface Transaction {
   id: string;
-  type: 'PURCHASE' | 'ISSUE' | 'RETURN' | 'ADJUSTMENT';
+  type: 'PURCHASE' | 'ISSUE' | 'RETURN' | 'RETURN_PENDING_APPROVAL' | 'ADJUSTMENT';
   quantity: number;
   balanceAfter: number;
   date: string;
@@ -22,6 +22,7 @@ interface Transaction {
     unitCost?: number;
     rack?: string;
     notes?: string;
+    isPending?: boolean;
   };
 }
 
@@ -38,7 +39,8 @@ export const MaterialTransactionHistory: React.FC<MaterialTransactionHistoryProp
     totalPurchased: 0,
     totalIssued: 0,
     totalReturned: 0,
-    totalDamaged: 0
+    totalDamaged: 0,
+    pendingReturns: 0
   });
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export const MaterialTransactionHistory: React.FC<MaterialTransactionHistoryProp
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-5 gap-4 p-6 bg-gray-50 border-b">
+        <div className="grid grid-cols-6 gap-4 p-6 bg-gray-50 border-b">
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <p className="text-sm text-gray-600 mb-1">Current Stock</p>
             <p className="text-2xl font-bold text-blue-600">{summary.currentStock}</p>
@@ -109,6 +111,13 @@ export const MaterialTransactionHistory: React.FC<MaterialTransactionHistoryProp
             <p className="text-sm text-gray-600 mb-1">Total Damaged</p>
             <p className="text-2xl font-bold text-red-600">{summary.totalDamaged}</p>
           </div>
+          {summary.pendingReturns > 0 && (
+            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 shadow-sm animate-pulse">
+              <p className="text-sm text-yellow-700 mb-1">⏳ Pending Returns</p>
+              <p className="text-2xl font-bold text-yellow-600">+{summary.pendingReturns}</p>
+              <p className="text-xs text-yellow-600 mt-1">Awaiting approval</p>
+            </div>
+          )}
         </div>
 
         {/* Transactions List */}
@@ -150,6 +159,11 @@ export const MaterialTransactionHistory: React.FC<MaterialTransactionHistoryProp
                             <TrendingUp className="w-5 h-5 text-blue-600" />
                           </div>
                         )}
+                        {txn.type === 'RETURN_PENDING_APPROVAL' && (
+                          <div className="bg-yellow-100 p-2 rounded-full animate-pulse">
+                            <TrendingUp className="w-5 h-5 text-yellow-600" />
+                          </div>
+                        )}
 
                         {/* Type & Quantity */}
                         <div>
@@ -157,6 +171,9 @@ export const MaterialTransactionHistory: React.FC<MaterialTransactionHistoryProp
                             {txn.type === 'PURCHASE' && 'Stock Purchase'}
                             {txn.type === 'ISSUE' && 'Material Issued'}
                             {txn.type === 'RETURN' && 'Material Returned'}
+                            {txn.type === 'RETURN_PENDING_APPROVAL' && (
+                              <span className="text-yellow-600">⏳ Pending Return (Awaiting Approval)</span>
+                            )}
                             {txn.type === 'ADJUSTMENT' && 'Stock Adjustment'}
                           </h3>
                           <p className="text-sm text-gray-600 flex items-center gap-2 mt-1">
@@ -215,13 +232,22 @@ export const MaterialTransactionHistory: React.FC<MaterialTransactionHistoryProp
                       <p className={`text-2xl font-bold ${
                         txn.type === 'PURCHASE' || txn.type === 'RETURN' 
                           ? 'text-green-600' 
+                          : txn.type === 'RETURN_PENDING_APPROVAL'
+                          ? 'text-yellow-600'
                           : 'text-orange-600'
                       }`}>
-                        {txn.type === 'PURCHASE' || txn.type === 'RETURN' ? '+' : '-'}
-                        {txn.quantity}
+                        {txn.type === 'PURCHASE' || txn.type === 'RETURN' ? '+' : ''}
+                        {txn.type === 'RETURN_PENDING_APPROVAL' ? '(+' + txn.quantity + ')' : ''}
+                        {txn.type === 'ISSUE' ? '-' + txn.quantity : ''}
+                        {(txn.type === 'PURCHASE' || txn.type === 'RETURN') && txn.quantity}
                       </p>
                       <p className="text-sm text-gray-500 mt-1">
                         Balance: <span className="font-semibold text-gray-700">{txn.balanceAfter}</span>
+                        {txn.type === 'RETURN_PENDING_APPROVAL' && (
+                          <span className="block text-xs text-yellow-600 mt-1">
+                            Will be +{txn.quantity} after approval
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
