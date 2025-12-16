@@ -2068,7 +2068,6 @@ router.get("/:materialId/history", authenticateToken as any, async (req: AuthReq
     }
 
     const transactions: any[] = [];
-    let runningBalance = 0;
 
     // 1. Get all stock batches (PURCHASES)
     const batches = await prisma.stockBatch.findMany({
@@ -2077,12 +2076,11 @@ router.get("/:materialId/history", authenticateToken as any, async (req: AuthReq
     });
 
     for (const batch of batches) {
-      runningBalance += batch.quantityPurchased;
       transactions.push({
         id: batch.id,
         type: 'PURCHASE',
         quantity: batch.quantityPurchased,
-        balanceAfter: runningBalance,
+        balanceAfter: 0, // Will calculate after sorting
         date: batch.purchaseDate,
         details: {
           supplier: batch.vendorName || 'N/A',
@@ -2108,12 +2106,11 @@ router.get("/:materialId/history", authenticateToken as any, async (req: AuthReq
     });
 
     for (const issue of issues) {
-      runningBalance -= issue.quantity;
       transactions.push({
         id: issue.id,
         type: 'ISSUE',
         quantity: issue.quantity,
-        balanceAfter: runningBalance,
+        balanceAfter: 0, // Will calculate after sorting
         date: issue.issuedAt,
         details: {
           jobCode: issue.job.jobCode,
@@ -2142,16 +2139,12 @@ router.get("/:materialId/history", authenticateToken as any, async (req: AuthReq
 
     for (const ret of returns) {
       if (ret.quantityGood > 0 && ret.issue) {
-        // Only add to running balance if return has been restocked (approved)
         const isRestocked = ret.restocked === true;
-        if (isRestocked) {
-          runningBalance += ret.quantityGood;
-        }
         transactions.push({
           id: ret.id,
           type: isRestocked ? 'RETURN' : 'RETURN_PENDING_APPROVAL',
           quantity: ret.quantityGood,
-          balanceAfter: runningBalance,
+          balanceAfter: 0, // Will calculate after sorting
           date: ret.recordedAt,
           details: {
             jobCode: ret.issue.job.jobCode,
@@ -2165,8 +2158,22 @@ router.get("/:materialId/history", authenticateToken as any, async (req: AuthReq
       }
     }
 
-    // Sort all transactions by date
+    // Sort all transactions by date FIRST
     transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // NOW calculate running balance in correct chronological order
+    let runningBalance = 0;
+    for (const txn of transactions) {
+      if (txn.type === 'PURCHASE') {
+        runningBalance += txn.quantity;
+      } else if (txn.type === 'ISSUE') {
+        runningBalance -= txn.quantity;
+      } else if (txn.type === 'RETURN') {
+        runningBalance += txn.quantity;
+      }
+      // RETURN_PENDING_APPROVAL does NOT affect balance yet
+      txn.balanceAfter = runningBalance;
+    }
 
     // Calculate summary - only count restocked returns
     const restockedReturns = returns.filter((r: any) => r.restocked === true);
