@@ -91,15 +91,12 @@ const MaterialsDashboard: React.FC = () => {
         notes: ''
     });
     const [purchaseForm, setPurchaseForm] = useState({
-        orderNumber: '',
         invoiceNumber: '',
         vendorName: '',
         materialId: '',
         quantity: 0,
         unitCost: 0,
-        orderDate: new Date().toISOString().split('T')[0],
-        receivedDate: '',
-        status: 'PENDING',
+        purchaseDate: new Date().toISOString().split('T')[0],
         notes: ''
     });
     const [loading, setLoading] = useState(false);
@@ -251,20 +248,17 @@ const MaterialsDashboard: React.FC = () => {
 
         const token = localStorage.getItem('authToken');
         try {
+            // Simple direct stock entry - no status workflow
             const purchaseData = {
-                orderNumber: purchaseForm.orderNumber,
-                invoiceNumber: purchaseForm.invoiceNumber,
+                batchNumber: purchaseForm.invoiceNumber || `INV-${Date.now()}`,
                 vendorName: purchaseForm.vendorName,
                 materialId: purchaseForm.materialId,
-                quantity: purchaseForm.quantity,
+                quantityReceived: purchaseForm.quantity,
                 unitCost: purchaseForm.unitCost,
-                orderDate: purchaseForm.orderDate,
-                receivedDate: purchaseForm.receivedDate || null,
-                status: purchaseForm.status,
                 notes: purchaseForm.notes
             };
 
-            const response = await apiFetch('/materials/purchase-orders', {
+            const response = await apiFetch('/materials/stock', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -274,27 +268,25 @@ const MaterialsDashboard: React.FC = () => {
             });
 
             if (response.ok) {
-                alert('Stock purchase created successfully!');
+                alert('✅ Stock added successfully! Stock updated immediately.');
                 setShowPurchaseForm(false);
                 setPurchaseForm({
-                    orderNumber: '',
                     invoiceNumber: '',
                     vendorName: '',
                     materialId: '',
                     quantity: 0,
                     unitCost: 0,
-                    orderDate: new Date().toISOString().split('T')[0],
-                    receivedDate: '',
-                    status: 'PENDING',
+                    purchaseDate: new Date().toISOString().split('T')[0],
                     notes: ''
                 });
                 loadData();
             } else {
-                alert('Failed to create purchase order');
+                const error = await response.json();
+                alert('Failed to add stock: ' + (error.error || 'Unknown error'));
             }
         } catch (error) {
-            console.error('Error creating purchase:', error);
-            alert('Error creating purchase order');
+            console.error('Error adding stock:', error);
+            alert('Error adding stock');
         } finally {
             setLoading(false);
         }
@@ -744,39 +736,32 @@ const MaterialsDashboard: React.FC = () => {
                                 {showPurchaseForm && (
                                     <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
                                         <div className="flex justify-between items-center mb-4">
-                                            <h3 className="text-lg font-bold text-gray-900">Create Stock Purchase</h3>
+                                            <h3 className="text-lg font-bold text-gray-900">➕ Add Stock (Direct Entry)</h3>
                                             <button onClick={() => setShowPurchaseForm(false)}>
                                                 <X className="w-5 h-5 text-gray-500 hover:text-gray-700" />
                                             </button>
                                         </div>
 
+                                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                                            <p className="text-sm text-green-800">
+                                                ✅ <strong>Direct Entry:</strong> Stock will be added immediately - no approval needed!
+                                            </p>
+                                        </div>
+
                                         <form onSubmit={handleCreatePurchase} className="space-y-4">
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">PO Number *</label>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Invoice/Reference Number *</label>
                                                     <input
                                                         type="text"
                                                         required
-                                                        value={purchaseForm.orderNumber}
-                                                        onChange={(e) => setPurchaseForm({ ...purchaseForm, orderNumber: e.target.value })}
-                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                        placeholder="PO-2024-001"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
-                                                    <input
-                                                        type="text"
                                                         value={purchaseForm.invoiceNumber}
                                                         onChange={(e) => setPurchaseForm({ ...purchaseForm, invoiceNumber: e.target.value })}
                                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                                         placeholder="INV-123456"
                                                     />
                                                 </div>
-                                            </div>
 
-                                            <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-1">Vendor Name *</label>
                                                     <input
@@ -788,23 +773,23 @@ const MaterialsDashboard: React.FC = () => {
                                                         placeholder="e.g., Acme Supplies"
                                                     />
                                                 </div>
+                                            </div>
 
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Material *</label>
-                                                    <select
-                                                        required
-                                                        value={purchaseForm.materialId}
-                                                        onChange={(e) => setPurchaseForm({ ...purchaseForm, materialId: e.target.value })}
-                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                    >
-                                                        <option value="">Select material</option>
-                                                        {materials.map(m => (
-                                                            <option key={m.id} value={m.id}>
-                                                                {m.sku} - {m.name}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Material *</label>
+                                                <select
+                                                    required
+                                                    value={purchaseForm.materialId}
+                                                    onChange={(e) => setPurchaseForm({ ...purchaseForm, materialId: e.target.value })}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                >
+                                                    <option value="">Select material</option>
+                                                    {materials.map(m => (
+                                                        <option key={m.id} value={m.id}>
+                                                            {m.sku} - {m.name} (Current: {m.totalQuantity} {m.unit})
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">
@@ -834,52 +819,14 @@ const MaterialsDashboard: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Order Date *</label>
-                                                    <input
-                                                        type="date"
-                                                        required
-                                                        value={purchaseForm.orderDate}
-                                                        onChange={(e) => setPurchaseForm({ ...purchaseForm, orderDate: e.target.value })}
-                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Received Date</label>
-                                                    <input
-                                                        type="date"
-                                                        value={purchaseForm.receivedDate}
-                                                        onChange={(e) => setPurchaseForm({ ...purchaseForm, receivedDate: e.target.value })}
-                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                                                <select
-                                                    value={purchaseForm.status}
-                                                    onChange={(e) => setPurchaseForm({ ...purchaseForm, status: e.target.value })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                >
-                                                    <option value="PENDING">Pending</option>
-                                                    <option value="APPROVED">Approved</option>
-                                                    <option value="ORDERED">Ordered</option>
-                                                    <option value="RECEIVED">Received</option>
-                                                    <option value="CANCELLED">Cancelled</option>
-                                                </select>
-                                            </div>
-
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                                                 <textarea
                                                     value={purchaseForm.notes}
                                                     onChange={(e) => setPurchaseForm({ ...purchaseForm, notes: e.target.value })}
                                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                    rows={3}
-                                                    placeholder="Additional purchase details..."
+                                                    rows={2}
+                                                    placeholder="Optional notes..."
                                                 />
                                             </div>
 
@@ -889,7 +836,7 @@ const MaterialsDashboard: React.FC = () => {
                                                 className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
                                             >
                                                 <Save className="w-4 h-4" />
-                                                {loading ? 'Creating...' : 'Create Purchase'}
+                                                {loading ? 'Adding Stock...' : '✅ Add Stock Now'}
                                             </button>
                                         </form>
                                     </div>

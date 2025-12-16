@@ -587,54 +587,65 @@ router.get("/stock/all", authenticateToken as any, async (req: AuthRequest, res)
 
 /**
  * POST /api/materials/stock
- * Add new stock batch (simplified endpoint)
+ * Add new stock batch (SIMPLE DIRECT ENTRY - immediately adds to stock)
+ * This is the ONLY way to add stock - no pending/approval workflow
  */
 router.post("/stock", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId, id: userId } = req.user!;
-    const { materialId, batchNumber, quantityReceived, unitCost, sellingPrice } = req.body;
+    const { materialId, batchNumber, quantityReceived, unitCost, sellingPrice, vendorName, notes } = req.body;
 
     if (!materialId || !batchNumber || !quantityReceived) {
-      return res.status(400).json({ error: "Material, batch number, and quantity are required" });
+      return res.status(400).json({ error: "Material, batch/invoice number, and quantity are required" });
     }
 
-    // Create stock batch
+    // Create stock batch - IMMEDIATELY adds to stock
     const batch = await prisma.stockBatch.create({
       data: {
         materialId,
         batchNumber,
+        vendorName: vendorName || 'Direct Entry',
         quantityPurchased: quantityReceived,
         quantityRemaining: quantityReceived,
         unitCost: unitCost || 0,
         sellingPrice: sellingPrice || 0,
         receivedById: userId,
+        notes: notes || null,
         companyId,
         purchaseDate: new Date(),
       },
       include: {
         material: {
-          select: { sku: true, name: true, unit: true }
+          select: { sku: true, name: true, unit: true, totalQuantity: true }
         }
       },
     });
 
-    // Update material total quantity
-    await prisma.packingMaterial.update({
+    // Update material total quantity - IMMEDIATELY
+    const updatedMaterial = await prisma.packingMaterial.update({
       where: { id: materialId },
       data: {
         totalQuantity: {
           increment: quantityReceived
-        }
+        },
+        // Update unit cost to latest
+        unitCost: unitCost || undefined
       }
     });
 
-    res.status(201).json(batch);
+    console.log(`[STOCK] Added ${quantityReceived} to ${batch.material?.name}. New total: ${updatedMaterial.totalQuantity}`);
+
+    res.status(201).json({
+      ...batch,
+      newTotalQuantity: updatedMaterial.totalQuantity,
+      message: `Successfully added ${quantityReceived} ${batch.material?.unit || 'units'} to stock`
+    });
   } catch (error: any) {
     console.error("Error creating stock batch:", error);
     if (error.code === "P2002") {
-      return res.status(400).json({ error: "Batch number already exists" });
+      return res.status(400).json({ error: "Batch/Invoice number already exists. Use a unique number." });
     }
-    res.status(500).json({ error: "Failed to create stock batch" });
+    res.status(500).json({ error: "Failed to add stock" });
   }
 });
 
