@@ -61,6 +61,8 @@ interface CompanyAnalytics {
     avgStorageDays: number;
     // NEW: CBM stats
     totalCBM?: number;
+    releasedCBM?: number;
+    releasedCBMValue?: number;
     totalCurrentCharges?: number;
     total30DayCharges?: number;
     // Invoice stats
@@ -918,7 +920,7 @@ export const CompanyProfile: React.FC = () => {
           </p>
         </div>
 
-        {/* Total CBM */}
+        {/* Total CBM (Active) */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-cyan-50 rounded-lg">
@@ -926,10 +928,25 @@ export const CompanyProfile: React.FC = () => {
             </div>
             <ChartBarIcon className="h-5 w-5 text-gray-400" />
           </div>
-          <p className="text-sm font-medium text-gray-600 mb-1">Total CBM</p>
+          <p className="text-sm font-medium text-gray-600 mb-1">Current CBM</p>
           <p className="text-3xl font-bold text-cyan-600">{formatNumber(stats.totalCBM || 0)} m³</p>
           <p className="text-xs text-gray-500 mt-2">
             Rate: {formatNumber(data?.profile?.cbmRatePerDay || 0.5)} KWD/CBM/day
+          </p>
+        </div>
+
+        {/* Released CBM */}
+        <div className="bg-white rounded-lg shadow-sm border-2 border-green-200 p-6 hover:shadow-md transition-shadow bg-green-50">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-green-100 rounded-lg">
+              <CubeIcon className="h-7 w-7 text-green-600" />
+            </div>
+            <CheckCircleIcon className="h-5 w-5 text-green-400" />
+          </div>
+          <p className="text-sm font-medium text-green-700 mb-1">Released CBM</p>
+          <p className="text-3xl font-bold text-green-600">{formatNumber(stats.releasedCBM || 0)} m³</p>
+          <p className="text-xs text-green-600 mt-2 font-semibold">
+            Value: {formatNumber(stats.releasedCBMValue || 0)} KWD
           </p>
         </div>
 

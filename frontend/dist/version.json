@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
   "buildDate": "Dec 16, 2025",
-  "buildTime": "10:52:37",
-  "commit": "3c16c81a0",
-  "commitMessage": "v2.3.5: Simplified stock entry - single direct entry system (no PO workflow)",
+  "buildTime": "13:11:11",
+  "commit": "9f7fe2476",
+  "commitMessage": "fix: Balance calculation - sort by date BEFORE calculating running balance",
   "author": "akifbade46-del",
   "environment": "local"
 }

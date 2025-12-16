@@ -386,7 +386,8 @@ router.get('/:profileId/analytics', authenticateToken, async (req: AuthRequest, 
       s.status === 'IN_WAREHOUSE' || s.status === 'ACTIVE' || s.status === 'PARTIAL' || s.status === 'IN_STORAGE'
     );
     const activeShipments = activeShipmentsArr.length;
-    const releasedShipments = allShipments.filter(s => s.status === 'RELEASED').length;
+    const releasedShipmentsArr = allShipments.filter(s => s.status === 'RELEASED');
+    const releasedShipments = releasedShipmentsArr.length;
     const pendingShipments = allShipments.filter(s => s.status === 'PENDING').length;
 
     // Calculate box statistics
@@ -395,6 +396,32 @@ router.get('/:profileId/analytics', authenticateToken, async (req: AuthRequest, 
 
     // Calculate total CBM for active shipments
     const totalCBM = activeShipmentsArr.reduce((sum, s) => sum + (Number((s as any).cbm) || 0), 0);
+
+    // Calculate released CBM and its value
+    const releasedCBM = releasedShipmentsArr.reduce((sum, s) => sum + (Number((s as any).cbm) || 0), 0);
+    
+    // Calculate value of released CBM based on billing type
+    const releasedCharges = releasedShipmentsArr.map(s => {
+      const cbm = Number((s as any).cbm) || 0;
+      const arrival = s.arrivalDate ? new Date(s.arrivalDate) : new Date(s.createdAt);
+      const released = s.releasedAt ? new Date(s.releasedAt) : new Date();
+      const daysStored = Math.max(0, Math.floor((released.getTime() - arrival.getTime()) / (1000 * 60 * 60 * 24)));
+      const chargeableDays = Math.max(0, daysStored - freeStorageDays);
+
+      let charge = 0;
+      if (billingType === 'FIXED_MONTHLY') {
+        const shipmentShare = monthlyContractAmount / (allShipments.length || 1);
+        charge = (chargeableDays / 30) * shipmentShare;
+      } else if (billingType === 'PER_BOX') {
+        const boxCount = s.originalBoxCount || 1;
+        charge = Math.max(minimumCharge, boxCount * cbmRatePerDay * chargeableDays);
+      } else {
+        // PER_CBM
+        charge = Math.max(minimumCharge, cbm * cbmRatePerDay * chargeableDays);
+      }
+      return charge;
+    });
+    const releasedCBMValue = releasedCharges.reduce((sum, c) => sum + c, 0);
 
     // Calculate charges for each shipment - BASED ON BILLING TYPE
     const shipmentCharges = activeShipmentsArr.map(s => {
@@ -548,6 +575,8 @@ router.get('/:profileId/analytics', authenticateToken, async (req: AuthRequest, 
 
         // CBM & Charges stats
         totalCBM: parseFloat(totalCBM.toFixed(3)),
+        releasedCBM: parseFloat(releasedCBM.toFixed(3)),
+        releasedCBMValue: parseFloat(releasedCBMValue.toFixed(3)),
         totalCurrentCharges: parseFloat(totalCurrentCharges.toFixed(3)),
         total30DayCharges: parseFloat(total30DayCharges.toFixed(3)),
 
