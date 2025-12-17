@@ -1101,8 +1101,7 @@ export const emailTemplates = {
         </div>
       </div>
     `,
-  });
-  },
+  }),
 
   // Reminder email for pending approval
   jobCompletionApprovalReminder: (data: {
