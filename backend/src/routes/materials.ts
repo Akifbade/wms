@@ -1460,15 +1460,32 @@ router.patch("/approvals/:approvalId", authenticateToken as any, async (req: Aut
         });
 
         if (job) {
+          const company = await prisma.company.findUnique({ where: { id: companyId } });
+          const { materials, totals } = await buildJobMaterialsSummary(companyId, job.id);
+
+          // Save materials snapshot for comparison on resubmit
+          const materialsSnapshot = JSON.stringify({
+            materials,
+            totals,
+            rejectedAt: new Date().toISOString(),
+            rejectedBy: req.user?.name || 'Unknown',
+            rejectionReason: notes || 'No reason provided'
+          });
+
+          // Update approval with snapshot and increment rejection count
+          await prisma.materialApproval.update({
+            where: { id: approvalId },
+            data: {
+              previousMaterialsSnapshot: materialsSnapshot,
+              rejectionCount: { increment: 1 }
+            }
+          });
+
           // Reset job status to IN_PROGRESS so they can re-work and re-submit
           await prisma.movingJob.update({
             where: { id: job.id },
             data: { status: 'IN_PROGRESS' },
           });
-
-          const company = await prisma.company.findUnique({ where: { id: companyId } });
-
-          const { materials, totals } = await buildJobMaterialsSummary(companyId, job.id);
 
           // Send rejection notification to job creator/team leader
           await sendNotification(companyId, 'JOB_COMPLETION_REJECTED', {

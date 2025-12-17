@@ -1550,7 +1550,7 @@ model MaterialDamage {
 model MaterialApproval {
   id              String    @id @default(cuid())
   jobId           String
-  approvalType    String // Allowed: RETURN, DAMAGE, STOCK_IN
+  approvalType    String // Allowed: RETURN, DAMAGE, STOCK_IN, JOB_COMPLETION_REPORT
   status          String    @default("PENDING") // Allowed: PENDING, APPROVED, REJECTED
   requestedById   String?
   requestedAt     DateTime  @default(now())
@@ -1563,6 +1563,9 @@ model MaterialApproval {
   subjectReturnId String?   @unique
   subjectDamageId String?   @unique
   companyId       String
+  // Snapshot of materials at time of rejection (for showing changes on resubmit)
+  previousMaterialsSnapshot String? @db.LongText // JSON snapshot of materials before rejection
+  rejectionCount  Int       @default(0) // Number of times this job was rejected
 
   job           MovingJob       @relation(fields: [jobId], references: [id], onDelete: Cascade)
   requestedBy   User?           @relation("ApprovalRequestedBy", fields: [requestedById], references: [id])

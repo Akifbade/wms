@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
-  "buildDate": "Dec 16, 2025",
-  "buildTime": "13:11:11",
-  "commit": "9f7fe2476",
-  "commitMessage": "fix: Balance calculation - sort by date BEFORE calculating running balance",
+  "buildDate": "Dec 17, 2025",
+  "buildTime": "11:54:37",
+  "commit": "18a5b0a14",
+  "commitMessage": "feat: Add Released CBM and Released CBM Value to Company Profile analytics",
   "author": "akifbade46-del",
   "environment": "local"
 }

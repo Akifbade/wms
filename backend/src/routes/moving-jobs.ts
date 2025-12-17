@@ -331,12 +331,23 @@ router.patch("/:jobId", authenticateToken as any, async (req: AuthRequest, res) 
               companyId,
               jobId,
               approvalType: 'JOB_COMPLETION_REPORT',
-              status: 'PENDING',
             },
             orderBy: { requestedAt: 'desc' },
           });
 
-          if (!approval) {
+          // Get previous snapshot if this is a resubmission after rejection
+          let previousSnapshot = null;
+          let isResubmission = false;
+          if (approval && approval.status === 'REJECTED' && (approval as any).previousMaterialsSnapshot) {
+            try {
+              previousSnapshot = JSON.parse((approval as any).previousMaterialsSnapshot);
+              isResubmission = true;
+            } catch (e) {
+              console.log('[MovingJobs] Could not parse previous snapshot:', e);
+            }
+          }
+
+          if (!approval || approval.status !== 'PENDING') {
             approval = await prisma.materialApproval.create({
               data: {
                 companyId,
@@ -401,6 +412,7 @@ router.patch("/:jobId", authenticateToken as any, async (req: AuthRequest, res) 
           });
 
           console.log('[MovingJobs] Final physicalReportUrls:', physicalReportUrls);
+          console.log('[MovingJobs] isResubmission:', isResubmission);
           console.log('[MovingJobs] ==========================================\n');
 
           // Send approval request email
@@ -414,6 +426,10 @@ router.patch("/:jobId", authenticateToken as any, async (req: AuthRequest, res) 
             materials,
             totals,
             physicalReports: physicalReportUrls,
+            // Resubmission data for showing changes
+            isResubmission,
+            previousSnapshot,
+            resubmittedBy: req.user?.name || 'User',
           }, physicalReportAttachments);
 
           // If caller provided explicit emails, ensure they receive it even if notification settings are empty/disabled
@@ -427,6 +443,9 @@ router.patch("/:jobId", authenticateToken as any, async (req: AuthRequest, res) 
               approvalUrl,
               materials,
               totals,
+              isResubmission,
+              previousSnapshot,
+              resubmittedBy: req.user?.name || 'User',
               physicalReports: physicalReportUrls,
             });
             await sendEmail(companyId, {

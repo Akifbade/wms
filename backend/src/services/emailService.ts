@@ -926,13 +926,85 @@ export const emailTemplates = {
     materials: Array<{ name: string; issued: number; used: number; returnedGood: number; damaged: number; unit: string; totalCost: number }>;
     totals: { issued: number; used: number; returnedGood: number; damaged: number; totalCost: number };
     physicalReports?: string[];
-  }) => ({
-    subject: `🛡️ Approval Required - Job Completion Report (${data.jobCode})`,
+    isResubmission?: boolean;
+    previousSnapshot?: { materials: any[]; totals: any; rejectedAt: string; rejectedBy: string; rejectionReason: string };
+    resubmittedBy?: string;
+  }) => {
+    // Build changes comparison section if this is a resubmission
+    let changesSection = '';
+    if (data.isResubmission && data.previousSnapshot) {
+      const prev = data.previousSnapshot;
+      const prevMaterialsMap = new Map(prev.materials.map((m: any) => [m.name, m]));
+      const currentMaterialsMap = new Map(data.materials.map(m => [m.name, m]));
+      
+      const changes: string[] = [];
+      
+      // Check for new materials (added after rejection)
+      data.materials.forEach(m => {
+        if (!prevMaterialsMap.has(m.name)) {
+          changes.push(`<li style="color: #16a34a; margin: 4px 0;">➕ <strong>ADDED:</strong> ${m.name} - ${m.issued} ${m.unit}</li>`);
+        }
+      });
+      
+      // Check for removed materials
+      prev.materials.forEach((m: any) => {
+        if (!currentMaterialsMap.has(m.name)) {
+          changes.push(`<li style="color: #dc2626; margin: 4px 0;">➖ <strong>REMOVED:</strong> ${m.name} - was ${m.issued} ${m.unit}</li>`);
+        }
+      });
+      
+      // Check for quantity changes
+      data.materials.forEach(m => {
+        const prevM = prevMaterialsMap.get(m.name);
+        if (prevM) {
+          if (m.issued !== prevM.issued) {
+            const diff = m.issued - prevM.issued;
+            const arrow = diff > 0 ? '📈' : '📉';
+            changes.push(`<li style="color: #f59e0b; margin: 4px 0;">${arrow} <strong>CHANGED:</strong> ${m.name} issued: ${prevM.issued} → ${m.issued} ${m.unit} (${diff > 0 ? '+' : ''}${diff})</li>`);
+          }
+          if (m.returnedGood !== prevM.returnedGood) {
+            changes.push(`<li style="color: #3b82f6; margin: 4px 0;">🔄 <strong>RETURN CHANGED:</strong> ${m.name} returned: ${prevM.returnedGood} → ${m.returnedGood} ${m.unit}</li>`);
+          }
+          if (m.damaged !== prevM.damaged) {
+            changes.push(`<li style="color: #ef4444; margin: 4px 0;">⚠️ <strong>DAMAGE CHANGED:</strong> ${m.name} damaged: ${prevM.damaged} → ${m.damaged} ${m.unit}</li>`);
+          }
+        }
+      });
+      
+      if (changes.length > 0) {
+        changesSection = `
+          <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 10px; padding: 20px; margin: 20px 0;">
+            <h3 style="color: #92400e; margin: 0 0 10px 0;">🔄 RESUBMISSION - Changes from Previous Rejection</h3>
+            <div style="background: #fffbeb; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+              <p style="margin: 0; font-size: 13px; color: #78350f;">
+                <strong>Previously rejected by:</strong> ${prev.rejectedBy}<br/>
+                <strong>Rejected at:</strong> ${prev.rejectedAt}<br/>
+                <strong>Rejection reason:</strong> ${prev.rejectionReason}
+              </p>
+            </div>
+            <p style="color: #92400e; margin: 0 0 8px 0; font-weight: bold;">Changes Made:</p>
+            <ul style="margin: 0; padding-left: 20px; color: #78350f;">
+              ${changes.join('')}
+            </ul>
+            ${data.resubmittedBy ? `<p style="margin: 12px 0 0 0; font-size: 12px; color: #78350f;">Resubmitted by: <strong>${data.resubmittedBy}</strong></p>` : ''}
+          </div>
+        `;
+      } else {
+        changesSection = `
+          <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin: 16px 0;">
+            <p style="margin: 0; color: #92400e;"><strong>🔄 RESUBMISSION</strong> - Previously rejected by ${prev.rejectedBy}. No material changes detected.</p>
+          </div>
+        `;
+      }
+    }
+
+    return {
+    subject: `${data.isResubmission ? '🔄 RESUBMITTED: ' : ''}🛡️ Approval Required - Job Completion Report (${data.jobCode})`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #0f172a 0%, #334155 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0;">🛡️ Job Completion Approval</h1>
-          <p style="margin: 8px 0 0; opacity: 0.95;">Verification required before the system updates returns/restock.</p>
+        <div style="background: linear-gradient(135deg, ${data.isResubmission ? '#f59e0b 0%, #d97706' : '#0f172a 0%, #334155'} 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0;">${data.isResubmission ? '🔄 RESUBMITTED: ' : '🛡️ '}Job Completion Approval</h1>
+          <p style="margin: 8px 0 0; opacity: 0.95;">${data.isResubmission ? 'This job was previously rejected and has been resubmitted with changes.' : 'Verification required before the system updates returns/restock.'}</p>
         </div>
         <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
@@ -940,6 +1012,8 @@ export const emailTemplates = {
             <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Customer:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${data.customerName}</td></tr>
             <tr><td style="padding: 8px 0;"><strong>Completed At:</strong></td><td style="padding: 8px 0;">${data.completedAt}</td></tr>
           </table>
+
+          ${changesSection}
 
           <div style="background: #fff7ed; border: 1px solid #fdba74; border-radius: 8px; padding: 12px; margin: 16px 0;">
             <strong>Action required:</strong> Please approve this job completion report to keep the system up to date.
@@ -1027,7 +1101,8 @@ export const emailTemplates = {
         </div>
       </div>
     `,
-  }),
+  });
+  },
 
   // Reminder email for pending approval
   jobCompletionApprovalReminder: (data: {

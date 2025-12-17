@@ -224,7 +224,7 @@ export const MovingJobs: React.FC = () => {
               {(() => {
                 const latestApproval = job.approvals?.[0];
                 if (latestApproval?.status === 'REJECTED') {
-                  const rejectedBy = latestApproval.decisionBy?.name || 'Manager';
+                  const rejectedBy = latestApproval.decisionBy?.name || 'Unknown User';
                   const rejectedAt = latestApproval.decidedAt ? new Date(latestApproval.decidedAt).toLocaleString() : '';
                   const reason = latestApproval.decisionNotes || 'No reason provided';
                   return (
@@ -261,8 +261,8 @@ export const MovingJobs: React.FC = () => {
                 const latestApproval = job.approvals?.[0];
                 if (!latestApproval) return null;
                 const status = latestApproval.status;
-                const approver = latestApproval.decisionBy?.name || 'Manager';
-                const requester = latestApproval.requestedBy?.name || 'Team';
+                const approver = latestApproval.decisionBy?.name || 'Unknown User';
+                const requester = latestApproval.requestedBy?.name || 'Unknown User';
                 const decidedAt = latestApproval.decidedAt ? new Date(latestApproval.decidedAt).toLocaleString() : null;
                 const requestedAt = latestApproval.requestedAt ? new Date(latestApproval.requestedAt).toLocaleString() : null;
                 const note = latestApproval.decisionNotes;
