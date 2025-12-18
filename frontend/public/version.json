@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
-  "buildDate": "Dec 17, 2025",
-  "buildTime": "15:41:37",
-  "commit": "3f4d66c40",
-  "commitMessage": "deploy: Force GitHub Actions cloud build 14:53",
+  "buildDate": "Dec 18, 2025",
+  "buildTime": "08:06:55",
+  "commit": "247c22c1a",
+  "commitMessage": "fix: email template syntax crash",
   "author": "akifbade46-del",
   "environment": "local"
 }

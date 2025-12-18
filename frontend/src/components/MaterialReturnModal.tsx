@@ -326,7 +326,7 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
               {issuedMaterials.map(material => {
                 const returnData = returns.get(material.id);
                 if (!returnData) return null;
-                const isLocked = Boolean(returnData.existingReturnId);
+                const isLocked = false; // Allow editing for resubmission
 
                 return (
                   <div key={material.id} className="border-2 border-gray-200 rounded-xl p-5 bg-gradient-to-br from-white to-gray-50 shadow-sm hover:shadow-md transition-shadow">
@@ -341,8 +341,8 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
                         </p>
                       </div>
                       {isLocked && (
-                        <div className="mt-2 bg-green-100 border border-green-300 rounded px-3 py-1.5">
-                          <p className="text-xs text-green-800 font-medium">✅ Already submitted - These values will be used for approval</p>
+                        <div className="mt-2 bg-blue-100 border border-blue-300 rounded px-3 py-1.5">
+                          <p className="text-xs text-blue-800 font-medium">📝 Previous values loaded - Edit as needed for resubmission</p>
                         </div>
                       )}
                     </div>
