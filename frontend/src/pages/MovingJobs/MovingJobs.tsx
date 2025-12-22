@@ -213,9 +213,16 @@ export const MovingJobs: React.FC = () => {
                         <div className="flex-shrink-0 mt-0.5">
                           <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-red-800">REJECTED</p>
-                          <p className="text-xs text-red-700 mt-0.5 line-clamp-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-xs font-bold text-red-800">REJECTED</p>
+                            {latestApproval?.decidedBy && (
+                              <span className="text-xs text-red-600">
+                                by {latestApproval.decidedBy.name || latestApproval.decidedBy.username}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-red-700 whitespace-pre-wrap break-words">
                             {latestApproval?.decisionNotes || 'No reason provided'}
                           </p>
                         </div>
