@@ -162,6 +162,16 @@ export const MovingJobs: React.FC = () => {
             const latestApproval = job.approvals?.[0];
             const isRejected = latestApproval?.status === 'REJECTED';
             const isPending = job.status === 'PENDING_APPROVAL';
+            
+            // Debug: Log approval data to console
+            if (isRejected && latestApproval) {
+              console.log('Rejected job approval data:', {
+                jobCode: job.jobCode,
+                decidedBy: latestApproval.decisionBy,
+                decidedByName: latestApproval.decisionBy?.name,
+                decidedByEmail: latestApproval.decisionBy?.email
+              });
+            }
 
             // Get physical report files
             const physicalReports = job.materialReturns
@@ -214,17 +224,84 @@ export const MovingJobs: React.FC = () => {
                           <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
                         </div>
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1.5">
                             <p className="text-xs font-bold text-red-800">REJECTED</p>
                             {latestApproval?.decidedBy && (
-                              <span className="text-xs text-red-600">
-                                by {latestApproval.decidedBy.name || latestApproval.decidedBy.username}
+                              <span className="text-xs text-red-600 font-semibold">
+                                by {latestApproval.decidedBy.name || latestApproval.decidedBy.email || 'Manager'}
+                              </span>
+                            )}
+                            {latestApproval?.decidedAt && (
+                              <span className="text-xs text-red-500">
+                                • {new Date(latestApproval.decidedAt).toLocaleDateString()}
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-red-700 whitespace-pre-wrap break-words">
-                            {latestApproval?.decisionNotes || 'No reason provided'}
-                          </p>
+                          
+                          {/* Parse and display verification details */}
+                          {(() => {
+                            try {
+                              const parsed = JSON.parse(latestApproval?.decisionNotes || '{}');
+                              const hasVerifications = parsed.verifications && Object.keys(parsed.verifications).length > 0;
+                              
+                              return (
+                                <>
+                                  {/* Overall Notes */}
+                                  {parsed.notes && (
+                                    <p className="text-xs text-red-700 mb-2 whitespace-pre-wrap break-words">
+                                      {parsed.notes}
+                                    </p>
+                                  )}
+                                  
+                                  {/* Material Verification Checklist */}
+                                  {hasVerifications && (
+                                    <div className="mt-2 space-y-1">
+                                      <p className="text-xs font-semibold text-red-800 mb-1">Material Issues:</p>
+                                      {Object.entries(parsed.verifications).map(([material, data]: [string, any]) => {
+                                        if (!data.status) return null;
+                                        
+                                        const isCorrect = data.status === 'CORRECT';
+                                        return (
+                                          <div 
+                                            key={material} 
+                                            className={`flex items-start gap-1.5 text-xs p-1.5 rounded ${
+                                              isCorrect ? 'bg-green-50' : 'bg-red-100'
+                                            }`}
+                                          >
+                                            <span className={`font-bold ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                                              {isCorrect ? '✓' : '✗'}
+                                            </span>
+                                            <div className="flex-1">
+                                              <span className={`font-medium ${isCorrect ? 'text-green-800' : 'text-red-800'}`}>
+                                                {material}
+                                              </span>
+                                              {data.remarks && (
+                                                <span className="text-gray-600"> - {data.remarks}</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                  
+                                  {/* Fallback for old format (plain text) */}
+                                  {!parsed.notes && !hasVerifications && latestApproval?.decisionNotes && (
+                                    <p className="text-xs text-red-700 whitespace-pre-wrap break-words">
+                                      {latestApproval.decisionNotes}
+                                    </p>
+                                  )}
+                                </>
+                              );
+                            } catch (e) {
+                              // If JSON parse fails, show as plain text
+                              return (
+                                <p className="text-xs text-red-700 whitespace-pre-wrap break-words">
+                                  {latestApproval?.decisionNotes || 'No reason provided'}
+                                </p>
+                              );
+                            }
+                          })()}
                         </div>
                       </div>
                     </div>

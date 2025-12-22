@@ -58,6 +58,8 @@ const ApprovalManager: React.FC = () => {
   const [selectedDetail, setSelectedDetail] = useState<ApprovalDetailResponse | null>(null);
   const [decisionNotes, setDecisionNotes] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifications, setVerifications] = useState<Record<string, { status: 'CORRECT' | 'ISSUE' | null; remarks: string }>>({});
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchApprovals();
@@ -128,6 +130,7 @@ const ApprovalManager: React.FC = () => {
   };
 
   const handleApprove = async (approvalId: string) => {
+    const combinedNotes = JSON.stringify({ notes: decisionNotes, verifications });
     try {
       const res = await fetch(`/api/materials/approvals/${approvalId}`, {
         method: 'PATCH',
@@ -137,7 +140,7 @@ const ApprovalManager: React.FC = () => {
         },
         body: JSON.stringify({
           status: 'APPROVED',
-          notes: decisionNotes,
+          notes: combinedNotes,
         }),
       });
 
@@ -158,6 +161,7 @@ const ApprovalManager: React.FC = () => {
   };
 
   const handleReject = async (approvalId: string) => {
+    const combinedNotes = JSON.stringify({ notes: decisionNotes, verifications });
     try {
       const res = await fetch(`/api/materials/approvals/${approvalId}`, {
         method: 'PATCH',
@@ -167,7 +171,7 @@ const ApprovalManager: React.FC = () => {
         },
         body: JSON.stringify({
           status: 'REJECTED',
-          notes: decisionNotes,
+          notes: combinedNotes,
         }),
       });
 
@@ -405,13 +409,15 @@ const ApprovalManager: React.FC = () => {
               backgroundColor: 'white',
               padding: '20px',
               borderRadius: '8px',
-              maxWidth: '500px',
-              width: '90%',
+              maxWidth: '1400px',
+              width: '95vw',
+              maxHeight: '90vh',
+              overflow: 'auto',
               boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h4 style={{ marginBottom: '15px' }}>Review Approval Request</h4>
+            <h4 style={{ marginBottom: '15px' }}>Review Approval Request • Requested by {selectedApproval.requestedBy?.name || selectedApproval.requestedBy?.email || 'System'}</h4>
 
             <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
               <small style={{ color: '#6c757d' }}>
@@ -422,9 +428,50 @@ const ApprovalManager: React.FC = () => {
               </p>
             </div>
 
-            {selectedDetail && (selectedDetail as any).physicalReports && (selectedDetail as any).physicalReports.length > 0 && (
-              <div style={{ marginBottom: '20px' }}>
-                <h5 style={{ marginBottom: '10px', color: '#16a34a' }}>📄 Physical Reports Uploaded</h5>
+            <div style={{ display: 'grid', gridTemplateColumns: '60% 40%', gap: '20px', marginBottom: '20px' }}>
+              {/* LEFT: Physical Reports */}
+              <div>
+                {selectedDetail && (selectedDetail as any).physicalReports && (selectedDetail as any).physicalReports.length > 0 && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <h5 style={{ marginBottom: '10px', color: '#16a34a' }}>📄 Physical Reports Uploaded</h5>
+                    
+                    {expandedImage ? (
+                      // Show expanded single image
+                      <div style={{ position: 'relative', border: '2px solid #16a34a', borderRadius: '8px', overflow: 'hidden' }}>
+                        <img 
+                          src={expandedImage} 
+                          alt="Expanded Report" 
+                          style={{ width: '100%', height: 'auto', maxHeight: '600px', objectFit: 'contain', backgroundColor: '#f8f9fa' }}
+                        />
+                        <button
+                          onClick={() => setExpandedImage(null)}
+                          style={{
+                            position: 'absolute',
+                            top: '10px',
+                            right: '10px',
+                            backgroundColor: 'rgba(220, 38, 38, 0.9)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '36px',
+                            height: '36px',
+                            cursor: 'pointer',
+                            fontSize: '20px',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                          }}
+                        >
+                          ✕
+                        </button>
+                        <div style={{ padding: '10px', backgroundColor: '#f0fdf4', textAlign: 'center', fontWeight: 'bold', color: '#166534' }}>
+                          Click ✕ to see all images again
+                        </div>
+                      </div>
+                    ) : (
+                      // Show thumbnail grid
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
                   {(selectedDetail as any).physicalReports.map((reportUrl: string, idx: number) => {
                     const normalizeReportUrl = (rawUrl: string) => {
@@ -454,7 +501,13 @@ const ApprovalManager: React.FC = () => {
                       <div
                         key={idx}
                         style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '2px solid #16a34a', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
-                        onClick={() => window.open(fullUrl, '_blank')}
+                        onClick={() => {
+                          if (isPdf) {
+                            window.open(fullUrl, '_blank');
+                          } else {
+                            setExpandedImage(fullUrl);
+                          }
+                        }}
                       >
                         {isPdf ? (
                           <div style={{ width: '100%', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0fdf4', color: '#166534', fontWeight: 'bold' }}>
@@ -478,50 +531,63 @@ const ApprovalManager: React.FC = () => {
                     );
                   })}
                 </div>
-                <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '8px', fontWeight: 'bold' }}>✅ Click any image to view full size in new tab</p>
-              </div>
-            )}
-
-            {selectedDetail && (selectedDetail as any).materials && (
-              <div style={{ marginBottom: '15px' }}>
-                <h5 style={{ marginBottom: '10px' }}>Materials Summary</h5>
-                <div style={{ maxHeight: '260px', overflow: 'auto', border: '1px solid #dee2e6', borderRadius: '4px' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: '#f1f5f9' }}>
-                        <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #dee2e6' }}>Material</th>
-                        <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>Issued</th>
-                        <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>Used</th>
-                        <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>Returned</th>
-                        <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>Damaged</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(selectedDetail as any).materials.map((m: any, idx: number) => (
-                        <tr key={idx}>
-                          <td style={{ padding: '8px', borderBottom: '1px solid #f1f5f9' }}>{m.name || 'N/A'}</td>
-                          <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>{m.issued || 0} {m.unit || ''}</td>
-                          <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>{m.used || 0} {m.unit || ''}</td>
-                          <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>{m.returnedGood || 0} {m.unit || ''}</td>
-                          <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>{m.damaged || 0} {m.unit || ''}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    {(selectedDetail as any).totals && (
-                      <tfoot>
-                        <tr style={{ background: '#f8fafc' }}>
-                          <td style={{ padding: '8px', fontWeight: 'bold' }}>Totals</td>
-                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>{(selectedDetail as any).totals?.issued || 0}</td>
-                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>{(selectedDetail as any).totals?.used || 0}</td>
-                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>{(selectedDetail as any).totals?.returnedGood || 0}</td>
-                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>{(selectedDetail as any).totals?.damaged || 0}</td>
-                        </tr>
-                      </tfoot>
                     )}
-                  </table>
+                    <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '8px', fontWeight: 'bold' }}>✅ Click image to expand, PDF opens in new tab</p>
+                  </div>
+                )}
+              </div>
+
+              {/* RIGHT: Material Verification */}
+              <div>
+                {selectedDetail && (selectedDetail as any).materials && (
+                  <div style={{ marginBottom: '15px' }}>
+                    <h5 style={{ marginBottom: '10px', color: '#0ea5e9' }}>🔍 Material Verification</h5>
+                <div style={{ maxHeight: '500px', overflow: 'auto', border: '1px solid #dee2e6', borderRadius: '4px', padding: '10px' }}>
+                  {(selectedDetail as any).materials.map((m: any, idx: number) => {
+                    const materialKey = m.name || `material-${idx}`;
+                    const verification = verifications[materialKey] || { status: null, remarks: '' };
+                    return (
+                      <div key={idx} style={{ marginBottom: '15px', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '6px', backgroundColor: verification.status === 'CORRECT' ? '#f0fdf4' : verification.status === 'ISSUE' ? '#fef2f2' : '#fff' }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: '5px', color: '#1e293b' }}>{m.name || 'N/A'}</div>
+                        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
+                          Issued: {m.issued || 0} • Used: {m.used || 0} • Returned: {m.returnedGood || 0} • Damaged: {m.damaged || 0}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                          <button
+                            onClick={() => setVerifications({ ...verifications, [materialKey]: { ...verification, status: 'CORRECT' } })}
+                            style={{ flex: 1, padding: '6px', backgroundColor: verification.status === 'CORRECT' ? '#16a34a' : '#e2e8f0', color: verification.status === 'CORRECT' ? 'white' : '#64748b', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                          >
+                            ✓ Correct
+                          </button>
+                          <button
+                            onClick={() => setVerifications({ ...verifications, [materialKey]: { ...verification, status: 'ISSUE' } })}
+                            style={{ flex: 1, padding: '6px', backgroundColor: verification.status === 'ISSUE' ? '#dc2626' : '#e2e8f0', color: verification.status === 'ISSUE' ? 'white' : '#64748b', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                          >
+                            ✗ Issue
+                          </button>
+                        </div>
+                        {verification.status && (
+                          <textarea
+                            placeholder="Add remarks..."
+                            value={verification.remarks}
+                            onChange={(e) => setVerifications({ ...verifications, [materialKey]: { ...verification, remarks: e.target.value } })}
+                            style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '12px', boxSizing: 'border-box', minHeight: '50px' }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                  <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f8fafc', borderRadius: '4px' }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Totals:</div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      Issued: {(selectedDetail as any).totals?.issued || 0} • Used: {(selectedDetail as any).totals?.used || 0} • Returned: {(selectedDetail as any).totals?.returnedGood || 0} • Damaged: {(selectedDetail as any).totals?.damaged || 0}
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
+                )}
+              </div>
+            </div>
 
             <div style={{ marginBottom: '15px' }}>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>

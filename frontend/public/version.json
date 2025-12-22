@@ -1,9 +1,9 @@
 {
-  "version": "v2.3.0",
+  "version": "v2.3.1",
   "buildDate": "Dec 22, 2025",
-  "buildTime": "09:31:29",
-  "commit": "d80036825",
-  "commitMessage": "feat: redesign moving jobs ui",
+  "buildTime": "13:48:40",
+  "commit": "ead02e697",
+  "commitMessage": "fix: Show rejector name and full rejection reason in Moving Jobs - Display 'rejected by' with user name, Remove line-clamp to show full rejection text",
   "author": "akifbade46-del",
   "environment": "local"
 }
