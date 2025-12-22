@@ -54,8 +54,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onMenuClick, userRole }) =
   const navItems = getNavItems();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 z-50 md:hidden safe-area-bottom shadow-lg">
-      <div className="flex items-center justify-around h-14">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 z-50 md:hidden safe-area-bottom shadow-lg animate-slideUp">
+      <div className="flex items-center justify-around h-16">
         {navItems.map((item) => {
           const active = isActive(item.href);
           const Icon = active ? item.activeIcon : item.icon;
@@ -64,18 +64,20 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onMenuClick, userRole }) =
             <Link
               key={item.name}
               to={item.href}
-              className={`relative flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              className={`relative flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 touch-target active:scale-95 ${
                 active
                   ? 'text-blue-600'
                   : 'text-slate-400 active:text-blue-600'
               }`}
             >
-              <Icon className={`h-5 w-5 ${active ? 'scale-110' : ''} transition-transform`} />
-              <span className={`text-[9px] mt-0.5 ${active ? 'font-bold' : 'font-medium'}`}>
+              <div className={`transform transition-transform duration-200 ${active ? 'scale-110' : 'scale-100'}`}>
+                <Icon className="h-6 w-6" />
+              </div>
+              <span className={`text-[10px] mt-1 ${active ? 'font-bold' : 'font-medium'} transition-all`}>
                 {item.name}
               </span>
               {active && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-0.5 bg-blue-600 rounded-full" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-1 bg-blue-600 rounded-full animate-slideDown" />
               )}
             </Link>
           );
@@ -84,10 +86,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onMenuClick, userRole }) =
         {/* More menu button */}
         <button
           onClick={onMenuClick}
-          className="relative flex flex-col items-center justify-center flex-1 h-full text-slate-400 active:text-blue-600 transition-colors"
+          className="relative flex flex-col items-center justify-center flex-1 h-full text-slate-400 active:text-blue-600 transition-all duration-200 touch-target active:scale-95"
         >
-          <Bars3Icon className="h-5 w-5" />
-          <span className="text-[9px] mt-0.5 font-medium">More</span>
+          <Bars3Icon className="h-6 w-6" />
+          <span className="text-[10px] mt-1 font-medium">More</span>
         </button>
       </div>
     </nav>

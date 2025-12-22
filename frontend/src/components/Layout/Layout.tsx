@@ -114,7 +114,7 @@ export const Layout: React.FC = () => {
       {/* Sidebar - Modern Glass Dark Theme */}
       <div
         className={`
-          fixed inset-y-0 left-0 z-50 w-64 bg-slate-900/95 backdrop-blur-xl shadow-2xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+          fixed inset-y-0 left-0 z-50 w-64 bg-slate-900/95 backdrop-blur-xl shadow-2xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
@@ -135,7 +135,7 @@ export const Layout: React.FC = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto no-scrollbar">
           {/* Role-based Navigation */}
           {currentUser?.role ? (
             navigationConfig[currentUser.role as keyof typeof navigationConfig]?.map((item) => {
@@ -168,29 +168,29 @@ export const Layout: React.FC = () => {
         </nav>
 
         {/* User Profile & Logout */}
-        <div className="border-t border-slate-700/50 p-4 space-y-2">
+        <div className="border-t border-slate-700/50 p-3 space-y-1.5">
           <Link
             to="/profile"
-            className="flex items-center space-x-3 p-2 rounded-xl hover:bg-white/5 transition-colors"
+            className="flex items-center space-x-3 p-2.5 rounded-xl hover:bg-white/5 transition-all duration-200 group"
             onClick={() => setSidebarOpen(false)}
           >
-            <div className="w-9 h-9 bg-gradient-to-br from-slate-600 to-slate-700 rounded-full flex items-center justify-center ring-2 ring-slate-600">
+            <div className="w-9 h-9 bg-gradient-to-br from-slate-600 to-slate-700 rounded-full flex items-center justify-center ring-2 ring-slate-600 group-hover:ring-blue-500 transition-all">
               <span className="text-white font-semibold text-sm">
                 {currentUser?.name?.charAt(0)?.toUpperCase() || 'U'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
+              <p className="text-sm font-medium text-white truncate group-hover:text-blue-300 transition-colors">
                 {currentUser?.name || 'User'}
               </p>
-              <p className="text-xs text-slate-500 truncate">
+              <p className="text-xs text-slate-400 truncate group-hover:text-slate-300 transition-colors">
                 {currentUser?.email || 'user@demo.com'}
               </p>
             </div>
           </Link>
           <button
             onClick={handleLogout}
-            className="flex items-center w-full px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-xl transition-colors"
+            className="flex items-center w-full px-4 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-xl transition-all duration-200 touch-target active:scale-95"
           >
             <ArrowRightOnRectangleIcon className="mr-3 h-5 w-5" />
             Logout
@@ -236,7 +236,7 @@ export const Layout: React.FC = () => {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-slate-100 p-4 md:p-6 pb-20 md:pb-6">
+        <main className="flex-1 overflow-y-auto bg-slate-100 p-4 md:p-6 pb-24 md:pb-6 no-scrollbar">
           <Outlet />
         </main>
 
