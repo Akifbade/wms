@@ -1,9 +1,9 @@
 {
   "version": "v2.3.1",
   "buildDate": "Dec 22, 2025",
-  "buildTime": "13:56:33",
-  "commit": "9f0a78c96",
-  "commitMessage": "feat: Side-by-side approval UI with per-item verification and in-place image expansion",
+  "buildTime": "15:36:57",
+  "commit": "25e3a22cb",
+  "commitMessage": "feat: Mobile-first responsive UI with smooth animations",
   "author": "akifbade46-del",
   "environment": "local"
 }

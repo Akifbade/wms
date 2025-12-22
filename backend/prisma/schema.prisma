@@ -1556,7 +1556,7 @@ model MaterialApproval {
   requestedAt     DateTime  @default(now())
   decisionById    String?
   decidedAt       DateTime?
-  decisionNotes   String?
+  decisionNotes   String?   @db.LongText // JSON with verification data, notes, remarks
   notifyEmails    String?   @db.Text // Comma-separated internal recipients for approval emails
   reminderCount   Int       @default(0)
   lastReminderAt  DateTime?

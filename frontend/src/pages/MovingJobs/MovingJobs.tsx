@@ -165,11 +165,16 @@ export const MovingJobs: React.FC = () => {
             
             // Debug: Log approval data to console
             if (isRejected && latestApproval) {
-              console.log('Rejected job approval data:', {
+              console.log('🔴 REJECTED JOB - Full Approval Data:', {
+                jobId: job.id,
                 jobCode: job.jobCode,
-                decidedBy: latestApproval.decisionBy,
-                decidedByName: latestApproval.decisionBy?.name,
-                decidedByEmail: latestApproval.decisionBy?.email
+                approvalId: latestApproval.id,
+                status: latestApproval.status,
+                decidedAt: latestApproval.decidedAt,
+                decisionBy: latestApproval.decisionBy,
+                hasDecisionBy: !!latestApproval.decisionBy,
+                decisionByName: latestApproval.decisionBy?.name,
+                decisionByEmail: latestApproval.decisionBy?.email
               });
             }
 

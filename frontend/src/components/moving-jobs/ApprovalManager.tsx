@@ -148,12 +148,13 @@ const ApprovalManager: React.FC = () => {
         alert('Approval recorded successfully');
         setSelectedApproval(null);
         setSelectedDetail(null);
-        setDecisionNotes('');
-        fetchApprovals();
+        setDecisionNotes('');        setVerifications({});        fetchApprovals();
         // Remove query param if this was opened from an email deep-link
         if (approvalIdFromQuery) navigate('/approvals', { replace: true });
       } else {
-        alert('Failed to record approval');
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Approval failed:', errorData);
+        alert(`Failed to record approval: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -180,10 +181,13 @@ const ApprovalManager: React.FC = () => {
         setSelectedApproval(null);
         setSelectedDetail(null);
         setDecisionNotes('');
+        setVerifications({});
         fetchApprovals();
         if (approvalIdFromQuery) navigate('/approvals', { replace: true });
       } else {
-        alert('Failed to record rejection');
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Rejection failed:', errorData);
+        alert(`Failed to record rejection: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -436,13 +440,21 @@ const ApprovalManager: React.FC = () => {
                     <h5 style={{ marginBottom: '10px', color: '#16a34a' }}>📄 Physical Reports Uploaded</h5>
                     
                     {expandedImage ? (
-                      // Show expanded single image
+                      // Show expanded single image or PDF
                       <div style={{ position: 'relative', border: '2px solid #16a34a', borderRadius: '8px', overflow: 'hidden' }}>
-                        <img 
-                          src={expandedImage} 
-                          alt="Expanded Report" 
-                          style={{ width: '100%', height: 'auto', maxHeight: '600px', objectFit: 'contain', backgroundColor: '#f8f9fa' }}
-                        />
+                        {/\.pdf($|\?)/i.test(expandedImage) ? (
+                          <iframe 
+                            src={expandedImage} 
+                            title="PDF Report"
+                            style={{ width: '100%', height: '600px', border: 'none', backgroundColor: '#f8f9fa' }}
+                          />
+                        ) : (
+                          <img 
+                            src={expandedImage} 
+                            alt="Expanded Report" 
+                            style={{ width: '100%', height: 'auto', maxHeight: '600px', objectFit: 'contain', backgroundColor: '#f8f9fa' }}
+                          />
+                        )}
                         <button
                           onClick={() => setExpandedImage(null)}
                           style={{
@@ -467,7 +479,7 @@ const ApprovalManager: React.FC = () => {
                           ✕
                         </button>
                         <div style={{ padding: '10px', backgroundColor: '#f0fdf4', textAlign: 'center', fontWeight: 'bold', color: '#166534' }}>
-                          Click ✕ to see all images again
+                          Click ✕ to see all files again
                         </div>
                       </div>
                     ) : (
@@ -502,11 +514,7 @@ const ApprovalManager: React.FC = () => {
                         key={idx}
                         style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '2px solid #16a34a', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
                         onClick={() => {
-                          if (isPdf) {
-                            window.open(fullUrl, '_blank');
-                          } else {
-                            setExpandedImage(fullUrl);
-                          }
+                          setExpandedImage(fullUrl);
                         }}
                       >
                         {isPdf ? (
@@ -532,7 +540,7 @@ const ApprovalManager: React.FC = () => {
                   })}
                 </div>
                     )}
-                    <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '8px', fontWeight: 'bold' }}>✅ Click image to expand, PDF opens in new tab</p>
+                    <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '8px', fontWeight: 'bold' }}>✅ Click any file to expand in-place (images & PDFs)</p>
                   </div>
                 )}
               </div>
