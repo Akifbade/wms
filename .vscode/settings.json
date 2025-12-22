@@ -149,5 +149,6 @@
     "autoversion.enabled": true,
     "autoversion.script": ".vscode/auto-version-and-commit.ps1",
     "autoversion.description": "Every rebuild auto-increments version and commits to git for safety",
-    "autoversion.format": "🔄 Auto-increment version to vX.X.X (rebuild safety)"
+    "autoversion.format": "🔄 Auto-increment version to vX.X.X (rebuild safety)",
+    "github.copilot.chat.tools.memory.enabled": true
 }

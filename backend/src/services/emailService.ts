@@ -936,23 +936,23 @@ export const emailTemplates = {
       const prev = data.previousSnapshot;
       const prevMaterialsMap = new Map(prev.materials.map((m: any) => [m.name, m]));
       const currentMaterialsMap = new Map(data.materials.map(m => [m.name, m]));
-      
+
       const changes: string[] = [];
-      
+
       // Check for new materials (added after rejection)
       data.materials.forEach(m => {
         if (!prevMaterialsMap.has(m.name)) {
           changes.push(`<li style="color: #16a34a; margin: 4px 0;">➕ <strong>ADDED:</strong> ${m.name} - ${m.issued} ${m.unit}</li>`);
         }
       });
-      
+
       // Check for removed materials
       prev.materials.forEach((m: any) => {
         if (!currentMaterialsMap.has(m.name)) {
           changes.push(`<li style="color: #dc2626; margin: 4px 0;">➖ <strong>REMOVED:</strong> ${m.name} - was ${m.issued} ${m.unit}</li>`);
         }
       });
-      
+
       // Check for quantity changes
       data.materials.forEach(m => {
         const prevM = prevMaterialsMap.get(m.name);
@@ -970,7 +970,7 @@ export const emailTemplates = {
           }
         }
       });
-      
+
       if (changes.length > 0) {
         changesSection = `
           <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 10px; padding: 20px; margin: 20px 0;">
@@ -999,8 +999,8 @@ export const emailTemplates = {
     }
 
     return {
-    subject: `${data.isResubmission ? '🔄 RESUBMITTED: ' : ''}🛡️ Approval Required - Job Completion Report (${data.jobCode})`,
-    html: `
+      subject: `${data.isResubmission ? '🔄 RESUBMITTED: ' : ''}🛡️ Approval Required - Job Completion Report (${data.jobCode})`,
+      html: `
       <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, ${data.isResubmission ? '#f59e0b 0%, #d97706' : '#0f172a 0%, #334155'} 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
           <h1 style="margin: 0;">${data.isResubmission ? '🔄 RESUBMITTED: ' : '🛡️ '}Job Completion Approval</h1>
@@ -1030,26 +1030,26 @@ export const emailTemplates = {
 
             <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 10px 0 14px 0;">
               ${data.physicalReports
-          .slice(0, 6)
-          .map((url, idx) => {
-            const isPdf = /\.pdf($|\?)/i.test(url);
-            if (isPdf) {
-              return `
+            .slice(0, 6)
+            .map((url, idx) => {
+              const isPdf = /\.pdf($|\?)/i.test(url);
+              if (isPdf) {
+                return `
                       <a href="${url}" target="_blank" style="display: inline-block; background: #ffffff; border: 1px solid #93c5fd; border-radius: 8px; padding: 10px 12px; color: #1e40af; text-decoration: none; font-weight: bold; font-size: 12px;">
                         📄 Open PDF #${idx + 1}
                       </a>
                     `;
-            }
+              }
 
-            // Use inline CID images so email previews work even if the URL isn't publicly reachable.
-            const cid = `physical-report-${idx + 1}`;
-            return `
+              // Use inline CID images so email previews work even if the URL isn't publicly reachable.
+              const cid = `physical-report-${idx + 1}`;
+              return `
                     <a href="${url}" target="_blank" style="display: inline-block; text-decoration: none;">
                       <img src="cid:${cid}" alt="Physical Report ${idx + 1}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 8px; border: 2px solid #3b82f6; background: #ffffff;" />
                     </a>
                   `;
-          })
-          .join('')}
+            })
+            .join('')}
             </div>
 
             <a href="${data.physicalReports[0]}" target="_blank" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">

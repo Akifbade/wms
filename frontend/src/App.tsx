@@ -28,6 +28,7 @@ import MaterialsHub from './pages/Materials/MaterialsHub';
 import { DamageReport } from './components/reports/DamageReport';
 import { DebugLogin } from './pages/DebugLogin';
 import BackupManagement from './pages/BackupManagement/BackupManagement';
+import RoleManagement from './pages/Admin/RoleManagement';
 import SystemMonitorEnhanced from './pages/Admin/SystemMonitorEnhanced';
 import CompanyAnalytics from './pages/Analytics/CompanyAnalytics';
 
@@ -180,6 +181,11 @@ function App() {
               } />
 
               {/* ADMIN Only Routes */}
+              <Route path="admin/role-management" element={
+                <ProtectedRoute allowedRoles={['ADMIN']}>
+                  <RoleManagement />
+                </ProtectedRoute>
+              } />
               <Route path="settings" element={
                 <ProtectedRoute allowedRoles={['ADMIN']}>
                   <Settings />

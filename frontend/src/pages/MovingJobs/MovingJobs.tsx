@@ -65,7 +65,7 @@ export const MovingJobs: React.FC = () => {
         };
         params.status = statusMap[filterStatus] || filterStatus.toUpperCase();
       }
-      
+
       const data = await jobsAPI.getAll(params);
       setJobs(data.jobs || []);
     } catch (err) {
@@ -85,7 +85,7 @@ export const MovingJobs: React.FC = () => {
       'COMPLETED': 'bg-green-100 text-green-800 border-green-200',
       'CANCELLED': 'bg-red-100 text-red-800 border-red-200',
     };
-    
+
     const labels: Record<string, string> = {
       'SCHEDULED': 'Scheduled',
       'PLANNED': 'Planned',
@@ -111,7 +111,7 @@ export const MovingJobs: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Moving Jobs</h1>
           <p className="text-sm text-gray-500">Manage your moving operations</p>
         </div>
-        <button 
+        <button
           onClick={() => setCreateModalOpen(true)}
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
         >
@@ -141,11 +141,10 @@ export const MovingJobs: React.FC = () => {
           <button
             key={status}
             onClick={() => setFilterStatus(status)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors border ${
-              filterStatus === status
+            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors border ${filterStatus === status
                 ? 'bg-gray-900 text-white border-gray-900'
                 : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-            }`}
+              }`}
           >
             {status.charAt(0).toUpperCase() + status.slice(1)}
           </button>
@@ -163,18 +162,17 @@ export const MovingJobs: React.FC = () => {
             const latestApproval = job.approvals?.[0];
             const isRejected = latestApproval?.status === 'REJECTED';
             const isPending = job.status === 'PENDING_APPROVAL';
-            
+
             // Get physical report files
             const physicalReports = job.materialReturns
               ?.filter((mr: any) => mr.physicalReportUrl)
               .map((mr: any) => mr.physicalReportUrl) || [];
 
             return (
-              <div 
-                key={job.id} 
-                className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow flex flex-col relative group ${
-                  isRejected ? 'border-red-300 ring-1 ring-red-100' : 'border-gray-200'
-                }`}
+              <div
+                key={job.id}
+                className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow flex flex-col relative group ${isRejected ? 'border-red-300 ring-1 ring-red-100' : 'border-gray-200'
+                  }`}
               >
                 {/* Delete Button - Absolute Top Right */}
                 <button
@@ -245,8 +243,8 @@ export const MovingJobs: React.FC = () => {
                   <div className="flex items-center gap-2 text-sm text-gray-700">
                     <CalendarIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
                     <span>
-                      {job.jobDate ? new Date(job.jobDate).toLocaleDateString('en-US', { 
-                        month: 'short', day: 'numeric', year: 'numeric' 
+                      {job.jobDate ? new Date(job.jobDate).toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', year: 'numeric'
                       }) : 'No Date'}
                     </span>
                   </div>
@@ -280,7 +278,7 @@ export const MovingJobs: React.FC = () => {
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {physicalReports.map((url: string, idx: number) => (
-                          <a 
+                          <a
                             key={idx}
                             href={url}
                             target="_blank"
@@ -340,11 +338,10 @@ export const MovingJobs: React.FC = () => {
                   {(!isPending && !job.status.includes('COMPLETED')) && (
                     <button
                       onClick={() => { setSelectedJob(job); setReturnModalOpen(true); }}
-                      className={`col-span-4 mt-1 py-2 px-3 rounded-md text-xs font-bold text-white shadow-sm flex items-center justify-center gap-2 transition-colors ${
-                        isRejected 
-                          ? 'bg-red-600 hover:bg-red-700' 
+                      className={`col-span-4 mt-1 py-2 px-3 rounded-md text-xs font-bold text-white shadow-sm flex items-center justify-center gap-2 transition-colors ${isRejected
+                          ? 'bg-red-600 hover:bg-red-700'
                           : 'bg-gray-900 hover:bg-gray-800'
-                      }`}
+                        }`}
                     >
                       {isRejected ? (
                         <>

@@ -1,14 +1,15 @@
 # 📦 WMS Version History
 
-## Current Version: **v2.2.88**
-- **Released**: Jan 15, 2025 at 12:30:00
+## Current Version: **v2.3.1**
+- **Released**: Dec 22, 2025 at 09:57:26
 - **Author**: akifbade46-del
 - **Status**: Production
 
-### Changes in v2.2.88:
-- 🔧 Fix: Job link from Material Report now opens job properly
-- 📦 Fix: CBM recalculates when editing old shipment dimensions
-- 🔢 Fix: Auto-version now syncs VERSION.md + version.ts together
+### Changes in v2.3.0:
+- 🧹 Workspace cleanup: Removed 50+ unnecessary files
+- 📦 Optimized workspace size to 0.84 GB
+- 💾 Added automatic memory persistence for session context
+- 🔢 Fixed version sync between version.ts and VERSION.md
 
 ### Changes in v2.2.87:
 - 🔧 Fix: Job click in Material Report opens job instead of scanner
@@ -47,3 +48,4 @@
 ---
 
 ## Version History
+

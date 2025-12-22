@@ -1438,7 +1438,7 @@ router.patch("/approvals/:approvalId", authenticateToken as any, async (req: Aut
             totalAmount: (job as any).totalCost || totals.totalCost || 0,
             currency: company?.currency || 'KWD',
             companyName: company?.name || 'WMS',
-            approvedBy: req.user?.name || 'Manager',
+            approvedBy: req.user?.name || req.user?.email || 'Unknown Approver',
             approvalNotes: notes || '',
             materials,
             totals,
@@ -1468,7 +1468,7 @@ router.patch("/approvals/:approvalId", authenticateToken as any, async (req: Aut
             materials,
             totals,
             rejectedAt: new Date().toISOString(),
-            rejectedBy: req.user?.name || 'Unknown',
+            rejectedBy: req.user?.name || req.user?.email || 'Unknown User',
             rejectionReason: notes || 'No reason provided'
           });
 
@@ -1491,7 +1491,7 @@ router.patch("/approvals/:approvalId", authenticateToken as any, async (req: Aut
           await sendNotification(companyId, 'JOB_COMPLETION_REJECTED', {
             jobCode: job.jobCode,
             customerName: job.clientName,
-            rejectedBy: req.user?.name || 'Manager',
+            rejectedBy: req.user?.name || req.user?.email || 'Unknown Rejector',
             rejectedAt: approval.decidedAt ? new Date(approval.decidedAt).toLocaleString() : new Date().toLocaleString(),
             rejectionReason: notes || 'No reason provided',
             companyName: company?.name || 'WMS',

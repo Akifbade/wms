@@ -4,14 +4,13 @@
 # This script syncs version across:
 # - frontend/src/config/version.ts
 # - VERSION.md
-# - backend version endpoint
 
 $versionFile = "frontend/src/config/version.ts"
 $versionMd = "VERSION.md"
 $content = Get-Content $versionFile -Raw
 
 # Extract current version from version.ts
-$pattern = 'export\s+const\s+APP_VERSION\s*=\s*[\"\'']v?(\d+)\.(\d+)\.(\d+)[\"\'']\s*;'
+$pattern = "export\s+const\s+APP_VERSION\s*=\s*['`"]v?(\d+)\.(\d+)\.(\d+)['`"]\s*;"
 
 if ($content -match $pattern) {
     $major = [int]$Matches[1]
@@ -46,7 +45,7 @@ if ($content -match $pattern) {
     # Git commit
     try {
         git add $versionFile $versionMd
-        git commit -m "🔢 Version $newVersionWithV" -q
+        git commit -m "Version $newVersionWithV" -q
         Write-Host " Git commit successful" -ForegroundColor Green
     } catch {
         Write-Host " Git commit skipped" -ForegroundColor Yellow

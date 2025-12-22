@@ -114,6 +114,37 @@ plink -batch -pw Qgocargo@123 root@148.230.107.155 "docker exec wms-database mys
 
 ---
 
-## 📖 For Full Context
+## � PERMISSION SYSTEM (CRITICAL)
+
+### ⚠️ USE THIS - NOT OLD CODE:
+```
+✅ CURRENT: frontend/src/pages/Admin/RoleManagement.tsx (154 granular permissions)
+❌ OLD (ARCHIVED): frontend/src/removed-features/old-user-management/
+```
+
+### 📚 Documentation:
+- **Architecture:** `backend/PERMISSION_SYSTEM.md` (READ THIS FIRST)
+- **Seeder:** `backend/prisma/seed-permissions-granular.ts`
+- **Routes:** `backend/src/routes/permissions.ts`
+
+### Key Points:
+- 154 permissions across 47 resources
+- ADMIN: 154, MANAGER: 113, WORKER: 32
+- Database-driven (NOT hardcoded role checks)
+- Access: Sidebar → "Role Management" OR Settings → "User Management" (redirects)
+
+### ❌ NEVER DO:
+```typescript
+if (user.role === 'ADMIN') { ... }  // ❌ Wrong
+```
+
+### ✅ ALWAYS DO:
+```typescript
+checkPermission('RESOURCE', 'ACTION')  // ✅ Correct
+```
+
+---
+
+## �📖 For Full Context
 
 Read `.vscode/AI-PROJECT-CONTEXT.md` for complete project documentation.

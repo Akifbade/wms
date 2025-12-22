@@ -118,7 +118,7 @@ export const Settings: React.FC = () => {
   }, [location.pathname]);
 
   const handleSectionClick = (id: string) => {
-    setActiveSection(id);
+
     if (id === 'company') {
       navigate('/settings');
     } else {

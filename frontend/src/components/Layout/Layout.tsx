@@ -18,7 +18,8 @@ import {
   ExclamationTriangleIcon,
   ServerStackIcon,
   BuildingOfficeIcon,
-  CpuChipIcon
+  CpuChipIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 import { VersionBadgeHeader } from '../VersionBadgeHeader';
 import MobileNav from './MobileNav';
@@ -240,8 +241,8 @@ export const Layout: React.FC = () => {
         </main>
 
         {/* Mobile Bottom Navigation */}
-        <MobileNav 
-          onMenuClick={() => setSidebarOpen(true)} 
+        <MobileNav
+          onMenuClick={() => setSidebarOpen(true)}
           userRole={currentUser?.role}
         />
       </div>

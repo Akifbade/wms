@@ -393,7 +393,7 @@ export const Shipments: React.FC = () => {
                   <ArrowRightOnRectangleIcon className="h-4 md:h-5 w-4 md:w-5" />
                 </button>
               )}
-              <button onClick={() => navigate(`/shipment/${shipment.id}`)} className="p-1 md:p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Report">
+              <button onClick={() => window.open(`/shipment-report/${shipment.id}`, '_blank')} className="p-1 md:p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Report">
                 <DocumentTextIcon className="h-4 md:h-5 w-4 md:w-5" />
               </button>
               <button onClick={() => handleDelete(shipment.id)} className="p-1 md:p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">

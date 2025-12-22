@@ -1,9 +1,9 @@
 {
   "version": "v2.3.0",
-  "buildDate": "Dec 18, 2025",
-  "buildTime": "08:06:55",
-  "commit": "247c22c1a",
-  "commitMessage": "fix: email template syntax crash",
+  "buildDate": "Dec 22, 2025",
+  "buildTime": "09:31:29",
+  "commit": "d80036825",
+  "commitMessage": "feat: redesign moving jobs ui",
   "author": "akifbade46-del",
   "environment": "local"
 }

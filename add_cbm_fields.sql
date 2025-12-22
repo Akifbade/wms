@@ -1,3 +1,0 @@
-ALTER TABLE company_profiles ADD COLUMN cbmRatePerDay DOUBLE NOT NULL DEFAULT 0.5;
-ALTER TABLE company_profiles ADD COLUMN freeStorageDays INT NOT NULL DEFAULT 0;
-ALTER TABLE company_profiles ADD COLUMN minimumCharge DOUBLE NOT NULL DEFAULT 0;

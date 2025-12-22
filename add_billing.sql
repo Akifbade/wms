@@ -1,1 +1,0 @@
-ALTER TABLE company_profiles ADD COLUMN billingType VARCHAR(50) NOT NULL DEFAULT 'PER_CBM';
