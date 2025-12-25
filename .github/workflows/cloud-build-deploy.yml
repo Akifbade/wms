@@ -66,24 +66,6 @@ jobs:
             NODE_ENV=production
           no-cache: true
 
-      # Save images as tar files to transfer to VPS
-      - name: Save Docker images
-        run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
-          docker save ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest | gzip > backend.tar.gz
-          docker save ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest | gzip > frontend.tar.gz
-          ls -lh *.tar.gz
-
-      - name: Copy images to VPS
-        uses: appleboy/scp-action@master
-        with:
-          host: 148.230.107.155
-          username: root
-          password: ${{ secrets.VPS_PASSWORD }}
-          source: "backend.tar.gz,frontend.tar.gz"
-          target: "/root/"
-
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -100,7 +82,7 @@ jobs:
             echo "✅ VPS_PASSWORD is set"
           fi
 
-      - name: Deploy to VPS
+      - name: Deploy to VPS (PULL from GHCR)
         uses: appleboy/ssh-action@master
         timeout-minutes: 12
         with:
@@ -117,17 +99,12 @@ jobs:
             git fetch origin stable/prisma-mysql-production
             git reset --hard origin/stable/prisma-mysql-production
             
-            # 2. Load images from transferred tar files
-            echo "📦 Loading Docker images from tar files..."
-            docker rmi ghcr.io/akifbade/wms-backend:latest 2>/dev/null || true
-            docker rmi ghcr.io/akifbade/wms-frontend:latest 2>/dev/null || true
+            # 2. Pull images from GHCR (no SSH transfer needed!)
+            echo "📦 Pulling Docker images from GitHub Container Registry..."
+            docker pull ghcr.io/akifbade/wms-backend:latest
+            docker pull ghcr.io/akifbade/wms-frontend:latest
             
-            gunzip -c /root/backend.tar.gz | docker load
-            gunzip -c /root/frontend.tar.gz | docker load
-            
-            rm -f /root/backend.tar.gz /root/frontend.tar.gz
-            
-            echo "✅ Images loaded:"
+            echo "✅ Images pulled:"
             docker images | grep wms
             
             # 3. Run Deployment Script
