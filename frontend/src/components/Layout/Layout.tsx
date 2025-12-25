@@ -202,7 +202,8 @@ export const Layout: React.FC = () => {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top header - Glass Effect */}
         <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 z-30 shadow-sm">
-          <div className="flex items-center justify-between h-14 px-6">
+          <div className="flex items-center justify-between h-14 px-4 md:px-6">
+            {/* Mobile: Menu button */}
             <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden text-slate-600 hover:text-slate-900 p-2 rounded-xl hover:bg-slate-100 transition-colors"
@@ -210,7 +211,15 @@ export const Layout: React.FC = () => {
               <Bars3Icon className="h-6 w-6" />
             </button>
 
-            <div className="flex-1 flex items-center justify-end space-x-3">
+            <div className="flex-1 flex items-center justify-end space-x-2 md:space-x-3">
+              {/* Mobile: Logout button (visible on mobile only) */}
+              <button
+                onClick={handleLogout}
+                className="lg:hidden flex items-center space-x-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-all duration-200 touch-target active:scale-95"
+              >
+                <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                <span className="text-sm font-semibold">Logout</span>
+              </button>
               {/* Version badge */}
               <VersionBadgeHeader />
 

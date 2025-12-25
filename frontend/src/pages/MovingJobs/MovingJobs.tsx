@@ -231,14 +231,20 @@ export const MovingJobs: React.FC = () => {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1.5">
                             <p className="text-xs font-bold text-red-800">REJECTED</p>
-                            {latestApproval?.decidedBy && (
+                            {latestApproval?.decisionBy && (
                               <span className="text-xs text-red-600 font-semibold">
-                                by {latestApproval.decidedBy.name || latestApproval.decidedBy.email || 'Manager'}
+                                by {latestApproval.decisionBy.name || latestApproval.decisionBy.email || 'Manager'}
                               </span>
                             )}
                             {latestApproval?.decidedAt && (
                               <span className="text-xs text-red-500">
-                                • {new Date(latestApproval.decidedAt).toLocaleDateString()}
+                                • {new Date(latestApproval.decidedAt).toLocaleString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
                               </span>
                             )}
                           </div>
@@ -306,6 +312,62 @@ export const MovingJobs: React.FC = () => {
                                 </p>
                               );
                             }
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Approval Info (for approved/completed jobs) */}
+                  {!isRejected && latestApproval?.status === 'APPROVED' && (
+                    <div className="mt-2 bg-green-50 border border-green-100 rounded-md p-2.5">
+                      <div className="flex gap-2">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs font-bold text-green-800">APPROVED</p>
+                            {latestApproval?.decisionBy && (
+                              <span className="text-xs text-green-700 font-semibold">
+                                by {latestApproval.decisionBy.name || latestApproval.decisionBy.email || 'Manager'}
+                              </span>
+                            )}
+                            {latestApproval?.decidedAt && (
+                              <span className="text-xs text-green-600">
+                                • {new Date(latestApproval.decidedAt).toLocaleString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* Show approval notes if any */}
+                          {(() => {
+                            try {
+                              const parsed = JSON.parse(latestApproval?.decisionNotes || '{}');
+                              if (parsed.notes) {
+                                return (
+                                  <p className="text-xs text-green-700 mt-1.5 whitespace-pre-wrap break-words">
+                                    {parsed.notes}
+                                  </p>
+                                );
+                              }
+                            } catch (e) {
+                              // If JSON parse fails and there are notes, show them
+                              if (latestApproval?.decisionNotes) {
+                                return (
+                                  <p className="text-xs text-green-700 mt-1.5 whitespace-pre-wrap break-words">
+                                    {latestApproval.decisionNotes}
+                                  </p>
+                                );
+                              }
+                            }
+                            return null;
                           })()}
                         </div>
                       </div>

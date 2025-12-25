@@ -1,9 +1,9 @@
 {
   "version": "v2.3.1",
-  "buildDate": "Dec 22, 2025",
-  "buildTime": "15:36:57",
-  "commit": "25e3a22cb",
-  "commitMessage": "feat: Mobile-first responsive UI with smooth animations",
+  "buildDate": "Dec 25, 2025",
+  "buildTime": "09:21:07",
+  "commit": "fefcaf3ef",
+  "commitMessage": "fix: User names in rejection emails + database schema",
   "author": "akifbade46-del",
   "environment": "local"
 }

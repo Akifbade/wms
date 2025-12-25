@@ -359,13 +359,134 @@ const MaterialReports: React.FC = () => {
   const printStatement = () => window.print();
 
   return (
-    <div className="p-6 max-w-7xl mx-auto print:p-0 print:max-w-none">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6 print:hidden">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">📦 Material Stock Statement</h1>
-          <p className="text-gray-500 mt-1">Complete stock movement report with opening & closing balances</p>
-        </div>
+    <>
+      {/* Professional Print Styles */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4 landscape;
+            margin: 15mm;
+          }
+          
+          /* NUCLEAR OPTION: HIDE EVERYTHING */
+          * {
+            visibility: hidden !important;
+          }
+          
+          /* ONLY show print container and its children */
+          .print-only-report,
+          .print-only-report * {
+            visibility: visible !important;
+          }
+          
+          .print-only-report {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+          }
+          
+          body {
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+            background: white !important;
+            margin: 0;
+            padding: 0;
+          }
+          
+          /* Print Header with Logo */
+          .print-header {
+            display: flex !important;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid #1e40af;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+          }
+          
+          .print-logo {
+            max-width: 180px;
+            max-height: 80px;
+          }
+          
+          .print-company-info {
+            text-align: right;
+          }
+          
+          .print-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 5px;
+          }
+          
+          .print-period {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+            text-align: center;
+          }
+          
+          /* Table Styles */
+          .print-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+          }
+          
+          .print-table th {
+            background-color: #1e40af !important;
+            color: white !important;
+            padding: 8px 4px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #ddd;
+          }
+          
+          .print-table td {
+            padding: 6px 4px;
+            border: 1px solid #ddd;
+          }
+          
+          .print-table tbody tr:nth-child(even) {
+            background-color: #f9fafb !important;
+          }
+          
+          .print-table tfoot {
+            background-color: #1f2937 !important;
+            color: white !important;
+            font-weight: bold;
+          }
+          
+          /* Footer */
+          .print-footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 9px;
+            color: #666;
+            padding: 10px;
+            border-top: 1px solid #ddd;
+          }
+          
+          /* Ensure colors print */
+          .bg-blue-50 { background-color: #eff6ff !important; }
+          .bg-green-50 { background-color: #f0fdf4 !important; }
+          .bg-purple-50 { background-color: #faf5ff !important; }
+          .bg-red-50 { background-color: #fef2f2 !important; }
+          .text-blue-700 { color: #1d4ed8 !important; }
+          .text-green-600 { color: #16a34a !important; }
+          .text-purple-600 { color: #9333ea !important; }
+          .text-red-600 { color: #dc2626 !important; }
+        }
+      `}</style>
+      
+      <div className="p-6 max-w-7xl mx-auto print:p-0 print:max-w-none material-reports-print-container">
+        {/* Screen Header */}
+        <div className="flex justify-between items-center mb-6 print:hidden">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">📦 Material Stock Statement</h1>
+            <p className="text-gray-500 mt-1">Complete stock movement report with opening & closing balances</p>
+          </div>
         <div className="flex gap-2">
           <button
             onClick={exportToPDF}
@@ -607,19 +728,57 @@ const MaterialReports: React.FC = () => {
           {/* SUMMARY VIEW - Stock Statement Table */}
           {!loading && statements.length > 0 && viewMode === 'summary' && (
             <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4">
-                <h2 className="text-xl font-bold">Stock Statement</h2>
-                <p className="text-blue-100 text-sm">Period: {formatDate(dateRange.start)} to {formatDate(dateRange.end)}</p>
-              </div>
+              {/* Print-Only Professional Report Container */}
+              <div className="print-only-report">
+                {/* Print-Only Professional Header */}
+                <div className="hidden print:block print-header">
+                  <div>
+                    <img 
+                      src="http://qgocargo.com/logo.png" 
+                      alt="Company Logo" 
+                      className="print-logo"
+                    />
+                  </div>
+                  <div className="print-company-info">
+                    <div className="print-title">MATERIAL STOCK STATEMENT</div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>
+                      QGO Cargo & Warehouse Management
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#888', marginTop: '5px' }}>
+                      Tel: +965 XXXX XXXX | Email: info@qgocargo.com
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Print Period */}
+                <div className="hidden print:block print-period">
+                  <strong>Report Period:</strong> {formatDate(dateRange.start)} to {formatDate(dateRange.end)}
+                  <br />
+                  <strong>Generated:</strong> {new Date().toLocaleString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </div>
+                
+                {/* Screen Header (Hidden in Print) */}
+                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 print:hidden">
+                  <h2 className="text-xl font-bold">Stock Statement</h2>
+                  <p className="text-blue-100 text-sm">Period: {formatDate(dateRange.start)} to {formatDate(dateRange.end)}</p>
+                </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full">
+                <table className="min-w-full print-table">
                   <thead className="bg-gray-100">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Material</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SKU</th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-100">📦 Current Stock</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-100">
+                        <span className="print:hidden">📦 </span>Current Stock
+                      </th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50">+ Purchased</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50">- Consumed</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50">+ Returned</th>
@@ -633,10 +792,10 @@ const MaterialReports: React.FC = () => {
                     {statements.map((stmt) => (
                       <tr key={stmt.material.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
-                          <Link to={`/materials/${stmt.material.id}`} className="text-blue-600 hover:underline font-medium">
+                          <Link to={`/materials/${stmt.material.id}`} className="text-blue-600 hover:underline font-medium print:text-black print:no-underline">
                             {stmt.material.name}
                           </Link>
-                          <p className="text-xs text-gray-500">{stmt.material.category}</p>
+                          <p className="text-xs text-gray-500 print:inline print:ml-1">({stmt.material.category})</p>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">{stmt.material.sku}</td>
                         <td className="px-4 py-3 text-center text-sm text-gray-600">{stmt.material.unit}</td>
@@ -688,6 +847,13 @@ const MaterialReports: React.FC = () => {
                   )}
                 </table>
               </div>
+              
+              {/* Print Footer */}
+              <div className="hidden print:block print-footer">
+                <strong>QGO Cargo Kuwait</strong> | Warehouse Storage, Customs Clearance, Import Export & International Moving
+              </div>
+              </div>
+              {/* End print-only-report wrapper */}
 
               {/* Legend */}
               <div className="px-6 py-4 bg-gray-50 border-t flex gap-6 text-sm print:hidden">
@@ -927,7 +1093,23 @@ const MaterialReports: React.FC = () => {
           )}
         </>
       )}
+      
+      {/* Print-Only Footer */}
+      <div className="hidden print:block print-footer">
+        <div>
+          <strong>QGO Cargo & Warehouse Management System</strong>
+          <br />
+          Generated on {new Date().toLocaleString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })} | This is a system-generated report
+        </div>
+      </div>
     </div>
+    </>
   );
 };
 
