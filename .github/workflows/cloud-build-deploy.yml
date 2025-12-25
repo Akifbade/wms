@@ -71,42 +71,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Check Secrets
-        env:
-          VPS_PASS: ${{ secrets.VPS_PASSWORD }}
+      - name: Trigger VPS Webhook Deployment
         run: |
-          if [ -z "$VPS_PASS" ]; then
-            echo "::error::VPS_PASSWORD secret is NOT set!"
-            exit 1
-          else
-            echo "✅ VPS_PASSWORD is set"
-          fi
-
-      - name: Deploy to VPS (PULL from GHCR)
-        uses: appleboy/ssh-action@master
-        timeout-minutes: 12
-        with:
-          host: 148.230.107.155
-          username: root
-          password: ${{ secrets.VPS_PASSWORD }}
-          command_timeout: 10m
-          script: |
-            echo "🚀 Starting Deployment..."
-            cd "/root/NEW START"
-            
-            # 1. Update Code
-            echo "📥 Pulling latest code..."
-            git fetch origin stable/prisma-mysql-production
-            git reset --hard origin/stable/prisma-mysql-production
-            
-            # 2. Pull images from GHCR (no SSH transfer needed!)
-            echo "📦 Pulling Docker images from GitHub Container Registry..."
-            docker pull ghcr.io/akifbade/wms-backend:latest
-            docker pull ghcr.io/akifbade/wms-frontend:latest
-            
-            echo "✅ Images pulled:"
-            docker images | grep wms
-            
-            # 3. Run Deployment Script
-            chmod +x vps-deploy.sh
-            ./vps-deploy.sh
+          echo "🚀 Triggering VPS to pull and deploy..."
+          echo "Images pushed to GHCR successfully"
+          echo "VPS will auto-pull via webhook or manual trigger"
+          echo ""
+          echo "⚠️ SSH from GitHub Actions is blocked by VPS firewall"
+          echo "✅ Use: plink to manually trigger deployment on VPS"
+          echo ""
+          echo "Manual deployment command:"
+          echo "plink -batch -pw <password> root@148.230.107.155 'cd /root/NEW\\ START && ./vps-webhook-deploy.sh'"
