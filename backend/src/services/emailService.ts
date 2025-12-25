@@ -63,7 +63,14 @@ export type NotificationType =
   // Reports
   | 'DAILY_SUMMARY'
   | 'WEEKLY_REPORT'
-  | 'CUSTOM';
+  | 'CUSTOM'
+  // Backup & System
+  | 'BACKUP_CREATED'
+  | 'BACKUP_FAILED'
+  | 'BACKUP_AUTO_COMPLETED'
+  | 'BACKUP_RETENTION_CLEANUP'
+  | 'BACKUP_LIMIT_WARNING'
+  | 'BACKUP_GIT_SYNC';
 
 // Create transporter based on company email settings
 const createTransporter = (config: EmailConfig) => {
@@ -1396,6 +1403,188 @@ export const emailTemplates = {
       </div>
     `,
   }),
+
+  // ============================================
+  // BACKUP & SYSTEM TEMPLATES
+  // ============================================
+
+  // Backup Created
+  backupCreated: (data: {
+    backupType: string;
+    backupSize: string;
+    backupFile: string;
+    createdAt: string;
+    companyName: string;
+  }) => ({
+    subject: `✅ Backup Created Successfully - ${data.backupFile}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0;">✅ Backup Created Successfully</h1>
+        </div>
+        <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+          <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <strong style="font-size: 18px;">🔒 ${data.backupType} Backup Created</strong>
+          </div>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Backup File:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; font-family: monospace; font-size: 12px;">${data.backupFile}</td></tr>
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Size:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">${data.backupSize}</td></tr>
+            <tr><td style="padding: 10px 0;"><strong>Created At:</strong></td><td style="padding: 10px 0;">${data.createdAt}</td></tr>
+          </table>
+          <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; margin-top: 20px;">
+            <strong>💡 Recommendation:</strong> Download this backup to external storage for extra safety.
+          </div>
+          <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">This is an automated notification from ${data.companyName}.</p>
+        </div>
+      </div>
+    `,
+  }),
+
+  // Auto Backup Completed
+  backupAutoCompleted: (data: {
+    backupType: string;
+    backupSize: string;
+    backupFile: string;
+    createdAt: string;
+    retentionDays: number;
+    maxBackups: number;
+    cleanedUp: number;
+    nextBackup: string;
+    companyName: string;
+  }) => ({
+    subject: `🤖 Auto Backup Completed - ${data.backupType}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0;">🤖 Automatic Backup Completed</h1>
+        </div>
+        <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+          <div style="background: #ede9fe; border: 1px solid #8b5cf6; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <strong style="font-size: 18px;">✅ Scheduled Backup Success</strong>
+          </div>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Backup Type:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">${data.backupType}</td></tr>
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>File:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; font-family: monospace; font-size: 11px;">${data.backupFile}</td></tr>
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Size:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">${data.backupSize}</td></tr>
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Completed At:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">${data.createdAt}</td></tr>
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Old Backups Cleaned:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">${data.cleanedUp} files</td></tr>
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Retention Policy:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">${data.retentionDays} days / ${data.maxBackups} backups max</td></tr>
+            <tr><td style="padding: 10px 0;"><strong>Next Backup:</strong></td><td style="padding: 10px 0; color: #8b5cf6;"><strong>${data.nextBackup}</strong></td></tr>
+          </table>
+          <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">This is an automated notification from ${data.companyName}.</p>
+        </div>
+      </div>
+    `,
+  }),
+
+  // Backup Failed
+  backupFailed: (data: {
+    companyName: string;
+    failedAt: string;
+    error: string;
+    nextAttempt: string;
+  }) => ({
+    subject: `❌ Backup Failed - Action Required`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0;">❌ Backup Failed</h1>
+        </div>
+        <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+          <div style="background: #fee2e2; border: 1px solid #ef4444; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <strong>⚠️ Backup creation failed - immediate attention required!</strong>
+          </div>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Failed At:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">${data.failedAt}</td></tr>
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Error:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; color: #dc2626;">${data.error}</td></tr>
+            <tr><td style="padding: 10px 0;"><strong>Next Attempt:</strong></td><td style="padding: 10px 0;">${data.nextAttempt}</td></tr>
+          </table>
+          <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; margin-top: 20px;">
+            <strong>📋 Recommended Actions:</strong>
+            <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+              <li>Check backup directory permissions</li>
+              <li>Verify database connectivity</li>
+              <li>Check available disk space</li>
+              <li>Review system logs for details</li>
+              <li>Test manual backup creation</li>
+            </ul>
+          </div>
+          <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">This is an automated notification from ${data.companyName}.</p>
+        </div>
+      </div>
+    `,
+  }),
+
+  // Backup Retention Cleanup
+  backupRetentionCleanup: (data: {
+    deletedCount: number;
+    deletedFiles: string[];
+    retentionDays: number;
+    maxBackups: number;
+    cleanedAt: string;
+    directory: string;
+  }) => ({
+    subject: `🗑️ Backup Cleanup Completed - ${data.deletedCount} Old Backups Removed`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0;">🗑️ Backup Retention Cleanup</h1>
+        </div>
+        <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+          <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <strong>Deleted ${data.deletedCount} old backup(s) based on retention policy</strong>
+          </div>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Directory:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">${data.directory}</td></tr>
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Retention Days:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">${data.retentionDays} days</td></tr>
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Max Backups:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">${data.maxBackups}</td></tr>
+            <tr><td style="padding: 10px 0;"><strong>Cleaned At:</strong></td><td style="padding: 10px 0;">${data.cleanedAt}</td></tr>
+          </table>
+          ${data.deletedFiles.length > 0 ? `
+            <div style="margin-top: 20px;">
+              <strong>Deleted Files:</strong>
+              <ul style="font-family: monospace; font-size: 11px; color: #6b7280; margin: 10px 0; padding-left: 20px;">
+                ${data.deletedFiles.map(f => `<li>${f}</li>`).join('')}
+                ${data.deletedCount > data.deletedFiles.length ? `<li>...and ${data.deletedCount - data.deletedFiles.length} more</li>` : ''}
+              </ul>
+            </div>
+          ` : ''}
+          <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">This is an automated maintenance notification.</p>
+        </div>
+      </div>
+    `,
+  }),
+
+  // Git Backup Sync
+  backupGitSync: (data: {
+    backupFile: string;
+    syncedAt: string;
+    repository: string;
+    companyName: string;
+  }) => ({
+    subject: `🔄 Backup Synced to Git - ${data.backupFile}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0;">🔄 Git Backup Sync</h1>
+        </div>
+        <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+          <div style="background: #e0e7ff; border: 1px solid #6366f1; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <strong>✅ Backup successfully committed to Git repository</strong>
+          </div>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Backup File:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; font-family: monospace; font-size: 12px;">${data.backupFile}</td></tr>
+            <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><strong>Repository:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; font-family: monospace; font-size: 11px;">${data.repository}</td></tr>
+            <tr><td style="padding: 10px 0;"><strong>Synced At:</strong></td><td style="padding: 10px 0;">${data.syncedAt}</td></tr>
+          </table>
+          <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 8px; padding: 15px; margin-top: 20px;">
+            <strong>✅ Your data is now version-controlled and safely stored in Git</strong>
+          </div>
+          <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">This is an automated notification from ${data.companyName}.</p>
+        </div>
+      </div>
+    `,
+  }),
 };
 
 // ============================================
@@ -1496,6 +1685,23 @@ export const sendNotification = async (
       case 'DAILY_SUMMARY':
       case 'WEEKLY_REPORT':
         template = emailTemplates.custom(templateData);
+        break;
+
+      // Backup & System
+      case 'BACKUP_CREATED':
+        template = emailTemplates.backupCreated(templateData);
+        break;
+      case 'BACKUP_AUTO_COMPLETED':
+        template = emailTemplates.backupAutoCompleted(templateData);
+        break;
+      case 'BACKUP_FAILED':
+        template = emailTemplates.backupFailed(templateData);
+        break;
+      case 'BACKUP_RETENTION_CLEANUP':
+        template = emailTemplates.backupRetentionCleanup(templateData);
+        break;
+      case 'BACKUP_GIT_SYNC':
+        template = emailTemplates.backupGitSync(templateData);
         break;
 
       case 'CUSTOM':

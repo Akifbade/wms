@@ -7,6 +7,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import archiver from 'archiver';
 import { createWriteStream } from 'fs';
+import { sendNotification } from '../services/emailService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -351,6 +352,19 @@ router.post('/create', authenticateToken, authorizeRoles('ADMIN'), async (req, r
         // 8. Cleanup old backups
         await cleanupOldBackups();
 
+        // 9. Send success notification
+        try {
+            await sendNotification(req.user!.companyId, 'BACKUP_CREATED', {
+                backupType: 'Manual Backup',
+                backupSize: `${(stats.size / 1024 / 1024).toFixed(2)} MB`,
+                backupFile: `${name}.zip`,
+                createdAt: new Date().toLocaleString(),
+                companyName: (await prisma.company.findUnique({ where: { id: req.user!.companyId } }))?.name || 'WMS'
+            });
+        } catch (emailErr) {
+            console.error('Email notification error:', emailErr);
+        }
+
         res.json({
             success: true,
             message: 'Backup created successfully',
@@ -364,6 +378,19 @@ router.post('/create', authenticateToken, authorizeRoles('ADMIN'), async (req, r
         });
     } catch (error: any) {
         console.error('Create backup error:', error);
+        
+        // Send failure notification
+        try {
+            await sendNotification(req.user!.companyId, 'BACKUP_FAILED', {
+                companyName: (await prisma.company.findUnique({ where: { id: req.user!.companyId } }))?.name || 'WMS',
+                failedAt: new Date().toLocaleString(),
+                error: error.message || 'Unknown error',
+                nextAttempt: 'Manual retry required'
+            });
+        } catch (emailErr) {
+            console.error('Email notification error:', emailErr);
+        }
+
         res.status(500).json({
             success: false,
             error: error.message,
@@ -580,6 +607,223 @@ async function cleanupOldBackups() {
         console.error('Cleanup error:', error);
     }
 }
+
+/**
+ * POST /api/backups/git-sync
+ * Sync backup to Git repository (advanced feature)
+ */
+router.post('/git-sync', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+    try {
+        const { companyId } = req.user!;
+        const { backupName, gitRepoUrl, commitMessage } = req.body;
+
+        if (!backupName) {
+            return res.status(400).json({ error: 'Backup name is required' });
+        }
+
+        // Find backup file
+        const quickPath = path.join(BACKUP_DIR, backupName);
+        const fullPath = path.join(FULL_BACKUP_DIR, backupName);
+        
+        let backupPath: string | null = null;
+        try {
+            await fs.access(quickPath);
+            backupPath = quickPath;
+        } catch {
+            try {
+                await fs.access(fullPath);
+                backupPath = fullPath;
+            } catch {
+                return res.status(404).json({ error: 'Backup file not found' });
+            }
+        }
+
+        const gitBackupDir = 'C:\\WMS_GIT_BACKUPS';
+        await fs.mkdir(gitBackupDir, { recursive: true });
+
+        // Get company name for folder
+        const company = await prisma.company.findUnique({
+            where: { id: companyId },
+            select: { name: true }
+        });
+
+        const companyFolder = company?.name.replace(/\s+/g, '_') || 'WMS';
+        const gitPath = path.join(gitBackupDir, companyFolder);
+        await fs.mkdir(gitPath, { recursive: true });
+
+        // Copy backup to git directory
+        const destPath = path.join(gitPath, backupName);
+        await fs.copyFile(backupPath, destPath);
+
+        // Initialize git if needed
+        try {
+            await execAsync('git status', { cwd: gitPath });
+        } catch {
+            await execAsync('git init', { cwd: gitPath });
+            await execAsync('git config user.email "backup@wms.local"', { cwd: gitPath });
+            await execAsync('git config user.name "WMS Backup System"', { cwd: gitPath });
+            
+            // Add remote if URL provided
+            if (gitRepoUrl) {
+                await execAsync(`git remote add origin "${gitRepoUrl}"`, { cwd: gitPath });
+            }
+        }
+
+        // Commit
+        await execAsync(`git add "${backupName}"`, { cwd: gitPath });
+        const message = commitMessage || `Backup: ${backupName} - ${new Date().toISOString()}`;
+        await execAsync(`git commit -m "${message}"`, { cwd: gitPath });
+
+        // Push if remote exists
+        let pushResult = null;
+        if (gitRepoUrl) {
+            try {
+                const { stdout } = await execAsync('git push origin master', { cwd: gitPath });
+                pushResult = stdout;
+            } catch (pushErr: any) {
+                console.warn('Git push warning:', pushErr.message);
+                pushResult = 'Local commit only - push failed or no remote';
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Backup synced to Git repository',
+            gitPath,
+            backupName,
+            commitMessage: message,
+            pushed: Boolean(pushResult),
+            pushResult
+        });
+    } catch (error: any) {
+        console.error('Git sync error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/backups/test-auto
+ * Manually trigger auto backup for testing
+ */
+router.post('/test-auto', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+    try {
+        const { triggerManualBackupCron } = require('../cron/backupJobs');
+        const { companyId } = req.user!;
+        
+        const result = await triggerManualBackupCron(companyId);
+        
+        res.json({
+            success: result.success,
+            message: result.success ? 'Test backup completed successfully' : 'Test backup failed',
+            ...result
+        });
+    } catch (error: any) {
+        console.error('Test backup error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * GET /api/backups/stats
+ * Get comprehensive backup statistics
+ */
+router.get('/stats', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+    try {
+        const { companyId } = req.user!;
+
+        // Get all backups
+        const quickBackups = await getAllBackups(BACKUP_DIR);
+        const autoBackups = await getAllBackups(path.join(BACKUP_DIR, 'auto'));
+        const fullBackups = await getAllBackups(FULL_BACKUP_DIR);
+
+        const allBackups = [...quickBackups, ...autoBackups, ...fullBackups];
+
+        const stats = {
+            totalBackups: allBackups.length,
+            totalSize: allBackups.reduce((sum, b) => sum + b.size, 0),
+            quickBackups: quickBackups.length,
+            autoBackups: autoBackups.length,
+            fullSystemBackups: fullBackups.length,
+            oldestBackup: allBackups.length > 0 
+                ? new Date(Math.min(...allBackups.map(b => new Date(b.createdAt).getTime())))
+                : null,
+            newestBackup: allBackups.length > 0
+                ? new Date(Math.max(...allBackups.map(b => new Date(b.createdAt).getTime())))
+                : null,
+            avgBackupSize: allBackups.length > 0
+                ? allBackups.reduce((sum, b) => sum + b.size, 0) / allBackups.length
+                : 0,
+            storageUsed: {
+                quick: quickBackups.reduce((sum, b) => sum + b.size, 0),
+                auto: autoBackups.reduce((sum, b) => sum + b.size, 0),
+                full: fullBackups.reduce((sum, b) => sum + b.size, 0)
+            }
+        };
+
+        res.json({ success: true, stats });
+    } catch (error: any) {
+        console.error('Stats error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/backups/restore
+ * Restore database from backup (dangerous operation)
+ */
+router.post('/restore', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+    try {
+        const { backupName, confirmPassword } = req.body;
+
+        // Extra password confirmation for restore
+        if (confirmPassword !== SECRET_PASSWORD) {
+            return res.status(401).json({ error: 'Invalid confirmation password' });
+        }
+
+        if (!backupName) {
+            return res.status(400).json({ error: 'Backup name is required' });
+        }
+
+        // Find backup
+        const quickPath = path.join(BACKUP_DIR, backupName);
+        const autoPath = path.join(BACKUP_DIR, 'auto', backupName);
+        
+        let backupPath: string | null = null;
+        
+        if (backupName.endsWith('.sql')) {
+            // Direct SQL restore
+            try {
+                await fs.access(quickPath);
+                backupPath = quickPath;
+            } catch {
+                try {
+                    await fs.access(autoPath);
+                    backupPath = autoPath;
+                } catch {
+                    return res.status(404).json({ error: 'Backup file not found' });
+                }
+            }
+
+            // Restore database
+            const { stdout, stderr } = await execAsync(
+                `docker exec -i wms-database mysql -u wms_user -pwmspassword123 warehouse_wms < "${backupPath}"`
+            );
+
+            res.json({
+                success: true,
+                message: 'Database restored successfully',
+                backupName,
+                output: stdout,
+                warnings: stderr
+            });
+        } else {
+            res.status(400).json({ error: 'Only .sql backups can be restored directly. Full system backups must be extracted manually.' });
+        }
+    } catch (error: any) {
+        console.error('Restore error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Initialize backup directories on startup
 ensureBackupDirs();

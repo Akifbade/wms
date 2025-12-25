@@ -216,6 +216,14 @@ router.get('/notifications', authMiddleware, async (req: AuthRequest, res: Respo
       // Daily Reports
       { type: 'DAILY_SUMMARY', label: 'Daily Summary Report', description: 'Daily summary of all activities', category: 'Reports' },
       { type: 'WEEKLY_REPORT', label: 'Weekly Report', description: 'Weekly summary report', category: 'Reports' },
+      
+      // Backup & System
+      { type: 'BACKUP_CREATED', label: 'Backup Created', description: 'Manual backup created successfully', category: 'Backup & System' },
+      { type: 'BACKUP_FAILED', label: 'Backup Failed', description: 'Backup creation failed', category: 'Backup & System' },
+      { type: 'BACKUP_AUTO_COMPLETED', label: 'Auto Backup Completed', description: 'Scheduled automatic backup completed', category: 'Backup & System' },
+      { type: 'BACKUP_RETENTION_CLEANUP', label: 'Backup Cleanup', description: 'Old backups deleted due to retention policy', category: 'Backup & System' },
+      { type: 'BACKUP_LIMIT_WARNING', label: 'Backup Limit Warning', description: 'Backup storage limit approaching', category: 'Backup & System' },
+      { type: 'BACKUP_GIT_SYNC', label: 'Git Backup Sync', description: 'Backup synced to Git repository', category: 'Backup & System' },
     ];
 
     // Merge with existing settings

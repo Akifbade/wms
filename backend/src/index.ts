@@ -45,6 +45,7 @@ import systemRoutes from './routes/system'; // NEW: System monitoring
 import financeRoutes from './routes/finance'; // NEW: Finance dashboard
 import emailRoutes from './routes/email'; // NEW: Email notification system
 import { startAllNotificationJobs } from './cron/notificationJobs'; // NEW: Notification cron jobs
+import { initializeBackupCron } from './cron/backupJobs'; // NEW: Auto backup cron jobs
 
 // Load environment variables FIRST (but allow env vars to override .env)
 dotenv.config({ override: false });
@@ -224,6 +225,9 @@ const startServer = async () => {
 
     // Start notification cron jobs
     startAllNotificationJobs();
+    
+    // Start auto backup cron jobs
+    initializeBackupCron();
   });
 };
 
