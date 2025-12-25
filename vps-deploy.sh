@@ -87,7 +87,17 @@ docker run -d --name wms-database \
 echo "⏳ Waiting 20s for database..."
 sleep 20
 
-# 6. RUN PRISMA MIGRATIONS (inside backend container temporarily)
+# 6. FORCE REMOVE OLD IMAGES TO USE FRESH PULLED IMAGES
+echo "🔄 Removing old image cache to force use of fresh images..."
+docker rmi ghcr.io/akifbade/wms-backend:latest 2>/dev/null || true
+docker rmi ghcr.io/akifbade/wms-frontend:latest 2>/dev/null || true
+
+# Pull fresh images (already done by GitHub Actions, but ensure latest)
+echo "📦 Re-pulling images to ensure we have latest..."
+docker pull ghcr.io/akifbade/wms-backend:latest
+docker pull ghcr.io/akifbade/wms-frontend:latest
+
+# 7. RUN PRISMA MIGRATIONS (inside backend container temporarily)
 echo "🔄 Running Prisma migrations..."
 docker run --rm --network wms-network \
   -e DATABASE_URL='mysql://wms_user:wmspassword123@wms-database:3306/warehouse_wms' \
@@ -96,7 +106,7 @@ docker run --rm --network wms-network \
   ghcr.io/akifbade/wms-backend:latest \
   npx prisma db push --accept-data-loss 2>/dev/null || echo "⚠️ Prisma migration skipped"
 
-# 7. START BACKEND
+# 8. START BACKEND
 echo "⚙️ Starting backend..."
 docker run -d --name wms-backend \
   --network wms-network \
@@ -113,7 +123,7 @@ docker run -d --name wms-backend \
 echo "⏳ Waiting 10s for backend..."
 sleep 10
 
-# 8. START FRONTEND
+# 9. START FRONTEND
 echo "🌐 Starting frontend..."
 docker run -d --name wms-frontend \
   --network wms-network \
@@ -128,7 +138,7 @@ docker run -d --name wms-frontend \
 echo "⏳ Waiting 5s for frontend..."
 sleep 5
 
-# 9. VERIFY NETWORK CONNECTIVITY
+# 10. VERIFY NETWORK CONNECTIVITY
 echo "🔍 Verifying network connectivity..."
 docker network inspect wms-network --format '{{range .Containers}}{{.Name}} {{end}}'
 
@@ -141,7 +151,7 @@ else
     docker logs wms-backend --tail 20
 fi
 
-# 10. EXTERNAL HEALTH CHECK
+# 11. EXTERNAL HEALTH CHECK
 echo "🏥 Running external health checks..."
 if curl -s http://localhost:5000/api/health | grep -q "ok"; then
     echo "✅ Backend API: HEALTHY"
@@ -149,7 +159,7 @@ else
     echo "❌ Backend API: Check 'docker logs wms-backend'"
 fi
 
-# 11. AGGRESSIVE CLEANUP - Free up disk space
+# 12. AGGRESSIVE CLEANUP - Free up disk space
 echo "🧹 AGGRESSIVE CLEANUP - Freeing disk space..."
 docker image prune -af 2>/dev/null || true
 docker container prune -f 2>/dev/null || true
