@@ -87,15 +87,10 @@ docker run -d --name wms-database \
 echo "⏳ Waiting 20s for database..."
 sleep 20
 
-# 6. FORCE REMOVE OLD IMAGES TO USE FRESH PULLED IMAGES
-echo "🔄 Removing old image cache to force use of fresh images..."
-docker rmi ghcr.io/akifbade/wms-backend:latest 2>/dev/null || true
-docker rmi ghcr.io/akifbade/wms-frontend:latest 2>/dev/null || true
-
-# Pull fresh images (already done by GitHub Actions, but ensure latest)
-echo "📦 Re-pulling images to ensure we have latest..."
-docker pull ghcr.io/akifbade/wms-backend:latest
-docker pull ghcr.io/akifbade/wms-frontend:latest
+# 6. IMAGES ALREADY LOADED
+# Images were loaded from tar files by GitHub Actions
+# No need to pull from registry - they're already here!
+echo "✅ Using Docker images loaded from GitHub Actions..."
 
 # 7. RUN PRISMA MIGRATIONS (inside backend container temporarily)
 echo "🔄 Running Prisma migrations..."
