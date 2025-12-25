@@ -748,7 +748,14 @@ const backupsAPI = {
   updateSettings: async (settings: any) => {
     return apiCall<{ success: boolean; message: string }>('/backups/settings', {
       method: 'PUT',
-      body: JSON.stringify({ settings }),
+      body: JSON.stringify(settings),
+    });
+  },
+
+  testGitConnection: async (gitConfig: { gitRepoUrl?: string; gitToken?: string; gitBranch?: string }) => {
+    return apiCall<{ success: boolean; message: string }>('/backups/settings/test-git', {
+      method: 'POST',
+      body: JSON.stringify(gitConfig),
     });
   },
 

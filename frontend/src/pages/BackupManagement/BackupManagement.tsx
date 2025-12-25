@@ -36,6 +36,18 @@ interface BackupSettings {
     maxBackupCount: number;
     emailNotifications: boolean;
     retentionDays: number;
+    // Git Sync Settings
+    gitSyncEnabled?: boolean;
+    gitRepoUrl?: string;
+    gitBranch?: string;
+    gitUsername?: string;
+    gitEmail?: string;
+    gitToken?: string;
+    // Advanced Email Settings
+    emailOnSuccess?: boolean;
+    emailOnFailure?: boolean;
+    emailOnWarning?: boolean;
+    autoDeleteOld?: boolean;
 }
 
 const SECRET_PASSWORD = '24865'; // Secret backup access code
@@ -67,8 +79,21 @@ const BackupManagement: React.FC = () => {
         includeCode: false,
         maxBackupCount: 10,
         emailNotifications: true,
-        retentionDays: 30
+        retentionDays: 30,
+        // Git Sync defaults
+        gitSyncEnabled: false,
+        gitRepoUrl: '',
+        gitBranch: 'main',
+        gitUsername: '',
+        gitEmail: '',
+        gitToken: '',
+        // Email defaults
+        emailOnSuccess: true,
+        emailOnFailure: true,
+        emailOnWarning: true,
+        autoDeleteOld: true
     });
+    const [testingGit, setTestingGit] = useState(false);
 
     // Custom backup options
     const [showCustomBackup, setShowCustomBackup] = useState(false);
@@ -135,11 +160,33 @@ const BackupManagement: React.FC = () => {
     const handleSaveSettings = async () => {
         try {
             await api.backups.updateSettings(settings);
-            setSuccess('Settings saved successfully!');
+            setSuccess('✅ Settings saved successfully!');
             setShowSettings(false);
             setTimeout(() => setSuccess(''), 3000);
         } catch (err: any) {
-            setError('Failed to save settings');
+            setError('Failed to save settings: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    const handleTestGitConnection = async () => {
+        try {
+            setTestingGit(true);
+            setError('');
+            setSuccess('');
+            
+            // Test endpoint (you'll need to add this to backend)
+            const response = await api.backups.testGitConnection({
+                gitRepoUrl: settings.gitRepoUrl,
+                gitToken: settings.gitToken,
+                gitBranch: settings.gitBranch
+            });
+            
+            setSuccess('✅ Git connection successful!');
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (err: any) {
+            setError('❌ Git connection failed: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setTestingGit(false);
         }
     };
 
@@ -692,16 +739,193 @@ const BackupManagement: React.FC = () => {
                                     <p className="text-sm text-gray-500 mt-1">Backups older than this will be deleted</p>
                                 </div>
 
-                                {/* Notifications */}
+                                {/* Max Backup Count */}
                                 <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Maximum Backup Count
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={settings.maxBackupCount}
+                                        onChange={(e) => setSettings({ ...settings, maxBackupCount: parseInt(e.target.value) })}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                        min="5"
+                                        max="100"
+                                    />
+                                    <p className="text-sm text-gray-500 mt-1">Keep only the most recent backups</p>
+                                </div>
+
+                                {/* Email Notifications */}
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 mb-3">📧 Email Notifications</h3>
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.emailNotifications}
+                                                onChange={(e) => setSettings({ ...settings, emailNotifications: e.target.checked })}
+                                                className="w-5 h-5 text-blue-600 rounded"
+                                            />
+                                            <span className="text-gray-700">Enable All Notifications</span>
+                                        </label>
+                                        
+                                        {settings.emailNotifications && (
+                                            <div className="ml-8 space-y-2 mt-2">
+                                                <label className="flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={settings.emailOnSuccess}
+                                                        onChange={(e) => setSettings({ ...settings, emailOnSuccess: e.target.checked })}
+                                                        className="w-4 h-4 text-green-600 rounded"
+                                                    />
+                                                    <span className="text-sm text-gray-600">✅ Backup Created Successfully</span>
+                                                </label>
+                                                
+                                                <label className="flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={settings.emailOnFailure}
+                                                        onChange={(e) => setSettings({ ...settings, emailOnFailure: e.target.checked })}
+                                                        className="w-4 h-4 text-red-600 rounded"
+                                                    />
+                                                    <span className="text-sm text-gray-600">❌ Backup Failed</span>
+                                                </label>
+                                                
+                                                <label className="flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={settings.emailOnWarning}
+                                                        onChange={(e) => setSettings({ ...settings, emailOnWarning: e.target.checked })}
+                                                        className="w-4 h-4 text-yellow-600 rounded"
+                                                    />
+                                                    <span className="text-sm text-gray-600">⚠️ Storage Warnings</span>
+                                                </label>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Git Sync Section */}
+                                <div className="border-t pt-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.gitSyncEnabled}
+                                            onChange={(e) => setSettings({ ...settings, gitSyncEnabled: e.target.checked })}
+                                            className="w-5 h-5 text-blue-600 rounded"
+                                        />
+                                        <h3 className="font-semibold text-gray-900">🔗 Git Sync (Auto-push backups to GitHub)</h3>
+                                    </div>
+
+                                    {settings.gitSyncEnabled && (
+                                        <div className="space-y-4 ml-8">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Repository URL *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={settings.gitRepoUrl}
+                                                    onChange={(e) => setSettings({ ...settings, gitRepoUrl: e.target.value })}
+                                                    placeholder="https://github.com/username/wms-backups.git"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                        Branch
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={settings.gitBranch}
+                                                        onChange={(e) => setSettings({ ...settings, gitBranch: e.target.value })}
+                                                        placeholder="main"
+                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                        Username
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={settings.gitUsername}
+                                                        onChange={(e) => setSettings({ ...settings, gitUsername: e.target.value })}
+                                                        placeholder="Your GitHub username"
+                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Email
+                                                </label>
+                                                <input
+                                                    type="email"
+                                                    value={settings.gitEmail}
+                                                    onChange={(e) => setSettings({ ...settings, gitEmail: e.target.value })}
+                                                    placeholder="your@email.com"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Personal Access Token *
+                                                </label>
+                                                <input
+                                                    type="password"
+                                                    value={settings.gitToken}
+                                                    onChange={(e) => setSettings({ ...settings, gitToken: e.target.value })}
+                                                    placeholder="ghp_xxxxxxxxxxxx"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Generate at: <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">github.com/settings/tokens</a>
+                                                </p>
+                                            </div>
+
+                                            <button
+                                                onClick={handleTestGitConnection}
+                                                disabled={testingGit || !settings.gitRepoUrl || !settings.gitToken}
+                                                className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold flex items-center justify-center gap-2"
+                                            >
+                                                {testingGit ? (
+                                                    <>
+                                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                                        Testing Connection...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <CheckCircleIcon className="h-5 w-5" />
+                                                        Test Git Connection
+                                                    </>
+                                                )}
+                                            </button>
+
+                                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                                <p className="text-xs text-blue-800">
+                                                    💡 <strong>Tip:</strong> When Git Sync is enabled, every backup will be automatically committed and pushed to your GitHub repository!
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Auto-delete Old Backups */}
+                                <div className="border-t pt-6">
                                     <label className="flex items-center gap-3">
                                         <input
                                             type="checkbox"
-                                            checked={settings.emailNotifications}
-                                            onChange={(e) => setSettings({ ...settings, emailNotifications: e.target.checked })}
-                                            className="w-5 h-5 text-blue-600 rounded"
+                                            checked={settings.autoDeleteOld}
+                                            onChange={(e) => setSettings({ ...settings, autoDeleteOld: e.target.checked })}
+                                            className="w-5 h-5 text-red-600 rounded"
                                         />
-                                        <span className="text-gray-700">Email Notifications</span>
+                                        <span className="text-gray-700">🗑️ Automatically Delete Old Backups (based on retention policy)</span>
                                     </label>
                                 </div>
                             </div>
