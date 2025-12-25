@@ -3,7 +3,7 @@ set -e
 
 # ==========================================
 # VPS WEBHOOK DEPLOYMENT SCRIPT
-# Called by VPS when GitHub webhook triggers
+# Called manually from local machine
 # ==========================================
 
 echo "🚀 Webhook Deployment Triggered at $(date)"
@@ -14,10 +14,8 @@ echo "📥 Pulling latest code from GitHub..."
 git fetch origin stable/prisma-mysql-production
 git reset --hard origin/stable/prisma-mysql-production
 
-# 2. Pull fresh Docker images from GHCR
-echo "📦 Pulling fresh Docker images..."
-docker pull ghcr.io/akifbade/wms-backend:latest
-docker pull ghcr.io/akifbade/wms-frontend:latest
+# 2. Images are already on VPS from previous GitHub Actions build
+# Skip docker pull - use existing images
 
 # 3. Run deployment script
 echo "🔄 Running deployment script..."

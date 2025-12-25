@@ -69,16 +69,18 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 2
     steps:
-      - name: Trigger VPS Webhook Deployment
+      - name: Build Complete - Manual Deployment Required
         run: |
-          echo "🚀 Triggering VPS to pull and deploy..."
-          echo "Images pushed to GHCR successfully"
-          echo "VPS will auto-pull via webhook or manual trigger"
+          echo "✅ Docker images built and pushed to GHCR successfully!"
           echo ""
-          echo "⚠️ SSH from GitHub Actions is blocked by VPS firewall"
-          echo "✅ Use: plink to manually trigger deployment on VPS"
+          echo "📦 Images available at:"
+          echo "  - ghcr.io/akifbade/wms-backend:latest"
+          echo "  - ghcr.io/akifbade/wms-frontend:latest"
           echo ""
-          echo "Manual deployment command:"
-          echo "plink -batch -pw <password> root@148.230.107.155 'cd /root/NEW\\ START && ./vps-webhook-deploy.sh'"
+          echo "🚀 TO DEPLOY TO VPS:"
+          echo "  Run this command on your local machine:"
+          echo "  .\deploy-vps-manual.ps1"
+          echo ""
+          echo "⚠️ Why manual? GitHub Actions IPs are blocked by VPS firewall on port 22"
