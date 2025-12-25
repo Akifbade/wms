@@ -69,6 +69,9 @@ model Company {
   contractStatus     String? @default("ACTIVE") // ACTIVE, INACTIVE, EXPIRED
   contractDocument   String? // File path to contract PDF/DOC
 
+  // NEW: Backup Settings (JSON stored as text)
+  backupSettings     String? @db.Text // JSON for backup configuration
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

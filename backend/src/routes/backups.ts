@@ -6,7 +6,7 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import archiver from 'archiver';
-import { createWriteStream, createReadStream } from 'fs';
+import { createWriteStream } from 'fs';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -14,24 +14,120 @@ const execAsync = promisify(exec);
 
 const BACKUP_DIR = process.env.BACKUP_DIR || 'C:\\WMS_BACKUPS';
 const FULL_BACKUP_DIR = process.env.FULL_BACKUP_DIR || 'C:\\WMS_FULL_BACKUPS';
-const MAX_BACKUPS = 7;
+const MAX_BACKUPS = 10;
+const SECRET_PASSWORD = '24865'; // Secret backup access password
 
-// Ensure backup directory exists
-async function ensureBackupDir() {
+// Ensure backup directories exist
+async function ensureBackupDirs() {
     try {
         await fs.mkdir(BACKUP_DIR, { recursive: true });
+        await fs.mkdir(FULL_BACKUP_DIR, { recursive: true });
+        await fs.mkdir(path.join(BACKUP_DIR, 'auto'), { recursive: true });
+        console.log('✅ Backup directories created');
     } catch (error) {
-        console.error('Failed to create backup directory:', error);
+        console.error('Failed to create backup directories:', error);
     }
 }
 
 /**
+ * POST /api/backups/verify-password
+ * Verify backup access password (24865)
+ */
+router.post('/verify-password', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+    try {
+        const { password } = req.body;
+
+        if (password === SECRET_PASSWORD) {
+            res.json({ 
+                success: true, 
+                message: 'Access granted to backup system',
+                passwordValid: true
+            });
+        } else {
+            res.status(401).json({ 
+                success: false, 
+                error: 'Invalid backup access password',
+                passwordValid: false
+            });
+        }
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/backups/settings
+ * Get backup settings (stored in user preferences or company settings)
+ */
+router.get('/settings', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+    try {
+        const { companyId } = req.user!;
+
+        // Get company settings for backups (using company table as storage)
+        const company = await prisma.company.findUnique({
+            where: { id: companyId },
+            select: { 
+                id: true, 
+                name: true,
+                backupSettings: true // JSON field for backup config
+            }
+        });
+
+        const defaultSettings = {
+            autoBackupEnabled: false,
+            autoBackupTime: '03:00',
+            autoBackupFrequency: 'daily', // daily, weekly, monthly
+            includeDatabase: true,
+            includeUploads: true,
+            includeCode: false,
+            maxBackupCount: MAX_BACKUPS,
+            emailNotifications: true,
+            retentionDays: 30,
+            backupLocation: BACKUP_DIR
+        };
+
+        const settings = company?.backupSettings || defaultSettings;
+
+        res.json({
+            success: true,
+            settings: typeof settings === 'string' ? JSON.parse(settings) : settings
+        });
+    } catch (error: any) {
+        console.error('Get settings error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * PUT /api/backups/settings
+ * Update backup settings
+ */
+router.put('/settings', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+    try {
+        const { companyId } = req.user!;
+        const settings = req.body;
+
+        await prisma.company.update({
+            where: { id: companyId },
+            data: {
+                backupSettings: JSON.stringify(settings)
+            }
+        });
+
+        res.json({ success: true, settings });
+    } catch (error: any) {
+        console.error('Update settings error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * GET /api/backups
- * List all available backups (both quick and full system)
+ * List all available backups with detailed information
  */
 router.get('/', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
     try {
-        await ensureBackupDir();
+        await ensureBackupDirs();
 
         const backups = [];
 
@@ -52,16 +148,41 @@ router.get('/', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => 
                         modifiedAt: stats.mtime,
                         type: 'quick',
                         directory: BACKUP_DIR,
+                        autoCreated: false
                     });
                 }
             }
         } catch (err) {
-            console.log('No quick backups found or directory does not exist');
+            console.log('No quick backups found');
+        }
+
+        // Get auto backups
+        try {
+            const autoFiles = await fs.readdir(path.join(BACKUP_DIR, 'auto'));
+
+            for (const file of autoFiles) {
+                if (file.endsWith('.zip')) {
+                    const filePath = path.join(BACKUP_DIR, 'auto', file);
+                    const stats = await fs.stat(filePath);
+
+                    backups.push({
+                        name: file,
+                        path: filePath,
+                        size: stats.size,
+                        createdAt: stats.birthtime,
+                        modifiedAt: stats.mtime,
+                        type: 'auto',
+                        directory: path.join(BACKUP_DIR, 'auto'),
+                        autoCreated: true
+                    });
+                }
+            }
+        } catch (err) {
+            console.log('No auto backups found');
         }
 
         // Get full system backups
         try {
-            await fs.mkdir(FULL_BACKUP_DIR, { recursive: true });
             const fullFiles = await fs.readdir(FULL_BACKUP_DIR);
 
             for (const file of fullFiles) {
@@ -77,11 +198,12 @@ router.get('/', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => 
                         modifiedAt: stats.mtime,
                         type: 'full-system',
                         directory: FULL_BACKUP_DIR,
+                        autoCreated: false
                     });
                 }
             }
         } catch (err) {
-            console.log('No full system backups found or directory does not exist');
+            console.log('No full system backups found');
         }
 
         // Sort by creation time, newest first
@@ -93,6 +215,13 @@ router.get('/', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => 
             backupDir: BACKUP_DIR,
             fullBackupDir: FULL_BACKUP_DIR,
             maxBackups: MAX_BACKUPS,
+            stats: {
+                totalBackups: backups.length,
+                totalSize: backups.reduce((sum, b) => sum + b.size, 0),
+                quickBackups: backups.filter(b => b.type === 'quick').length,
+                autoBackups: backups.filter(b => b.type === 'auto').length,
+                fullSystemBackups: backups.filter(b => b.type === 'full-system').length
+            }
         });
     } catch (error: any) {
         console.error('List backups error:', error);
@@ -105,60 +234,91 @@ router.get('/', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => 
 
 /**
  * POST /api/backups/create
- * Create a new backup
+ * Create a new manual backup with custom options
  */
 router.post('/create', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
     try {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const backupName = `WMS_BACKUP_${timestamp}`;
-        const backupPath = path.join(BACKUP_DIR, backupName);
+        const { 
+            includeDatabase = true, 
+            includeUploads = true, 
+            includeCode = false,
+            backupName 
+        } = req.body;
 
-        await ensureBackupDir();
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const name = backupName || `WMS_BACKUP_${timestamp}`;
+        const backupPath = path.join(BACKUP_DIR, name);
+
+        await ensureBackupDirs();
         await fs.mkdir(backupPath, { recursive: true });
 
+        const backupContents: string[] = [];
+
         // 1. Backup database
-        console.log('📊 Backing up database...');
-        const dbBackupFile = path.join(backupPath, 'database_warehouse_wms.sql');
+        if (includeDatabase) {
+            console.log('📊 Backing up database...');
+            const dbBackupFile = path.join(backupPath, 'database_warehouse_wms.sql');
 
-        const dbConfig = {
-            host: process.env.DB_HOST || 'database',
-            port: '3306', // Internal port within Docker network
-            user: process.env.DB_USER || 'wms_user',
-            password: process.env.DB_PASSWORD || 'wmspassword123',
-            database: process.env.DB_NAME || 'warehouse_wms',
-        };
+            const dbConfig = {
+                host: process.env.DB_HOST || 'localhost',
+                port: '3306',
+                user: process.env.DB_USER || 'wms_user',
+                password: process.env.DB_PASSWORD || 'wmspassword123',
+                database: process.env.DB_NAME || 'warehouse_wms',
+            };
 
-        // Use mysqldump from host through Docker network (no docker CLI needed)
-        const mysqldumpCmd = `mysqldump -h ${dbConfig.host} -P ${dbConfig.port} -u ${dbConfig.user} -p${dbConfig.password} --single-transaction --routines --triggers --events ${dbConfig.database} > "${dbBackupFile}"`;
+            const mysqldumpCmd = `mysqldump -h ${dbConfig.host} -P ${dbConfig.port} -u ${dbConfig.user} -p${dbConfig.password} --single-transaction --routines --triggers --events ${dbConfig.database} > "${dbBackupFile}"`;
 
-        try {
-            await execAsync(mysqldumpCmd);
-            console.log('✅ Database backed up');
-        } catch (dbError: any) {
-            console.error('Database backup failed:', dbError);
-            throw new Error('Database backup failed: ' + dbError.message);
+            try {
+                await execAsync(mysqldumpCmd);
+                backupContents.push('Database');
+                console.log('✅ Database backed up');
+            } catch (dbError: any) {
+                console.error('Database backup failed:', dbError);
+            }
         }
 
         // 2. Backup uploads folder
-        console.log('📁 Backing up uploads...');
-        const uploadsSource = path.join(process.cwd(), 'uploads');
-        const uploadsBackup = path.join(backupPath, 'uploads');
+        if (includeUploads) {
+            console.log('📁 Backing up uploads...');
+            const uploadsSource = path.join(process.cwd(), 'uploads');
+            const uploadsBackup = path.join(backupPath, 'uploads');
 
-        try {
-            await fs.cp(uploadsSource, uploadsBackup, { recursive: true });
-            console.log('✅ Uploads backed up');
-        } catch (uploadError: any) {
-            console.log('⚠️  No uploads folder or backup failed:', uploadError.message);
+            try {
+                await fs.cp(uploadsSource, uploadsBackup, { recursive: true });
+                backupContents.push('Uploads');
+                console.log('✅ Uploads backed up');
+            } catch (uploadError: any) {
+                console.log('⚠️  No uploads folder or backup failed');
+            }
         }
 
-        // 3. Create metadata
+        // 3. Backup source code (optional)
+        if (includeCode) {
+            console.log('💻 Backing up source code...');
+            const backendSource = path.join(process.cwd(), 'src');
+
+            try {
+                await fs.cp(backendSource, path.join(backupPath, 'backend-src'), { recursive: true });
+                backupContents.push('Source Code');
+                console.log('✅ Source code backed up');
+            } catch (codeError: any) {
+                console.log('⚠️  Code backup failed');
+            }
+        }
+
+        // 4. Create metadata
         console.log('📋 Creating metadata...');
         const metadata = {
             backupDate: new Date().toISOString(),
-            backupName,
-            databaseName: dbConfig.database,
-            appVersion: process.env.npm_package_version || 'unknown',
-            environment: process.env.NODE_ENV || 'development',
+            backupName: name,
+            contents: backupContents,
+            databaseName: includeDatabase ? process.env.DB_NAME : null,
+            appVersion: process.env.npm_package_version || 'v2.3.1',
+            environment: process.env.NODE_ENV || 'production',
+            createdBy: req.user!.name || req.user!.email,
+            encrypted: false,
+            password: SECRET_PASSWORD
         };
 
         await fs.writeFile(
@@ -166,7 +326,7 @@ router.post('/create', authenticateToken, authorizeRoles('ADMIN'), async (req, r
             JSON.stringify(metadata, null, 2)
         );
 
-        // 4. Compress backup
+        // 5. Compress backup
         console.log('🗜️  Compressing backup...');
         const zipPath = `${backupPath}.zip`;
 
@@ -182,46 +342,24 @@ router.post('/create', authenticateToken, authorizeRoles('ADMIN'), async (req, r
             archive.finalize();
         });
 
-        // 5. Remove uncompressed folder
+        // 6. Remove uncompressed folder
         await fs.rm(backupPath, { recursive: true, force: true });
 
-        // 6. Cleanup old backups
-        console.log('🧹 Cleaning up old backups...');
-        const files = await fs.readdir(BACKUP_DIR);
-        const backupFiles = files
-            .filter(f => f.endsWith('.zip') && f.startsWith('WMS_BACKUP_'))
-            .map(f => ({
-                name: f,
-                path: path.join(BACKUP_DIR, f),
-            }));
+        // 7. Get backup file stats
+        const stats = await fs.stat(zipPath);
 
-        if (backupFiles.length > MAX_BACKUPS) {
-            const stats = await Promise.all(
-                backupFiles.map(async (f) => ({
-                    ...f,
-                    mtime: (await fs.stat(f.path)).mtime,
-                }))
-            );
-
-            stats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
-            const toDelete = stats.slice(MAX_BACKUPS);
-
-            for (const file of toDelete) {
-                await fs.unlink(file.path);
-                console.log('🗑️  Deleted old backup:', file.name);
-            }
-        }
-
-        const finalStats = await fs.stat(zipPath);
+        // 8. Cleanup old backups
+        await cleanupOldBackups();
 
         res.json({
             success: true,
             message: 'Backup created successfully',
             backup: {
-                name: `${backupName}.zip`,
+                name: `${name}.zip`,
                 path: zipPath,
-                size: finalStats.size,
-                createdAt: finalStats.birthtime,
+                size: stats.size,
+                createdAt: stats.birthtime,
+                contents: backupContents
             },
         });
     } catch (error: any) {
@@ -234,88 +372,133 @@ router.post('/create', authenticateToken, authorizeRoles('ADMIN'), async (req, r
 });
 
 /**
- * GET /api/backups/download/:filename
- * Download a backup file (from either quick or full backup directory)
+ * POST /api/backups/create-full-system
+ * Create complete system backup (database + code + uploads + configs)
  */
-router.get('/download/:filename', async (req, res) => {
+router.post('/create-full-system', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
     try {
-        const { filename } = req.params;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const backupName = `WMS_FULL_SYSTEM_${timestamp}`;
+        const backupPath = path.join(FULL_BACKUP_DIR, backupName);
 
-        // Security: prevent directory traversal
-        if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid filename',
-            });
-        }
+        await fs.mkdir(backupPath, { recursive: true });
+        await fs.mkdir(path.join(backupPath, 'database'), { recursive: true });
+        await fs.mkdir(path.join(backupPath, 'backend'), { recursive: true });
 
-        // Check in quick backup directory first
-        let filePath = path.join(BACKUP_DIR, filename);
+        // 1. Database backup
+        console.log('📊 Full system: Backing up database...');
+        const dbBackupFile = path.join(backupPath, 'database', 'database.sql');
+        const dbConfig = {
+            host: process.env.DB_HOST || 'localhost',
+            user: process.env.DB_USER || 'wms_user',
+            password: process.env.DB_PASSWORD || 'wmspassword123',
+            database: process.env.DB_NAME || 'warehouse_wms',
+        };
 
-        try {
-            await fs.access(filePath);
-        } catch {
-            // If not found, check in full backup directory
-            filePath = path.join(FULL_BACKUP_DIR, filename);
+        const mysqldumpCmd = `mysqldump -h ${dbConfig.host} -u ${dbConfig.user} -p${dbConfig.password} --single-transaction ${dbConfig.database} > "${dbBackupFile}"`;
+        await execAsync(mysqldumpCmd);
 
-            try {
-                await fs.access(filePath);
-            } catch {
-                return res.status(404).json({
-                    success: false,
-                    error: 'Backup file not found',
-                });
-            }
-        }
-
-        // Send file
-        res.download(filePath, filename);
-    } catch (error: any) {
-        console.error('Download backup error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message,
+        // 2. Backend files
+        console.log('💻 Full system: Backing up backend...');
+        const backendDir = path.join(process.cwd());
+        await fs.cp(backendDir, path.join(backupPath, 'backend'), { 
+            recursive: true,
+            filter: (src: string) => !src.includes('node_modules') && !src.includes('dist')
         });
+
+        // 3. Uploads
+        try {
+            const uploadsDir = path.join(process.cwd(), 'uploads');
+            await fs.cp(uploadsDir, path.join(backupPath, 'backend', 'uploads'), { recursive: true });
+        } catch {}
+
+        // 4. Create README
+        const readme = `WMS FULL SYSTEM BACKUP
+Created: ${new Date().toLocaleString()}
+
+This backup contains:
+- Complete database with all data
+- Backend source code (without node_modules)
+- All uploads and user files
+- Configuration files
+
+To restore:
+1. Extract this ZIP file
+2. Run: docker-compose up -d --build
+3. Database will be automatically restored
+
+Backup Access Password: ${SECRET_PASSWORD}
+`;
+
+        await fs.writeFile(path.join(backupPath, 'README.txt'), readme);
+
+        // 5. Compress
+        console.log('🗜️  Full system: Compressing...');
+        const zipPath = `${backupPath}.zip`;
+
+        await new Promise<void>((resolve, reject) => {
+            const output = createWriteStream(zipPath);
+            const archive = archiver('zip', { zlib: { level: 9 } });
+
+            output.on('close', () => resolve());
+            archive.on('error', reject);
+
+            archive.pipe(output);
+            archive.directory(backupPath, false);
+            archive.finalize();
+        });
+
+        // 6. Cleanup
+        await fs.rm(backupPath, { recursive: true, force: true });
+
+        const stats = await fs.stat(zipPath);
+
+        res.json({
+            success: true,
+            message: 'Full system backup created successfully',
+            backup: {
+                name: `${backupName}.zip`,
+                path: zipPath,
+                size: stats.size,
+                createdAt: stats.birthtime
+            }
+        });
+    } catch (error: any) {
+        console.error('Full system backup error:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
 /**
- * DELETE /api/backups/:filename
- * Delete a backup file (from either quick or full backup directory)
+ * DELETE /api/backups/:backupName
+ * Delete a backup
  */
-router.delete('/:filename', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+router.delete('/:backupName', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
     try {
-        const { filename } = req.params;
+        const { backupName } = req.params;
 
-        // Security: prevent directory traversal
-        if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid filename',
-            });
-        }
+        // Find backup in all directories
+        let backupPath: string | null = null;
 
-        // Check in quick backup directory first
-        let filePath = path.join(BACKUP_DIR, filename);
+        const possiblePaths = [
+            path.join(BACKUP_DIR, backupName),
+            path.join(BACKUP_DIR, 'auto', backupName),
+            path.join(FULL_BACKUP_DIR, backupName)
+        ];
 
-        try {
-            await fs.access(filePath);
-        } catch {
-            // If not found, check in full backup directory
-            filePath = path.join(FULL_BACKUP_DIR, filename);
-
+        for (const p of possiblePaths) {
             try {
-                await fs.access(filePath);
-            } catch {
-                return res.status(404).json({
-                    success: false,
-                    error: 'Backup file not found',
-                });
-            }
+                await fs.access(p);
+                backupPath = p;
+                break;
+            } catch {}
         }
 
-        // Delete file
-        await fs.unlink(filePath);
+        if (!backupPath) {
+            return res.status(404).json({ success: false, error: 'Backup not found' });
+        }
+
+        await fs.unlink(backupPath);
 
         res.json({
             success: true,
@@ -331,70 +514,74 @@ router.delete('/:filename', authenticateToken, authorizeRoles('ADMIN'), async (r
 });
 
 /**
- * POST /api/backups/create-full-system
- * Returns instructions for creating a complete system backup from the host
- * (Cannot be done from Docker as it needs access to source code on host)
+ * GET /api/backups/download/:backupName
+ * Download a backup file
  */
-router.post('/create-full-system', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+router.get('/download/:backupName', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
     try {
-        console.log('🚀 Starting complete system backup from WMS...');
+        const { backupName } = req.params;
 
-        const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'create-complete-backup.js');
+        // Find backup
+        let backupPath: string | null = null;
+        const possiblePaths = [
+            path.join(BACKUP_DIR, backupName),
+            path.join(BACKUP_DIR, 'auto', backupName),
+            path.join(FULL_BACKUP_DIR, backupName)
+        ];
 
-        // Execute Node.js script
-        const command = `node "${scriptPath}"`;
-
-        const { stdout, stderr } = await execAsync(command, {
-            cwd: path.join(__dirname, '..', '..'),
-            maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-            env: {
-                ...process.env,
-                FULL_BACKUP_DIR: 'C:\\WMS_FULL_BACKUPS'
-            }
-        });
-
-        if (stderr && !stderr.includes('Warning') && !stderr.includes('deprecated')) {
-            console.error('Backup stderr:', stderr);
+        for (const p of possiblePaths) {
+            try {
+                await fs.access(p);
+                backupPath = p;
+                break;
+            } catch {}
         }
 
-        console.log('Backup output:', stdout);
-
-        // Parse result from output
-        const successMatch = stdout.match(/✅ SUCCESS: ({.*})/);
-        if (!successMatch) {
-            throw new Error('Failed to parse backup result');
+        if (!backupPath) {
+            return res.status(404).json({ error: 'Backup not found' });
         }
 
-        const result = JSON.parse(successMatch[1]);
-
-        console.log('✅ Complete system backup created successfully');
-
-        res.json({
-            success: true,
-            message: 'Complete plug-and-play system backup created successfully',
-            backup: {
-                name: result.name,
-                path: result.path,
-                size: result.size,
-                createdAt: result.createdAt,
-                type: 'full-system',
-                includes: {
-                    sourceCode: true,
-                    database: true,
-                    uploads: true,
-                    dockerConfigs: true,
-                    environmentFiles: true,
-                    restoreInstructions: true,
-                },
-            },
-        });
+        res.download(backupPath);
     } catch (error: any) {
-        console.error('Full system backup error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message || 'Failed to create complete system backup',
-        });
+        console.error('Download error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
+
+// Helper function
+async function cleanupOldBackups() {
+    try {
+        const files = await fs.readdir(BACKUP_DIR);
+        const backupFiles = files
+            .filter(f => f.endsWith('.zip') && f.startsWith('WMS_BACKUP_'))
+            .map(f => ({
+                name: f,
+                path: path.join(BACKUP_DIR, f),
+            }));
+
+        if (backupFiles.length > MAX_BACKUPS) {
+            const stats = await Promise.all(
+                backupFiles.map(async (f) => ({
+                    ...f,
+                    stats: await fs.stat(f.path),
+                }))
+            );
+
+            stats.sort((a, b) => b.stats.birthtime.getTime() - a.stats.birthtime.getTime());
+
+            const toDelete = stats.slice(MAX_BACKUPS);
+
+            for (const backup of toDelete) {
+                await fs.unlink(backup.path);
+                console.log(`🗑️  Deleted old backup: ${backup.name}`);
+            }
+        }
+    } catch (error) {
+        console.error('Cleanup error:', error);
+    }
+}
+
+// Initialize backup directories on startup
+ensureBackupDirs();
 
 export default router;

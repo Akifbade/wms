@@ -8,6 +8,10 @@ import {
     DocumentArrowDownIcon,
     ExclamationTriangleIcon,
     CheckCircleIcon,
+    Cog6ToothIcon,
+    LockClosedIcon,
+    ShieldCheckIcon,
+    CalendarIcon,
 } from '@heroicons/react/24/outline';
 import api from '../../services/api';
 
@@ -17,9 +21,24 @@ interface Backup {
     size: number;
     createdAt: string;
     modifiedAt: string;
-    type?: 'quick' | 'full-system';
+    type?: 'quick' | 'full-system' | 'auto';
     directory?: string;
+    autoCreated?: boolean;
 }
+
+interface BackupSettings {
+    autoBackupEnabled: boolean;
+    autoBackupTime: string;
+    autoBackupFrequency: string;
+    includeDatabase: boolean;
+    includeUploads: boolean;
+    includeCode: boolean;
+    maxBackupCount: number;
+    emailNotifications: boolean;
+    retentionDays: number;
+}
+
+const SECRET_PASSWORD = '24865'; // Secret backup access code
 
 const BackupManagement: React.FC = () => {
     const [backups, setBackups] = useState<Backup[]>([]);
@@ -29,11 +48,61 @@ const BackupManagement: React.FC = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [backupDir, setBackupDir] = useState('');
-    const [maxBackups, setMaxBackups] = useState(7);
+    const [maxBackups, setMaxBackups] = useState(10);
+    const [stats, setStats] = useState<any>(null);
+
+    // Password protection
+    const [isUnlocked, setIsUnlocked] = useState(false);
+    const [passwordInput, setPasswordInput] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+
+    // Settings modal
+    const [showSettings, setShowSettings] = useState(false);
+    const [settings, setSettings] = useState<BackupSettings>({
+        autoBackupEnabled: false,
+        autoBackupTime: '03:00',
+        autoBackupFrequency: 'daily',
+        includeDatabase: true,
+        includeUploads: true,
+        includeCode: false,
+        maxBackupCount: 10,
+        emailNotifications: true,
+        retentionDays: 30
+    });
+
+    // Custom backup options
+    const [showCustomBackup, setShowCustomBackup] = useState(false);
+    const [customOptions, setCustomOptions] = useState({
+        includeDatabase: true,
+        includeUploads: true,
+        includeCode: false,
+        backupName: ''
+    });
 
     useEffect(() => {
-        loadBackups();
+        // Check if previously unlocked in this session
+        const unlocked = sessionStorage.getItem('backupUnlocked');
+        if (unlocked === 'true') {
+            setIsUnlocked(true);
+            loadBackups();
+            loadSettings();
+        }
     }, []);
+
+    const handlePasswordSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPasswordError('');
+
+        if (passwordInput === SECRET_PASSWORD) {
+            setIsUnlocked(true);
+            sessionStorage.setItem('backupUnlocked', 'true');
+            loadBackups();
+            loadSettings();
+        } else {
+            setPasswordError('Invalid access code. Please try again.');
+            setPasswordInput('');
+        }
+    };
 
     const loadBackups = async () => {
         try {
@@ -45,11 +114,32 @@ const BackupManagement: React.FC = () => {
             setBackups(response.backups);
             setBackupDir(response.backupDir);
             setMaxBackups(response.maxBackups);
+            setStats(response.stats);
         } catch (err: any) {
             console.error('Load backups error:', err);
             setError(err.response?.data?.error || 'Failed to load backups');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadSettings = async () => {
+        try {
+            const response = await api.backups.getSettings();
+            setSettings(response.settings);
+        } catch (err: any) {
+            console.error('Load settings error:', err);
+        }
+    };
+
+    const handleSaveSettings = async () => {
+        try {
+            await api.backups.updateSettings(settings);
+            setSuccess('Settings saved successfully!');
+            setShowSettings(false);
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (err: any) {
+            setError('Failed to save settings');
         }
     };
 
@@ -61,8 +151,8 @@ const BackupManagement: React.FC = () => {
 
             const response = await api.backups.create();
 
-            setSuccess(`Backup created successfully: ${response.backup.name}`);
-            loadBackups(); // Refresh list
+            setSuccess(`✅ Backup created: ${response.backup.name}`);
+            loadBackups();
         } catch (err: any) {
             console.error('Create backup error:', err);
             setError(err.response?.data?.error || 'Failed to create backup');
@@ -71,32 +161,40 @@ const BackupManagement: React.FC = () => {
         }
     };
 
+    const handleCreateCustomBackup = async () => {
+        try {
+            setCreating(true);
+            setError('');
+            setSuccess('');
+
+            const response = await api.backups.createCustom(customOptions);
+
+            setSuccess(`✅ Custom backup created: ${response.backup.name}`);
+            setShowCustomBackup(false);
+            loadBackups();
+        } catch (err: any) {
+            console.error('Create custom backup error:', err);
+            setError(err.response?.data?.error || 'Failed to create backup');
+        } finally {
+            setCreating(false);
+        }
+    };
+
     const handleCreateFullSystemBackup = async () => {
-        const command = `$t=Get-Date -Format 'yyyy-MM-dd_HH-mm-ss';$p="C:\\WMS_FULL_BACKUPS\\WMS_FULL_SYSTEM_$t";mkdir "$p\\database","$p\\backend","$p\\frontend" -Force|Out-Null;docker exec wms-database mysqldump -u wms_user -pwmspassword123 --single-transaction warehouse_wms>"$p\\database\\database.sql";Copy-Item backend\\* "$p\\backend\\" -Recurse -Exclude node_modules,dist,uploads -Force;Copy-Item backend\\uploads "$p\\backend\\" -Recurse -Force -ErrorAction SilentlyContinue;Copy-Item frontend\\* "$p\\frontend\\" -Recurse -Exclude node_modules,dist -Force;Copy-Item docker-compose*.yml,"env*" $p -Force -ErrorAction SilentlyContinue;'Complete backup ready!'|Out-File "$p\\README.txt";Compress-Archive "$p\\*" "$p.zip" -Force;Remove-Item $p -Recurse;Write-Host "✅ Backup created: $p.zip" -ForegroundColor Green`;
+        try {
+            setCreatingFull(true);
+            setError('');
+            setSuccess('');
 
-        const message = `🚀 COMPLETE PLUG-AND-PLAY SYSTEM BACKUP\n\n` +
-            `This creates a backup with:\n` +
-            `• Complete backend source code\n` +
-            `• Complete frontend source code\n` +
-            `• Full database with all data\n` +
-            `• All uploads and user files\n` +
-            `• Docker configurations\n\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-            `📋 COPY & RUN THIS COMMAND IN POWERSHELL:\n\n` +
-            `The command will be copied to your clipboard.\n` +
-            `Just paste it in PowerShell and press Enter!\n\n` +
-            `Backup will be saved to: C:\\WMS_FULL_BACKUPS\\`;
+            const response = await api.backups.createFullSystem();
 
-        if (confirm(message)) {
-            try {
-                // Copy to clipboard
-                await navigator.clipboard.writeText(command);
-                setSuccess(`✅ Command copied to clipboard!\n\nNow:\n1. Open PowerShell\n2. Press Ctrl+V to paste\n3. Press Enter\n\nBackup will be created in C:\\WMS_FULL_BACKUPS\\`);
-            } catch {
-                // Fallback: show command in alert
-                alert(`Copy this command and run in PowerShell:\n\n${command}`);
-                setSuccess('Command shown in dialog - copy and run it in PowerShell');
-            }
+            setSuccess(`✅ Full system backup created: ${response.backup.name}`);
+            loadBackups();
+        } catch (err: any) {
+            console.error('Full backup error:', err);
+            setError(err.response?.data?.error || 'Failed to create full system backup');
+        } finally {
+            setCreatingFull(false);
         }
     };
 
@@ -108,9 +206,7 @@ const BackupManagement: React.FC = () => {
                 },
             });
 
-            if (!response.ok) {
-                throw new Error('Download failed');
-            }
+            if (!response.ok) throw new Error('Download failed');
 
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
@@ -130,7 +226,7 @@ const BackupManagement: React.FC = () => {
     };
 
     const handleDeleteBackup = async (backup: Backup) => {
-        if (!confirm(`Are you sure you want to delete backup: ${backup.name}?`)) {
+        if (!confirm(`🗑️ DELETE BACKUP?\n\nAre you sure you want to delete:\n${backup.name}\n\nThis action CANNOT be undone!`)) {
             return;
         }
 
@@ -140,7 +236,7 @@ const BackupManagement: React.FC = () => {
             await api.backups.delete(backup.name);
 
             setSuccess(`Deleted: ${backup.name}`);
-            loadBackups(); // Refresh list
+            loadBackups();
         } catch (err: any) {
             console.error('Delete error:', err);
             setError(err.response?.data?.error || 'Failed to delete backup');
@@ -165,6 +261,64 @@ const BackupManagement: React.FC = () => {
         });
     };
 
+    // Password Lock Screen
+    if (!isUnlocked) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-6">
+                <div className="max-w-md w-full">
+                    <form onSubmit={handlePasswordSubmit} className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/20">
+                        <div className="text-center mb-8">
+                            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-4 shadow-lg">
+                                <LockClosedIcon className="w-10 h-10 text-white" />
+                            </div>
+                            <h1 className="text-3xl font-bold text-white mb-2">🔒 Secure Backup Access</h1>
+                            <p className="text-blue-200">Enter secret access code to continue</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-blue-100 mb-2">
+                                    Access Code
+                                </label>
+                                <input
+                                    type="password"
+                                    value={passwordInput}
+                                    onChange={(e) => setPasswordInput(e.target.value)}
+                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-2xl tracking-widest"
+                                    placeholder="• • • • •"
+                                    maxLength={5}
+                                    autoFocus
+                                />
+                            </div>
+
+                            {passwordError && (
+                                <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 flex items-center gap-2">
+                                    <ExclamationTriangleIcon className="w-5 h-5 text-red-300 flex-shrink-0" />
+                                    <p className="text-red-200 text-sm">{passwordError}</p>
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                            >
+                                <ShieldCheckIcon className="w-5 h-5" />
+                                Unlock Backup System
+                            </button>
+                        </div>
+
+                        <div className="mt-6 text-center">
+                            <p className="text-sm text-blue-300">
+                                🔐 Protected by secret access code
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        );
+    }
+
+    // Main Backup Management Interface
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
             <div className="max-w-7xl mx-auto">
@@ -176,62 +330,121 @@ const BackupManagement: React.FC = () => {
                                 <ServerStackIcon className="h-10 w-10 text-white" />
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Backup Management</h1>
+                                <h1 className="text-3xl font-bold text-gray-900">🔒 Secure Backup Management</h1>
                                 <p className="text-gray-600 mt-1">
-                                    Protect your data with automated backups
+                                    Advanced backup control panel - Protected by secret code
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={handleCreateBackup}
-                                disabled={creating || creatingFull}
-                                className={`
-                  flex items-center gap-3 px-6 py-3 rounded-xl font-semibold shadow-lg transition-all
-                  ${creating || creatingFull
-                                        ? 'bg-gray-400 cursor-not-allowed'
-                                        : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
-                                    }
-                `}
-                            >
-                                {creating ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                                        Creating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <PlusIcon className="h-5 w-5" />
-                                        Quick Backup
-                                    </>
-                                )}
-                            </button>
+                        <button
+                            onClick={() => setShowSettings(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                            <Cog6ToothIcon className="h-5 w-5 text-gray-600" />
+                            <span className="font-medium text-gray-700">Settings</span>
+                        </button>
+                    </div>
+                </div>
 
-                            <button
-                                onClick={handleCreateFullSystemBackup}
-                                disabled={creating || creatingFull}
-                                className={`
-                  flex items-center gap-3 px-6 py-3 rounded-xl font-semibold shadow-lg transition-all
-                  ${creating || creatingFull
-                                        ? 'bg-gray-400 cursor-not-allowed'
-                                        : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
-                                    }
-                `}
-                            >
-                                {creatingFull ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                                        Creating Full Backup...
-                                    </>
-                                ) : (
-                                    <>
-                                        <ServerStackIcon className="h-5 w-5" />
-                                        Full System Backup
-                                    </>
-                                )}
-                            </button>
+                {/* Stats Cards */}
+                {stats && (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div className="bg-white rounded-xl shadow p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">Total Backups</p>
+                                    <p className="text-3xl font-bold text-gray-900">{stats.totalBackups}</p>
+                                </div>
+                                <ServerStackIcon className="h-12 w-12 text-blue-500" />
+                            </div>
                         </div>
+
+                        <div className="bg-white rounded-xl shadow p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">Total Size</p>
+                                    <p className="text-3xl font-bold text-gray-900">{formatBytes(stats.totalSize)}</p>
+                                </div>
+                                <DocumentArrowDownIcon className="h-12 w-12 text-green-500" />
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">Quick Backups</p>
+                                    <p className="text-3xl font-bold text-gray-900">{stats.quickBackups}</p>
+                                </div>
+                                <ClockIcon className="h-12 w-12 text-purple-500" />
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">Full System</p>
+                                    <p className="text-3xl font-bold text-gray-900">{stats.fullSystemBackups}</p>
+                                </div>
+                                <ShieldCheckIcon className="h-12 w-12 text-orange-500" />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="bg-white rounded-xl shadow p-6 mb-6">
+                    <div className="flex flex-wrap gap-3">
+                        <button
+                            onClick={handleCreateBackup}
+                            disabled={creating || creatingFull}
+                            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow transition-all ${creating || creatingFull
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
+                                }`}
+                        >
+                            {creating ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                                    Creating...
+                                </>
+                            ) : (
+                                <>
+                                    <PlusIcon className="h-5 w-5" />
+                                    Quick Backup
+                                </>
+                            )}
+                        </button>
+
+                        <button
+                            onClick={() => setShowCustomBackup(true)}
+                            disabled={creating || creatingFull}
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold bg-purple-500 hover:bg-purple-600 text-white shadow transition-all"
+                        >
+                            <Cog6ToothIcon className="h-5 w-5" />
+                            Custom Backup
+                        </button>
+
+                        <button
+                            onClick={handleCreateFullSystemBackup}
+                            disabled={creating || creatingFull}
+                            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow transition-all ${creating || creatingFull
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+                                }`}
+                        >
+                            {creatingFull ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                                    Creating...
+                                </>
+                            ) : (
+                                <>
+                                    <ServerStackIcon className="h-5 w-5" />
+                                    Full System Backup
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
 
@@ -256,30 +469,12 @@ const BackupManagement: React.FC = () => {
                     </div>
                 )}
 
-                {/* Info Card */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <p className="text-sm text-gray-600 mb-1">Total Backups</p>
-                            <p className="text-2xl font-bold text-gray-900">{backups.length}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-600 mb-1">Backup Location</p>
-                            <p className="text-sm font-mono text-gray-900 truncate" title={backupDir}>{backupDir}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-600 mb-1">Retention Policy</p>
-                            <p className="text-2xl font-bold text-gray-900">Last {maxBackups} backups</p>
-                        </div>
-                    </div>
-                </div>
-
                 {/* Backups List */}
                 <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
                     <div className="px-6 py-5 border-b border-gray-200">
                         <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                             <DocumentArrowDownIcon className="h-6 w-6 text-gray-600" />
-                            Available Backups
+                            Available Backups ({backups.length})
                         </h2>
                     </div>
 
@@ -305,10 +500,7 @@ const BackupManagement: React.FC = () => {
                     ) : (
                         <div className="divide-y divide-gray-200">
                             {backups.map((backup) => (
-                                <div
-                                    key={backup.name}
-                                    className="p-6 hover:bg-gray-50 transition-colors"
-                                >
+                                <div key={backup.name} className="p-6 hover:bg-gray-50 transition-colors">
                                     <div className="flex items-center justify-between">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-3 mb-2">
@@ -317,13 +509,18 @@ const BackupManagement: React.FC = () => {
                                                     {backup.name}
                                                 </h3>
                                                 {backup.type === 'full-system' && (
-                                                    <span className="px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs font-bold rounded-full uppercase tracking-wide shadow-lg">
+                                                    <span className="px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs font-bold rounded-full uppercase tracking-wide shadow">
                                                         ⭐ Full System
                                                     </span>
                                                 )}
+                                                {backup.type === 'auto' && (
+                                                    <span className="px-3 py-1 bg-purple-500 text-white text-xs font-semibold rounded-full uppercase">
+                                                        🤖 Auto
+                                                    </span>
+                                                )}
                                                 {backup.type === 'quick' && (
-                                                    <span className="px-3 py-1 bg-blue-500 text-white text-xs font-semibold rounded-full uppercase tracking-wide">
-                                                        Quick
+                                                    <span className="px-3 py-1 bg-blue-500 text-white text-xs font-semibold rounded-full uppercase">
+                                                        ⚡ Quick
                                                     </span>
                                                 )}
                                             </div>
@@ -337,11 +534,6 @@ const BackupManagement: React.FC = () => {
                                                     <DocumentArrowDownIcon className="h-4 w-4" />
                                                     <span className="font-semibold">{formatBytes(backup.size)}</span>
                                                 </div>
-                                                {backup.type === 'full-system' && (
-                                                    <div className="text-xs text-green-600 font-semibold">
-                                                        ✓ Complete system - One-click restore ready!
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
 
@@ -374,17 +566,239 @@ const BackupManagement: React.FC = () => {
                     <div className="flex items-start gap-3">
                         <ExclamationTriangleIcon className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" />
                         <div>
-                            <h3 className="font-semibold text-yellow-900 mb-2">Important Information</h3>
+                            <h3 className="font-semibold text-yellow-900 mb-2">🔐 Backup Security Information</h3>
                             <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
-                                <li>Backups include: Database, uploaded files, and configurations</li>
-                                <li>Only the last {maxBackups} backups are kept automatically</li>
+                                <li>This backup system is protected by secret access code: <code className="bg-yellow-200 px-2 py-1 rounded">24865</code></li>
+                                <li>Backups include: Database, uploaded files, and system configurations</li>
+                                <li>Last {maxBackups} backups are kept automatically, older ones are deleted</li>
                                 <li>Download important backups to external storage for safety</li>
-                                <li>Regular backups help recover from accidental data loss or system failures</li>
-                                <li>Backup creation may take 10-60 seconds depending on data size</li>
+                                <li>Auto backups can be scheduled in Settings (coming soon)</li>
+                                <li>All backups are compressed and optimized for storage</li>
                             </ul>
                         </div>
                     </div>
                 </div>
+
+                {/* Settings Modal */}
+                {showSettings && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                            <div className="p-6 border-b border-gray-200">
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-2xl font-bold text-gray-900">⚙️ Backup Settings</h2>
+                                    <button
+                                        onClick={() => setShowSettings(false)}
+                                        className="text-gray-500 hover:text-gray-700"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="p-6 space-y-6">
+                                {/* Auto Backup */}
+                                <div>
+                                    <label className="flex items-center gap-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.autoBackupEnabled}
+                                            onChange={(e) => setSettings({ ...settings, autoBackupEnabled: e.target.checked })}
+                                            className="w-5 h-5 text-blue-600 rounded"
+                                        />
+                                        <span className="font-semibold text-gray-900">Enable Automatic Backups</span>
+                                    </label>
+                                </div>
+
+                                {settings.autoBackupEnabled && (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Backup Time
+                                            </label>
+                                            <input
+                                                type="time"
+                                                value={settings.autoBackupTime}
+                                                onChange={(e) => setSettings({ ...settings, autoBackupTime: e.target.value })}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Frequency
+                                            </label>
+                                            <select
+                                                value={settings.autoBackupFrequency}
+                                                onChange={(e) => setSettings({ ...settings, autoBackupFrequency: e.target.value })}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                            >
+                                                <option value="daily">Daily</option>
+                                                <option value="weekly">Weekly</option>
+                                                <option value="monthly">Monthly</option>
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* What to Backup */}
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 mb-3">What to Include</h3>
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.includeDatabase}
+                                                onChange={(e) => setSettings({ ...settings, includeDatabase: e.target.checked })}
+                                                className="w-5 h-5 text-blue-600 rounded"
+                                            />
+                                            <span className="text-gray-700">Database (Recommended)</span>
+                                        </label>
+
+                                        <label className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.includeUploads}
+                                                onChange={(e) => setSettings({ ...settings, includeUploads: e.target.checked })}
+                                                className="w-5 h-5 text-blue-600 rounded"
+                                            />
+                                            <span className="text-gray-700">Uploaded Files (Recommended)</span>
+                                        </label>
+
+                                        <label className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.includeCode}
+                                                onChange={(e) => setSettings({ ...settings, includeCode: e.target.checked })}
+                                                className="w-5 h-5 text-blue-600 rounded"
+                                            />
+                                            <span className="text-gray-700">Source Code (Advanced)</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* Retention */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Retention Days
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={settings.retentionDays}
+                                        onChange={(e) => setSettings({ ...settings, retentionDays: parseInt(e.target.value) })}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                        min="7"
+                                        max="365"
+                                    />
+                                    <p className="text-sm text-gray-500 mt-1">Backups older than this will be deleted</p>
+                                </div>
+
+                                {/* Notifications */}
+                                <div>
+                                    <label className="flex items-center gap-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.emailNotifications}
+                                            onChange={(e) => setSettings({ ...settings, emailNotifications: e.target.checked })}
+                                            className="w-5 h-5 text-blue-600 rounded"
+                                        />
+                                        <span className="text-gray-700">Email Notifications</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="p-6 border-t border-gray-200 flex gap-3">
+                                <button
+                                    onClick={handleSaveSettings}
+                                    className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold"
+                                >
+                                    Save Settings
+                                </button>
+                                <button
+                                    onClick={() => setShowSettings(false)}
+                                    className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Custom Backup Modal */}
+                {showCustomBackup && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+                            <div className="p-6 border-b border-gray-200">
+                                <h2 className="text-2xl font-bold text-gray-900">🎯 Custom Backup</h2>
+                            </div>
+
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Backup Name (Optional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={customOptions.backupName}
+                                        onChange={(e) => setCustomOptions({ ...customOptions, backupName: e.target.value })}
+                                        placeholder="Leave empty for auto-generated name"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                    />
+                                </div>
+
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 mb-3">Select What to Backup</h3>
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={customOptions.includeDatabase}
+                                                onChange={(e) => setCustomOptions({ ...customOptions, includeDatabase: e.target.checked })}
+                                                className="w-5 h-5 text-blue-600 rounded"
+                                            />
+                                            <span>Database</span>
+                                        </label>
+
+                                        <label className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={customOptions.includeUploads}
+                                                onChange={(e) => setCustomOptions({ ...customOptions, includeUploads: e.target.checked })}
+                                                className="w-5 h-5 text-blue-600 rounded"
+                                            />
+                                            <span>Uploads</span>
+                                        </label>
+
+                                        <label className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={customOptions.includeCode}
+                                                onChange={(e) => setCustomOptions({ ...customOptions, includeCode: e.target.checked })}
+                                                className="w-5 h-5 text-blue-600 rounded"
+                                            />
+                                            <span>Source Code</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-6 border-t border-gray-200 flex gap-3">
+                                <button
+                                    onClick={handleCreateCustomBackup}
+                                    className="flex-1 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold"
+                                >
+                                    Create Custom Backup
+                                </button>
+                                <button
+                                    onClick={() => setShowCustomBackup(false)}
+                                    className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

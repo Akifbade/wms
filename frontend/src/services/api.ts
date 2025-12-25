@@ -715,7 +715,7 @@ export const shipmentSettingsAPI = {
 // Backups API
 const backupsAPI = {
   getAll: async () => {
-    return apiCall<{ backups: any[]; backupDir: string; maxBackups: number }>('/backups', {
+    return apiCall<{ backups: any[]; backupDir: string; maxBackups: number; stats: any }>('/backups', {
       method: 'GET',
     });
   },
@@ -723,6 +723,39 @@ const backupsAPI = {
   create: async () => {
     return apiCall<{ success: boolean; message: string; backup: any }>('/backups/create', {
       method: 'POST',
+    });
+  },
+
+  createCustom: async (options: { includeDatabase: boolean; includeUploads: boolean; includeCode: boolean; backupName?: string }) => {
+    return apiCall<{ success: boolean; message: string; backup: any }>('/backups/create', {
+      method: 'POST',
+      body: JSON.stringify(options),
+    });
+  },
+
+  createFullSystem: async () => {
+    return apiCall<{ success: boolean; message: string; backup: any }>('/backups/create-full-system', {
+      method: 'POST',
+    });
+  },
+
+  getSettings: async () => {
+    return apiCall<{ settings: any }>('/backups/settings', {
+      method: 'GET',
+    });
+  },
+
+  updateSettings: async (settings: any) => {
+    return apiCall<{ success: boolean; message: string }>('/backups/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ settings }),
+    });
+  },
+
+  verifyPassword: async (password: string) => {
+    return apiCall<{ success: boolean; message: string }>('/backups/verify-password', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
     });
   },
 

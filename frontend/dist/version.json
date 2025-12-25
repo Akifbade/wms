@@ -1,9 +1,9 @@
 {
   "version": "v2.3.1",
   "buildDate": "Dec 25, 2025",
-  "buildTime": "09:21:07",
-  "commit": "fefcaf3ef",
-  "commitMessage": "fix: User names in rejection emails + database schema",
+  "buildTime": "10:59:30",
+  "commit": "90894c461",
+  "commitMessage": "feat: Add logout button to mobile UI top header",
   "author": "akifbade46-del",
   "environment": "local"
 }
