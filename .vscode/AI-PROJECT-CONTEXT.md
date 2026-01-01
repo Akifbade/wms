@@ -1,8 +1,36 @@
 # 🤖 AI Project Context - WMS (Warehouse Management System)
 
-> **Last Updated**: December 14, 2025
-> **Current Version**: v2.2.87
+> **Last Updated**: January 1, 2026
+> **Current Version**: v2.5.1
 > **Branch**: stable/prisma-mysql-production
+
+---
+
+## 🚨🚨🚨 CRITICAL DEPLOYMENT RULE 🚨🚨🚨
+
+### ✅ CORRECT DEPLOYMENT (Git-based Auto Deploy)
+```powershell
+# 1. Build frontend if UI changed
+cd frontend && npm run build
+
+# 2. Commit & Push (GitHub Actions auto-deploys in ~7 mins)
+git add -A
+git commit -m "v2.x.x: Description"
+git push origin stable/prisma-mysql-production
+```
+
+### ❌ FORBIDDEN (NEVER DO)
+```
+❌ plink -pw ... root@148.230.107.155 "docker build ..."
+❌ pscp to VPS for deployment
+❌ docker cp to VPS containers
+❌ ANY direct VPS deployment commands
+```
+
+### 📍 VPS Access ONLY For:
+- Checking logs
+- Database queries
+- Emergency debugging
 
 ---
 
