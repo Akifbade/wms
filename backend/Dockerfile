@@ -4,10 +4,11 @@ FROM node:18-slim
 
 WORKDIR /app
 
-# Install OpenSSL for Prisma, MySQL client for backups, and Chromium for Puppeteer
+# Install OpenSSL for Prisma, MySQL client for backups, Docker CLI for stats, and Chromium for Puppeteer
 RUN apt-get update -y && apt-get install -y \
     openssl \
     default-mysql-client \
+    docker.io \
     chromium \
     fonts-liberation \
     libasound2 \

@@ -112,6 +112,7 @@ docker run -d --name wms-backend \
   -e CORS_ORIGIN='https://qgocargo.cloud,https://www.qgocargo.cloud,http://localhost' \
   -p 5000:5000 \
   -v "/root/NEW START/backend/uploads:/app/uploads" \
+  -v /var/run/docker.sock:/var/run/docker.sock \
   --restart always \
   ghcr.io/akifbade/wms-backend:latest
 
