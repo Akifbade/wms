@@ -109,6 +109,7 @@ docker run -d --name wms-backend \
   -e DATABASE_URL='mysql://wms_user:wmspassword123@wms-database:3306/warehouse_wms' \
   -e JWT_SECRET='your-production-jwt-secret-here' \
   -e PORT=5000 \
+  -e DOCKER_API_VERSION=1.44 \
   -e CORS_ORIGIN='https://qgocargo.cloud,https://www.qgocargo.cloud,http://localhost' \
   -p 5000:5000 \
   -v "/root/NEW START/backend/uploads:/app/uploads" \

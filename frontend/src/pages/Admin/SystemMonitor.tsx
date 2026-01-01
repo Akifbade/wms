@@ -292,10 +292,10 @@ const SystemMonitor: React.FC = () => {
               <Box p={2} display="flex" alignItems="center">
                 <ContainerIcon color="primary" sx={{ mr: 1 }} />
                 <Typography variant="h6">Docker Containers (Live)</Typography>
-                <Chip 
-                  label="Real-time" 
-                  size="small" 
-                  color="success" 
+                <Chip
+                  label="Real-time"
+                  size="small"
+                  color="success"
                   sx={{ ml: 2 }}
                 />
               </Box>
@@ -317,24 +317,24 @@ const SystemMonitor: React.FC = () => {
                         const cpuValue = parseFloat(container.cpu.replace('%', ''));
                         const isWmsContainer = container.name.startsWith('wms-');
                         return (
-                          <TableRow 
-                            key={container.name} 
+                          <TableRow
+                            key={container.name}
                             hover
-                            sx={{ 
+                            sx={{
                               backgroundColor: isWmsContainer ? 'rgba(25, 118, 210, 0.04)' : 'inherit'
                             }}
                           >
                             <TableCell>
                               <Box display="flex" alignItems="center">
-                                <ContainerIcon 
-                                  sx={{ 
-                                    mr: 1, 
+                                <ContainerIcon
+                                  sx={{
+                                    mr: 1,
                                     fontSize: 18,
                                     color: isWmsContainer ? 'primary.main' : 'text.secondary'
-                                  }} 
+                                  }}
                                 />
-                                <Typography 
-                                  variant="body2" 
+                                <Typography
+                                  variant="body2"
                                   fontWeight={isWmsContainer ? 600 : 400}
                                 >
                                   {container.name}
@@ -342,9 +342,9 @@ const SystemMonitor: React.FC = () => {
                               </Box>
                             </TableCell>
                             <TableCell align="center">
-                              <Chip 
-                                label="Running" 
-                                size="small" 
+                              <Chip
+                                label="Running"
+                                size="small"
                                 color="success"
                                 sx={{ fontSize: '0.7rem' }}
                               />

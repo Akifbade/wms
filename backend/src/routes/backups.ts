@@ -39,14 +39,14 @@ router.post('/verify-password', authenticateToken, authorizeRoles('ADMIN'), asyn
         const { password } = req.body;
 
         if (password === SECRET_PASSWORD) {
-            res.json({ 
-                success: true, 
+            res.json({
+                success: true,
                 message: 'Access granted to backup system',
                 passwordValid: true
             });
         } else {
-            res.status(401).json({ 
-                success: false, 
+            res.status(401).json({
+                success: false,
                 error: 'Invalid backup access password',
                 passwordValid: false
             });
@@ -67,8 +67,8 @@ router.get('/settings', authenticateToken, authorizeRoles('ADMIN'), async (req, 
         // Get company settings for backups (using company table as storage)
         const company = await prisma.company.findUnique({
             where: { id: companyId },
-            select: { 
-                id: true, 
+            select: {
+                id: true,
                 name: true,
                 backupSettings: true // JSON field for backup config
             }
@@ -239,11 +239,11 @@ router.get('/', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => 
  */
 router.post('/create', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
     try {
-        const { 
-            includeDatabase = true, 
-            includeUploads = true, 
+        const {
+            includeDatabase = true,
+            includeUploads = true,
             includeCode = false,
-            backupName 
+            backupName
         } = req.body;
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -378,7 +378,7 @@ router.post('/create', authenticateToken, authorizeRoles('ADMIN'), async (req, r
         });
     } catch (error: any) {
         console.error('Create backup error:', error);
-        
+
         // Send failure notification
         try {
             await sendNotification(req.user!.companyId, 'BACKUP_FAILED', {
@@ -428,7 +428,7 @@ router.post('/create-full-system', authenticateToken, authorizeRoles('ADMIN'), a
         // 2. Backend files
         console.log('💻 Full system: Backing up backend...');
         const backendDir = path.join(process.cwd());
-        await fs.cp(backendDir, path.join(backupPath, 'backend'), { 
+        await fs.cp(backendDir, path.join(backupPath, 'backend'), {
             recursive: true,
             filter: (src: string) => !src.includes('node_modules') && !src.includes('dist')
         });
@@ -437,7 +437,7 @@ router.post('/create-full-system', authenticateToken, authorizeRoles('ADMIN'), a
         try {
             const uploadsDir = path.join(process.cwd(), 'uploads');
             await fs.cp(uploadsDir, path.join(backupPath, 'backend', 'uploads'), { recursive: true });
-        } catch {}
+        } catch { }
 
         // 4. Create README
         const readme = `WMS FULL SYSTEM BACKUP
@@ -518,7 +518,7 @@ router.delete('/:backupName', authenticateToken, authorizeRoles('ADMIN'), async 
                 await fs.access(p);
                 backupPath = p;
                 break;
-            } catch {}
+            } catch { }
         }
 
         if (!backupPath) {
@@ -561,7 +561,7 @@ router.get('/download/:backupName', authenticateToken, authorizeRoles('ADMIN'), 
                 await fs.access(p);
                 backupPath = p;
                 break;
-            } catch {}
+            } catch { }
         }
 
         if (!backupPath) {
@@ -624,7 +624,7 @@ router.post('/git-sync', authenticateToken, authorizeRoles('ADMIN'), async (req,
         // Find backup file
         const quickPath = path.join(BACKUP_DIR, backupName);
         const fullPath = path.join(FULL_BACKUP_DIR, backupName);
-        
+
         let backupPath: string | null = null;
         try {
             await fs.access(quickPath);
@@ -662,7 +662,7 @@ router.post('/git-sync', authenticateToken, authorizeRoles('ADMIN'), async (req,
             await execAsync('git init', { cwd: gitPath });
             await execAsync('git config user.email "backup@wms.local"', { cwd: gitPath });
             await execAsync('git config user.name "WMS Backup System"', { cwd: gitPath });
-            
+
             // Add remote if URL provided
             if (gitRepoUrl) {
                 await execAsync(`git remote add origin "${gitRepoUrl}"`, { cwd: gitPath });
@@ -709,9 +709,9 @@ router.post('/test-auto', authenticateToken, authorizeRoles('ADMIN'), async (req
     try {
         const { triggerManualBackupCron } = require('../cron/backupJobs');
         const { companyId } = req.user!;
-        
+
         const result = await triggerManualBackupCron(companyId);
-        
+
         res.json({
             success: result.success,
             message: result.success ? 'Test backup completed successfully' : 'Test backup failed',
@@ -744,7 +744,7 @@ router.get('/stats', authenticateToken, authorizeRoles('ADMIN'), async (req, res
             quickBackups: quickBackups.length,
             autoBackups: autoBackups.length,
             fullSystemBackups: fullBackups.length,
-            oldestBackup: allBackups.length > 0 
+            oldestBackup: allBackups.length > 0
                 ? new Date(Math.min(...allBackups.map(b => new Date(b.createdAt).getTime())))
                 : null,
             newestBackup: allBackups.length > 0
@@ -787,9 +787,9 @@ router.post('/restore', authenticateToken, authorizeRoles('ADMIN'), async (req, 
         // Find backup
         const quickPath = path.join(BACKUP_DIR, backupName);
         const autoPath = path.join(BACKUP_DIR, 'auto', backupName);
-        
+
         let backupPath: string | null = null;
-        
+
         if (backupName.endsWith('.sql')) {
             // Direct SQL restore
             try {
