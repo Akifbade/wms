@@ -125,10 +125,8 @@ echo "🌐 Starting frontend..."
 docker run -d --name wms-frontend \
   --network wms-network \
   -e VITE_API_URL=https://qgocargo.cloud/api \
-  -p 80:80 \
-  -p 443:443 \
-  -v "/root/NEW START/frontend/nginx-ssl.conf:/etc/nginx/conf.d/default.conf:ro" \
-  -v /etc/letsencrypt:/etc/letsencrypt:ro \
+  -p 3080:80 \
+  -v "/root/NEW START/frontend/nginx-http-only.conf:/etc/nginx/conf.d/default.conf:ro" \
   --restart always \
   ghcr.io/akifbade/wms-frontend:latest
 
