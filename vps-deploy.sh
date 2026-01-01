@@ -64,7 +64,7 @@ docker network rm newstart_default 2>/dev/null || true
 # Create fresh network
 docker network rm wms-network 2>/dev/null || true
 echo "🌐 Creating fresh Docker network..."
-docker network create wms-network
+docker network create wms-network 2>/dev/null || true
 
 # 4. FIX DATABASE VOLUME PERMISSIONS
 echo "🔧 Fixing database permissions..."
