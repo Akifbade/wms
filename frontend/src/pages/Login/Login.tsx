@@ -181,26 +181,6 @@ export const Login: React.FC = () => {
               )}
             </button>
 
-            {/* Demo Credentials */}
-            <div className='mt-8 pt-6 border-t border-gray-100'>
-              <p className='text-xs text-center text-gray-500 mb-3 uppercase tracking-wider font-semibold'>Quick Login (Demo)</p>
-              <div className='grid grid-cols-2 gap-3'>
-                <button
-                  type='button'
-                  onClick={() => { setEmail('admin@demo.com'); setPassword('demo123'); }}
-                  className='px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 text-xs font-medium border border-gray-200 transition-colors'
-                >
-                  Admin
-                </button>
-                <button
-                  type='button'
-                  onClick={() => { setEmail('manager@demo.com'); setPassword('demo123'); }}
-                  className='px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 text-xs font-medium border border-gray-200 transition-colors'
-                >
-                  Manager
-                </button>
-              </div>
-            </div>
           </form>
         </div>
       </div>
