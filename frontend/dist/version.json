@@ -1,9 +1,9 @@
 {
   "version": "v2.3.2",
-  "buildDate": "Dec 25, 2025",
-  "buildTime": "15:27:22",
-  "commit": "058cb587d",
-  "commitMessage": "fix: Remove unnecessary GHCR re-pull (images already loaded)",
+  "buildDate": "Jan 01, 2026",
+  "buildTime": "17:07:36",
+  "commit": "f2f2d3b92",
+  "commitMessage": "docs: Update AI context with deployment rules and latest info",
   "author": "akifbade46-del",
   "environment": "local"
 }

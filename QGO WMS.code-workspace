@@ -1,0 +1,155 @@
+{
+    "folders": [
+        {
+            "name": "🏢 QGO WMS (Root)",
+            "path": "."
+        },
+        {
+            "name": "⚙️ Backend (Node.js + Prisma)",
+            "path": "backend"
+        },
+        {
+            "name": "🌐 Frontend (Nginx)",
+            "path": "frontend"
+        },
+        {
+            "name": "🗄️ Database",
+            "path": "database"
+        },
+        {
+            "name": "📁 Uploads",
+            "path": "uploads"
+        }
+    ],
+    "settings": {
+        "files.exclude": {
+            "**/node_modules": true,
+            "**/dist": true,
+            "**/.git": true,
+            "**/*.log": true
+        },
+        "search.exclude": {
+            "**/node_modules": true,
+            "**/dist": true,
+            "**/uploads": true
+        },
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "typescript.tsdk": "backend/node_modules/typescript/lib",
+        "[typescript]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[javascript]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[prisma]": {
+            "editor.defaultFormatter": "Prisma.prisma"
+        },
+        "files.associations": {
+            "*.env": "properties",
+            "Dockerfile*": "dockerfile",
+            "docker-compose*.yml": "dockercompose"
+        },
+        "terminal.integrated.env.windows": {
+            "NODE_ENV": "development"
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-azuretools.vscode-docker",
+            "Prisma.prisma",
+            "esbenp.prettier-vscode",
+            "dbaeumer.vscode-eslint",
+            "ms-vscode.vscode-typescript-next",
+            "rangav.vscode-thunder-client",
+            "humao.rest-client"
+        ]
+    },
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "type": "node",
+                "request": "launch",
+                "name": "🚀 Debug Backend",
+                "skipFiles": [
+                    "<node_internals>/**"
+                ],
+                "program": "${workspaceFolder:⚙️ Backend (Node.js + Prisma)}/src/index.ts",
+                "preLaunchTask": "tsc: build - backend/tsconfig.json",
+                "outFiles": [
+                    "${workspaceFolder:⚙️ Backend (Node.js + Prisma)}/dist/**/*.js"
+                ],
+                "envFile": "${workspaceFolder:⚙️ Backend (Node.js + Prisma)}/.env",
+                "console": "integratedTerminal"
+            },
+            {
+                "name": "🐳 Docker: Attach to Backend",
+                "type": "node",
+                "request": "attach",
+                "port": 9229,
+                "address": "localhost",
+                "localRoot": "${workspaceFolder:⚙️ Backend (Node.js + Prisma)}",
+                "remoteRoot": "/app",
+                "protocol": "inspector"
+            }
+        ]
+    },
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+                "label": "🐳 Start Docker Compose",
+                "type": "shell",
+                "command": "docker-compose up -d",
+                "problemMatcher": [],
+                "presentation": {
+                    "reveal": "always",
+                    "panel": "new"
+                }
+            },
+            {
+                "label": "🛑 Stop Docker Compose",
+                "type": "shell",
+                "command": "docker-compose down",
+                "problemMatcher": []
+            },
+            {
+                "label": "📊 View Docker Logs",
+                "type": "shell",
+                "command": "docker-compose logs -f",
+                "problemMatcher": [],
+                "isBackground": true
+            },
+            {
+                "label": "🔨 Build Backend",
+                "type": "shell",
+                "command": "npm run build",
+                "options": {
+                    "cwd": "${workspaceFolder}/backend"
+                },
+                "problemMatcher": [
+                    "$tsc"
+                ]
+            },
+            {
+                "label": "🔄 Prisma: Generate Client",
+                "type": "shell",
+                "command": "npx prisma generate",
+                "options": {
+                    "cwd": "${workspaceFolder}/backend"
+                },
+                "problemMatcher": []
+            },
+            {
+                "label": "🗄️ Prisma: Migrate Dev",
+                "type": "shell",
+                "command": "npx prisma migrate dev",
+                "options": {
+                    "cwd": "${workspaceFolder}/backend"
+                },
+                "problemMatcher": []
+            }
+        ]
+    }
+}

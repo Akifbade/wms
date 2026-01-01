@@ -1,0 +1,166 @@
+name: 🚀 Build & Deploy to VPS (Optimized)
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔤 Lowercase Repo Name
+        run: |
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
+      - name: 📌 Get Version
+        id: version
+        run: |
+          if [ -f VERSION.md ]; then
+            VERSION=$(cat VERSION.md | grep -oP 'v\d+\.\d+\.\d+' | head -1)
+          else
+            VERSION="v1.0.0"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: 🔐 Log in to Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏗️ Build and push Backend (OPTIMIZED - Compiled JS)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/wms-backend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/wms-backend:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/wms-backend:compiled
+          build-args: |
+            NODE_ENV=production
+          no-cache: false
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/wms-backend:latest
+          cache-to: type=inline
+
+      - name: 💾 Save Backend Image
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/wms-backend:latest
+          docker save ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/wms-backend:latest | gzip > backend-optimized.tar.gz
+          ls -lh backend-optimized.tar.gz
+          echo "Backend image size: $(du -h backend-optimized.tar.gz | cut -f1)"
+
+      - name: 📤 Copy Backend Image to VPS
+        uses: appleboy/scp-action@master
+        with:
+          host: 148.230.107.155
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "backend-optimized.tar.gz"
+          target: "/tmp/"
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 🔍 Check Secrets
+        env:
+          VPS_PASS: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          if [ -z "$VPS_PASS" ]; then
+            echo "::error::VPS_PASSWORD secret is NOT set!"
+            exit 1
+          else
+            echo "✅ VPS_PASSWORD is set"
+          fi
+
+      - name: 📥 Checkout repository (for scripts)
+        uses: actions/checkout@v4
+
+      - name: 📤 Copy deployment script to VPS
+        uses: appleboy/scp-action@master
+        with:
+          host: 148.230.107.155
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "vps-deploy-optimized.sh"
+          target: "/root/"
+
+      - name: 🚀 Deploy to VPS (Optimized Version)
+        uses: appleboy/ssh-action@master
+        timeout-minutes: 12
+        with:
+          host: 148.230.107.155
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 10m
+          script: |
+            echo "🚀 Starting Optimized Deployment..."
+            
+            # Load the optimized backend image
+            echo "📦 Loading optimized backend image..."
+            if [ -f /tmp/backend-optimized.tar.gz ]; then
+              gunzip -c /tmp/backend-optimized.tar.gz | docker load
+              rm -f /tmp/backend-optimized.tar.gz
+              echo "✅ Backend image loaded"
+            else
+              echo "❌ Backend image not found!"
+              exit 1
+            fi
+            
+            # Run deployment script
+            echo "🔧 Running deployment script..."
+            chmod +x /root/vps-deploy-optimized.sh
+            /root/vps-deploy-optimized.sh
+
+      - name: ✅ Verify Deployment
+        uses: appleboy/ssh-action@master
+        with:
+          host: 148.230.107.155
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            echo "🔍 Verifying deployment..."
+            
+            # Check containers
+            echo "📊 Container Status:"
+            docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+            
+            # Check backend health
+            echo ""
+            echo "🏥 Backend Health Check:"
+            curl -s http://localhost:5000/health || echo "⚠️ Backend health check failed"
+            
+            # Check memory usage
+            echo ""
+            echo "💾 Backend Memory Usage:"
+            docker stats --no-stream wms-backend --format "table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}"
+            
+            # Check if using compiled version
+            echo ""
+            echo "🔍 Verifying compiled JS (not ts-node):"
+            docker exec wms-backend ps aux | grep node | grep -v grep
+            
+            echo ""
+            echo "✅ Deployment verification complete!"

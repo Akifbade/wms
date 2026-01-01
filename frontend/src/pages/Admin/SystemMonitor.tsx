@@ -22,10 +22,19 @@ import {
   Memory as MemoryIcon,
   Storage as StorageIcon,
   Speed as SpeedIcon,
-  Dns as DnsIcon
+  Dns as DnsIcon,
+  ViewInAr as ContainerIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import { getAuthToken } from '../../services/api';
+
+interface ContainerStat {
+  name: string;
+  cpu: string;
+  memory: string;
+  network: string;
+  diskIO: string;
+}
 
 interface SystemStats {
   system: {
@@ -61,6 +70,7 @@ interface SystemStats {
     memory: number;
     command: string;
   }>;
+  containers?: ContainerStat[];
 }
 
 const SystemMonitor: React.FC = () => {
@@ -267,6 +277,116 @@ const SystemMonitor: React.FC = () => {
                       <TableRow>
                         <TableCell colSpan={5} align="center">
                           No process data available (requires Linux/Mac host)
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Grid>
+
+          {/* Docker Containers Section */}
+          <Grid item xs={12}>
+            <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+              <Box p={2} display="flex" alignItems="center">
+                <ContainerIcon color="primary" sx={{ mr: 1 }} />
+                <Typography variant="h6">Docker Containers (Live)</Typography>
+                <Chip 
+                  label="Real-time" 
+                  size="small" 
+                  color="success" 
+                  sx={{ ml: 2 }}
+                />
+              </Box>
+              <TableContainer sx={{ maxHeight: 400 }}>
+                <Table stickyHeader size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Container</strong></TableCell>
+                      <TableCell align="center"><strong>Status</strong></TableCell>
+                      <TableCell align="right"><strong>CPU</strong></TableCell>
+                      <TableCell align="right"><strong>Memory</strong></TableCell>
+                      <TableCell align="right"><strong>Network I/O</strong></TableCell>
+                      <TableCell align="right"><strong>Disk I/O</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {stats.containers && stats.containers.length > 0 ? (
+                      stats.containers.map((container) => {
+                        const cpuValue = parseFloat(container.cpu.replace('%', ''));
+                        const isWmsContainer = container.name.startsWith('wms-');
+                        return (
+                          <TableRow 
+                            key={container.name} 
+                            hover
+                            sx={{ 
+                              backgroundColor: isWmsContainer ? 'rgba(25, 118, 210, 0.04)' : 'inherit'
+                            }}
+                          >
+                            <TableCell>
+                              <Box display="flex" alignItems="center">
+                                <ContainerIcon 
+                                  sx={{ 
+                                    mr: 1, 
+                                    fontSize: 18,
+                                    color: isWmsContainer ? 'primary.main' : 'text.secondary'
+                                  }} 
+                                />
+                                <Typography 
+                                  variant="body2" 
+                                  fontWeight={isWmsContainer ? 600 : 400}
+                                >
+                                  {container.name}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip 
+                                label="Running" 
+                                size="small" 
+                                color="success"
+                                sx={{ fontSize: '0.7rem' }}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Chip
+                                label={container.cpu}
+                                size="small"
+                                color={cpuValue > 80 ? 'error' : cpuValue > 50 ? 'warning' : 'default'}
+                                sx={{ minWidth: 60 }}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2" fontFamily="monospace">
+                                {container.memory}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2" fontFamily="monospace" color="text.secondary">
+                                {container.network}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2" fontFamily="monospace" color="text.secondary">
+                                {container.diskIO}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                          <Box>
+                            <ContainerIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                            <Typography color="text.secondary">
+                              No Docker containers detected
+                            </Typography>
+                            <Typography variant="caption" color="text.disabled">
+                              Docker stats are only available when running on the VPS
+                            </Typography>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     )}
