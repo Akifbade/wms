@@ -1,9 +1,9 @@
 {
-  "version": "v2.3.2",
-  "buildDate": "Jan 01, 2026",
-  "buildTime": "17:07:36",
-  "commit": "f2f2d3b92",
-  "commitMessage": "docs: Update AI context with deployment rules and latest info",
+  "version": "v2.3.3",
+  "buildDate": "Jan 03, 2026",
+  "buildTime": "09:14:42",
+  "commit": "a3289d8bc",
+  "commitMessage": "fix: Change frontend port from 80/443 to 3080 (host nginx handles SSL)",
   "author": "akifbade46-del",
   "environment": "local"
 }
