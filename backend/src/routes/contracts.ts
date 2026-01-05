@@ -302,8 +302,8 @@ router.put('/:contractId', authenticateToken, authorizeRoles('ADMIN', 'MANAGER')
             const userId = req.user!.id;
 
             await prisma.$executeRaw`
-                INSERT INTO contract_history (id, customerPrepaidBalanceId, monthlyRate, contractStartDate, contractEndDate, reason, changedByUserId, createdAt)
-                VALUES (${historyId}, ${contractId}, ${existingContract.monthlyRate}, ${startDate}, ${endDate}, 'Contract Update', ${userId}, NOW())
+                INSERT INTO contract_history (company_id, start_date, end_date, monthly_fee, payment_due_day, max_cbm_allowed, max_storage_days, status, notes, created_by)
+                VALUES (${companyId}, ${startDate}, ${endDate}, ${existingContract.monthlyRate}, ${existingContract.paymentDueDay || 30}, ${existingContract.maxCbmAllowed || null}, ${existingContract.maxStorageDays || null}, 'ACTIVE', 'Contract Update', ${userId})
             `;
         }
 
