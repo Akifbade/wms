@@ -1,0 +1,14 @@
+quizzical_wescoff: alpine
+temp-storage: supabase/storage-api:v1.11.13
+supabase-studio: supabase/studio:latest
+supabase-rest: postgrest/postgrest:v11.2.2
+supabase-analytics: supabase/logflare:1.4.0
+supabase-meta: supabase/postgres-meta:v0.68.0
+supabase-realtime: supabase/realtime:v2.25.35
+supabase-auth: supabase/gotrue:v2.132.3
+supabase-db: supabase/postgres:15.1.0.147
+supabase-edge-functions: supabase/edge-runtime:v1.22.4
+supabase-kong: kong:2.8.1
+wms-frontend: ghcr.io/akifbade/wms-frontend:latest
+wms-backend: ghcr.io/akifbade/wms-backend:latest
+wms-database: mysql:8.0
