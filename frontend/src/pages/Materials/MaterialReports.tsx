@@ -212,7 +212,7 @@ const MaterialReports: React.FC = () => {
   };
 
   const exportToCSV = () => {
-    const rows: string[] = ['Material,SKU,Unit,Opening Stock,Purchased,Consumed,Returned,Damaged,Closing Stock,Unit Cost,Total Value'];
+    const rows: string[] = ['Material,SKU,Unit,Opening Stock,Purchased,Consumed,Returned,Damaged,Closing Stock,Unit Price,Total Value'];
     statements.forEach(stmt => {
       rows.push([
         `"${stmt.material.name}"`,
@@ -307,7 +307,7 @@ const MaterialReports: React.FC = () => {
 
     doc.autoTable({
       startY: yPos,
-      head: [['Material', 'SKU', 'Unit', 'Current Stock', 'Purchase', 'Consumed', 'Returned', 'Damaged', 'Unit Cost', 'Total Value']],
+      head: [['Material', 'SKU', 'Unit', 'Current Stock', 'Purchase', 'Consumed', 'Returned', 'Damaged', 'Unit Price', 'Total Value']],
       body: tableData,
       theme: 'grid',
       headStyles: {
@@ -783,7 +783,7 @@ const MaterialReports: React.FC = () => {
                       <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50">- Consumed</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50">+ Returned</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-red-700 uppercase tracking-wider bg-red-50">- Damaged</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit Cost</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit Price</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total Value</th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider print:hidden">Actions</th>
                     </tr>
