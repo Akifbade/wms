@@ -1,9 +1,9 @@
 {
   "version": "v2.3.3",
-  "buildDate": "Jan 12, 2026",
-  "buildTime": "09:16:01",
-  "commit": "222f47805",
-  "commitMessage": "fix: contract_history SQL query with correct column names",
+  "buildDate": "Jan 19, 2026",
+  "buildTime": "13:52:46",
+  "commit": "76fd46e75",
+  "commitMessage": "fix: Change Unit Cost to Unit Price in Material Reports",
   "author": "akifbade46-del",
   "environment": "local"
 }

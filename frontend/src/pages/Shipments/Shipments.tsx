@@ -43,7 +43,7 @@ export const Shipments: React.FC = () => {
   const [statusCounts, setStatusCounts] = useState({ all: 0, pending: 0, in_storage: 0, partial: 0, released: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Modals
   const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<any>(null);
@@ -62,7 +62,7 @@ export const Shipments: React.FC = () => {
 
   // Debounced search - wait 500ms after user stops typing
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -125,7 +125,7 @@ export const Shipments: React.FC = () => {
           if (!src) return 0;
           return Math.ceil((Date.now() - new Date(src).getTime()) / (1000 * 60 * 60 * 24));
         };
-        
+
         switch (sortBy) {
           case 'date_desc': return getCreatedAt(b) - getCreatedAt(a); // Newest added first
           case 'date_asc': return getCreatedAt(a) - getCreatedAt(b); // Oldest added first
@@ -209,14 +209,14 @@ export const Shipments: React.FC = () => {
     const dateB = new Date(b.arrivalDate || b.createdAt || 0).getTime();
     return dateB - dateA; // Latest arrival first
   });
-  
+
   const groupedByCompany = sortedForFolders.reduce((acc: any, shipment: any) => {
     const company = shipment.companyProfile?.name || 'Unassigned';
     if (!acc[company]) acc[company] = [];
     acc[company].push(shipment);
     return acc;
   }, {}) as Record<string, any[]>;
-  
+
   // Sort folders by their latest shipment's arrival date
   const sortedFolderNames = Object.keys(groupedByCompany).sort((a, b) => {
     const latestA = Math.max(...groupedByCompany[a].map((s: any) => new Date(s.arrivalDate || s.createdAt || 0).getTime()));
@@ -262,12 +262,14 @@ export const Shipments: React.FC = () => {
 
   const ShipmentCard = ({ shipment }: { shipment: any }) => {
     const days = getDaysStored(shipment);
-    const canRelease = ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE', 'PARTIAL'].includes(shipment.status) && shipment.currentBoxCount > 0;
+    // ✅ FIX: Allow release for moved shipments - check if boxes exist regardless of move history
+    const canRelease = ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE', 'PARTIAL'].includes(shipment.status) &&
+      (shipment.currentBoxCount > 0 || (shipment.boxes && shipment.boxes.length > 0));
     const photos = shipment.shipmentPhotos || [];
     const firstRackId = shipment.boxes?.find((b: any) => b.rackId)?.rackId;
     const isReleased = shipment.status === 'RELEASED';
     const isContract = shipment.companyProfile?.hasContract; // Assuming this field exists or logic
-    
+
     return (
       <div className="relative bg-white rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-all p-2 md:p-4 overflow-hidden group">
         {/* Stamps & Badges */}
@@ -316,7 +318,7 @@ export const Shipments: React.FC = () => {
                 {shipment.clientName}
               </h3>
               <p className="text-[10px] md:text-xs font-mono text-slate-500 mt-0.5">{shipment.referenceId}</p>
-              
+
               {shipment.companyProfile && (
                 <div className="flex items-center gap-1 mt-1 md:mt-2 text-[10px] md:text-xs text-blue-600 font-medium bg-blue-50 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md w-fit">
                   <BuildingOfficeIcon className="h-3 w-3" />
@@ -336,8 +338,8 @@ export const Shipments: React.FC = () => {
             <div className="space-y-1">
               <p className="text-slate-400 flex items-center gap-1"><ScaleIcon className="h-3 w-3" /> CBM / Wgt</p>
               <p className="font-semibold text-slate-700">
-                {shipment.cbm ? `${Number(shipment.cbm).toFixed(2)} m³` : '-'} 
-                <span className="text-slate-300 mx-1">|</span> 
+                {shipment.cbm ? `${Number(shipment.cbm).toFixed(2)} m³` : '-'}
+                <span className="text-slate-300 mx-1">|</span>
                 {shipment.weight ? `${shipment.weight} kg` : '-'}
               </p>
             </div>
@@ -427,7 +429,7 @@ export const Shipments: React.FC = () => {
               <h1 className="text-lg md:text-2xl font-bold text-blue-900">Shipments</h1>
               <p className="text-xs md:text-sm text-slate-500 hidden md:block">Manage intake, storage, and release operations</p>
             </div>
-            
+
             <div className="flex items-center gap-1.5 md:gap-3">
               {/* View Toggle */}
               <div className="flex bg-slate-100 p-0.5 md:p-1 rounded-lg border border-slate-200">
@@ -456,7 +458,7 @@ export const Shipments: React.FC = () => {
                   warehouseFilter="all"
                 />
               </div>
-              
+
               <button
                 onClick={() => setCreateModalOpen(true)}
                 className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2.5 bg-blue-600 text-white text-xs md:text-sm font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg active:scale-95"
@@ -484,7 +486,7 @@ export const Shipments: React.FC = () => {
                 </button>
               )}
             </div>
-            
+
             {/* Sort Dropdown */}
             <div className="relative">
               <select
@@ -513,16 +515,14 @@ export const Shipments: React.FC = () => {
               <button
                 key={tab.key}
                 onClick={() => setActiveStatus(tab.key)}
-                className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all whitespace-nowrap ${
-                  activeStatus === tab.key
+                className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all whitespace-nowrap ${activeStatus === tab.key
                     ? 'bg-blue-600 text-white shadow-md'
                     : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                }`}
+                  }`}
               >
                 {tab.label}
-                <span className={`px-1 md:px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold ${
-                  activeStatus === tab.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                }`}>
+                <span className={`px-1 md:px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold ${activeStatus === tab.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                  }`}>
                   {tab.count}
                 </span>
               </button>
@@ -595,17 +595,17 @@ export const Shipments: React.FC = () => {
         ) : (
           /* TABLE VIEW */
           <div className="space-y-2 md:space-y-4">
-             {shipments.map((shipment: any) => (
-                <ShipmentCard key={shipment.id} shipment={shipment} />
-             ))}
-             {shipments.length === 0 && (
-                <div className="text-center py-20">
-                  <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CubeIcon className="h-10 w-10 text-blue-200" />
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-700">No shipments found</h3>
+            {shipments.map((shipment: any) => (
+              <ShipmentCard key={shipment.id} shipment={shipment} />
+            ))}
+            {shipments.length === 0 && (
+              <div className="text-center py-20">
+                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CubeIcon className="h-10 w-10 text-blue-200" />
                 </div>
-             )}
+                <h3 className="text-lg font-bold text-slate-700">No shipments found</h3>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -650,7 +650,7 @@ export const Shipments: React.FC = () => {
 
       {/* Photo Lightbox */}
       {lightboxOpen && lightboxPhotos.length > 0 && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center backdrop-blur-sm"
           onClick={() => setLightboxOpen(false)}
         >

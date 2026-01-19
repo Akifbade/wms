@@ -479,7 +479,7 @@ const MaterialReports: React.FC = () => {
           .text-red-600 { color: #dc2626 !important; }
         }
       `}</style>
-      
+
       <div className="p-6 max-w-7xl mx-auto print:p-0 print:max-w-none material-reports-print-container">
         {/* Screen Header */}
         <div className="flex justify-between items-center mb-6 print:hidden">
@@ -487,628 +487,626 @@ const MaterialReports: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-900">📦 Material Stock Statement</h1>
             <p className="text-gray-500 mt-1">Complete stock movement report with opening & closing balances</p>
           </div>
-        <div className="flex gap-2">
-          <button
-            onClick={exportToPDF}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            <FileText className="w-4 h-4" />
-            Download PDF
-          </button>
-          <button
-            onClick={printStatement}
-            className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-          >
-            <Printer className="w-4 h-4" />
-            Print
-          </button>
-          <button
-            onClick={exportToCSV}
-            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-          >
-            <Download className="w-4 h-4" />
-            Export CSV
-          </button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6 print:hidden">
-        <div className="flex flex-wrap gap-4 items-end">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-            <input
-              type="date"
-              value={dateRange.start}
-              onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-              className="border rounded-lg px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-              className="border rounded-lg px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Material (Optional)</label>
-            <select
-              value={selectedMaterial}
-              onChange={(e) => setSelectedMaterial(e.target.value)}
-              className="border rounded-lg px-3 py-2 min-w-[200px]"
-            >
-              <option value="">All Materials</option>
-              {statements.map(s => (
-                <option key={s.material.id} value={s.material.id}>
-                  {s.material.name} ({s.material.sku})
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            onClick={loadMaterialStatement}
-            disabled={loading}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Load Statement
-          </button>
-          <div className="flex gap-2 ml-auto">
+          <div className="flex gap-2">
             <button
-              onClick={() => setViewMode('summary')}
-              className={`flex items-center gap-1 px-3 py-2 rounded-lg ${viewMode === 'summary' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+              onClick={exportToPDF}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            >
+              <FileText className="w-4 h-4" />
+              Download PDF
+            </button>
+            <button
+              onClick={printStatement}
+              className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+            <button
+              onClick={exportToCSV}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-lg shadow p-4 mb-6 print:hidden">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                className="border rounded-lg px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                className="border rounded-lg px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Material (Optional)</label>
+              <select
+                value={selectedMaterial}
+                onChange={(e) => setSelectedMaterial(e.target.value)}
+                className="border rounded-lg px-3 py-2 min-w-[200px]"
+              >
+                <option value="">All Materials</option>
+                {statements.map(s => (
+                  <option key={s.material.id} value={s.material.id}>
+                    {s.material.name} ({s.material.sku})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={loadMaterialStatement}
+              disabled={loading}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Load Statement
+            </button>
+            <div className="flex gap-2 ml-auto">
+              <button
+                onClick={() => setViewMode('summary')}
+                className={`flex items-center gap-1 px-3 py-2 rounded-lg ${viewMode === 'summary' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                <Table className="w-4 h-4" />
+                Summary View
+              </button>
+              <button
+                onClick={() => setViewMode('detailed')}
+                className={`flex items-center gap-1 px-3 py-2 rounded-lg ${viewMode === 'detailed' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                Detailed View
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Tabs */}
+        <div className="bg-white rounded-lg shadow mb-6 print:hidden">
+          <div className="border-b flex">
+            <button
+              onClick={() => setActiveTab('statement')}
+              className={`px-6 py-3 font-medium flex items-center gap-2 ${activeTab === 'statement' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <Table className="w-4 h-4" />
-              Summary View
+              Stock Statement
             </button>
             <button
-              onClick={() => setViewMode('detailed')}
-              className={`flex items-center gap-1 px-3 py-2 rounded-lg ${viewMode === 'detailed' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+              onClick={() => setActiveTab('history')}
+              className={`px-6 py-3 font-medium flex items-center gap-2 ${activeTab === 'history' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              <BarChart3 className="w-4 h-4" />
-              Detailed View
+              <History className="w-4 h-4" />
+              Edit/Delete History
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Main Tabs */}
-      <div className="bg-white rounded-lg shadow mb-6 print:hidden">
-        <div className="border-b flex">
-          <button
-            onClick={() => setActiveTab('statement')}
-            className={`px-6 py-3 font-medium flex items-center gap-2 ${activeTab === 'statement' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            <Table className="w-4 h-4" />
-            Stock Statement
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`px-6 py-3 font-medium flex items-center gap-2 ${activeTab === 'history' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            <History className="w-4 h-4" />
-            Edit/Delete History
-          </button>
-        </div>
-      </div>
-
-      {/* HISTORY TAB */}
-      {activeTab === 'history' && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-4 flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <History className="w-5 h-5" />
-                Material Issue History
-              </h2>
-              <p className="text-purple-100 text-sm">All edits and deletions for material issues</p>
+        {/* HISTORY TAB */}
+        {activeTab === 'history' && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-4 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  Material Issue History
+                </h2>
+                <p className="text-purple-100 text-sm">All edits and deletions for material issues</p>
+              </div>
+              <button
+                onClick={loadIssueHistory}
+                disabled={historyLoading}
+                className="flex items-center gap-2 bg-white/20 text-white px-4 py-2 rounded-lg hover:bg-white/30"
+              >
+                <RefreshCw className={`w-4 h-4 ${historyLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
             </div>
-            <button
-              onClick={loadIssueHistory}
-              disabled={historyLoading}
-              className="flex items-center gap-2 bg-white/20 text-white px-4 py-2 rounded-lg hover:bg-white/30"
-            >
-              <RefreshCw className={`w-4 h-4 ${historyLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
 
-          {historyLoading && (
-            <div className="text-center py-12">
-              <RefreshCw className="w-8 h-8 animate-spin mx-auto text-purple-600" />
-              <p className="mt-2 text-gray-500">Loading history...</p>
-            </div>
-          )}
+            {historyLoading && (
+              <div className="text-center py-12">
+                <RefreshCw className="w-8 h-8 animate-spin mx-auto text-purple-600" />
+                <p className="mt-2 text-gray-500">Loading history...</p>
+              </div>
+            )}
 
-          {!historyLoading && issueHistory.length === 0 && (
-            <div className="p-12 text-center">
-              <History className="w-16 h-16 mx-auto text-gray-300" />
-              <h3 className="mt-4 text-lg font-medium text-gray-900">No History Found</h3>
-              <p className="mt-2 text-gray-500">No material issue edits or deletions recorded yet.</p>
-            </div>
-          )}
+            {!historyLoading && issueHistory.length === 0 && (
+              <div className="p-12 text-center">
+                <History className="w-16 h-16 mx-auto text-gray-300" />
+                <h3 className="mt-4 text-lg font-medium text-gray-900">No History Found</h3>
+                <p className="mt-2 text-gray-500">No material issue edits or deletions recorded yet.</p>
+              </div>
+            )}
 
-          {!historyLoading && issueHistory.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date/Time</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Action</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Material</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Quantity</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Cost</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Reason</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">By</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {issueHistory.map((item) => (
-                    <tr
-                      key={item.id}
-                      className={`
-                        ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'bg-red-50' : (item.action === 'EDITED' || item.action === 'RETURN_EDITED') ? 'bg-yellow-50' : 'bg-green-50'}
-                        ${item.jobId ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}
-                      `}
-                      onClick={() => item.jobId && window.open(`/jobs/${item.jobId}`, '_blank')}
-                      title={item.jobId ? "Click to open job details" : ""}
-                    >
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                        {new Date(item.performedAt).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'bg-red-100 text-red-700' :
-                          (item.action === 'EDITED' || item.action === 'RETURN_EDITED') ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-green-100 text-green-700'
-                          }`}>
-                          {(item.action === 'DELETED' || item.action === 'RETURN_DELETED') && <Trash2 className="w-3 h-3" />}
-                          {(item.action === 'EDITED' || item.action === 'RETURN_EDITED') && <Edit2 className="w-3 h-3" />}
-                          {item.action === 'CREATED' && <ArrowUpCircle className="w-3 h-3" />}
-                          {item.action.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-gray-900">{item.materialName}</div>
-                        <div className="text-xs text-gray-500">{item.materialSku}</div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {(item.action === 'EDITED' || item.action === 'RETURN_EDITED') && item.previousQty !== null ? (
-                          <div className="text-sm">
-                            <span className="text-gray-500 line-through">{item.previousQty}</span>
-                            <span className="mx-1">→</span>
-                            <span className="font-bold text-yellow-700">{item.quantity}</span>
-                          </div>
-                        ) : (
-                          <span className={`font-bold ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'text-red-600' : 'text-gray-900'}`}>
-                            {item.quantity}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-gray-600">
-                        KWD {item.totalCost?.toFixed(2) || '0.00'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
-                        {item.reason || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {item.performedBy?.name || 'Unknown'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* STATEMENT TAB CONTENT */}
-      {activeTab === 'statement' && (
-        <>
-          {/* Loading */}
-          {loading && (
-            <div className="text-center py-12">
-              <RefreshCw className="w-8 h-8 animate-spin mx-auto text-blue-600" />
-              <p className="mt-2 text-gray-500">Loading material statement...</p>
-            </div>
-          )}
-
-          {/* No Data */}
-          {!loading && statements.length === 0 && (
-            <div className="bg-white rounded-lg shadow p-12 text-center">
-              <Package className="w-16 h-16 mx-auto text-gray-300" />
-              <h3 className="mt-4 text-lg font-medium text-gray-900">No Data Found</h3>
-              <p className="mt-2 text-gray-500">No material transactions found for the selected date range.</p>
-            </div>
-          )}
-
-          {/* SUMMARY VIEW - Stock Statement Table */}
-          {!loading && statements.length > 0 && viewMode === 'summary' && (
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              {/* Print-Only Professional Report Container */}
-              <div className="print-only-report">
-                {/* Print-Only Professional Header */}
-                <div className="hidden print:block print-header">
-                  <div>
-                    <img 
-                      src="http://qgocargo.com/logo.png" 
-                      alt="Company Logo" 
-                      className="print-logo"
-                    />
-                  </div>
-                  <div className="print-company-info">
-                    <div className="print-title">MATERIAL STOCK STATEMENT</div>
-                    <div style={{ fontSize: '12px', color: '#666' }}>
-                      QGO Cargo & Warehouse Management
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#888', marginTop: '5px' }}>
-                      Tel: +965 XXXX XXXX | Email: info@qgocargo.com
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Print Period */}
-                <div className="hidden print:block print-period">
-                  <strong>Report Period:</strong> {formatDate(dateRange.start)} to {formatDate(dateRange.end)}
-                  <br />
-                  <strong>Generated:</strong> {new Date().toLocaleString('en-GB', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </div>
-                
-                {/* Screen Header (Hidden in Print) */}
-                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 print:hidden">
-                  <h2 className="text-xl font-bold">Stock Statement</h2>
-                  <p className="text-blue-100 text-sm">Period: {formatDate(dateRange.start)} to {formatDate(dateRange.end)}</p>
-                </div>
-
+            {!historyLoading && issueHistory.length > 0 && (
               <div className="overflow-x-auto">
-                <table className="min-w-full print-table">
-                  <thead className="bg-gray-100">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Material</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SKU</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-100">
-                        <span className="print:hidden">📦 </span>Current Stock
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50">+ Purchased</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50">- Consumed</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50">+ Returned</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-red-700 uppercase tracking-wider bg-red-50">- Damaged</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit Price</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total Value</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider print:hidden">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date/Time</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Action</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Material</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Quantity</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Cost</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Reason</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">By</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {statements.map((stmt) => (
-                      <tr key={stmt.material.id} className="hover:bg-gray-50">
+                    {issueHistory.map((item) => (
+                      <tr
+                        key={item.id}
+                        className={`
+                        ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'bg-red-50' : (item.action === 'EDITED' || item.action === 'RETURN_EDITED') ? 'bg-yellow-50' : 'bg-green-50'}
+                        ${item.jobId ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}
+                      `}
+                        onClick={() => item.jobId && window.open(`/jobs/${item.jobId}`, '_blank')}
+                        title={item.jobId ? "Click to open job details" : ""}
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                          {new Date(item.performedAt).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'bg-red-100 text-red-700' :
+                            (item.action === 'EDITED' || item.action === 'RETURN_EDITED') ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-green-100 text-green-700'
+                            }`}>
+                            {(item.action === 'DELETED' || item.action === 'RETURN_DELETED') && <Trash2 className="w-3 h-3" />}
+                            {(item.action === 'EDITED' || item.action === 'RETURN_EDITED') && <Edit2 className="w-3 h-3" />}
+                            {item.action === 'CREATED' && <ArrowUpCircle className="w-3 h-3" />}
+                            {item.action.replace('_', ' ')}
+                          </span>
+                        </td>
                         <td className="px-4 py-3">
-                          <Link to={`/materials/${stmt.material.id}`} className="text-blue-600 hover:underline font-medium print:text-black print:no-underline">
-                            {stmt.material.name}
-                          </Link>
-                          <p className="text-xs text-gray-500 print:inline print:ml-1">({stmt.material.category})</p>
+                          <div className="text-sm font-medium text-gray-900">{item.materialName}</div>
+                          <div className="text-xs text-gray-500">{item.materialSku}</div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{stmt.material.sku}</td>
-                        <td className="px-4 py-3 text-center text-sm text-gray-600">{stmt.material.unit}</td>
-                        <td className="px-4 py-3 text-right font-bold text-blue-700 bg-blue-50">{stmt.material.currentStock}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-green-600 bg-green-50">
-                          {stmt.totals.totalPurchased > 0 ? `+${stmt.totals.totalPurchased}` : '-'}
+                        <td className="px-4 py-3 text-center">
+                          {(item.action === 'EDITED' || item.action === 'RETURN_EDITED') && item.previousQty !== null ? (
+                            <div className="text-sm">
+                              <span className="text-gray-500 line-through">{item.previousQty}</span>
+                              <span className="mx-1">→</span>
+                              <span className="font-bold text-yellow-700">{item.quantity}</span>
+                            </div>
+                          ) : (
+                            <span className={`font-bold ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'text-red-600' : 'text-gray-900'}`}>
+                              {item.quantity}
+                            </span>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-blue-600 bg-blue-50">
-                          {stmt.totals.totalIssued > 0 ? `-${stmt.totals.totalIssued}` : '-'}
+                        <td className="px-4 py-3 text-right text-sm text-gray-600">
+                          KWD {item.totalCost?.toFixed(2) || '0.00'}
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-purple-600 bg-purple-50">
-                          {stmt.totals.totalReturned > 0 ? `+${stmt.totals.totalReturned}` : '-'}
+                        <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
+                          {item.reason || '-'}
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-red-600 bg-red-50">
-                          {stmt.totals.totalDamaged > 0 ? `-${stmt.totals.totalDamaged}` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm">{stmt.material.unitCost.toFixed(2)} KWD</td>
-                        <td className="px-4 py-3 text-right font-semibold">{stmt.totals.totalValue.toFixed(2)} KWD</td>
-                        <td className="px-4 py-3 text-center print:hidden">
-                          <button
-                            onClick={() => {
-                              setViewMode('detailed');
-                              setExpandedMaterials(new Set([stmt.material.id]));
-                            }}
-                            className="text-blue-600 hover:text-blue-800"
-                            title="View Transactions"
-                          >
-                            <Eye className="w-5 h-5" />
-                          </button>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {item.performedBy?.name || 'Unknown'}
                         </td>
                       </tr>
                     ))}
                   </tbody>
-                  {/* Totals Footer */}
-                  {summary && (
-                    <tfoot className="bg-gray-800 text-white">
-                      <tr>
-                        <td colSpan={3} className="px-4 py-3 font-bold text-right">TOTAL ({summary.totalMaterials} Materials)</td>
-                        <td className="px-4 py-3 text-right font-bold text-blue-400">{statements.reduce((sum, s) => sum + s.material.currentStock, 0)}</td>
-                        <td className="px-4 py-3 text-right font-bold text-green-400">+{summary.totalPurchased}</td>
-                        <td className="px-4 py-3 text-right font-bold text-blue-400">-{summary.totalIssued}</td>
-                        <td className="px-4 py-3 text-right font-bold text-purple-400">+{summary.totalReturned}</td>
-                        <td className="px-4 py-3 text-right font-bold text-red-400">-{summary.totalDamaged}</td>
-                        <td className="px-4 py-3"></td>
-                        <td className="px-4 py-3 text-right font-bold">{summary.totalValue.toFixed(2)} KWD</td>
-                        <td className="print:hidden"></td>
-                      </tr>
-                    </tfoot>
-                  )}
                 </table>
               </div>
-              
-              {/* Print Footer */}
-              <div className="hidden print:block print-footer">
-                <strong>QGO Cargo Kuwait</strong> | Warehouse Storage, Customs Clearance, Import Export & International Moving
-              </div>
-              </div>
-              {/* End print-only-report wrapper */}
+            )}
+          </div>
+        )}
 
-              {/* Legend */}
-              <div className="px-6 py-4 bg-gray-50 border-t flex gap-6 text-sm print:hidden">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                  <span className="text-gray-600">Purchase = Stock In (from vendors)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                  <span className="text-gray-600">Consumed = Stock Out (to jobs)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-purple-500"></span>
-                  <span className="text-gray-600">Returned = Stock In (from jobs)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-red-500"></span>
-                  <span className="text-gray-600">Damaged = Stock Loss</span>
-                </div>
+        {/* STATEMENT TAB CONTENT */}
+        {activeTab === 'statement' && (
+          <>
+            {/* Loading */}
+            {loading && (
+              <div className="text-center py-12">
+                <RefreshCw className="w-8 h-8 animate-spin mx-auto text-blue-600" />
+                <p className="mt-2 text-gray-500">Loading material statement...</p>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* DETAILED VIEW - Individual Material Transactions */}
-          {!loading && statements.length > 0 && viewMode === 'detailed' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <p className="text-gray-600">Click on a material to view its transaction history</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setExpandedMaterials(new Set(statements.map(s => s.material.id)))}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    Expand All
-                  </button>
-                  <span className="text-gray-300">|</span>
-                  <button
-                    onClick={() => setExpandedMaterials(new Set())}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    Collapse All
-                  </button>
-                </div>
+            {/* No Data */}
+            {!loading && statements.length === 0 && (
+              <div className="bg-white rounded-lg shadow p-12 text-center">
+                <Package className="w-16 h-16 mx-auto text-gray-300" />
+                <h3 className="mt-4 text-lg font-medium text-gray-900">No Data Found</h3>
+                <p className="mt-2 text-gray-500">No material transactions found for the selected date range.</p>
               </div>
+            )}
 
-              {statements.map((stmt) => (
-                <div key={stmt.material.id} className="bg-white rounded-lg shadow overflow-hidden">
-                  {/* Material Header - Clickable */}
-                  <div
-                    onClick={() => toggleMaterial(stmt.material.id)}
-                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 border-b"
-                  >
-                    <div className="flex items-center gap-4">
-                      {expandedMaterials.has(stmt.material.id) ? (
-                        <ChevronDown className="w-5 h-5 text-gray-500" />
-                      ) : (
-                        <ChevronRight className="w-5 h-5 text-gray-500" />
-                      )}
-                      <div>
-                        <Link
-                          to={`/materials/${stmt.material.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-lg font-bold text-blue-600 hover:underline"
-                        >
-                          {stmt.material.name}
-                        </Link>
-                        <p className="text-sm text-gray-500">
-                          SKU: {stmt.material.sku} • {stmt.material.category} • {stmt.material.unit}
-                        </p>
-                      </div>
+            {/* SUMMARY VIEW - Stock Statement Table */}
+            {!loading && statements.length > 0 && viewMode === 'summary' && (
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                {/* Print-Only Professional Report Container */}
+                <div className="print-only-report">
+                  {/* Print-Only Professional Header */}
+                  <div className="hidden print:block print-header">
+                    <div>
+                      <img
+                        src="http://qgocargo.com/logo.png"
+                        alt="Company Logo"
+                        className="print-logo"
+                      />
                     </div>
-
-                    {/* Quick Stats */}
-                    <div className="flex items-center gap-6">
-                      <div className="text-center px-3 py-1 bg-gray-100 rounded">
-                        <p className="text-xs text-gray-500">Opening</p>
-                        <p className="font-bold">{stmt.totals.openingStock}</p>
+                    <div className="print-company-info">
+                      <div className="print-title">MATERIAL STOCK STATEMENT</div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>
+                        QGO Cargo & Warehouse Management
                       </div>
-                      <div className="text-center px-3 py-1 bg-green-100 rounded">
-                        <p className="text-xs text-green-600">Purchased</p>
-                        <p className="font-bold text-green-700">+{stmt.totals.totalPurchased}</p>
-                      </div>
-                      <div className="text-center px-3 py-1 bg-blue-100 rounded">
-                        <p className="text-xs text-blue-600">Consumed</p>
-                        <p className="font-bold text-blue-700">-{stmt.totals.totalIssued}</p>
-                      </div>
-                      <div className="text-center px-3 py-1 bg-purple-100 rounded">
-                        <p className="text-xs text-purple-600">Returned</p>
-                        <p className="font-bold text-purple-700">+{stmt.totals.totalReturned}</p>
-                      </div>
-                      {stmt.totals.totalDamaged > 0 && (
-                        <div className="text-center px-3 py-1 bg-red-100 rounded">
-                          <p className="text-xs text-red-600">Damaged</p>
-                          <p className="font-bold text-red-700">-{stmt.totals.totalDamaged}</p>
-                        </div>
-                      )}
-                      <div className={`text-center px-3 py-1 rounded ${stmt.totals.closingBalance < stmt.material.minStockLevel ? 'bg-red-100' : 'bg-gray-200'}`}>
-                        <p className="text-xs text-gray-600">Closing</p>
-                        <p className={`font-bold ${stmt.totals.closingBalance < stmt.material.minStockLevel ? 'text-red-600' : ''}`}>
-                          {stmt.totals.closingBalance}
-                        </p>
+                      <div style={{ fontSize: '11px', color: '#888', marginTop: '5px' }}>
+                        Tel: +965 XXXX XXXX | Email: info@qgocargo.com
                       </div>
                     </div>
                   </div>
 
-                  {/* Transactions Table - Expanded View */}
-                  {expandedMaterials.has(stmt.material.id) && (
-                    <div>
-                      {/* Opening Balance Row */}
-                      <div className="bg-gray-100 px-4 py-2 flex justify-between items-center border-b">
-                        <span className="text-sm text-gray-600 font-medium">📂 Opening Balance (before {formatDate(dateRange.start)})</span>
-                        <span className="font-bold">{stmt.totals.openingStock} {stmt.material.unit}</span>
+                  {/* Print Period */}
+                  <div className="hidden print:block print-period">
+                    <strong>Report Period:</strong> {formatDate(dateRange.start)} to {formatDate(dateRange.end)}
+                    <br />
+                    <strong>Generated:</strong> {new Date().toLocaleString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+
+                  {/* Screen Header (Hidden in Print) */}
+                  <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 print:hidden">
+                    <h2 className="text-xl font-bold">Stock Statement</h2>
+                    <p className="text-blue-100 text-sm">Period: {formatDate(dateRange.start)} to {formatDate(dateRange.end)}</p>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full print-table">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Material</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SKU</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-100">
+                            <span className="print:hidden">📦 </span>Current Stock
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50">+ Purchased</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50">- Consumed</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50">+ Returned</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-red-700 uppercase tracking-wider bg-red-50">- Damaged</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit Price</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total Value</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider print:hidden">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {statements.map((stmt) => (
+                          <tr key={stmt.material.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <Link to={`/materials/${stmt.material.id}`} className="text-blue-600 hover:underline font-medium print:text-black print:no-underline">
+                                {stmt.material.name}
+                              </Link>
+                              <p className="text-xs text-gray-500 print:inline print:ml-1">({stmt.material.category})</p>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{stmt.material.sku}</td>
+                            <td className="px-4 py-3 text-center text-sm text-gray-600">{stmt.material.unit}</td>
+                            <td className="px-4 py-3 text-right font-bold text-blue-700 bg-blue-50">{stmt.material.currentStock}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-green-600 bg-green-50">
+                              {stmt.totals.totalPurchased > 0 ? `+${stmt.totals.totalPurchased}` : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-right font-semibold text-blue-600 bg-blue-50">
+                              {stmt.totals.totalIssued > 0 ? `-${stmt.totals.totalIssued}` : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-right font-semibold text-purple-600 bg-purple-50">
+                              {stmt.totals.totalReturned > 0 ? `+${stmt.totals.totalReturned}` : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-right font-semibold text-red-600 bg-red-50">
+                              {stmt.totals.totalDamaged > 0 ? `-${stmt.totals.totalDamaged}` : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm">{stmt.material.unitCost.toFixed(2)} KWD</td>
+                            <td className="px-4 py-3 text-right font-semibold">{stmt.totals.totalValue.toFixed(2)} KWD</td>
+                            <td className="px-4 py-3 text-center print:hidden">
+                              <button
+                                onClick={() => {
+                                  setViewMode('detailed');
+                                  setExpandedMaterials(new Set([stmt.material.id]));
+                                }}
+                                className="text-blue-600 hover:text-blue-800"
+                                title="View Transactions"
+                              >
+                                <Eye className="w-5 h-5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      {/* Totals Footer */}
+                      {summary && (
+                        <tfoot className="bg-gray-800 text-white">
+                          <tr>
+                            <td colSpan={3} className="px-4 py-3 font-bold text-right">TOTAL ({summary.totalMaterials} Materials)</td>
+                            <td className="px-4 py-3 text-right font-bold text-blue-400">{statements.reduce((sum, s) => sum + s.material.currentStock, 0)}</td>
+                            <td className="px-4 py-3 text-right font-bold text-green-400">+{summary.totalPurchased}</td>
+                            <td className="px-4 py-3 text-right font-bold text-blue-400">-{summary.totalIssued}</td>
+                            <td className="px-4 py-3 text-right font-bold text-purple-400">+{summary.totalReturned}</td>
+                            <td className="px-4 py-3 text-right font-bold text-red-400">-{summary.totalDamaged}</td>
+                            <td className="px-4 py-3"></td>
+                            <td className="px-4 py-3 text-right font-bold">{summary.totalValue.toFixed(2)} KWD</td>
+                            <td className="print:hidden"></td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+
+                  {/* Print Footer */}
+                  <div className="hidden print:block print-footer">
+                    <strong>QGO Cargo Kuwait</strong> | Warehouse Storage, Customs Clearance, Import Export & International Moving
+                  </div>
+                </div>
+                {/* End print-only-report wrapper */}
+
+                {/* Legend */}
+                <div className="px-6 py-4 bg-gray-50 border-t flex gap-6 text-sm print:hidden">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                    <span className="text-gray-600">Purchase = Stock In (from vendors)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                    <span className="text-gray-600">Consumed = Stock Out (to jobs)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+                    <span className="text-gray-600">Returned = Stock In (from jobs)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-500"></span>
+                    <span className="text-gray-600">Damaged = Stock Loss</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* DETAILED VIEW - Individual Material Transactions */}
+            {!loading && statements.length > 0 && viewMode === 'detailed' && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <p className="text-gray-600">Click on a material to view its transaction history</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setExpandedMaterials(new Set(statements.map(s => s.material.id)))}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      Expand All
+                    </button>
+                    <span className="text-gray-300">|</span>
+                    <button
+                      onClick={() => setExpandedMaterials(new Set())}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      Collapse All
+                    </button>
+                  </div>
+                </div>
+
+                {statements.map((stmt) => (
+                  <div key={stmt.material.id} className="bg-white rounded-lg shadow overflow-hidden">
+                    {/* Material Header - Clickable */}
+                    <div
+                      onClick={() => toggleMaterial(stmt.material.id)}
+                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 border-b"
+                    >
+                      <div className="flex items-center gap-4">
+                        {expandedMaterials.has(stmt.material.id) ? (
+                          <ChevronDown className="w-5 h-5 text-gray-500" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-gray-500" />
+                        )}
+                        <div>
+                          <Link
+                            to={`/materials/${stmt.material.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-lg font-bold text-blue-600 hover:underline"
+                          >
+                            {stmt.material.name}
+                          </Link>
+                          <p className="text-sm text-gray-500">
+                            SKU: {stmt.material.sku} • {stmt.material.category} • {stmt.material.unit}
+                          </p>
+                        </div>
                       </div>
 
-                      {stmt.transactions.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500">
-                          No transactions found for this material in the selected date range.
+                      {/* Quick Stats */}
+                      <div className="flex items-center gap-6">
+                        <div className="text-center px-3 py-1 bg-gray-100 rounded">
+                          <p className="text-xs text-gray-500">Opening</p>
+                          <p className="font-bold">{stmt.totals.openingStock}</p>
                         </div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full">
-                            <thead className="bg-gray-50 border-b">
-                              <tr>
-                                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Date</th>
-                                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Type</th>
-                                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Job / Details</th>
-                                <th className="px-4 py-2 text-right text-xs font-semibold text-green-600">IN</th>
-                                <th className="px-4 py-2 text-right text-xs font-semibold text-red-600">OUT</th>
-                                <th className="px-4 py-2 text-right text-xs font-semibold text-gray-800">Balance</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {stmt.transactions.map((txn, idx) => {
-                                // Extract customer name from description
-                                const customerMatch = txn.description?.match(/- (.+?)(?:\s*\(|$)/);
-                                const customerName = customerMatch ? customerMatch[1].trim() : '';
-                                const isPending = txn.type === 'RETURN_PENDING_APPROVAL';
-                                
-                                return (
-                                  <tr 
-                                    key={txn.id || idx} 
-                                    className={`hover:bg-gray-50 ${isPending ? 'bg-yellow-50' : ''} ${
-                                      txn.type === 'PURCHASE' ? 'bg-green-50/50' : 
-                                      txn.type === 'ISSUE' ? 'bg-blue-50/50' : 
-                                      txn.type === 'RETURN' ? 'bg-purple-50/50' : 
-                                      txn.type === 'DAMAGE' ? 'bg-red-50/50' : ''
-                                    }`}
-                                  >
-                                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                                      {formatDate(txn.date)}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                                        txn.type === 'PURCHASE' ? 'bg-green-100 text-green-700' :
-                                        txn.type === 'ISSUE' ? 'bg-blue-100 text-blue-700' :
-                                        txn.type === 'RETURN' ? 'bg-purple-100 text-purple-700' :
-                                        txn.type === 'RETURN_PENDING_APPROVAL' ? 'bg-yellow-100 text-yellow-700' :
-                                        txn.type === 'DAMAGE' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
-                                      }`}>
-                                        {txn.type === 'PURCHASE' && '📦 Stock In'}
-                                        {txn.type === 'ISSUE' && '📤 Issued'}
-                                        {txn.type === 'RETURN' && '↩️ Returned'}
-                                        {txn.type === 'RETURN_PENDING_APPROVAL' && '⏳ Pending Return'}
-                                        {txn.type === 'DAMAGE' && '❌ Damaged'}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      {txn.referenceType === 'moving_job' && txn.referenceId ? (
-                                        <Link 
-                                          to={`/moving-jobs/${txn.referenceId}`} 
-                                          className="group block"
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-blue-600 hover:text-blue-800 font-medium group-hover:underline">
-                                              {customerName || txn.reference}
-                                            </span>
-                                            <span className="text-xs text-gray-400 group-hover:text-blue-500">
-                                              → Open Job
-                                            </span>
-                                          </div>
-                                          <p className="text-xs text-gray-400">{txn.reference}</p>
-                                        </Link>
-                                      ) : (
-                                        <div>
-                                          <p className="font-medium text-gray-800">
-                                            {txn.description?.replace('Issued to Job:', '').replace('Returned from Job:', '').replace('Purchased from', '').trim() || txn.reference}
-                                          </p>
-                                          {txn.reference !== 'N/A' && txn.reference && (
-                                            <p className="text-xs text-gray-400">{txn.reference}</p>
-                                          )}
-                                        </div>
-                                      )}
-                                      {isPending && (
-                                        <span className="inline-block mt-1 text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">
-                                          ⏳ Waiting for approval - not added to stock
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                      {txn.stockIn > 0 ? (
-                                        <span className="text-lg font-bold text-green-600">+{txn.stockIn}</span>
-                                      ) : (
-                                        <span className="text-gray-300">-</span>
-                                      )}
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                      {txn.stockOut > 0 ? (
-                                        <span className="text-lg font-bold text-red-600">-{txn.stockOut}</span>
-                                      ) : (
-                                        <span className="text-gray-300">-</span>
-                                      )}
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                      <span className={`text-lg font-bold ${txn.balance < 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                                        {txn.balance}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
+                        <div className="text-center px-3 py-1 bg-green-100 rounded">
+                          <p className="text-xs text-green-600">Purchased</p>
+                          <p className="font-bold text-green-700">+{stmt.totals.totalPurchased}</p>
                         </div>
-                      )}
-
-                      {/* Closing Balance Row */}
-                      <div className="bg-gray-800 text-white px-4 py-3 flex justify-between items-center">
-                        <span className="font-medium">📦 Closing Balance</span>
-                        <span className="text-xl font-bold">{stmt.totals.closingBalance} {stmt.material.unit}</span>
+                        <div className="text-center px-3 py-1 bg-blue-100 rounded">
+                          <p className="text-xs text-blue-600">Consumed</p>
+                          <p className="font-bold text-blue-700">-{stmt.totals.totalIssued}</p>
+                        </div>
+                        <div className="text-center px-3 py-1 bg-purple-100 rounded">
+                          <p className="text-xs text-purple-600">Returned</p>
+                          <p className="font-bold text-purple-700">+{stmt.totals.totalReturned}</p>
+                        </div>
+                        {stmt.totals.totalDamaged > 0 && (
+                          <div className="text-center px-3 py-1 bg-red-100 rounded">
+                            <p className="text-xs text-red-600">Damaged</p>
+                            <p className="font-bold text-red-700">-{stmt.totals.totalDamaged}</p>
+                          </div>
+                        )}
+                        <div className={`text-center px-3 py-1 rounded ${stmt.totals.closingBalance < stmt.material.minStockLevel ? 'bg-red-100' : 'bg-gray-200'}`}>
+                          <p className="text-xs text-gray-600">Closing</p>
+                          <p className={`font-bold ${stmt.totals.closingBalance < stmt.material.minStockLevel ? 'text-red-600' : ''}`}>
+                            {stmt.totals.closingBalance}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-      
-      {/* Print-Only Footer */}
-      <div className="hidden print:block print-footer">
-        <div>
-          <strong>QGO Cargo & Warehouse Management System</strong>
-          <br />
-          Generated on {new Date().toLocaleString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          })} | This is a system-generated report
+
+                    {/* Transactions Table - Expanded View */}
+                    {expandedMaterials.has(stmt.material.id) && (
+                      <div>
+                        {/* Opening Balance Row */}
+                        <div className="bg-gray-100 px-4 py-2 flex justify-between items-center border-b">
+                          <span className="text-sm text-gray-600 font-medium">📂 Opening Balance (before {formatDate(dateRange.start)})</span>
+                          <span className="font-bold">{stmt.totals.openingStock} {stmt.material.unit}</span>
+                        </div>
+
+                        {stmt.transactions.length === 0 ? (
+                          <div className="p-8 text-center text-gray-500">
+                            No transactions found for this material in the selected date range.
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full">
+                              <thead className="bg-gray-50 border-b">
+                                <tr>
+                                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Date</th>
+                                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Type</th>
+                                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Job / Details</th>
+                                  <th className="px-4 py-2 text-right text-xs font-semibold text-green-600">IN</th>
+                                  <th className="px-4 py-2 text-right text-xs font-semibold text-red-600">OUT</th>
+                                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-800">Balance</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {stmt.transactions.map((txn, idx) => {
+                                  // Extract customer name from description
+                                  const customerMatch = txn.description?.match(/- (.+?)(?:\s*\(|$)/);
+                                  const customerName = customerMatch ? customerMatch[1].trim() : '';
+                                  const isPending = txn.type === 'RETURN_PENDING_APPROVAL';
+
+                                  return (
+                                    <tr
+                                      key={txn.id || idx}
+                                      className={`hover:bg-gray-50 ${isPending ? 'bg-yellow-50' : ''} ${txn.type === 'PURCHASE' ? 'bg-green-50/50' :
+                                          txn.type === 'ISSUE' ? 'bg-blue-50/50' :
+                                            txn.type === 'RETURN' ? 'bg-purple-50/50' :
+                                              txn.type === 'DAMAGE' ? 'bg-red-50/50' : ''
+                                        }`}
+                                    >
+                                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                                        {formatDate(txn.date)}
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${txn.type === 'PURCHASE' ? 'bg-green-100 text-green-700' :
+                                            txn.type === 'ISSUE' ? 'bg-blue-100 text-blue-700' :
+                                              txn.type === 'RETURN' ? 'bg-purple-100 text-purple-700' :
+                                                txn.type === 'RETURN_PENDING_APPROVAL' ? 'bg-yellow-100 text-yellow-700' :
+                                                  txn.type === 'DAMAGE' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                                          }`}>
+                                          {txn.type === 'PURCHASE' && '📦 Stock In'}
+                                          {txn.type === 'ISSUE' && '📤 Issued'}
+                                          {txn.type === 'RETURN' && '↩️ Returned'}
+                                          {txn.type === 'RETURN_PENDING_APPROVAL' && '⏳ Pending Return'}
+                                          {txn.type === 'DAMAGE' && '❌ Damaged'}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        {txn.referenceType === 'moving_job' && txn.referenceId ? (
+                                          <Link
+                                            to={`/moving-jobs/${txn.referenceId}`}
+                                            className="group block"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-blue-600 hover:text-blue-800 font-medium group-hover:underline">
+                                                {customerName || txn.reference}
+                                              </span>
+                                              <span className="text-xs text-gray-400 group-hover:text-blue-500">
+                                                → Open Job
+                                              </span>
+                                            </div>
+                                            <p className="text-xs text-gray-400">{txn.reference}</p>
+                                          </Link>
+                                        ) : (
+                                          <div>
+                                            <p className="font-medium text-gray-800">
+                                              {txn.description?.replace('Issued to Job:', '').replace('Returned from Job:', '').replace('Purchased from', '').trim() || txn.reference}
+                                            </p>
+                                            {txn.reference !== 'N/A' && txn.reference && (
+                                              <p className="text-xs text-gray-400">{txn.reference}</p>
+                                            )}
+                                          </div>
+                                        )}
+                                        {isPending && (
+                                          <span className="inline-block mt-1 text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">
+                                            ⏳ Waiting for approval - not added to stock
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3 text-right">
+                                        {txn.stockIn > 0 ? (
+                                          <span className="text-lg font-bold text-green-600">+{txn.stockIn}</span>
+                                        ) : (
+                                          <span className="text-gray-300">-</span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3 text-right">
+                                        {txn.stockOut > 0 ? (
+                                          <span className="text-lg font-bold text-red-600">-{txn.stockOut}</span>
+                                        ) : (
+                                          <span className="text-gray-300">-</span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3 text-right">
+                                        <span className={`text-lg font-bold ${txn.balance < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                                          {txn.balance}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* Closing Balance Row */}
+                        <div className="bg-gray-800 text-white px-4 py-3 flex justify-between items-center">
+                          <span className="font-medium">📦 Closing Balance</span>
+                          <span className="text-xl font-bold">{stmt.totals.closingBalance} {stmt.material.unit}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Print-Only Footer */}
+        <div className="hidden print:block print-footer">
+          <div>
+            <strong>QGO Cargo & Warehouse Management System</strong>
+            <br />
+            Generated on {new Date().toLocaleString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })} | This is a system-generated report
+          </div>
         </div>
       </div>
-    </div>
     </>
   );
 };
