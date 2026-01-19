@@ -1114,7 +1114,7 @@ router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, 
     if (cbmChanged && shipment.boxes && shipment.boxes.length > 0) {
       // Get unique rack IDs from shipment boxes
       const rackIds = [...new Set(shipment.boxes.filter((b: any) => b.rackId).map((b: any) => b.rackId))];
-      
+
       // Update each rack's CBM
       for (const rackId of rackIds) {
         await updateRackCapacityAndCBM(prisma, rackId, companyId);
@@ -2374,6 +2374,16 @@ router.post('/:shipmentId/move-boxes',
             destCapacity > 0 ? 'OCCUPIED' : 'AVAILABLE'
         }
       });
+
+      // 6. Update shipment status from PENDING to IN_STORAGE if boxes are now in racks
+      if (shipment.status === 'PENDING') {
+        await prisma.shipment.update({
+          where: { id: shipmentId },
+          data: {
+            status: 'IN_STORAGE'
+          }
+        });
+      }
 
       console.log('✅ Move completed successfully:', {
         shipmentId,

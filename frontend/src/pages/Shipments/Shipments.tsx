@@ -262,8 +262,8 @@ export const Shipments: React.FC = () => {
 
   const ShipmentCard = ({ shipment }: { shipment: any }) => {
     const days = getDaysStored(shipment);
-    // ✅ FIX: Allow release for PENDING shipments with boxes assigned to racks (after manual move)
-    const canRelease = ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE', 'PARTIAL', 'PENDING'].includes(shipment.status) &&
+    // ✅ FIX: Check if boxes exist for moved shipments (backend now updates status properly)
+    const canRelease = ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE', 'PARTIAL'].includes(shipment.status) &&
       (shipment.currentBoxCount > 0 || (shipment.boxes && shipment.boxes.length > 0));
     const photos = shipment.shipmentPhotos || [];
     const firstRackId = shipment.boxes?.find((b: any) => b.rackId)?.rackId;
