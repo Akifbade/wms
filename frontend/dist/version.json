@@ -1,9 +1,9 @@
 {
   "version": "v2.3.3",
   "buildDate": "Jan 19, 2026",
-  "buildTime": "13:52:46",
-  "commit": "76fd46e75",
-  "commitMessage": "fix: Change Unit Cost to Unit Price in Material Reports",
+  "buildTime": "15:01:56",
+  "commit": "ac0c21bcf",
+  "commitMessage": "fix: Show release button for shipments after manual rack move",
   "author": "akifbade46-del",
   "environment": "local"
 }

@@ -262,8 +262,8 @@ export const Shipments: React.FC = () => {
 
   const ShipmentCard = ({ shipment }: { shipment: any }) => {
     const days = getDaysStored(shipment);
-    // ✅ FIX: Allow release for moved shipments - check if boxes exist regardless of move history
-    const canRelease = ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE', 'PARTIAL'].includes(shipment.status) &&
+    // ✅ FIX: Allow release for PENDING shipments with boxes assigned to racks (after manual move)
+    const canRelease = ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE', 'PARTIAL', 'PENDING'].includes(shipment.status) &&
       (shipment.currentBoxCount > 0 || (shipment.boxes && shipment.boxes.length > 0));
     const photos = shipment.shipmentPhotos || [];
     const firstRackId = shipment.boxes?.find((b: any) => b.rackId)?.rackId;
@@ -516,8 +516,8 @@ export const Shipments: React.FC = () => {
                 key={tab.key}
                 onClick={() => setActiveStatus(tab.key)}
                 className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all whitespace-nowrap ${activeStatus === tab.key
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
                   }`}
               >
                 {tab.label}
