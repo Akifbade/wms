@@ -178,7 +178,7 @@ const StaffAssignmentDialog: React.FC<StaffAssignmentDialogProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 w-full">
           <div>
             <h3 className="text-lg font-semibold mb-4 text-gray-700 flex items-center gap-2">
               <Users className="w-5 h-5" />
@@ -341,11 +341,11 @@ const StaffAssignmentDialog: React.FC<StaffAssignmentDialogProps> = ({
             />
           </div>
 
-          <div className="flex justify-end gap-3 border-t pt-4">
-            <button type="button" onClick={onClose} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50" disabled={loading}>
+          <div className="flex flex-col sm:flex-row justify-end gap-3 border-t pt-4">
+            <button type="button" onClick={onClose} className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50" disabled={loading}>
               Cancel
             </button>
-            <button type="submit" className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50" disabled={loading}>
+            <button type="submit" className="w-full sm:w-auto px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50" disabled={loading}>
               {loading ? 'Saving...' : existingAssignment ? 'Update' : 'Assign Staff'}
             </button>
           </div>

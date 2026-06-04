@@ -90,7 +90,7 @@ export const MaterialTransactionHistory: React.FC<MaterialTransactionHistoryProp
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-6 gap-4 p-6 bg-gray-50 border-b">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 p-6 bg-gray-50 border-b">
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <p className="text-sm text-gray-600 mb-1">Current Stock</p>
             <p className="text-2xl font-bold text-blue-600">{summary.currentStock}</p>

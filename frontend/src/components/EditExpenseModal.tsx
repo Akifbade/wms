@@ -161,13 +161,13 @@ export const EditExpenseModal: React.FC<EditExpenseModalProps> = ({
 
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-[95vw] sm:w-full">
           {/* Header */}
           <div className="bg-primary-600 px-6 py-4 flex items-center justify-between">
             <h3 className="text-xl font-semibold text-white">Edit Expense</h3>
             <button
               onClick={handleClose}
-              className="text-white hover:text-gray-200 transition-colors"
+              className="text-white hover:text-gray-200 transition-colors min-h-[44px] min-w-[44px]"
             >
               <XMarkIcon className="h-6 w-6" />
             </button>
@@ -407,18 +407,18 @@ export const EditExpenseModal: React.FC<EditExpenseModalProps> = ({
             )}
 
             {/* Footer */}
-            <div className="mt-6 flex items-center justify-end space-x-3">
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-end space-y-3 sm:space-y-0 sm:space-x-3">
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                 disabled={loading}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={loading}
               >
                 {loading ? 'Updating...' : 'Update Expense'}

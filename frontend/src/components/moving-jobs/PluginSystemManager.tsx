@@ -379,7 +379,7 @@ const PluginSystemManager: React.FC = () => {
 
       {/* Logs Tab */}
       {activeTab === 'logs' && (
-        <div>
+        <div className="overflow-x-auto">
           {selectedPluginId && (
             <>
               <div style={{ marginBottom: '20px' }}>

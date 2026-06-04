@@ -249,7 +249,7 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-2xl w-[95vw] md:w-auto md:max-w-6xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 flex justify-between items-center rounded-t-lg print:hidden">
           <div className="flex items-center gap-3">
@@ -265,7 +265,7 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
           </div>
           <button
             onClick={onClose}
-            className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition"
+            className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition min-h-[44px] min-w-[44px]"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

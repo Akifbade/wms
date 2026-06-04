@@ -71,7 +71,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-[95vw] md:w-auto md:max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -80,7 +80,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600 transition-colors min-h-[44px] min-w-[44px]"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
@@ -88,7 +88,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
         {/* Balance Info */}
         <div className="p-6 bg-blue-50 border-b">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-gray-600">Current Balance Due</p>
               <p className="text-2xl font-bold text-red-600">{balance.toFixed(3)} KWD</p>
@@ -103,7 +103,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 w-full">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
               {error}
@@ -239,11 +239,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+              className="w-full sm:w-auto flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
               disabled={loading}
             >
               Cancel
@@ -251,7 +251,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Recording...' : 'Record Payment'}
             </button>

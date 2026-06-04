@@ -222,7 +222,7 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 w-full">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
               {error}
@@ -234,7 +234,7 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Release Type
             </label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
                 type="button"
                 onClick={() => {
@@ -449,7 +449,7 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
 
             {/* Uploaded Photos Preview */}
             {photos.length > 0 && (
-              <div className="mt-3 grid grid-cols-4 gap-2">
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 {photos.map((url, idx) => (
                   <div key={idx} className="relative group">
                     <img
@@ -497,17 +497,17 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+              className="w-full sm:w-auto flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 font-bold transition-all shadow-lg"
+              className="w-full sm:w-auto flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 font-bold transition-all shadow-lg"
             >
               💰 Continue to Payment
             </button>

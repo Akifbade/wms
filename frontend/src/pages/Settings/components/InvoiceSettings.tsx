@@ -152,7 +152,7 @@ export const InvoiceSettings: React.FC = () => {
       {/* Template Selection */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Invoice Template</h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {templates.map((template) => (
             <div
               key={template.id}
@@ -178,7 +178,7 @@ export const InvoiceSettings: React.FC = () => {
       {/* Colors */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Brand Colors</h3>
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Primary Color</label>
             <div className="flex items-center space-x-3">
@@ -219,7 +219,7 @@ export const InvoiceSettings: React.FC = () => {
       {/* Invoice Settings */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Invoice Settings</h3>
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Invoice Prefix</label>
             <input

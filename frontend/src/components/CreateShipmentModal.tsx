@@ -562,7 +562,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-200/50">
+      <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-3xl w-[95vw] md:w-auto md:max-w-3xl max-h-[90vh] overflow-y-auto border border-slate-200/50">
         {/* Header */}
         <div className="bg-slate-900 text-white px-6 py-4 rounded-t-2xl flex justify-between items-center">
           <div>
@@ -571,7 +571,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors p-2 rounded-xl hover:bg-white/10"
+            className="text-slate-400 hover:text-white transition-colors p-2 rounded-xl hover:bg-white/10 min-h-[44px] min-w-[44px]"
             disabled={loading}
           >
             <span className="sr-only">Close</span>
@@ -582,7 +582,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 w-full">
           {/* Error/Success Messages */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -925,7 +925,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-6 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">Qty</label>
                         <input
@@ -1198,18 +1198,18 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-medium transition-colors"
+              className="w-full sm:w-auto px-5 py-2.5 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-medium transition-colors"
               disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 font-medium disabled:bg-slate-400 disabled:cursor-not-allowed shadow-lg shadow-blue-500/25 transition-all"
+              className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 font-medium disabled:bg-slate-400 disabled:cursor-not-allowed shadow-lg shadow-blue-500/25 transition-all"
               disabled={loading}
             >
               {loading ? 'Creating...' : 'Create Shipment'}

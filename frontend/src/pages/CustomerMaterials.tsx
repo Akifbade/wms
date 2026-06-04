@@ -140,7 +140,7 @@ export default function CustomerMaterialsView() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 rounded-lg">
               <div className="text-sm opacity-90">Total Customers</div>
               <div className="text-3xl font-bold mt-1">{stats.totalCustomers}</div>
@@ -253,7 +253,7 @@ export default function CustomerMaterialsView() {
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-5 gap-4 mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <div className="text-xs text-gray-600">Shipments</div>
                     <div className="text-2xl font-bold text-gray-900">
@@ -290,7 +290,7 @@ export default function CustomerMaterialsView() {
                     <h3 className="text-sm font-semibold text-gray-700 mb-2">
                       📦 Items Breakdown
                     </h3>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {customer.items.map((item, idx) => (
                         <div
                           key={idx}

@@ -1564,7 +1564,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
                 {/* Totals */}
                 <div className="mt-4 pt-3 border-t border-slate-200">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="bg-blue-50 p-3 rounded-lg text-center">
                       <div className="text-xs text-slate-600 mb-1">Total CBM</div>
                       <div className="text-lg font-bold text-blue-700">{dimensionsTotal.cbm.toFixed(4)} m³</div>
@@ -1913,7 +1913,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
         {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-100px)]">
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="p-6 space-y-6 w-full">
 
             {/* Messages */}
             {error && (
@@ -2090,11 +2090,11 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+                className="w-full sm:w-auto px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
                 disabled={loading}
               >
                 Cancel
@@ -2102,14 +2102,14 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               <button
                 type="button"
                 onClick={resetForm}
-                className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+                className="w-full sm:w-auto px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
                 disabled={loading}
               >
                 Reset
               </button>
               <button
                 type="submit"
-                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={loading}
               >
                 {loading ? 'Creating...' : 'Create Shipment'}

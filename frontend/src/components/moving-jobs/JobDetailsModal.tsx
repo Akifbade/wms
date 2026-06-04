@@ -69,7 +69,7 @@ const JobDetailsModal: React.FC<JobDetailsModalProps> = ({ isOpen, onClose, job,
         {/* Tab Content */}
         <div className="p-6">
           {activeTab === 'details' && (
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-bold text-lg mb-3">Client Information</h3>
                 <div className="space-y-2">
@@ -129,7 +129,7 @@ const JobDetailsModal: React.FC<JobDetailsModalProps> = ({ isOpen, onClose, job,
 
               <div className="col-span-2">
                 <h3 className="font-bold text-lg mb-3">Addresses</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-500">Pickup Address</p>
                     <p className="font-medium">{job.jobAddress}</p>

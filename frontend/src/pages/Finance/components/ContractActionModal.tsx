@@ -166,7 +166,7 @@ export const ContractActionModal: React.FC<ContractActionModalProps> = ({
 
                                 {/* Full Company Profiles Table */}
                                 <div className="border rounded-lg overflow-hidden">
-                                    <div className="max-h-96 overflow-y-auto">
+                                    <div className="max-h-96 overflow-y-auto overflow-x-auto">
                                         <table className="min-w-full divide-y divide-gray-200">
                                             <thead className="bg-gray-50 sticky top-0">
                                                 <tr>
@@ -256,7 +256,7 @@ export const ContractActionModal: React.FC<ContractActionModalProps> = ({
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700">Monthly Rate (Optional)</label>
                                         <input

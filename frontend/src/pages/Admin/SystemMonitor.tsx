@@ -129,8 +129,8 @@ const SystemMonitor: React.FC = () => {
   }
 
   return (
-    <Box p={3}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+    <Box p={{ xs: 1.5, sm: 3 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexDirection={{ xs: 'column', sm: 'row' }} gap={1}>
         <Typography variant="h4" component="h1">
           System Monitor
         </Typography>
@@ -238,7 +238,7 @@ const SystemMonitor: React.FC = () => {
 
           {/* Top Processes Table */}
           <Grid item xs={12}>
-            <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+            <Paper sx={{ width: '100%', overflow: 'auto' }}>
               <Box p={2}>
                 <Typography variant="h6">Top Processes (by CPU)</Typography>
               </Box>
@@ -288,7 +288,7 @@ const SystemMonitor: React.FC = () => {
 
           {/* Docker Containers Section */}
           <Grid item xs={12}>
-            <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+            <Paper sx={{ width: '100%', overflow: 'auto' }}>
               <Box p={2} display="flex" alignItems="center">
                 <ContainerIcon color="primary" sx={{ mr: 1 }} />
                 <Typography variant="h6">Docker Containers (Live)</Typography>

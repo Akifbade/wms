@@ -2028,10 +2028,10 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                     <h3 className="text-base sm:text-lg md:text-xl font-bold text-primary-600 mb-1 sm:mb-2">📸 Scanning...</h3>
                     <p className="text-gray-600 text-xs sm:text-sm md:text-base">ضع رمز الاستجابة السريعة في الإطار</p>
                   </div>
-                  <div id={qrCodeRegionId} className="mx-auto"></div>
+                  <div id={qrCodeRegionId} className="w-full max-w-md mx-auto"></div>
                   <button
                     onClick={stopScanning}
-                    className="w-full py-2.5 sm:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm sm:text-base"
+                    className="w-full sm:w-auto py-2.5 sm:py-3 px-4 sm:px-6 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm sm:text-base"
                   >
                     Stop Camera / إيقاف الكاميرا
                   </button>
@@ -2074,7 +2074,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                   </div>
                   <button
                     onClick={startScanning}
-                    className="inline-flex items-center gap-2 sm:gap-3 px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 bg-primary-600 text-white text-base sm:text-lg md:text-xl font-bold rounded-lg sm:rounded-xl hover:bg-primary-700 transition-all shadow-lg hover:shadow-xl"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 bg-primary-600 text-white text-base sm:text-lg md:text-xl font-bold rounded-lg sm:rounded-xl hover:bg-primary-700 transition-all shadow-lg hover:shadow-xl"
                   >
                     <CameraIcon className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
                     <span>Start Camera</span>
@@ -2105,7 +2105,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                         <CubeIcon className="h-8 w-8 text-blue-600" />
                         <h4 className="text-xl font-bold text-blue-900">Rack Information</h4>
                       </div>
-                      <div className="grid grid-cols-2 gap-4 text-lg">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-lg">
                         <div>
                           <span className="text-gray-600">Code:</span>
                           <p className="font-bold">{scanResult.data.code}</p>
@@ -2154,7 +2154,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
                           {/* Client Info */}
                           <div className="mb-4 bg-gray-50 p-3 rounded-lg">
-                            <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                               <div>
                                 <span className="text-gray-600">Client:</span>
                                 <p className="font-semibold">{pendingShipment.clientName || 'N/A'}</p>
@@ -2368,7 +2368,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               </label>
 
                               {assignmentPhotos.length > 0 && (
-                                <div className="grid grid-cols-5 gap-2 mt-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mt-2">
                                   {assignmentPhotos.map((photo, idx) => (
                                     <div key={idx} className="relative">
                                       <img
@@ -2469,7 +2469,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       </div>
 
                       <div className="bg-white p-4 rounded-lg border border-purple-200">
-                        <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                           <div>
                             <span className="text-gray-500 text-xs">Client</span>
                             <p className="font-bold text-base">{scanResult.data.clientName}</p>
@@ -2895,7 +2895,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                               {shipment.status === 'PARTIAL' ? '🔄 PARTIAL' : '⏳ PENDING'}
                             </span>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 text-sm sm:text-base md:text-lg">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4 text-sm sm:text-base md:text-lg">
                             <div>
                               <span className="text-gray-500 text-xs sm:text-sm">Client:</span>
                               <p className="font-semibold text-gray-900 truncate">{shipment.clientName}</p>
@@ -3058,7 +3058,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
               <h3 className="text-base sm:text-lg md:text-xl font-bold text-blue-900 mb-3 sm:mb-4 flex items-center gap-2">
                 📦 Rack Information
               </h3>
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
                 <div>
                   <span className="text-gray-600 text-xs sm:text-sm">Code:</span>
                   <p className="text-sm sm:text-base md:text-xl font-bold text-gray-900">{selectedRackForAssignment.code}</p>
@@ -3338,7 +3338,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
                   {/* Photo Preview */}
                   {assignmentPhotos.length > 0 && (
-                    <div className="mt-4 grid grid-cols-3 gap-2">
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {assignmentPhotos.map((photo, idx) => (
                         <div key={idx} className="relative group">
                           <img
@@ -3689,7 +3689,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       </div>
 
                       {/* Move Details */}
-                      <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-3">
                         <div>
                           <p className="text-gray-500 text-xs">Reason</p>
                           <p className="font-semibold">{move.reason}</p>
@@ -3715,7 +3715,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       {/* Photos */}
                       {(move.oldPhotos?.length > 0 || move.newPhotos?.length > 0) && (
                         <div className="border-t pt-3">
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* Old Photos */}
                             {move.oldPhotos?.length > 0 && (
                               <div>
@@ -3887,7 +3887,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                       <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                         📦 Rack Information
                       </h4>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                         <div>
                           <span className="text-slate-500">Code:</span>
                           <p className="font-bold text-lg text-slate-900">{sourceRackInfo?.code}</p>
@@ -4022,7 +4022,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
                   <label className="block text-sm font-semibold text-slate-700 mb-3">
                     🎯 Select Destination Rack
                   </label>
-                  <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
                     {racks
                       .filter(r => r.id !== selectedSourceRack && r.status !== 'FULL')
                       .map(rack => {
@@ -4058,7 +4058,7 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
               {/* Reason & Authorized By */}
               {moveDestinationRack && (
                 <>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">Reason *</label>
                       <select

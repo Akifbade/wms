@@ -195,7 +195,7 @@ export default function DimensionRackManager({ shipmentId, onUpdate }: Dimension
             )}
 
             {/* Summary Stats */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
                 <div className="bg-white rounded-lg p-3 text-center border border-purple-200">
                     <p className="text-2xl font-bold text-purple-600">{summary?.totalCBM?.toFixed(3) || 0}</p>
                     <p className="text-xs text-gray-500">Total CBM</p>

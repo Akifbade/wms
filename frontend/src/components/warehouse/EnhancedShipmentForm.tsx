@@ -310,7 +310,7 @@ export default function EnhancedShipmentForm({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Shipment Category *
                   </label>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {SHIPMENT_CATEGORIES.map(cat => (
                       <button
                         key={cat.value}
@@ -330,7 +330,7 @@ export default function EnhancedShipmentForm({
                 </div>
 
                 {/* Basic Fields */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Shipment Name *
@@ -425,7 +425,7 @@ export default function EnhancedShipmentForm({
                     <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
                       ✈️ Airport Cargo Details
                     </h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           AWB Number *
@@ -483,7 +483,7 @@ export default function EnhancedShipmentForm({
                 )}
 
                 {/* Shipper/Consignee */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Shipper
@@ -518,7 +518,7 @@ export default function EnhancedShipmentForm({
               <div className="space-y-4">
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <h3 className="font-semibold text-gray-900 mb-3">Add New Item</h3>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="col-span-2">
                       <input
                         type="text"
@@ -625,7 +625,7 @@ export default function EnhancedShipmentForm({
 
                     {/* Summary */}
                     <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 mt-4">
-                      <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                         <div>
                           <div className="text-gray-600">Total Items</div>
                           <div className="text-xl font-bold text-blue-900">{items.length}</div>
@@ -676,7 +676,7 @@ export default function EnhancedShipmentForm({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Contact Name
@@ -718,18 +718,18 @@ export default function EnhancedShipmentForm({
           </div>
 
           {/* Footer */}
-          <div className="bg-gray-50 px-6 py-4 flex justify-between items-center border-t">
+          <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 border-t">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              className="w-full sm:w-auto px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {loading ? 'Saving...' : shipmentId ? 'Update Shipment' : 'Create Shipment'}
             </button>

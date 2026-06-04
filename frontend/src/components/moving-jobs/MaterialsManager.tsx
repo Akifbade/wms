@@ -132,7 +132,7 @@ const MaterialsManager: React.FC = () => {
 
       {/* Materials Tab */}
       {activeTab === 'materials' && (
-        <div>
+        <div className="overflow-x-auto">
           <button
             onClick={() => setShowForm(!showForm)}
             style={{
@@ -237,7 +237,7 @@ const MaterialsManager: React.FC = () => {
 
       {/* Issues Tab */}
       {activeTab === 'issues' && (
-        <div>
+        <div className="overflow-x-auto">
           <h5 style={{ marginBottom: '20px' }}>Material Issues (Allocations)</h5>
 
           {/* Issue Form */}

@@ -118,7 +118,7 @@ const MonthlyJobsReport: React.FC<MonthlyReportProps> = ({ jobs }) => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-blue-50 p-4 rounded-lg">
           <p className="text-sm text-gray-600 mb-1">Total Jobs</p>
           <p className="text-2xl font-bold text-blue-600">{stats.total}</p>

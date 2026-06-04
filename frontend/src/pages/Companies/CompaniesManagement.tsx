@@ -298,7 +298,7 @@ export const CompaniesManagement: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Contact Person
@@ -352,20 +352,20 @@ export const CompaniesManagement: React.FC = () => {
                 />
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => {
                     setModalOpen(false);
                     setEditingCompany(null);
                   }}
-                  className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold"
+                  className="w-full sm:w-auto flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 font-semibold"
+                  className="w-full sm:w-auto flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 font-semibold"
                 >
                   {editingCompany ? 'Update Company' : 'Create Company'}
                 </button>

@@ -395,7 +395,7 @@ const MaterialsDashboard: React.FC = () => {
                             <div className="space-y-6">
                                 <div>
                                     <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Stats</h2>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="bg-gray-50 rounded-lg p-4">
                                             <p className="text-sm text-gray-600">Active Materials</p>
                                             <p className="text-2xl font-bold text-gray-900 mt-1">
@@ -563,7 +563,7 @@ const MaterialsDashboard: React.FC = () => {
                                         </div>
 
                                         <form onSubmit={handleCreateIssue} className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-1">Material *</label>
                                                     <select
@@ -650,7 +650,7 @@ const MaterialsDashboard: React.FC = () => {
                                             <button
                                                 type="submit"
                                                 disabled={loading}
-                                                className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                                                className="w-full sm:w-auto flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
                                             >
                                                 <Save className="w-4 h-4" />
                                                 {loading ? 'Creating...' : 'Create Issue'}
@@ -749,7 +749,7 @@ const MaterialsDashboard: React.FC = () => {
                                         </div>
 
                                         <form onSubmit={handleCreatePurchase} className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-1">Invoice/Reference Number *</label>
                                                     <input
@@ -792,7 +792,7 @@ const MaterialsDashboard: React.FC = () => {
                                                 </select>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
                                                     <input

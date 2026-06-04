@@ -1745,7 +1745,7 @@ export const CompanyProfile: React.FC = () => {
                   </p>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Starting Month</label>
                   <select
@@ -1832,7 +1832,7 @@ export const CompanyProfile: React.FC = () => {
                 <p className="text-sm text-gray-600">Balance Due: <span className="font-semibold text-red-600">{formatNumber(Number(selectedInvoiceForPayment.totalAmount) - Number(selectedInvoiceForPayment.paidAmount))} KWD</span></p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Payment Amount (KWD) *</label>
                   <input
@@ -1891,7 +1891,7 @@ export const CompanyProfile: React.FC = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Receipt Number</label>
                   <input
@@ -2065,7 +2065,7 @@ export const CompanyProfile: React.FC = () => {
               </div>
 
               {/* Contract Period */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     📆 Start Date
@@ -2208,7 +2208,7 @@ export const CompanyProfile: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Billing Type
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   {[
                     { value: 'PER_CBM', label: 'Per CBM', desc: 'CBM × Rate × Days' },
                     { value: 'FIXED_MONTHLY', label: 'Fixed Monthly', desc: 'Fixed amount/month' },

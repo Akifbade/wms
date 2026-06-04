@@ -500,13 +500,13 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 border border-slate-200">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-[95vw] md:w-auto md:max-w-2xl max-h-[90vh] overflow-y-auto transform transition-all duration-300 border border-slate-200">
         {/* Header */}
         <div className="bg-slate-900 text-white px-6 py-4 rounded-t-xl flex justify-between items-center sticky top-0 z-10">
           <h2 className="text-xl font-semibold">Edit Shipment</h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white rounded-lg p-2 hover:bg-white/10 transition-all duration-200"
+            className="text-slate-400 hover:text-white rounded-lg p-2 hover:bg-white/10 transition-all duration-200 min-h-[44px] min-w-[44px]"
             disabled={loading}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -516,7 +516,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 w-full">
           {/* 🔒 SECURITY WARNING: Show if boxes are assigned */}
           {isRackAssigned && (
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
@@ -726,7 +726,7 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-6 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Qty</label>
                         <input
@@ -1189,18 +1189,18 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium"
+              className="w-full sm:w-auto px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium"
               disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
               disabled={loading}
             >
               {loading ? 'Updating...' : 'Update Shipment'}

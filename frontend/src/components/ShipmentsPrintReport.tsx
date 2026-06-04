@@ -381,10 +381,10 @@ const ShipmentsPrintReport: React.FC<ShipmentsPrintReportProps> = ({
     };
 
     return (
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
             <button
                 onClick={generatePDF}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
+                className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
                 title="Download as PDF"
             >
                 <PrinterIcon className="h-5 w-5 mr-2" />
@@ -393,7 +393,7 @@ const ShipmentsPrintReport: React.FC<ShipmentsPrintReportProps> = ({
 
             <button
                 onClick={printHTML}
-                className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
+                className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
                 title="Print in Browser"
             >
                 <PrinterIcon className="h-5 w-5 mr-2" />

@@ -203,7 +203,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
 
           {/* Document Info */}
           <div className="bg-gray-50 p-4 rounded mb-6">
-            <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="font-semibold">Release Note #:</span>
                 <span className="ml-2">RN-{formatDate(parsedReleaseDate, 'yyyyMMdd-HHmmss')}</span>
@@ -225,7 +225,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
           {settings.releaseShowShipment !== false && (
             <div className="mb-6">
               <h3 className="text-lg font-bold mb-3 pb-2 border-b" style={{ color: primaryColor }}>SHIPMENT DETAILS</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="mb-1"><span className="font-semibold">Shipment ID:</span> {shipment.qrCode}</p>
                   <p className="mb-1"><span className="font-semibold">Reference:</span> {shipment.referenceId || 'N/A'}</p>
@@ -246,7 +246,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
           {settings.releaseShowStorage !== false && (
             <div className="mb-6">
               <h3 className="text-lg font-bold mb-3 pb-2 border-b" style={{ color: primaryColor }}>STORAGE INFORMATION</h3>
-              <div className="grid grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                 <div>
                   <p className="font-semibold text-gray-600">Received Date</p>
                   <p className="text-gray-800">{shipment.receivedDate ? formatDate(shipment.receivedDate, 'MMM dd, yyyy') : 'N/A'}</p>
@@ -271,7 +271,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
           {settings.releaseShowItems !== false && (
             <div className="mb-6">
               <h3 className="text-lg font-bold mb-3 pb-2 border-b" style={{ color: primaryColor }}>ITEMS RELEASED</h3>
-              <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm mb-3">
                 <div>
                   <p className="font-semibold text-gray-600">Total Boxes</p>
                   <p className="text-gray-800 text-lg">{shipment.originalBoxCount} boxes</p>
@@ -377,7 +377,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
               })()}
 
               {/* Summary Stats */}
-              <div className="mt-4 grid grid-cols-3 gap-3 text-xs">
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
                 <div className="bg-white border border-gray-300 rounded p-2 text-center">
                   <p className="text-gray-600">Total Racks Used</p>
                   <p className="text-lg font-bold text-gray-800">
@@ -409,7 +409,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
           {settings.releaseShowCollector !== false && (
             <div className="mb-6">
               <h3 className="text-lg font-bold mb-3 pb-2 border-b" style={{ color: primaryColor }}>COLLECTOR INFORMATION</h3>
-              <div className="grid grid-cols-2 gap-6 text-sm mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm mb-4">
                 <div>
                   <p className="font-semibold text-gray-600 mb-1">Collector Name:</p>
                   <p className="border-b-2 border-gray-400 pb-1 min-h-[28px]">{collectorName || '_________________________'}</p>
@@ -419,7 +419,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
                   <p className="text-gray-800 font-mono font-semibold">{collectorID}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <p className="text-sm font-semibold text-gray-600 mb-2">Collector Signature:</p>
                   <div className="border-b-2 border-gray-800 h-20"></div>
@@ -434,7 +434,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
 
           {/* Charges & Payment */}
           {settings.releaseShowCharges !== false && invoice && (
-            <div className="mb-6">
+            <div className="mb-6 overflow-x-auto">
               <h3 className="text-lg font-bold mb-3 pb-2 border-b" style={{ color: primaryColor }}>CHARGES & PAYMENT</h3>
               <table className="w-full text-sm">
                 <tbody>
@@ -497,7 +497,7 @@ export const ReleaseNoteModal: React.FC<ReleaseNoteModalProps> = ({
           {settings.releaseShowSignatures !== false && (
             <div className="mb-6">
               <h3 className="text-lg font-bold mb-3 pb-2 border-b" style={{ color: primaryColor }}>AUTHORIZATION SIGNATURES</h3>
-              <div className="grid grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 <div className="text-center">
                   <p className="text-sm font-semibold mb-6 text-gray-700">Released By (Company Staff)</p>
                   <div className="border-b-2 border-gray-800 mb-2 h-16"></div>

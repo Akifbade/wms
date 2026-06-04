@@ -164,8 +164,8 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
         }
       `}</style>
 
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print-overlay">
-        <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 no-print-overlay">
+        <div className="bg-white rounded-lg max-w-6xl w-[95vw] md:w-auto md:max-w-6xl max-h-[90vh] overflow-y-auto">
           <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center no-print">
             <h2 className="text-2xl font-bold">📊 Job Material Report</h2>
             <div className="flex gap-2">
@@ -185,7 +185,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                 <Download className="w-4 h-4" />
                 CSV
               </button>
-              <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+              <button onClick={onClose} className="text-gray-500 hover:text-gray-700 min-h-[44px] min-w-[44px]">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -199,7 +199,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                 {/* Job Header */}
                 <div className="mb-6 border-b pb-4">
                   <h1 className="text-3xl font-bold mb-2">Material Usage Report</h1>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div>
                       <p><strong>Job Code:</strong> {job?.jobCode}</p>
                       <p><strong>Job Title:</strong> {job?.jobTitle}</p>
@@ -214,7 +214,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                 </div>
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-5 gap-4 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
                   <div className="bg-blue-50 p-4 rounded">
                     <p className="text-sm text-gray-600">Total Issued</p>
                     <p className="text-2xl font-bold text-blue-600">{totals.totalIssued}</p>
@@ -238,7 +238,8 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                 </div>
 
                 {/* Materials Table */}
-                <table className="min-w-full border-collapse border">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-collapse border">
                   <thead>
                     <tr className="bg-gray-100">
                       <th className="border px-4 py-2 text-left">SKU</th>
@@ -286,6 +287,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                     </tr>
                   </tbody>
                 </table>
+                </div>
 
                 {/* Damage Details */}
                 {materials.some(m => m.returns?.[0]?.quantityDamaged > 0) && (

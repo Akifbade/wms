@@ -299,8 +299,8 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-[95vw] md:w-auto md:max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
         <div className="sticky top-0 bg-gradient-to-r from-orange-500 to-orange-600 text-white border-b px-6 py-4 flex justify-between items-center z-10">
           <div>
             <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -308,7 +308,7 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
             </h2>
             <p className="text-orange-100 text-sm mt-1">Record material returns and submit for approval</p>
           </div>
-          <button onClick={onClose} className="text-white hover:bg-orange-700 rounded-full p-2 transition-colors">
+          <button onClick={onClose} className="text-white hover:bg-orange-700 rounded-full p-2 transition-colors min-h-[44px] min-w-[44px]">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -347,7 +347,7 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                       <div className="bg-white rounded-lg p-3 border-2 border-green-200">
                         <label className="block text-sm font-bold mb-2 text-green-700 flex items-center gap-1">
                           <span className="text-lg">✅</span> Returned (Good)

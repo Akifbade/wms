@@ -305,7 +305,7 @@ const CompanyAnalytics: React.FC = () => {
                                         </button>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                                         <div className="bg-white rounded p-2 border border-gray-100">
                                             <p className="text-xs text-gray-500">Shipments</p>
                                             <p className="text-lg font-bold text-gray-900">{company.totalShipments}</p>

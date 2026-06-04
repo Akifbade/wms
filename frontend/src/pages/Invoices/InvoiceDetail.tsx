@@ -238,7 +238,7 @@ export const InvoiceDetail: React.FC = () => {
           </div>
 
           {/* Invoice Details Grid */}
-          <div className="grid grid-cols-2 gap-8 mt-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-8">
             <div>
               <p className="text-sm text-gray-500">Invoice Date</p>
               <p className="text-gray-900 font-semibold">
@@ -255,7 +255,7 @@ export const InvoiceDetail: React.FC = () => {
         </div>
 
         {/* Bill To & From */}
-        <div className="p-8 grid grid-cols-2 gap-8 border-b">
+        <div className="p-8 grid grid-cols-1 sm:grid-cols-2 gap-8 border-b">
           {/* From */}
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">From</h3>
@@ -299,7 +299,7 @@ export const InvoiceDetail: React.FC = () => {
             </h3>
             
             {/* Shipment Info Grid */}
-            <div className="grid grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <div className="bg-white p-3 rounded-lg border border-blue-200">
                 <p className="text-xs text-gray-600">Shipment ID</p>
                 <p className="text-sm font-bold text-gray-900">{invoice.shipment.qrCode || invoice.shipment.id}</p>
@@ -351,7 +351,7 @@ export const InvoiceDetail: React.FC = () => {
                   });
 
                   return (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {Object.entries(rackGroups).map(([rackCode, boxes]) => {
                         const isUnassigned = rackCode === 'Unassigned';
                         const rack = boxes[0]?.rack;
@@ -403,7 +403,7 @@ export const InvoiceDetail: React.FC = () => {
                 })()}
 
                 {/* Summary Stats */}
-                <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   <div className="bg-white border border-gray-300 rounded p-2 text-center">
                     <p className="text-xs text-gray-600">Total Racks</p>
                     <p className="text-base font-bold text-gray-800">
@@ -484,7 +484,7 @@ export const InvoiceDetail: React.FC = () => {
         <div className="p-8 bg-gray-50 border-b">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Status</h3>
           
-          <div className="grid grid-cols-3 gap-6 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-4">
             <div>
               <p className="text-sm text-gray-500">Total Amount</p>
               <p className="text-xl font-bold text-gray-900">{parseFloat(invoice.totalAmount).toFixed(3)} {templateSettings?.currencySymbol || 'KWD'}</p>

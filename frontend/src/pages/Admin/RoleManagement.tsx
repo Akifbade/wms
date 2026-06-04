@@ -269,9 +269,9 @@ const RoleManagement: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center">
               <Shield className="w-6 h-6 mr-2 text-blue-600" />
               Role & Permission Management
             </h1>
@@ -340,7 +340,7 @@ const RoleManagement: React.FC = () => {
           </div>
 
           {/* Search & Controls */}
-          <div className="mb-4 flex items-center gap-3">
+          <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -437,11 +437,11 @@ const RoleManagement: React.FC = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-6 border-t">
             <button
               onClick={handleReset}
               disabled={selectedRole === 'ADMIN' || saving}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className="w-4 h-4 inline mr-2" />
               Reset Changes
@@ -449,7 +449,7 @@ const RoleManagement: React.FC = () => {
             <button
               onClick={handleSave}
               disabled={selectedRole === 'ADMIN' || saving}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="w-4 h-4 inline mr-2" />
               {saving ? 'Saving...' : 'Save Changes'}

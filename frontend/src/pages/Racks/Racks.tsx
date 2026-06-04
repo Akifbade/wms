@@ -81,7 +81,7 @@ const ShipmentBoxCard: React.FC<{
           </div>
 
           {/* Key Info Grid */}
-          <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
             <div className="bg-blue-50 rounded px-2 py-1.5 text-center">
               <span className="text-blue-600 font-bold">{boxCount}</span>
               <p className="text-blue-500 text-[10px]">📦 Boxes</p>
@@ -122,7 +122,7 @@ const ShipmentBoxCard: React.FC<{
           </button>
 
           {showPhotos && (
-            <div className="grid grid-cols-4 gap-2 mt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2">
               {photos.map((url: string, idx: number) => (
                 <a
                   key={idx}
@@ -866,7 +866,7 @@ export const Racks: React.FC = () => {
                 {/* Zone Content - Expandable */}
                 {isExpanded && (
                   <div className="px-6 py-4 bg-gray-50 border-t-2 border-gray-200">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 overflow-x-auto">
                       {zoneRacks.map((rack: any) => {
                         const totalCapacity = rack.capacityTotal && rack.capacityTotal > 0 ? rack.capacityTotal : 1;
                         const utilization = typeof rack.utilization === 'number'
@@ -1340,7 +1340,7 @@ export const Racks: React.FC = () => {
 
                 {/* Rack Information */}
                 <div className="px-6 pt-4 pb-2 bg-white border-b">
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     {rackDetails?.companyProfile && rackDetails.companyProfile.name && (
                       <div className="flex items-center gap-3 bg-purple-50 border border-purple-200 rounded-lg p-4">
                         {rackDetails.companyProfile.logo && (

@@ -202,13 +202,13 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-[95vw] md:w-auto md:max-w-3xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-green-600 text-white px-6 py-4 rounded-t-lg flex justify-between items-center">
           <h2 className="text-xl font-bold">✏️ Edit Moving Job</h2>
           <button
             onClick={onClose}
-            className="text-white hover:text-gray-200 text-2xl font-bold"
+            className="text-white hover:text-gray-200 text-2xl font-bold min-h-[44px] min-w-[44px]"
             disabled={loading}
           >
             ×
@@ -216,7 +216,7 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 w-full">
           {/* Error/Success Messages */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -464,11 +464,11 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium"
+              className="w-full sm:w-auto px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium"
               disabled={loading}
             >
               Cancel
@@ -477,7 +477,7 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
               <button
                 type="button"
                 onClick={handleCompleteJob}
-                className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-medium"
+                className="w-full sm:w-auto px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-medium"
                 disabled={loading}
               >
                 Complete Job
@@ -485,7 +485,7 @@ export default function EditMovingJobModal({ isOpen, onClose, onSuccess, job }: 
             )}
             <button
               type="submit"
-              className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
               disabled={loading}
             >
               {loading ? 'Updating...' : 'Update Job'}

@@ -371,7 +371,7 @@ export const BillingSettings: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">General Billing Settings</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
                 <input
@@ -502,7 +502,7 @@ export const BillingSettings: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Invoice Design & Layout</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Logo URL</label>
                 <input
@@ -619,7 +619,7 @@ export const BillingSettings: React.FC = () => {
               <p className="text-sm text-gray-600">These details will be shown on invoices for customer payments</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
                 <input

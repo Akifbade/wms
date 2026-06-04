@@ -110,7 +110,7 @@ function MoveHistorySection({ shipmentId }: { shipmentId: string }) {
                   </div>
 
                   {/* Details Grid */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <div>
                       <p className="text-gray-500">Reason</p>
                       <p className="font-semibold">{move.reason}</p>
@@ -136,7 +136,7 @@ function MoveHistorySection({ shipmentId }: { shipmentId: string }) {
                   {/* Photos */}
                   {(move.oldPhotos?.length > 0 || move.newPhotos?.length > 0) && (
                     <div className="mt-2 pt-2 border-t border-amber-100">
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {move.oldPhotos?.length > 0 && (
                           <div>
                             <p className="text-xs text-gray-500 mb-1">📷 Before</p>
@@ -295,7 +295,7 @@ function BoxDistributionSection({ shipmentId, shipmentStatus }: BoxDistributionP
       )}
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-white rounded-lg border border-blue-200">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4 p-3 bg-white rounded-lg border border-blue-200">
         <div className="text-center">
           <p className="text-2xl font-bold text-blue-600">{totalBoxes}</p>
           <p className="text-xs text-gray-600">Total Boxes</p>
@@ -381,7 +381,7 @@ function BoxDistributionSection({ shipmentId, shipmentStatus }: BoxDistributionP
               <span className="ml-2 text-red-600 text-xs font-bold">● RELEASED</span>
             )}
           </p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
             {photoUrls.map((url, idx) => (
               <ShipmentPhoto
                 key={idx}
@@ -529,7 +529,7 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-2xl w-[95vw] md:w-auto md:max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 flex justify-between items-center rounded-t-lg">
           <div>
@@ -540,7 +540,7 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
           </div>
           <button
             onClick={onClose}
-            className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition"
+            className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition min-h-[44px] min-w-[44px]"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -745,7 +745,7 @@ export default function ShipmentDetailModal({ isOpen, onClose, shipmentId }: Shi
                   <h4 className="font-bold text-gray-800 mb-3 flex items-center">
                     <span className="text-xl mr-2">🗄️</span> Primary Storage Location
                   </h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-gray-600">Rack Code</p>
                       <p className="font-semibold text-gray-800">{shipment.rack.code}</p>

@@ -23,7 +23,7 @@ export const IntegrationSettings: React.FC = () => {
             Configure
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">API Key</label>
             <input type="password" placeholder="Enter WhatsApp API key" className="w-full px-3 py-2 border border-gray-300 rounded-lg" />

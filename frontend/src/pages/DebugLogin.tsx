@@ -201,7 +201,7 @@ export const DebugLogin: React.FC = () => {
         {/* Quick Actions */}
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-bold mb-4">⚡ Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               onClick={() => window.location.href = '/login'}
               className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"

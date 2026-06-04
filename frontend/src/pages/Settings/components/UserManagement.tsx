@@ -657,7 +657,7 @@ export const UserManagement: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+                  className="w-full sm:w-auto px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
                 >
                   {selectedUser ? (
                     <>
@@ -712,7 +712,7 @@ export const UserManagement: React.FC = () => {
               </div>
 
               {/* Role & Status */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-500 mb-1">Role</p>
                   <span className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold ${roleColors[selectedUser.role]}`}>
@@ -742,7 +742,7 @@ export const UserManagement: React.FC = () => {
               )}
 
               {/* Dates */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-500 mb-1">Joined</p>
                   <p className="font-semibold text-gray-900">{selectedUser.joinedAt}</p>
@@ -826,7 +826,7 @@ export const UserManagement: React.FC = () => {
                 <h4 className="font-bold text-lg mb-4 flex items-center">
                   <span className="text-2xl mr-2">📦</span> Shipments Management
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="flex items-center space-x-3">
                     <input type="checkbox" name="shipments_view" className="w-5 h-5" defaultChecked />
                     <span>View Shipments</span>
@@ -859,7 +859,7 @@ export const UserManagement: React.FC = () => {
                 <h4 className="font-bold text-lg mb-4 flex items-center">
                   <span className="text-2xl mr-2">🏢</span> Racks Management
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="flex items-center space-x-3">
                     <input type="checkbox" name="racks_view" className="w-5 h-5" defaultChecked />
                     <span>View Racks</span>
@@ -905,7 +905,7 @@ export const UserManagement: React.FC = () => {
                 <h4 className="font-bold text-lg mb-4 flex items-center">
                   <span className="text-2xl mr-2">📊</span> Reports & Analytics
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="flex items-center space-x-3">
                     <input type="checkbox" name="reports_view" className="w-5 h-5" defaultChecked />
                     <span>View Reports</span>
@@ -926,7 +926,7 @@ export const UserManagement: React.FC = () => {
                 <h4 className="font-bold text-lg mb-4 flex items-center">
                   <span className="text-2xl mr-2">⚙️</span> Settings Access
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="flex items-center space-x-3">
                     <input type="checkbox" name="settings_users" className="w-5 h-5" />
                     <span>Manage Users</span>

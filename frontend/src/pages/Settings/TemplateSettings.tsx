@@ -256,7 +256,7 @@ export const TemplateSettingsPage: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Phone */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -507,7 +507,7 @@ export const TemplateSettingsPage: React.FC = () => {
             {/* Invoice Colors */}
             <div>
               <h3 className="text-lg font-semibold text-gray-800 mb-3">Invoice Colors</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Primary Color
@@ -553,7 +553,7 @@ export const TemplateSettingsPage: React.FC = () => {
             {/* Release Note Colors */}
             <div>
               <h3 className="text-lg font-semibold text-gray-800 mb-3">Release Note Colors</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Primary Color
@@ -620,7 +620,7 @@ export const TemplateSettingsPage: React.FC = () => {
             <h2 className="text-xl font-bold text-gray-900 mb-4">Advanced Settings</h2>
 
             {/* Currency */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Currency Symbol
@@ -649,7 +649,7 @@ export const TemplateSettingsPage: React.FC = () => {
             </div>
 
             {/* Date Format */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Date Format
@@ -702,7 +702,7 @@ export const TemplateSettingsPage: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Print Margins (mm)
               </label>
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {['Top', 'Bottom', 'Left', 'Right'].map((side) => (
                   <div key={side}>
                     <label className="block text-xs text-gray-600 mb-1">{side}</label>
@@ -756,7 +756,7 @@ export const TemplateSettingsPage: React.FC = () => {
                 <span className="ml-2 text-sm font-medium text-gray-700">Show QR Code on Documents</span>
               </label>
               {settings.showQRCode && (
-                <div className="grid grid-cols-2 gap-4 ml-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ml-6">
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Position</label>
                     <select

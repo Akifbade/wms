@@ -266,7 +266,7 @@ export default function PluginSettings() {
                         </p>
                     </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                     <div className="bg-white rounded-lg p-4 border border-blue-200">
                         <p className="text-sm text-gray-600">Backup Interval</p>
                         <p className="text-2xl font-bold text-blue-600">6 hours</p>

@@ -29,7 +29,7 @@ export const InventoryFinancials = () => {
     return (
         <div className="p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Inventory Financials</h2>
-            <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+            <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-300">
                     <thead className="bg-gray-50">
                         <tr>

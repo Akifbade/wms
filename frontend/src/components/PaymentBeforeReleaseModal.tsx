@@ -785,7 +785,7 @@ export const PaymentBeforeReleaseModal: React.FC<PaymentBeforeReleaseModalProps>
                   <DocumentTextIcon className="h-12 w-12 text-blue-600" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                   <div>
                     <p className="text-sm text-gray-600">Client</p>
                     <p className="font-bold text-gray-900">{shipment.clientName}</p>
@@ -991,7 +991,7 @@ export const PaymentBeforeReleaseModal: React.FC<PaymentBeforeReleaseModalProps>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Payment Option
                 </label>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {/* Full Payment - adjusted for prepaid */}
                   {(() => {
                     const prepaidDeduction = usePrepaid && prepaidBalance
@@ -1079,7 +1079,7 @@ export const PaymentBeforeReleaseModal: React.FC<PaymentBeforeReleaseModalProps>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Payment Method
                     </label>
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       {['CASH', 'KNET', 'BANK_TRANSFER', 'CHEQUE'].map((method) => (
                         <button
                           key={method}
@@ -1204,7 +1204,7 @@ export const PaymentBeforeReleaseModal: React.FC<PaymentBeforeReleaseModalProps>
 
                     {/* Uploaded Photos Preview */}
                     {releasePhotos.length > 0 && (
-                      <div className="mt-3 grid grid-cols-4 gap-2">
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                         {releasePhotos.map((url, idx) => (
                           <div key={idx} className="relative group">
                             <img

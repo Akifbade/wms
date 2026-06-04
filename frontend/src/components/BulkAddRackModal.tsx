@@ -280,7 +280,7 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="p-6 space-y-6 w-full">
                     {/* Zone Configuration */}
                     <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                         <h3 className="text-lg font-semibold mb-4 text-blue-800 flex items-center gap-2">
@@ -486,7 +486,7 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Capacity Mode
                             </label>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 <button
                                     type="button"
                                     onClick={() => setFormData(prev => ({ ...prev, capacityMode: 'FIXED' }))}
@@ -537,7 +537,7 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
                         )}
 
                         {formData.capacityMode === 'FLEXIBLE' && (
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Max Pallets
@@ -604,18 +604,18 @@ const BulkAddRackModal: React.FC<BulkAddRackModalProps> = ({ isOpen, onClose, on
                     )}
 
                     {/* Action Buttons */}
-                    <div className="flex justify-end gap-3 pt-4 border-t">
+                    <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+                            className="w-full sm:w-auto px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
                             disabled={loading}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             disabled={loading || getTotalCount() <= 0}
                         >
                             {loading ? (

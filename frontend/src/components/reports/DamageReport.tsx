@@ -120,7 +120,7 @@ export const DamageReport: React.FC = () => {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       {/* Header */}
       <div className="mb-6 print:mb-4">
         <div className="flex justify-between items-center">
@@ -131,7 +131,7 @@ export const DamageReport: React.FC = () => {
             </h1>
             <p className="text-gray-600 mt-1">Complete record of damaged materials with photos and job details</p>
           </div>
-          <div className="flex gap-2 print:hidden">
+          <div className="flex flex-col sm:flex-row gap-2 print:hidden">
             <button
               onClick={handlePrint}
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
@@ -158,7 +158,7 @@ export const DamageReport: React.FC = () => {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid grid-cols-4 gap-4 mb-6 print:mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 print:mb-4">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="text-sm text-red-700 font-medium mb-1">Total Damaged Items</p>
             <p className="text-3xl font-bold text-red-600">{summary.totalItems}</p>
@@ -182,7 +182,7 @@ export const DamageReport: React.FC = () => {
 
       {/* Filters */}
       <div className="bg-white border rounded-lg p-4 mb-6 print:hidden">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Start Date</label>
             <input
@@ -228,7 +228,7 @@ export const DamageReport: React.FC = () => {
           <div className="divide-y">
             {damages.map((damage) => (
               <div key={damage.id} className="p-6 hover:bg-gray-50">
-                <div className="flex gap-6">
+                <div className="flex flex-col md:flex-row gap-4 md:gap-6">
                   {/* Left: Details */}
                   <div className="flex-1">
                     {/* Material Info */}
@@ -249,7 +249,7 @@ export const DamageReport: React.FC = () => {
                     {/* Job Details */}
                     <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
                       <p className="font-semibold text-blue-900 mb-1">Job Details</p>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                         <div>
                           <span className="text-gray-600">Job Code:</span>
                           <span className="ml-2 font-medium text-blue-700">{damage.job.jobCode}</span>
@@ -287,13 +287,13 @@ export const DamageReport: React.FC = () => {
                   </div>
 
                   {/* Right: Photos */}
-                  <div className="w-64">
+                  <div className="w-full md:w-64">
                     <p className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       <Camera className="w-4 h-4" />
                       Damage Photos ({damage.photoUrls.length})
                     </p>
                     {damage.photoUrls.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {damage.photoUrls.map((url, idx) => (
                           <div
                             key={idx}

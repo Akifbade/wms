@@ -146,7 +146,7 @@ export const Layout: React.FC = () => {
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`
+                  className={`min-h-[44px] 
                     flex items-center px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200
                     ${active
                       ? 'bg-white/10 text-white backdrop-blur-sm border border-white/10'
@@ -206,7 +206,7 @@ export const Layout: React.FC = () => {
             {/* Mobile: Menu button */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden text-slate-600 hover:text-slate-900 p-2 rounded-xl hover:bg-slate-100 transition-colors"
+              className="lg:hidden text-slate-600 hover:text-slate-900 p-2 rounded-xl hover:bg-slate-100 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             >
               <Bars3Icon className="h-6 w-6" />
             </button>
@@ -245,7 +245,7 @@ export const Layout: React.FC = () => {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-slate-100 p-4 md:p-6 pb-24 md:pb-6 no-scrollbar">
+        <main className="flex-1 overflow-y-auto bg-slate-100 p-3 md:p-6 pb-20 md:pb-6 no-scrollbar scroll-smooth">
           <Outlet />
         </main>
 

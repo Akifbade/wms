@@ -166,7 +166,7 @@ const JobReportsDashboard: React.FC = () => {
 
           {/* Cost Breakdown Tab */}
           {activeTab === 'details' && report && (
-            <div>
+            <div className="overflow-x-auto">
               <h5 style={{ marginBottom: '20px' }}>Cost Breakdown</h5>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
@@ -217,7 +217,7 @@ const JobReportsDashboard: React.FC = () => {
 
           {/* Material Costs Tab */}
           {activeTab === 'costs' && (
-            <div>
+            <div className="overflow-x-auto">
               <h5 style={{ marginBottom: '20px' }}>Material Cost Details</h5>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>

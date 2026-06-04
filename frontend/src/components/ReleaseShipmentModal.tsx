@@ -400,7 +400,7 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-[95vw] md:w-auto md:max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
           <div>
@@ -423,7 +423,7 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600 transition-colors min-h-[44px] min-w-[44px]"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
@@ -509,7 +509,7 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
             {/* Release Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Release Type</label>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button
                   onClick={() => {
                     setReleaseType('FULL');
@@ -543,7 +543,7 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Quantity Type
               </label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 {(['BOXES', 'PALLETS', 'PIECES', 'CARTONS', 'BAGS', 'CONTAINERS', 'CRATES', 'UNITS'] as QuantityType[]).map((type) => (
                   <button
                     key={type}
@@ -691,7 +691,7 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
 
               {/* Uploaded Photos Preview */}
               {releasePhotos.length > 0 && (
-                <div className="mt-3 grid grid-cols-4 gap-2">
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                   {releasePhotos.map((url, idx) => (
                     <div key={idx} className="relative group">
                       <img
@@ -790,7 +790,7 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
                       className="w-full px-2 py-1 text-sm font-medium text-gray-900 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent mb-2"
                     />
 
-                    <div className="grid grid-cols-3 gap-2 mb-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-2">
                       {/* Editable Quantity */}
                       <div>
                         <label className="text-xs text-gray-600">Qty</label>

@@ -205,8 +205,8 @@ const SystemMonitorEnhanced: React.FC = () => {
   if (!stats) return null;
 
   return (
-    <Box p={3}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+    <Box p={{ xs: 1.5, sm: 3 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexDirection={{ xs: 'column', sm: 'row' }} gap={1}>
         <Typography variant="h4">System Monitor</Typography>
         <Tooltip title="Refresh">
           <IconButton onClick={fetchStats} color="primary">

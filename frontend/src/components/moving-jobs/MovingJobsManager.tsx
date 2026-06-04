@@ -234,7 +234,7 @@ const MovingJobsManager: React.FC = () => {
         </div>
       )}
 
-      <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+      <div className="overflow-x-auto" style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         {loading ? (
           <p>Loading...</p>
         ) : (

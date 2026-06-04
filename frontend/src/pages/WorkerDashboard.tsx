@@ -204,7 +204,7 @@ export default function WorkerDashboard() {
           </div>
 
           {/* Today's Stats */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-4 rounded-lg">
               <div className="text-sm opacity-90">Assigned Today</div>
               <div className="text-3xl font-bold mt-1">{todayStats.assignedToday}</div>
@@ -229,7 +229,7 @@ export default function WorkerDashboard() {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Pending Shipments */}
           <div className="col-span-2 space-y-4">
             <div className="bg-white rounded-lg shadow-sm p-4">
@@ -317,7 +317,7 @@ export default function WorkerDashboard() {
                       )}
 
                       {/* Boxes Grid */}
-                      <div className="grid grid-cols-6 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                         {shipment.boxes.map(box => (
                           <button
                             key={box.id}

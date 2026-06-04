@@ -474,11 +474,11 @@ const UserProfile: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 border-t pt-6">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 border-t pt-6">
                 <button
                   type="button"
                   onClick={() => fetchProfile()}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <X className="w-4 h-4 inline mr-2" />
                   Cancel
@@ -486,7 +486,7 @@ const UserProfile: React.FC = () => {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
                   <Save className="w-4 h-4 inline mr-2" />
                   {saving ? 'Saving...' : 'Save Changes'}
@@ -497,7 +497,7 @@ const UserProfile: React.FC = () => {
 
           {/* Security Tab */}
           {activeTab === 'security' && (
-            <form onSubmit={handleChangePassword} className="space-y-6 max-w-2xl">
+            <form onSubmit={handleChangePassword} className="space-y-6 max-w-2xl w-full">
               <div>
                 <h3 className="text-lg font-semibold mb-4">Change Password</h3>
                 <div className="space-y-4">
@@ -553,11 +553,11 @@ const UserProfile: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 border-t pt-6">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 border-t pt-6">
                 <button
                   type="button"
                   onClick={() => setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <X className="w-4 h-4 inline mr-2" />
                   Cancel
@@ -565,7 +565,7 @@ const UserProfile: React.FC = () => {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
                   <Lock className="w-4 h-4 inline mr-2" />
                   {saving ? 'Changing...' : 'Change Password'}

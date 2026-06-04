@@ -536,7 +536,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                 </button>
               </div>
 
-              <form onSubmit={handleIssueMaterial} className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleIssueMaterial} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Material *</label>
                   <select
@@ -618,7 +618,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                   <button
                     type="submit"
                     disabled={loading}
-                    className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
+                    className="w-full sm:w-auto bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
                   >
                     <Save className="w-4 h-4" />
                     {loading ? 'Issuing...' : 'Issue Material'}
@@ -726,7 +726,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
               <p className="text-sm text-gray-600">Current Qty: {editingIssue.quantity} {editingIssue.material.unit}</p>
             </div>
 
-            <form onSubmit={handleEditIssue} className="space-y-4">
+            <form onSubmit={handleEditIssue} className="space-y-4 w-full">
               <div>
                 <label className="block text-sm font-medium mb-1">New Quantity *</label>
                 <input
@@ -761,18 +761,18 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <button
                   type="button"
                   onClick={() => setShowEditForm(false)}
-                  className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300"
+                  className="w-full sm:w-auto flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                  className="w-full sm:w-auto flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
                 >
                   {loading ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -852,8 +852,8 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
               </p>
             </div>
 
-            <form onSubmit={handleReturnMaterial} className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
+            <form onSubmit={handleReturnMaterial} className="space-y-4 w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Quantity Used *</label>
                   <input
@@ -1035,7 +1035,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                 <p className="text-xs text-blue-600 mt-2">This file will be shown in the Approval Manager and emailed to approvers.</p>
               </div>
 
-              <div className="flex gap-2 justify-end">
+              <div className="flex flex-col sm:flex-row gap-2 justify-end">
                 <button
                   type="button"
                   onClick={() => {
@@ -1043,14 +1043,14 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                     setPhysicalReportFile(null);
                     setPhysicalReportPreview(null);
                   }}
-                  className="px-4 py-2 border rounded hover:bg-gray-50"
+                  className="w-full sm:w-auto px-4 py-2 border rounded hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
+                  className="w-full sm:w-auto bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
                 >
                   <Save className="w-4 h-4" />
                   {loading ? 'Saving...' : 'Record Return'}
@@ -1094,7 +1094,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-4 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="text-gray-500">Used</p>
                         <p className="font-medium">{ret.quantityUsed}</p>
@@ -1136,7 +1136,7 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
               </button>
             </div>
 
-            <form onSubmit={handleEditReturn} className="space-y-4">
+            <form onSubmit={handleEditReturn} className="space-y-4 w-full">
               <div>
                 <label className="block text-sm font-medium mb-1">Quantity Good</label>
                 <input
@@ -1171,18 +1171,18 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                 />
               </div>
 
-              <div className="flex gap-2 justify-end pt-4">
+              <div className="flex flex-col sm:flex-row gap-2 justify-end pt-4">
                 <button
                   type="button"
                   onClick={() => setShowEditReturnForm(false)}
-                  className="px-4 py-2 border rounded hover:bg-gray-50"
+                  className="w-full sm:w-auto px-4 py-2 border rounded hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                  className="w-full sm:w-auto bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
                 >
                   {loading ? 'Saving...' : 'Update Return'}
                 </button>

@@ -386,7 +386,7 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
               <>
                 {/* Stats Section */}
                 <div className="p-6 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="bg-white rounded-lg p-4 shadow-sm border border-blue-200">
                       <p className="text-xs text-gray-500 font-medium">Status</p>
                       <p className="text-lg font-bold mt-1">
@@ -496,7 +496,7 @@ export default function RackMapModal({ isOpen, onClose, onSelectRack, selectedRa
                               <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
                                 ???? Photos ({photoUrls.length})
                               </p>
-                              <div className="grid grid-cols-3 gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                 {photoUrls.map((url: string, idx: number) => (
                                   <a
                                     key={idx}

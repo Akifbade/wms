@@ -737,7 +737,7 @@ export const SystemSettings: React.FC = () => {
         </div>
 
         {/* Field Statistics */}
-        <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
           <div className="text-center">
             <div className="text-2xl font-bold text-primary-600">
               {customFields.filter(f => f.section === 'SHIPMENT').length}

@@ -240,7 +240,7 @@ export const ContractStatementModal: React.FC<ContractStatementModalProps> = ({
                                 {activeTab === 'summary' && (
                                     <div className="bg-gray-50 rounded-xl p-6">
                                         <h3 className="text-lg font-semibold mb-4">Contract Summary</h3>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <div className="bg-white p-4 rounded-lg border">
                                                 <p className="text-sm text-gray-500">Contract Start</p>
                                                 <p className="font-semibold">{new Date(data.contract.startDate).toLocaleDateString()}</p>

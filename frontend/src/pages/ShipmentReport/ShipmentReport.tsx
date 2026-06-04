@@ -836,7 +836,7 @@ const ShipmentReport: React.FC = () => {
 
                                                     {/* Payment Summary */}
                                                     <div className="mt-4 pt-4 border-t-2 border-green-400">
-                                                        <div className="grid grid-cols-2 gap-4 text-sm">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                                             <div>
                                                                 <p className="text-gray-600">Total Invoice Amount:</p>
                                                                 <p className="font-bold text-lg text-gray-900">{formatNumber(invoice.totalAmount, 3)} KWD</p>
