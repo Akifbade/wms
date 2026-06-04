@@ -246,7 +246,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                           <td className="border px-4 py-2">{material.material.sku}</td>
                           <td className="border px-4 py-2">{material.material.name}</td>
                           <td className="border px-4 py-2 text-center">{material.quantity} {material.material.unit}</td>
-                          <td className="border px-4 py-2 text-center">{returned?.quantityUsed || '-'}</td>
+                          <td className="border px-4 py-2 text-center">{returned?.quantityUsed ?? '-'}</td>
                           <td className="border px-4 py-2 text-center text-green-600">{returned?.quantityGood || '-'}</td>
                           <td className="border px-4 py-2 text-center text-red-600">{returned?.quantityDamaged || '-'}</td>
                           <td className="border px-4 py-2 text-right">{material.unitCost.toFixed(2)} KWD</td>
