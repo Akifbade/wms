@@ -212,6 +212,10 @@ const MaterialReports: React.FC = () => {
   };
 
   const exportToCSV = () => {
+    if (statements.length === 0) {
+      alert('No data to export. Please load the statement first.');
+      return;
+    }
     const rows: string[] = ['Material,SKU,Unit,Opening Stock,Purchased,Consumed,Returned,Damaged,Closing Stock,Unit Price,Total Value'];
     statements.forEach(stmt => {
       rows.push([
@@ -256,6 +260,10 @@ const MaterialReports: React.FC = () => {
 
   // Professional PDF Export
   const exportToPDF = () => {
+    if (statements.length === 0) {
+      alert('No data to export. Please load the statement first.');
+      return;
+    }
     const doc = new jsPDF('landscape');
     const pageWidth = doc.internal.pageSize.getWidth();
     let yPos = 15;
@@ -490,21 +498,24 @@ const MaterialReports: React.FC = () => {
           <div className="flex gap-2">
             <button
               onClick={exportToPDF}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              disabled={loading || statements.length === 0}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FileText className="w-4 h-4" />
               Download PDF
             </button>
             <button
               onClick={printStatement}
-              className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+              disabled={statements.length === 0}
+              className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Printer className="w-4 h-4" />
               Print
             </button>
             <button
               onClick={exportToCSV}
-              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+              disabled={loading || statements.length === 0}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download className="w-4 h-4" />
               Export CSV
