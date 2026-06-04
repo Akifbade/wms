@@ -10,7 +10,6 @@ interface ConsoleError {
 }
 
 const ErrorRecorder: React.FC = () => {
-  console.log('ErrorRecorder component is being executed');
   const [errors, setErrors] = useState<ConsoleError[]>([]);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isRecording, setIsRecording] = useState(true);
@@ -20,8 +19,6 @@ const ErrorRecorder: React.FC = () => {
 
   // Debug: Check if component mounted
   useEffect(() => {
-    console.log('🔴 ErrorRecorder mounted!', { position, windowWidth: window.innerWidth });
-    console.log('🔴 ErrorRecorder is VISIBLE and READY!');
   }, []);
 
   // Intercept console errors

@@ -125,7 +125,6 @@ const MaterialReports: React.FC = () => {
     setHistoryLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      console.log('Loading history with dates:', dateRange.start, dateRange.end);
       const startISO = `${dateRange.start}T00:00:00.000Z`;
       const endISO = `${dateRange.end}T23:59:59.999Z`;
       const response = await apiFetch(`/materials/issues/history?startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}`, {
@@ -135,8 +134,6 @@ const MaterialReports: React.FC = () => {
         }
       });
       const data = await response.json();
-      console.log('History API response:', data);
-      console.log('History array length:', Array.isArray(data) ? data.length : 'not an array');
       setIssueHistory(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load issue history:', error);

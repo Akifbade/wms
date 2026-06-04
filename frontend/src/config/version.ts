@@ -21,9 +21,6 @@ export const DEPLOYMENT_TIMELINE = {
 };
 
 // Auto-update log
-console.log(`%c🚀 WMS Version: ${APP_VERSION}`, 'color: green; font-weight: bold; font-size: 14px');
-console.log(`%cEnvironment: ${VERSION_INFO.environment}`, 'color: blue');
-console.log(`%cCommit: ${VERSION_INFO.commitHash}`, 'color: gray');
 
 
 

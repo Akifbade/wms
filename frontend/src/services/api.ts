@@ -841,6 +841,28 @@ const genericApi = {
   },
 };
 
+
+// Materials API
+export const materialsAPI = {
+  getAll: async (params?: { search?: string }) => {
+    const query = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
+    return apiCall<any[]>(`/materials${query}`);
+  },
+  getById: async (id: string) => apiCall<any>(`/materials/${id}`),
+  getHistory: async (materialId: string) => apiCall<any[]>(`/materials/${materialId}/history`),
+  getJobMaterials: async (jobId: string) => apiCall<any[]>(`/materials/job-materials/${jobId}`),
+  getPurchaseOrders: async () => apiCall<any[]>('/materials/purchase-orders'),
+  getAvailableRacks: async () => apiCall<any[]>('/materials/available-racks'),
+  createIssue: async (data: any) => apiCall<any>('/materials/issues', { method: 'POST', body: JSON.stringify(data) }),
+  updateIssue: async (id: string, data: any) => apiCall<any>(`/materials/issues/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  createReturn: async (data: any) => apiCall<any>('/materials/returns', { method: 'POST', body: JSON.stringify(data) }),
+  updateReturn: async (id: string, data: any) => apiCall<any>(`/materials/returns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteReturn: async (id: string) => apiCall<{ message: string }>(`/materials/returns/${id}`, { method: 'DELETE' }),
+  getApprovals: async () => apiCall<any[]>('/materials/approvals'),
+  createApproval: async (data: any) => apiCall<any>('/materials/approvals', { method: 'POST', body: JSON.stringify(data) }),
+  updateApproval: async (id: string, data: any) => apiCall<any>(`/materials/approvals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteApproval: async (id: string) => apiCall<{ message: string }>(`/materials/approvals/${id}`, { method: 'DELETE' }),
+};
 export default {
   ...genericApi,
   auth: authAPI,
@@ -861,4 +883,5 @@ export default {
   shipmentSettings: shipmentSettingsAPI,
   backups: backupsAPI,
   email: emailAPI,
+  materials: materialsAPI,
 };

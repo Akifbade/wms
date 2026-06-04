@@ -176,9 +176,7 @@ export const SystemSettings: React.FC = () => {
           : null
       };
 
-      console.log('Creating field with data:', fieldData);
       const response = await customFieldsAPI.create(fieldData);
-      console.log('API Response:', response);
 
       // Instead of manual transformation, reload all data from server
       // This ensures we get the exact format the backend returns
@@ -416,7 +414,6 @@ export const SystemSettings: React.FC = () => {
       };
 
       const response = await customFieldsAPI.update(editingField.id, fieldData);
-      console.log('Update response:', response);
 
       // Reload all data to ensure consistency
       await loadData();

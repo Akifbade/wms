@@ -184,7 +184,6 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     const pieces = getSafeNumber(formData.pieces, 0);
     const looseBoxes = extraBoxes || 0;
 
-    console.log('🎯 Generating dimensions - Mode:', intakeMode, 'Pallets:', palletCount, 'Pieces:', pieces, 'Extra:', looseBoxes);
 
     const newDimensions: DimensionItem[] = [];
 
@@ -252,7 +251,6 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     const newQtys = newDimensions.map(d => d.qty).join(',');
 
     if (currentIds !== newIds || currentQtys !== newQtys || dimensions.length !== newDimensions.length) {
-      console.log('🎯 Updating dimensions:', newDimensions.length, 'rows');
       setDimensions(newDimensions);
     }
   }, [intakeMode, formData.palletCount, formData.pieces, extraBoxes]);
@@ -414,13 +412,10 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
           try {
             const order = JSON.parse(settings.formSectionOrder);
             setSectionOrder(order);
-            console.log('??? Section order loaded:', order);
           } catch (e) {
-            console.log('Using default section order');
           }
         }
 
-        console.log('??? Shipment settings loaded:', settings);
       }
     } catch (err: any) {
       console.error('Failed to load shipment settings:', err);

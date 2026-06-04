@@ -100,7 +100,6 @@ export const Scanner: React.FC = () => {
   // Helper to calculate pallet box counts from palletDetails
   const getPalletBoxCount = useCallback(
     (details: any[] | undefined, palletCount: number, fallbackPerPallet: number = 0) => {
-      console.log('🔍 getPalletBoxCount called:', { details, palletCount, fallbackPerPallet });
 
       if (!palletCount) return 0;
 
@@ -109,12 +108,10 @@ export const Scanner: React.FC = () => {
         const selected = sorted.slice(0, Math.min(palletCount, details.length));
         const total = selected.reduce((sum, detail) => sum + (detail?.boxCount || 0), 0);
 
-        console.log('✅ Using palletDetails:', { sorted, selected, total });
         return total;
       }
 
       const fallback = palletCount * fallbackPerPallet;
-      console.log('⚠️ Using fallback calculation:', { palletCount, fallbackPerPallet, fallback });
       return fallback;
     },
     []
@@ -137,7 +134,6 @@ export const Scanner: React.FC = () => {
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.3);
     } catch (err) {
-      console.log('Sound playback failed:', err);
     }
   };
 
@@ -164,7 +160,6 @@ export const Scanner: React.FC = () => {
         }, i * 500); // 500ms between beeps
       }
     } catch (err) {
-      console.log('Error sound playback failed:', err);
     }
   };
 
@@ -185,7 +180,6 @@ export const Scanner: React.FC = () => {
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.8);
     } catch (err) {
-      console.log('Warning sound playback failed:', err);
     }
   };
 
@@ -222,7 +216,6 @@ export const Scanner: React.FC = () => {
                   type: 'image/jpeg',
                   lastModified: Date.now(),
                 });
-                console.log(`📸 Compressed: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
                 resolve(compressedFile);
               } else {
                 resolve(file); // Fallback to original
@@ -608,7 +601,6 @@ export const Scanner: React.FC = () => {
         try {
           await destinationScannerRef.current.stop();
         } catch (e) {
-          console.log('No scanner to stop');
         }
       }
 
@@ -619,7 +611,6 @@ export const Scanner: React.FC = () => {
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 200, height: 200 } },
         async (decodedText) => {
-          console.log('🎯 Destination rack scanned:', decodedText);
           const upperCode = decodedText.toUpperCase();
 
           // Handle multiple QR formats:
@@ -636,7 +627,6 @@ export const Scanner: React.FC = () => {
           // Create underscore version (GROUND-B -> GROUND_B)
           let rackCodeWithUnderscore = rackCode.replace(/-/g, '_');
 
-          console.log('🔍 Scanned:', decodedText, '→ Hyphen:', rackCodeWithHyphen, '→ Underscore:', rackCodeWithUnderscore);
 
           // Find rack using EXACT same logic as processScanCode (which works!)
           let rack = null;
@@ -644,20 +634,15 @@ export const Scanner: React.FC = () => {
           // ALWAYS fetch from API first
           try {
             // Search with HYPHEN version first (since DB uses hyphens like GROUND-B)
-            console.log('📡 Fetching rack from API with search:', rackCodeWithHyphen);
             let response = await racksAPI.getAll({ search: rackCodeWithHyphen });
-            console.log('📊 API returned:', response.racks?.length, 'racks');
 
             // If no results, try original scanned text
             if (!response.racks || response.racks.length === 0) {
-              console.log('📡 Retry with original text:', decodedText);
               response = await racksAPI.getAll({ search: decodedText });
-              console.log('📊 Retry returned:', response.racks?.length, 'racks');
             }
 
             if (response.racks && response.racks.length > 0) {
               response.racks.forEach((r: any) => {
-                console.log('  - Rack:', r.code, 'qrCode:', r.qrCode);
               });
 
               // Match by qrCode first
@@ -685,7 +670,6 @@ export const Scanner: React.FC = () => {
 
               // Final fallback: take first rack if only one result
               if (!rack && response.racks.length === 1) {
-                console.log('⚠️ Taking first rack as fallback');
                 rack = response.racks[0];
               }
             }
@@ -695,7 +679,6 @@ export const Scanner: React.FC = () => {
 
           // Fallback to local racks array
           if (!rack) {
-            console.log('📦 Trying local racks array, count:', racks.length);
             rack = racks.find(r => {
               const dbCode = r.code.toUpperCase();
               const scannedNormalized = upperCode.replace(/[-_]/g, '');
@@ -710,7 +693,6 @@ export const Scanner: React.FC = () => {
           }
 
           if (rack) {
-            console.log('✅ Found rack:', rack.code, 'ID:', rack.id);
             if (rack.id === moveShipmentData?.sourceRackId) {
               alert('Cannot move to the same rack!');
               return;
@@ -749,7 +731,6 @@ export const Scanner: React.FC = () => {
         await destinationScannerRef.current.stop();
         destinationScannerRef.current = null;
       } catch (e) {
-        console.log('Error stopping destination scanner:', e);
       }
     }
     setScanningForDestination(false);
@@ -782,9 +763,7 @@ export const Scanner: React.FC = () => {
       // Initialize audio context on user interaction (required by browsers)
       try {
         getAudioContext();
-        console.log('🔊 Audio context initialized');
       } catch (err) {
-        console.log('⚠️ Audio context initialization failed:', err);
       }
 
       // Check if we have HTTPS or localhost
@@ -829,14 +808,12 @@ export const Scanner: React.FC = () => {
       });
 
       // Wait for DOM to update and div to be rendered - INCREASED wait time for mobile
-      console.log('⏳ Waiting for DOM to render qr-reader element...');
       await new Promise(resolve => setTimeout(resolve, 500)); // Increased from 300ms to 500ms for mobile
 
       // Check if qr-reader element exists (with retry) - MORE RETRIES for slow mobile
       let qrReaderElement = document.getElementById(qrCodeRegionId);
       let retries = 0;
       while (!qrReaderElement && retries < 10) { // Increased from 5 to 10 retries
-        console.log(`⏳ Retry ${retries + 1}/10: Waiting for qr-reader element...`);
         await new Promise(resolve => setTimeout(resolve, 300)); // Increased from 200ms to 300ms
         qrReaderElement = document.getElementById(qrCodeRegionId);
         retries++;
@@ -850,15 +827,12 @@ export const Scanner: React.FC = () => {
         throw new Error('📱 Scanner container not ready after 10 retries (3.5 seconds). Please close this page completely and reopen, then try again. If issue persists, clear browser cache.');
       }
 
-      console.log('✅ QR reader element found:', qrReaderElement);
 
       const html5QrCode = new Html5Qrcode(qrCodeRegionId);
       scannerRef.current = html5QrCode;
 
       // 📹 CRITICAL: Test camera access BEFORE starting html5-qrcode
       // This matches camera-test.html behavior which works perfectly
-      console.log('📹 Step 1: Testing direct camera access (like camera-test.html)...');
-      console.log('📱 Available constraints:', navigator.mediaDevices.getSupportedConstraints());
 
       let cameraWorks = false;
 
@@ -871,10 +845,7 @@ export const Scanner: React.FC = () => {
 
       for (let i = 0; i < testConfigs.length; i++) {
         try {
-          console.log(`🔍 Testing camera config ${i + 1}/${testConfigs.length}:`, testConfigs[i]);
           const testStream = await navigator.mediaDevices.getUserMedia(testConfigs[i]);
-          console.log('✅ Camera test SUCCESS with config', i + 1);
-          console.log('📹 Video track settings:', testStream.getVideoTracks()[0]?.getSettings());
 
           // Stop test stream immediately
           testStream.getTracks().forEach(track => track.stop());
@@ -891,9 +862,7 @@ export const Scanner: React.FC = () => {
         throw new Error('Camera test failed - please check camera permissions and try camera-test.html first');
       }
 
-      console.log('✅ Camera test passed! Now starting html5-qrcode with working constraints...');
 
-      console.log('🚀 Step 2: Starting html5-qrcode with correct camera config...');
 
       // ✅ FIX: html5-qrcode.start() expects ONLY facingMode string OR deviceId string
       // NOT the full constraints object with width/height
@@ -912,7 +881,6 @@ export const Scanner: React.FC = () => {
           () => { }  // onScanFailure - ignore, not an error
         );
 
-        console.log('✅ html5-qrcode scanner started successfully!');
       } catch (html5Err: any) {
         console.error('❌ html5-qrcode.start() failed even though camera test passed!');
         console.error('This is an html5-qrcode library issue:', html5Err);
@@ -1056,7 +1024,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       const timeSinceLastScan = now - lastTime;
 
       if (lastCode === decodedText && timeSinceLastScan < SCAN_COOLDOWN_MS) {
-        console.log(`🚫 Duplicate scan ignored: ${decodedText} (scanned ${Math.round(timeSinceLastScan / 1000)}s ago)`);
         playWarningSound();
         return; // Ignore duplicate scan
       }
@@ -1221,24 +1188,19 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
     // ✅ PRIORITY 3: Check for PALLET_SHIPMENTID_NUMBER format (simplified pallet QR)
     // Example: PALLET_cmhhm6gq1000132e5vadvqil_1
     if (upperCode.startsWith('PALLET_')) {
-      console.log('🔍 Scanning pallet QR:', code);
       const parts = code.split('_');
-      console.log('📦 Pallet QR parts:', parts);
 
       if (parts.length === 3) {
         const shipmentId = parts[1];
-        console.log('🎯 Extracted shipmentId:', shipmentId);
 
         // Try 1: Direct shipment ID lookup
         try {
-          console.log('🔍 Try 1: Direct API lookup for shipmentId:', shipmentId);
           const directResponse = await fetch(`/api/shipments/${shipmentId}`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
           });
           if (directResponse.ok) {
             const data = await directResponse.json();
             const shipment = data.shipment || data;
-            console.log('✅ Found shipment via direct lookup:', shipment.referenceId);
             return await validateAndReturnShipment(shipment, code);
           } else {
             console.warn('❌ Direct lookup failed with status:', directResponse.status);
@@ -1248,18 +1210,14 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         }
 
         // Try 2: Search by shipment ID (this should work since ID is unique)
-        console.log('🔍 Try 2: Search API for shipmentId:', shipmentId);
         const response = await shipmentsAPI.getAll({ search: shipmentId });
-        console.log('📊 Search results:', response.shipments?.length, 'shipments found');
 
         const shipment = response.shipments?.find((s: any) => {
           const match = s.id === shipmentId || s.qrCode?.includes(shipmentId) || s.referenceId?.includes(shipmentId);
-          console.log(`  - Checking ${s.referenceId}: id=${s.id === shipmentId}, qr=${s.qrCode?.includes(shipmentId)}, ref=${s.referenceId?.includes(shipmentId)} → ${match}`);
           return match;
         });
 
         if (shipment) {
-          console.log('✅ Found shipment via search:', shipment.referenceId);
           return await validateAndReturnShipment(shipment, code);
         } else {
           console.error('❌ No shipment found matching ID:', shipmentId);
@@ -1374,7 +1332,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       let photoUrls: string[] = [];
       if (assignmentPhotos.length > 0) {
         setUploadingPhotos(true);
-        console.log(`📸 Starting upload of ${assignmentPhotos.length} photo(s)...`);
 
         for (let i = 0; i < assignmentPhotos.length; i++) {
           const photo = assignmentPhotos[i];
@@ -1388,10 +1345,8 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
           try {
             // 📸 Compress photo before upload (mobile cameras = huge files!)
-            console.log(`📸 Compressing photo ${i + 1}/${assignmentPhotos.length} (${originalSize}MB)...`);
             const compressedPhoto = await compressPhoto(photo);
             const compressedSize = (compressedPhoto.size / 1024 / 1024).toFixed(2);
-            console.log(`✅ Compressed: ${originalSize}MB → ${compressedSize}MB`);
 
             const formData = new FormData();
             formData.append('photo', compressedPhoto);
@@ -1405,7 +1360,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
             if (uploadRes.ok) {
               const uploadData = await uploadRes.json();
               photoUrls.push(uploadData.photoUrl);
-              console.log(`✅ Photo ${i + 1} uploaded: ${uploadData.photoUrl}`);
             } else {
               const errorText = await uploadRes.text();
               console.error(`❌ Photo ${i + 1} upload failed (${uploadRes.status}):`, errorText);
@@ -1419,7 +1373,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
         setUploadingPhotos(false);
         setUploadProgress(null);
-        console.log(`📸 Successfully uploaded ${photoUrls.length}/${assignmentPhotos.length} photos`);
       }
 
       // Use same API endpoint as Pending+Racks workflow
@@ -1476,7 +1429,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   const loadPendingShipments = async () => {
     try {
       setLoading(true);
-      console.log('Loading pending shipments...');
       const token = localStorage.getItem('authToken');
       // Fetch both PENDING and PARTIAL status shipments
       const response = await fetch('/api/shipments', {
@@ -1488,7 +1440,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Loaded shipments:', data);
         const shipments = data.shipments || data || [];
 
         // Filter shipments to only show PENDING and PARTIAL status with unassigned boxes
@@ -1557,7 +1508,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         );
 
         const validShipments = shipmentsWithBoxes.filter((s: any) => s !== null);
-        console.log('Shipments with unassigned boxes (PENDING + PARTIAL):', validShipments);
         setAllShipments(validShipments);
         setFilteredShipments(validShipments);
       } else {
@@ -1667,8 +1617,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
   // Select shipment from list - show rack selection
   const handleSelectShipment = async (shipment: any) => {
-    console.log('🎯 Choose Rack clicked for shipment:', shipment);
-    console.log('📦 Fetching FRESH box data and dimensions...');
 
     try {
       setLoading(true);
@@ -1691,7 +1639,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       const boxData = await boxResponse.json();
       const dimData = dimResponse.ok ? await dimResponse.json() : { dimensions: [] };
 
-      console.log('📏 Dimensions loaded:', dimData.dimensions?.length || 0);
 
       // ✅ CRITICAL: Filter out boxes that are assigned (have rackId) OR already in storage/released
       // A box is unassigned if: rackId is null/undefined AND status is not IN_STORAGE/RELEASED
@@ -1715,7 +1662,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
         }))
       });
 
-      console.log('📦 Unassigned boxes:', unassignedBoxes.length);
 
       // Recalculate pallet/loose box breakdown from CURRENT boxes
       const palletGroups = unassignedBoxes.reduce((acc: Record<number, number>, box: any) => {
@@ -1754,7 +1700,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       // Priority 1: Use shipment.cbm if available (from direct input or L×W×H calculation)
       if (shipment.cbm && Number(shipment.cbm) > 0) {
         totalCBM = Number(shipment.cbm);
-        console.log('📦 Using shipment.cbm:', totalCBM);
       }
       // Priority 2: Calculate from dimensions array
       else if (dimensions.length > 0) {
@@ -1762,7 +1707,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
           const cbm = ((d.length || 0) * (d.width || 0) * (d.height || 0) * (d.pieces || d.quantity || 1)) / 1000000;
           return sum + cbm;
         }, 0);
-        console.log('📐 Calculated CBM from dimensions:', totalCBM);
       }
 
       // Calculate CBM per pallet and per box (for partial assignments)
@@ -1812,7 +1756,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
   // Load racks for rack map
   const loadRacks = async () => {
     try {
-      console.log('Loading racks...');
       const token = localStorage.getItem('authToken');
       const response = await fetch('/api/racks', {
         headers: {
@@ -1823,10 +1766,8 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Loaded racks response:', data);
         // Backend returns { racks: [...] }
         const racksArray = data.racks || data || [];
-        console.log('Racks array:', racksArray);
         setRacks(Array.isArray(racksArray) ? racksArray : []);
       } else {
         console.error('Failed to load racks:', response.status);
@@ -1898,7 +1839,6 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
             photoUrls.push(uploadData.photoUrl);
           }
         }
-        console.log('📸 Uploaded photos:', photoUrls);
       }
 
       // Assign boxes to rack with photos and CBM

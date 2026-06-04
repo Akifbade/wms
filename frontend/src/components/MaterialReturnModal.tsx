@@ -242,17 +242,12 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
 
         // Add physical report file if selected (only attach once to first return)
         if (physicalReportFile && !physicalReportAttached) {
-          console.log('[MaterialReturnModal] ATTEMPTING TO ATTACH PHYSICAL REPORT');
-          console.log('[MaterialReturnModal] File:', physicalReportFile.name, 'Size:', physicalReportFile.size, 'Type:', physicalReportFile.type);
           formData.append('physicalReport', physicalReportFile);
           physicalReportAttached = true;
-          console.log('[MaterialReturnModal] Physical report attached to FormData:', physicalReportFile.name);
         } else {
           if (!physicalReportFile) {
-            console.log('[MaterialReturnModal] ⚠️ NO PHYSICAL REPORT FILE SELECTED');
           }
           if (physicalReportAttached) {
-            console.log('[MaterialReturnModal] ⚠️ PHYSICAL REPORT ALREADY ATTACHED (skipping)');
           }
         }
 

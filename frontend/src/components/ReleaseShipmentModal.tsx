@@ -314,9 +314,7 @@ export const ReleaseShipmentModal: React.FC<ReleaseShipmentModalProps> = ({
         isContractCustomer: contractValidity?.hasContract || false,
       };
 
-      console.log('Creating invoice with data:', invoice);
       const invoiceResult = await billingAPI.createInvoice(invoice);
-      console.log('Invoice created successfully:', invoiceResult);
 
       // Release boxes using proper API endpoint that handles rack capacity
       if (releaseType === 'FULL') {

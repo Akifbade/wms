@@ -281,14 +281,9 @@ export const Racks: React.FC = () => {
     setLoadingDetails(true);
     try {
       const response = await racksAPI.getById(rack.id);
-      console.log('✅ Rack details loaded:', response.rack);
-      console.log('   - companyProfile:', response.rack?.companyProfile);
-      console.log('   - companyProfile.name:', response.rack?.companyProfile?.name);
-      console.log('   - companyProfile.logo:', response.rack?.companyProfile?.logo);
       setRackDetails(response.rack);
     } catch (err) {
       console.error('❌ Failed to load rack details:', err);
-      console.log('⚠️ Falling back to basic rack data:', rack);
       setRackDetails(rack);
     } finally {
       setLoadingDetails(false);

@@ -224,7 +224,6 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
 
       if (response.ok) {
         const data = await response.json();
-        console.log('[MaterialReturn] Response data:', data);
         
         alert('Material return recorded successfully!');
         setShowReturnForm(false);

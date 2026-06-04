@@ -68,7 +68,6 @@ export const Dashboard: React.FC = () => {
   }
 
   // Debug: Log storage analytics
-  console.log('📊 Dashboard storageAnalytics:', stats?.storageAnalytics);
 
   const statsCards = [
     {

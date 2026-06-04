@@ -48,7 +48,6 @@ export const SwiftCargoLanding: React.FC = () => {
           if ((data.branding as any).loginPartners) setPartners((data.branding as any).loginPartners);
         }
       } catch (error) {
-        console.log('Using default branding');
       }
     };
     loadBranding();
