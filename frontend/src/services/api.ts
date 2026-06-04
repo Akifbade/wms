@@ -1,3 +1,10 @@
+import type { 
+  User, Company, Rack, RackCategory,
+  Shipment, ShipmentDimension,
+  MovingJob, Withdrawal, Expense,
+  CustomField,
+} from '../types/entities';
+
 // API configuration
 const API_BASE_URL = '/api';
 
@@ -88,7 +95,7 @@ async function apiCall<T>(
 // Auth API
 export const authAPI = {
   login: async (email: string, password: string) => {
-    const response = await apiCall<{ token: string; user: any }>('/auth/login', {
+    const response = await apiCall<{ token: string; user: User }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
@@ -98,7 +105,7 @@ export const authAPI = {
   },
 
   register: async (data: { email: string; password: string; name: string; companyId: string }) => {
-    const response = await apiCall<{ token: string; user: any }>('/auth/register', {
+    const response = await apiCall<{ token: string; user: User }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -108,7 +115,7 @@ export const authAPI = {
   },
 
   me: async () => {
-    return apiCall<{ user: any }>('/auth/me');
+    return apiCall<{ user: User }>('/auth/me');
   },
 
   logout: () => {
@@ -119,7 +126,7 @@ export const authAPI = {
 // Dashboard API
 export const dashboardAPI = {
   getStats: async () => {
-    return apiCall<any>('/dashboard/stats');
+    return apiCall<unknown>('/dashboard/stats');
   },
 };
 
@@ -134,22 +141,22 @@ export const shipmentsAPI = {
     if (params?.isWarehouseShipment !== undefined) queryParams.append('isWarehouseShipment', String(params.isWarehouseShipment));
 
     const query = queryParams.toString();
-    return apiCall<any>(`/shipments${query ? `?${query}` : ''}`);
+    return apiCall<unknown>(`/shipments${query ? `?${query}` : ''}`);
   },
 
   getById: async (id: string) => {
-    return apiCall<{ shipment: any }>(`/shipments/${id}`);
+    return apiCall<{ shipment: Shipment }>(`/shipments/${id}`);
   },
 
-  create: async (data: any) => {
-    return apiCall<{ shipment: any }>('/shipments', {
+  create: async (data: Record<string, unknown>) => {
+    return apiCall<{ shipment: Shipment }>('/shipments', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  update: async (id: string, data: any) => {
-    return apiCall<{ shipment: any }>(`/shipments/${id}`, {
+  update: async (id: string, data: Record<string, unknown>) => {
+    return apiCall<{ shipment: Shipment }>(`/shipments/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -163,18 +170,18 @@ export const shipmentsAPI = {
 
   // Dimensions API - Multiple dimensions per shipment
   getDimensions: async (shipmentId: string) => {
-    return apiCall<{ dimensions: any[]; summary: any }>(`/shipments/${shipmentId}/dimensions`);
+    return apiCall<{ dimensions: ShipmentDimension[]; summary: Record<string, unknown> }>(`/shipments/${shipmentId}/dimensions`);
   },
 
-  addDimension: async (shipmentId: string, data: any) => {
-    return apiCall<{ dimension: any }>(`/shipments/${shipmentId}/dimensions`, {
+  addDimension: async (shipmentId: string, data: Record<string, unknown>) => {
+    return apiCall<{ dimension: ShipmentDimension }>(`/shipments/${shipmentId}/dimensions`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  updateDimension: async (shipmentId: string, dimensionId: string, data: any) => {
-    return apiCall<{ dimension: any }>(`/shipments/${shipmentId}/dimensions/${dimensionId}`, {
+  updateDimension: async (shipmentId: string, dimensionId: string, data: Record<string, unknown>) => {
+    return apiCall<{ dimension: ShipmentDimension }>(`/shipments/${shipmentId}/dimensions/${dimensionId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -187,7 +194,7 @@ export const shipmentsAPI = {
   },
 
   saveDimensionsBulk: async (shipmentId: string, dimensions: any[]) => {
-    return apiCall<{ dimensions: any[]; summary: any }>(`/shipments/${shipmentId}/dimensions/bulk`, {
+    return apiCall<{ dimensions: ShipmentDimension[]; summary: Record<string, unknown> }>(`/shipments/${shipmentId}/dimensions/bulk`, {
       method: 'POST',
       body: JSON.stringify({ dimensions }),
     });
@@ -195,24 +202,24 @@ export const shipmentsAPI = {
 
   // 🎯 NEW: Dimension Rack Assignment APIs
   getDimensionsStatus: async (shipmentId: string) => {
-    return apiCall<{ dimensions: any[]; summary: any }>(`/shipments/${shipmentId}/dimensions/status`);
+    return apiCall<{ dimensions: ShipmentDimension[]; summary: Record<string, unknown> }>(`/shipments/${shipmentId}/dimensions/status`);
   },
 
   assignDimensionToRack: async (shipmentId: string, dimensionId: string, rackId: string) => {
-    return apiCall<any>(`/shipments/${shipmentId}/dimensions/${dimensionId}/assign`, {
+    return apiCall<unknown>(`/shipments/${shipmentId}/dimensions/${dimensionId}/assign`, {
       method: 'POST',
       body: JSON.stringify({ rackId }),
     });
   },
 
   releaseDimension: async (shipmentId: string, dimensionId: string) => {
-    return apiCall<any>(`/shipments/${shipmentId}/dimensions/${dimensionId}/release`, {
+    return apiCall<unknown>(`/shipments/${shipmentId}/dimensions/${dimensionId}/release`, {
       method: 'POST',
     });
   },
 
   bulkAssignDimensions: async (shipmentId: string, dimensionIds: string[], rackId: string) => {
-    return apiCall<any>(`/shipments/${shipmentId}/dimensions/bulk-assign`, {
+    return apiCall<unknown>(`/shipments/${shipmentId}/dimensions/bulk-assign`, {
       method: 'POST',
       body: JSON.stringify({ dimensionIds, rackId }),
     });
@@ -227,26 +234,26 @@ export const racksAPI = {
     if (params?.search) queryParams.append('search', params.search);
 
     const query = queryParams.toString();
-    return apiCall<{ racks: any[] }>(`/racks${query ? `?${query}` : ''}`);
+    return apiCall<{ racks: Rack[] }>(`/racks${query ? `?${query}` : ''}`);
   },
 
   getById: async (id: string) => {
-    return apiCall<{ rack: any }>(`/racks/${id}`);
+    return apiCall<{ rack: Rack }>(`/racks/${id}`);
   },
 
   getCategories: async () => {
-    return apiCall<{ categories: any[] }>('/racks/categories/list');
+    return apiCall<{ categories: RackCategory[] }>('/racks/categories/list');
   },
 
-  create: async (data: any) => {
-    return apiCall<{ rack: any }>('/racks', {
+  create: async (data: Record<string, unknown>) => {
+    return apiCall<{ rack: Rack }>('/racks', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  update: async (id: string, data: any) => {
-    return apiCall<{ rack: any }>(`/racks/${id}`, {
+  update: async (id: string, data: Record<string, unknown>) => {
+    return apiCall<{ rack: Rack }>(`/racks/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -262,12 +269,12 @@ export const racksAPI = {
 // NEW: Categories API
 export const categoriesAPI = {
   listByCompany: async (companyId: string) => {
-    const response = await apiCall<{ categories: any[] }>(`/categories/${companyId}`);
+    const response = await apiCall<{ categories: RackCategory[] }>(`/categories/${companyId}`);
     return response.categories;
   },
 
   getDetail: async (categoryId: string) => {
-    const response = await apiCall<{ category: any }>(`/categories/detail/${categoryId}`);
+    const response = await apiCall<{ category: RackCategory }>(`/categories/detail/${categoryId}`);
     return response.category;
   },
 
@@ -317,11 +324,11 @@ export const categoriesAPI = {
 // Company Profiles API (DIOR, JAZEERA, etc)
 export const companiesAPI = {
   listProfiles: async () => {
-    return apiCall<any[]>(`/company-profiles/`);
+    return apiCall<unknown[]>(`/company-profiles/`);
   },
 
   getProfile: async (profileId: string) => {
-    return apiCall<any>(`/company-profiles/${profileId}`);
+    return apiCall<unknown>(`/company-profiles/${profileId}`);
   },
 
   createProfile: async (data: FormData) => {
@@ -377,23 +384,23 @@ export const jobsAPI = {
     if (params?.endDate) queryParams.append('endDate', params.endDate);
 
     const query = queryParams.toString();
-    const jobs = await apiCall<any[]>(`/moving-jobs${query ? `?${query}` : ''}`);
+    const jobs = await apiCall<unknown[]>(`/moving-jobs${query ? `?${query}` : ''}`);
     return { jobs }; // Wrap in object for compatibility
   },
 
   getById: async (id: string) => {
-    return apiCall<{ job: any }>(`/moving-jobs/${id}`);
+    return apiCall<{ job: MovingJob }>(`/moving-jobs/${id}`);
   },
 
-  create: async (data: any) => {
-    return apiCall<{ job: any }>('/moving-jobs', {
+  create: async (data: Record<string, unknown>) => {
+    return apiCall<{ job: MovingJob }>('/moving-jobs', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  update: async (id: string, data: any) => {
-    return apiCall<{ job: any }>(`/moving-jobs/${id}`, {
+  update: async (id: string, data: Record<string, unknown>) => {
+    return apiCall<{ job: MovingJob }>(`/moving-jobs/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -410,11 +417,11 @@ export const jobsAPI = {
 export const billingAPI = {
   // Billing Settings
   getSettings: async () => {
-    return apiCall<any>('/billing/settings');
+    return apiCall<unknown>('/billing/settings');
   },
 
   updateSettings: async (settings: any) => {
-    return apiCall<any>('/billing/settings', {
+    return apiCall<unknown>('/billing/settings', {
       method: 'PUT',
       body: JSON.stringify(settings),
     });
@@ -426,22 +433,22 @@ export const billingAPI = {
     if (params?.category) query.append('category', params.category);
     if (params?.active !== undefined) query.append('active', String(params.active));
 
-    return apiCall<any[]>(`/billing/charge-types${query.toString() ? '?' + query.toString() : ''}`);
+    return apiCall<unknown[]>(`/billing/charge-types${query.toString() ? '?' + query.toString() : ''}`);
   },
 
   getChargeType: async (id: string) => {
-    return apiCall<any>(`/billing/charge-types/${id}`);
+    return apiCall<unknown>(`/billing/charge-types/${id}`);
   },
 
   createChargeType: async (chargeType: any) => {
-    return apiCall<any>('/billing/charge-types', {
+    return apiCall<unknown>('/billing/charge-types', {
       method: 'POST',
       body: JSON.stringify(chargeType),
     });
   },
 
   updateChargeType: async (id: string, chargeType: any) => {
-    return apiCall<any>(`/billing/charge-types/${id}`, {
+    return apiCall<unknown>(`/billing/charge-types/${id}`, {
       method: 'PUT',
       body: JSON.stringify(chargeType),
     });
@@ -456,22 +463,22 @@ export const billingAPI = {
   // Invoice endpoints
   getInvoices: async (params?: { status?: string; search?: string }) => {
     const query = new URLSearchParams(params as any).toString();
-    return apiCall<any[]>(`/billing/invoices${query ? '?' + query : ''}`);
+    return apiCall<unknown[]>(`/billing/invoices${query ? '?' + query : ''}`);
   },
 
   getInvoice: async (id: string) => {
-    return apiCall<any>(`/billing/invoices/${id}`);
+    return apiCall<unknown>(`/billing/invoices/${id}`);
   },
 
   createInvoice: async (invoice: any) => {
-    return apiCall<any>('/billing/invoices', {
+    return apiCall<unknown>('/billing/invoices', {
       method: 'POST',
       body: JSON.stringify(invoice),
     });
   },
 
   recordPayment: async (invoiceId: string, payment: any) => {
-    return apiCall<any>(`/billing/invoices/${invoiceId}/payments`, {
+    return apiCall<unknown>(`/billing/invoices/${invoiceId}/payments`, {
       method: 'POST',
       body: JSON.stringify(payment),
     });
@@ -489,22 +496,22 @@ export const withdrawalsAPI = {
     if (params?.shipmentId) queryParams.append('shipmentId', params.shipmentId);
 
     const query = queryParams.toString();
-    return apiCall<any>(`/withdrawals${query ? `?${query}` : ''}`);
+    return apiCall<unknown>(`/withdrawals${query ? `?${query}` : ''}`);
   },
 
   getById: async (id: string) => {
-    return apiCall<{ withdrawal: any }>(`/withdrawals/${id}`);
+    return apiCall<{ withdrawal: Withdrawal }>(`/withdrawals/${id}`);
   },
 
-  create: async (data: any) => {
-    return apiCall<{ withdrawal: any; message: string }>('/withdrawals', {
+  create: async (data: Record<string, unknown>) => {
+    return apiCall<{ withdrawal: Withdrawal; message: string }>('/withdrawals', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
   updateStatus: async (id: string, status: string) => {
-    return apiCall<{ withdrawal: any }>(`/withdrawals/${id}/status`, {
+    return apiCall<{ withdrawal: Withdrawal }>(`/withdrawals/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
     });
@@ -521,26 +528,26 @@ export const withdrawalsAPI = {
 export const expensesAPI = {
   getAll: async (filters?: any) => {
     const params = new URLSearchParams(filters).toString();
-    return apiCall<{ expenses: any[]; summary: any }>(`/expenses?${params}`, {
+    return apiCall<{ expenses: Expense[]; summary: Record<string, unknown> }>(`/expenses?${params}`, {
       method: 'GET',
     });
   },
 
   getById: async (id: string) => {
-    return apiCall<{ expense: any }>(`/expenses/${id}`, {
+    return apiCall<{ expense: Expense }>(`/expenses/${id}`, {
       method: 'GET',
     });
   },
 
-  create: async (data: any) => {
-    return apiCall<{ expense: any }>('/expenses', {
+  create: async (data: Record<string, unknown>) => {
+    return apiCall<{ expense: Expense }>('/expenses', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  update: async (id: string, data: any) => {
-    return apiCall<{ expense: any }>(`/expenses/${id}`, {
+  update: async (id: string, data: Record<string, unknown>) => {
+    return apiCall<{ expense: Expense }>(`/expenses/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -553,7 +560,7 @@ export const expensesAPI = {
   },
 
   updateStatus: async (id: string, status: string) => {
-    return apiCall<{ expense: any }>(`/expenses/${id}/status`, {
+    return apiCall<{ expense: Expense }>(`/expenses/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     });
@@ -576,12 +583,12 @@ export const expensesAPI = {
 // Company API
 export const companyAPI = {
   getInfo: () => {
-    return apiCall<{ company: any }>('/company', {
+    return apiCall<{ company: Company }>('/company', {
       method: 'GET',
     });
   },
-  updateInfo: (data: any) => {
-    return apiCall<{ company: any; message: string }>('/company', {
+  updateInfo: (data: Record<string, unknown>) => {
+    return apiCall<{ company: Company; message: string }>('/company', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -591,23 +598,23 @@ export const companyAPI = {
 // Users API
 export const usersAPI = {
   getAll: () => {
-    return apiCall<{ users: any[] }>('/users', {
+    return apiCall<{ users: User[] }>('/users', {
       method: 'GET',
     });
   },
   getById: (id: string) => {
-    return apiCall<{ user: any }>(`/users/${id}`, {
+    return apiCall<{ user: User }>(`/users/${id}`, {
       method: 'GET',
     });
   },
-  create: (data: any) => {
-    return apiCall<{ user: any; message: string }>('/users', {
+  create: (data: Record<string, unknown>) => {
+    return apiCall<{ user: User; message: string }>('/users', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
-  update: (id: string, data: any) => {
-    return apiCall<{ user: any; message: string }>(`/users/${id}`, {
+  update: (id: string, data: Record<string, unknown>) => {
+    return apiCall<{ user: User; message: string }>(`/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -618,7 +625,7 @@ export const usersAPI = {
     });
   },
   toggleStatus: (id: string) => {
-    return apiCall<{ user: any; message: string }>(`/users/${id}/toggle`, {
+    return apiCall<{ user: User; message: string }>(`/users/${id}/toggle`, {
       method: 'PATCH',
     });
   },
@@ -627,12 +634,12 @@ export const usersAPI = {
 // Invoice Settings API
 export const invoiceSettingsAPI = {
   get: () => {
-    return apiCall<{ settings: any }>('/invoice-settings', {
+    return apiCall<{ settings: Record<string, unknown> }>('/invoice-settings', {
       method: 'GET',
     });
   },
-  update: (data: any) => {
-    return apiCall<{ settings: any; message: string }>('/invoice-settings', {
+  update: (data: Record<string, unknown>) => {
+    return apiCall<{ settings: Record<string, unknown>; message: string }>('/invoice-settings', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -642,12 +649,12 @@ export const invoiceSettingsAPI = {
 // Notification Preferences API
 export const notificationPreferencesAPI = {
   get: () => {
-    return apiCall<{ preferences: any }>('/notification-preferences', {
+    return apiCall<{ preferences: Record<string, unknown> }>('/notification-preferences', {
       method: 'GET',
     });
   },
-  update: (data: any) => {
-    return apiCall<{ preferences: any; message: string }>('/notification-preferences', {
+  update: (data: Record<string, unknown>) => {
+    return apiCall<{ preferences: Record<string, unknown>; message: string }>('/notification-preferences', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -664,23 +671,23 @@ export const notificationPreferencesAPI = {
 export const customFieldsAPI = {
   getAll: (section?: string) => {
     const queryParams = section ? `?section=${section}` : '';
-    return apiCall<{ customFields: any[] }>(`/custom-fields${queryParams}`, {
+    return apiCall<{ customFields: CustomField[] }>(`/custom-fields${queryParams}`, {
       method: 'GET',
     });
   },
   getById: (id: string) => {
-    return apiCall<any>(`/custom-fields/${id}`, {
+    return apiCall<unknown>(`/custom-fields/${id}`, {
       method: 'GET',
     });
   },
-  create: (data: any) => {
-    return apiCall<any>('/custom-fields', {
+  create: (data: Record<string, unknown>) => {
+    return apiCall<unknown>('/custom-fields', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
-  update: (id: string, data: any) => {
-    return apiCall<any>(`/custom-fields/${id}`, {
+  update: (id: string, data: Record<string, unknown>) => {
+    return apiCall<unknown>(`/custom-fields/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -695,18 +702,18 @@ export const customFieldsAPI = {
 // Shipment Settings API
 export const shipmentSettingsAPI = {
   getSettings: () => {
-    return apiCall<{ settings: any }>('/shipment-settings', {
+    return apiCall<{ settings: Record<string, unknown> }>('/shipment-settings', {
       method: 'GET',
     });
   },
-  updateSettings: (data: any) => {
-    return apiCall<{ settings: any; message: string }>('/shipment-settings', {
+  updateSettings: (data: Record<string, unknown>) => {
+    return apiCall<{ settings: Record<string, unknown>; message: string }>('/shipment-settings', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   },
   resetSettings: () => {
-    return apiCall<{ settings: any; message: string }>('/shipment-settings/reset', {
+    return apiCall<{ settings: Record<string, unknown>; message: string }>('/shipment-settings/reset', {
       method: 'POST',
     });
   },
@@ -740,7 +747,7 @@ const backupsAPI = {
   },
 
   getSettings: async () => {
-    return apiCall<{ settings: any }>('/backups/settings', {
+    return apiCall<{ settings: Record<string, unknown> }>('/backups/settings', {
       method: 'GET',
     });
   },
@@ -781,34 +788,34 @@ const backupsAPI = {
 // Email API
 export const emailAPI = {
   getSettings: async () => {
-    return apiCall<any>('/email/settings', { method: 'GET' });
+    return apiCall<unknown>('/email/settings', { method: 'GET' });
   },
-  updateSettings: async (data: any) => {
-    return apiCall<any>('/email/settings', {
+  updateSettings: async (data: Record<string, unknown>) => {
+    return apiCall<unknown>('/email/settings', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   },
   testConnection: async (testEmail: string) => {
-    return apiCall<any>('/email/test', {
+    return apiCall<unknown>('/email/test', {
       method: 'POST',
       body: JSON.stringify({ testEmail }),
     });
   },
   getNotifications: async () => {
-    return apiCall<any>('/email/notifications', { method: 'GET' });
+    return apiCall<unknown>('/email/notifications', { method: 'GET' });
   },
-  updateNotification: async (type: string, data: any) => {
-    return apiCall<any>(`/email/notifications/${type}`, {
+  updateNotification: async (type: string, data: Record<string, unknown>) => {
+    return apiCall<unknown>(`/email/notifications/${type}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   },
   getStats: async () => {
-    return apiCall<any>('/email/stats', { method: 'GET' });
+    return apiCall<unknown>('/email/stats', { method: 'GET' });
   },
   sendCustom: async (data: { to: string | string[]; subject: string; message: string }) => {
-    return apiCall<any>('/email/send', {
+    return apiCall<unknown>('/email/send', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -846,21 +853,21 @@ const genericApi = {
 export const materialsAPI = {
   getAll: async (params?: { search?: string }) => {
     const query = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
-    return apiCall<any[]>(`/materials${query}`);
+    return apiCall<unknown[]>(`/materials${query}`);
   },
-  getById: async (id: string) => apiCall<any>(`/materials/${id}`),
-  getHistory: async (materialId: string) => apiCall<any[]>(`/materials/${materialId}/history`),
-  getJobMaterials: async (jobId: string) => apiCall<any[]>(`/materials/job-materials/${jobId}`),
-  getPurchaseOrders: async () => apiCall<any[]>('/materials/purchase-orders'),
-  getAvailableRacks: async () => apiCall<any[]>('/materials/available-racks'),
-  createIssue: async (data: any) => apiCall<any>('/materials/issues', { method: 'POST', body: JSON.stringify(data) }),
-  updateIssue: async (id: string, data: any) => apiCall<any>(`/materials/issues/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  createReturn: async (data: any) => apiCall<any>('/materials/returns', { method: 'POST', body: JSON.stringify(data) }),
-  updateReturn: async (id: string, data: any) => apiCall<any>(`/materials/returns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  getById: async (id: string) => apiCall<unknown>(`/materials/${id}`),
+  getHistory: async (materialId: string) => apiCall<unknown[]>(`/materials/${materialId}/history`),
+  getJobMaterials: async (jobId: string) => apiCall<unknown[]>(`/materials/job-materials/${jobId}`),
+  getPurchaseOrders: async () => apiCall<unknown[]>('/materials/purchase-orders'),
+  getAvailableRacks: async () => apiCall<unknown[]>('/materials/available-racks'),
+  createIssue: async (data: Record<string, unknown>) => apiCall<unknown>('/materials/issues', { method: 'POST', body: JSON.stringify(data) }),
+  updateIssue: async (id: string, data: Record<string, unknown>) => apiCall<unknown>(`/materials/issues/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  createReturn: async (data: Record<string, unknown>) => apiCall<unknown>('/materials/returns', { method: 'POST', body: JSON.stringify(data) }),
+  updateReturn: async (id: string, data: Record<string, unknown>) => apiCall<unknown>(`/materials/returns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteReturn: async (id: string) => apiCall<{ message: string }>(`/materials/returns/${id}`, { method: 'DELETE' }),
-  getApprovals: async () => apiCall<any[]>('/materials/approvals'),
-  createApproval: async (data: any) => apiCall<any>('/materials/approvals', { method: 'POST', body: JSON.stringify(data) }),
-  updateApproval: async (id: string, data: any) => apiCall<any>(`/materials/approvals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  getApprovals: async () => apiCall<unknown[]>('/materials/approvals'),
+  createApproval: async (data: Record<string, unknown>) => apiCall<unknown>('/materials/approvals', { method: 'POST', body: JSON.stringify(data) }),
+  updateApproval: async (id: string, data: Record<string, unknown>) => apiCall<unknown>(`/materials/approvals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteApproval: async (id: string) => apiCall<{ message: string }>(`/materials/approvals/${id}`, { method: 'DELETE' }),
 };
 export default {
