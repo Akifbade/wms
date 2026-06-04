@@ -421,7 +421,7 @@ const MaterialsDashboard: React.FC = () => {
                                                         {materials.find(m => m.id === issue.materialId)?.name || 'Unknown'}
                                                     </p>
                                                     <p className="text-sm text-gray-500">
-                                                        {issue.issueType === 'JOB' ? `Job: ${issue.jobId}` : `Ref: ${issue.reference}`}
+                                                        {issue.issueType === 'JOB' ? `Job: ${issue.job?.title || issue.job?.name || issue.jobId}` : `Ref: ${issue.reference}`}
                                                     </p>
                                                 </div>
                                                 <span className="text-lg font-bold text-blue-600">{issue.quantity}</span>

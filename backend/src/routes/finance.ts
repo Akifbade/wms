@@ -120,6 +120,7 @@ router.get('/top-customers', authenticateToken, async (req: any, res) => {
             },
             select: {
                 totalAmount: true,
+                clientName: true,
                 companyProfileId: true,
                 companyProfile: {
                     select: { id: true, name: true }
@@ -131,18 +132,19 @@ router.get('/top-customers', authenticateToken, async (req: any, res) => {
         const customerMap: Record<string, { id: string, name: string, totalRevenue: number, totalInvoices: number }> = {};
 
         invoices.forEach(inv => {
-            if (inv.companyProfileId && inv.companyProfile) {
-                if (!customerMap[inv.companyProfileId]) {
-                    customerMap[inv.companyProfileId] = {
-                        id: inv.companyProfile.id,
-                        name: inv.companyProfile.name,
-                        totalRevenue: 0,
-                        totalInvoices: 0
-                    };
-                }
-                customerMap[inv.companyProfileId].totalRevenue += inv.totalAmount;
-                customerMap[inv.companyProfileId].totalInvoices += 1;
+            const customerId = inv.companyProfileId || inv.clientName || 'unknown';
+            const customerName = inv.companyProfile?.name || inv.clientName || 'Unknown';
+            
+            if (!customerMap[customerId]) {
+                customerMap[customerId] = {
+                    id: customerId,
+                    name: customerName,
+                    totalRevenue: 0,
+                    totalInvoices: 0
+                };
             }
+            customerMap[customerId].totalRevenue += inv.totalAmount;
+            customerMap[customerId].totalInvoices += 1;
         });
 
         // Convert to array and sort by revenue
@@ -242,7 +244,7 @@ router.get('/transactions', authenticateToken, async (req: any, res) => {
             where: { companyId },
             take: limit,
             orderBy: { paymentDate: 'desc' },
-            include: { invoice: { select: { invoiceNumber: true, companyProfile: { select: { name: true } } } } }
+            include: { invoice: { select: { invoiceNumber: true, clientName: true, companyProfile: { select: { name: true } } } } }
         });
 
         // 2. Expenses (Outflow)
@@ -268,7 +270,7 @@ router.get('/transactions', authenticateToken, async (req: any, res) => {
                 date: p.paymentDate,
                 type: 'INCOME',
                 category: 'Payment Received',
-                description: `Inv #${p.invoice?.invoiceNumber} - ${p.invoice?.companyProfile?.name || 'Unknown'}`,
+                description: `Inv #${p.invoice?.invoiceNumber} - ${p.invoice?.companyProfile?.name || p.invoice?.clientName || 'Unknown'}`,
                 amount: p.amount,
                 reference: p.transactionRef
             })),
