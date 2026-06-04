@@ -86,15 +86,15 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
     const totalIssued = materials.reduce((sum, m) => sum + m.quantity, 0);
     const totalUsed = materials.reduce((sum, m) => {
       const returned = m.returns?.[0];
-      return sum + (returned?.quantityUsed || 0);
+      return sum + (returned?.quantityUsed ?? 0);
     }, 0);
     const totalReturned = materials.reduce((sum, m) => {
       const returned = m.returns?.[0];
-      return sum + (returned?.quantityGood || 0);
+      return sum + (returned?.quantityGood ?? 0);
     }, 0);
     const totalDamaged = materials.reduce((sum, m) => {
       const returned = m.returns?.[0];
-      return sum + (returned?.quantityDamaged || 0);
+      return sum + (returned?.quantityDamaged ?? 0);
     }, 0);
     const totalCost = materials.reduce((sum, m) => sum + m.totalCost, 0);
 
@@ -106,23 +106,32 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
   };
 
   const handleDownload = () => {
-    const totals = calculateTotals();
-    let csv = 'Material SKU,Material Name,Issued Qty,Used Qty,Returned Good,Damaged,Unit Cost,Total Cost,Status\n';
+    if (materials.length === 0) {
+      alert('No materials data to download.');
+      return;
+    }
+    try {
+      const totals = calculateTotals();
+      let csv = 'Material SKU,Material Name,Issued Qty,Used Qty,Returned Good,Damaged,Unit Cost,Total Cost,Status\n';
 
-    materials.forEach(material => {
-      const returned = material.returns?.[0];
-      const status = returned ? 'Returned' : 'Pending';
-      csv += `${material.material.sku},${material.material.name},${material.quantity},${returned?.quantityUsed || 0},${returned?.quantityGood || 0},${returned?.quantityDamaged || 0},${material.unitCost},${material.totalCost},${status}\n`;
-    });
+      materials.forEach(material => {
+        const returned = material.returns?.[0];
+        const status = returned ? 'Returned' : 'Pending';
+        csv += `${material.material.sku},${material.material.name},${material.quantity},${returned?.quantityUsed ?? 0},${returned?.quantityGood ?? 0},${returned?.quantityDamaged ?? 0},${material.unitCost},${material.totalCost},${status}\n`;
+      });
 
-    csv += `\nTotals:,,,${totals.totalIssued},${totals.totalUsed},${totals.totalReturned},${totals.totalDamaged},,${totals.totalCost}\n`;
+      csv += `\nTotals:,,,${totals.totalIssued},${totals.totalUsed},${totals.totalReturned},${totals.totalDamaged},,${totals.totalCost}\n`;
 
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Job-${job?.jobCode}-Material-Report.csv`;
-    a.click();
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Job-${job?.jobCode}-Material-Report.csv`;
+      a.click();
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('Failed to download report. Please try again.');
+    }
   };
 
   if (!isOpen) return null;
@@ -146,27 +155,32 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
             top: 0;
             width: 100%;
           }
+          .no-print-overlay {
+            visibility: hidden !important;
+          }
           .no-print {
             display: none !important;
           }
         }
       `}</style>
 
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print-overlay">
         <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
           <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center no-print">
             <h2 className="text-2xl font-bold">📊 Job Material Report</h2>
             <div className="flex gap-2">
               <button
                 onClick={handlePrint}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"
+                disabled={loading || materials.length === 0}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Printer className="w-4 h-4" />
                 Print
               </button>
               <button
                 onClick={handleDownload}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2"
+                disabled={loading || materials.length === 0}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download className="w-4 h-4" />
                 CSV
