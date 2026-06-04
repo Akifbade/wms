@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Component } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import {
   ScanLine, Camera, CameraOff, AlertTriangle, CheckCircle2, XCircle,
@@ -185,7 +185,7 @@ function ScanHistory({ history }: { history: ScanResult[] }) {
             {h.type === 'shipment' ? (
               <Package className="w-3.5 h-3.5 flex-shrink-0" />
             ) : h.type === 'rack' ? (
-              <Ruler className="w-3.5 h-3.5 flex-shrink-0" />
+              <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
             ) : (
               <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
             )}
@@ -1134,7 +1134,7 @@ function RackInfoCard({
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-blue-200 dark:border-blue-800 shadow-lg overflow-hidden">
       <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Ruler className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           <span className="font-semibold text-sm text-gray-900 dark:text-white">Rack Found</span>
         </div>
         <button onClick={onClear} className="p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
@@ -1162,8 +1162,8 @@ function RackInfoCard({
           )}
           <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
             <span className="text-gray-500">Status</span>
-            <div className={cn('mt-0.5 px-1.5 py-0.5 rounded text-xs font-medium inline-block', getStatusColor(rack.status))}>
-              {getStatusLabel(rack.status)}
+            <div className={cn('mt-0.5 px-1.5 py-0.5 rounded text-xs font-medium inline-block', getStatusColor(rack.status?.toUpperCase?.()))}>
+              {getStatusLabel(rack.status?.toUpperCase?.())}
             </div>
           </div>
           <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
@@ -1625,7 +1625,7 @@ function CameraScanner({
     setInitializing(true)
     setError('')
     try {
-      const scanner = new (Html5Qrcode as any)('scanner-container')
+      const scanner = new Html5Qrcode('scanner-container')
       scannerRef.current = scanner
       await scanner.start(
         { facingMode: 'environment' },
@@ -1662,7 +1662,30 @@ function CameraScanner({
               return
             }
           } catch {
-            // Not a shipment, try rack
+            // Not a direct ID match, try searching by qrCode or referenceId
+          }
+
+          // Try searching by qrCode / referenceId
+          try {
+            const searchRes = await shipmentsAPI.getAll({ search: decodedText, limit: 5 })
+            const matched = searchRes.shipments?.find(
+              (s: Shipment) =>
+                s.qrCode === decodedText ||
+                s.referenceId === decodedText ||
+                s.id === decodedText
+            )
+            if (matched) {
+              result = {
+                type: 'shipment',
+                value: decodedText,
+                shipment: matched,
+                timestamp: now,
+              }
+              onScanResult(result)
+              return
+            }
+          } catch {
+            // Not found by search either
           }
 
           try {
@@ -1763,10 +1786,46 @@ function CameraScanner({
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Error Boundary
+// ═══════════════════════════════════════════════════════════════
+
+class ScannerErrorBoundary extends Component<
+  { children: React.ReactNode; fallback?: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; fallback?: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+  render() {
+    if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback
+      return (
+        <div className="p-6 text-center">
+          <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Scanner Error</h2>
+          <p className="text-sm text-gray-500 mb-4">{this.state.error?.message || 'Something went wrong'}</p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Main Scanner Page
 // ═══════════════════════════════════════════════════════════════
 
-export default function ScannerPage() {
+function ScannerPage() {
   const [activeTab, setActiveTab] = useState<Tab>('scanner')
   const [scanResult, setScanResult] = useState<ScanResult | null>(null)
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([])
@@ -1926,29 +1985,37 @@ export default function ScannerPage() {
       )}
 
       {/* Modals */}
-      {showAssignmentModal && (
-        <AssignmentModal
-          open={showAssignmentModal}
-          onClose={() => {
-            setShowAssignmentModal(false)
-            setPendingSelection(null)
-          }}
-          shipment={pendingSelection?.shipment || scanResult?.shipment!}
-          onSuccess={handleSuccess}
-        />
-      )}
+      {showAssignmentModal && (() => {
+        const shipment = pendingSelection?.shipment || scanResult?.shipment
+        if (!shipment) return null
+        return (
+          <AssignmentModal
+            open={showAssignmentModal}
+            onClose={() => {
+              setShowAssignmentModal(false)
+              setPendingSelection(null)
+            }}
+            shipment={shipment}
+            onSuccess={handleSuccess}
+          />
+        )
+      })()}
 
-      {showMoveModal && (
-        <MoveShipmentModal
-          open={showMoveModal}
-          onClose={() => {
-            setShowMoveModal(false)
-            setPendingSelection(null)
-          }}
-          shipment={pendingSelection?.shipment || scanResult?.shipment!}
-          onSuccess={handleSuccess}
-        />
-      )}
+      {showMoveModal && (() => {
+        const shipment = pendingSelection?.shipment || scanResult?.shipment
+        if (!shipment) return null
+        return (
+          <MoveShipmentModal
+            open={showMoveModal}
+            onClose={() => {
+              setShowMoveModal(false)
+              setPendingSelection(null)
+            }}
+            shipment={shipment}
+            onSuccess={handleSuccess}
+          />
+        )
+      })()}
 
       {showShipmentDetails && scanResult?.shipment && (
         <ShipmentDetailsModal
@@ -1968,3 +2035,11 @@ export default function ScannerPage() {
     </div>
   )
 }
+
+const WrappedScannerPage = () => (
+  <ScannerErrorBoundary>
+    <ScannerPage />
+  </ScannerErrorBoundary>
+)
+
+export default WrappedScannerPage

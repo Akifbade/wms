@@ -5,17 +5,34 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number, currency = 'KWD'): string {
-  return `${amount.toLocaleString('en-KW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`
+  if (amount == null || isNaN(amount)) return `0.000 ${currency}`
+  try {
+    return `${amount.toLocaleString('en-KW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`
+  } catch {
+    return `${amount.toFixed(2)} ${currency}`
+  }
 }
 
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return '-'
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  } catch {
+    return '-'
+  }
 }
 
 export function formatDateTime(dateStr: string): string {
   if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return '-'
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return '-'
+  }
 }
 
 export function getDaysBetween(start: string, end?: string): number {

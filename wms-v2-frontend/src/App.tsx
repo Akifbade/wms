@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { getToken } from './api/client'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Layout } from './components/layout/Layout'
 
 // Lazy load pages
@@ -101,7 +102,7 @@ function AppRoutes() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout><Dashboard /></Layout>} />
-        <Route path="/shipments" element={<Layout><Shipments /></Layout>} />
+        <Route path="/shipments" element={<Layout><ErrorBoundary><Shipments /></ErrorBoundary></Layout>} />
         <Route path="/racks" element={<Layout><Racks /></Layout>} />
         <Route path="/scanner" element={<Layout><Scanner /></Layout>} />
         <Route path="/materials" element={<Layout><Materials /></Layout>} />

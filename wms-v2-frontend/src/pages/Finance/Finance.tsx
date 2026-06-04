@@ -659,7 +659,7 @@ export default function FinancePage() {
   // ══════════════════════════════════════════════════════════
 
   const collectionRate = overview && overview.totalRevenue > 0
-    ? (overview.collectedRevenue / overview.totalRevenue) * 100 : 0
+    ? ((overview.collectedRevenue ?? 0) / overview.totalRevenue) * 100 : 0
 
   const uniqueExpenseCategories = [...new Set(expenses.map(e => e.category).filter(Boolean))]
   const expenseStatuses = [...new Set(expenses.map(e => e.status).filter(Boolean))]
@@ -713,14 +713,14 @@ export default function FinancePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <StatCard
                     label="Total Revenue"
-                    value={formatCurrency(overview.totalRevenue)}
+                    value={formatCurrency(overview.totalRevenue ?? 0)}
                     sublabel="Total invoiced amount"
                     icon={<DollarSign className="w-5 h-5" />}
                     color="blue"
                   />
                   <StatCard
                     label="Collected"
-                    value={formatCurrency(overview.collectedRevenue)}
+                    value={formatCurrency(overview.collectedRevenue ?? 0)}
                     sublabel="Payments received"
                     trend="up"
                     trendLabel={`${collectionRate.toFixed(1)}% collection rate`}
@@ -729,14 +729,14 @@ export default function FinancePage() {
                   />
                   <StatCard
                     label="Pending"
-                    value={formatCurrency(overview.pendingRevenue)}
+                    value={formatCurrency(overview.pendingRevenue ?? 0)}
                     sublabel="Awaiting payment"
                     icon={<Clock className="w-5 h-5" />}
                     color="orange"
                   />
                   <StatCard
                     label="Overdue"
-                    value={formatCurrency(overview.overdueRevenue)}
+                    value={formatCurrency(overview.overdueRevenue ?? 0)}
                     sublabel="Past due invoices"
                     trend={overview.overdueRevenue > 0 ? 'down' : 'neutral'}
                     trendLabel={overview.overdueRevenue > 0 ? 'Action needed' : 'All clear'}
@@ -753,7 +753,7 @@ export default function FinancePage() {
                   <div className="flex items-center gap-4 mb-4">
                     <div className="flex-1">
                       <ProgressBar
-                        value={overview.collectedRevenue}
+                        value={overview.collectedRevenue ?? 0}
                         max={overview.totalRevenue || 1}
                         color="green"
                       />
@@ -764,8 +764,8 @@ export default function FinancePage() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                    <span>Collected: {formatCurrency(overview.collectedRevenue)}</span>
-                    <span>Total: {formatCurrency(overview.totalRevenue)}</span>
+                    <span>Collected: {formatCurrency(overview.collectedRevenue ?? 0)}</span>
+                    <span>Total: {formatCurrency(overview.totalRevenue ?? 0)}</span>
                   </div>
                 </div>
               </section>
@@ -777,17 +777,18 @@ export default function FinancePage() {
                   <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
                     <div className="flex items-end gap-2 sm:gap-3 h-48">
                       {overview.monthlyRevenue.map((m, idx) => {
-                        const maxRev = Math.max(...overview.monthlyRevenue.map(x => x.revenue), 1)
-                        const heightPct = (m.revenue / maxRev) * 100
+                        const rev = m.revenue ?? 0
+                        const maxRev = Math.max(...overview.monthlyRevenue.map(x => x.revenue ?? 0), 1)
+                        const heightPct = (rev / maxRev) * 100
                         return (
                           <div key={m.month || idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
                             <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
-                              {formatCurrency(m.revenue)}
+                              {formatCurrency(rev)}
                             </span>
                             <div
                               className="w-full max-w-[48px] rounded-t-md bg-blue-500 dark:bg-blue-400 hover:bg-blue-600 dark:hover:bg-blue-300 transition-all cursor-pointer"
                               style={{ height: `${Math.max(heightPct, 2)}%` }}
-                              title={`${m.month}: ${formatCurrency(m.revenue)}`}
+                              title={`${m.month}: ${formatCurrency(rev)}`}
                             />
                             <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate w-full text-center">
                               {m.month}

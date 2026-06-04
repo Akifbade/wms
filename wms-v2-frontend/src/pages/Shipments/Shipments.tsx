@@ -32,6 +32,7 @@ import {
   formatDate, formatDateTime, formatCurrency, getStatusColor,
   getStatusLabel, calcCBM, getDaysBetween, truncate, cn,
 } from '../../lib/utils'
+import { mapShipment, mapShipmentList } from '../../api/mappers'
 
 // ═══════════════════════════════════════════════════════════════
 // TYPES
@@ -332,7 +333,7 @@ function DetailModal({ shipmentId, onClose }: { shipmentId: string; onClose: () 
           shipmentsAPI.getMoveHistory(shipmentId).catch(() => ({ moves: [] })),
           withdrawalsAPI.getAll({ shipmentId }).catch(() => ({ withdrawals: [] })),
         ])
-        setShipment(shipRes.shipment)
+        setShipment(mapShipment(shipRes.shipment))
         setMoveHistory(moveRes.moves || [])
         setWithdrawals(withdrawRes.withdrawals || [])
       } catch (err: any) {
@@ -1594,10 +1595,8 @@ export default function ShipmentsPage() {
         }
         params.status = statusMap[activeTab] || ''
       }
-      params.isWarehouseShipment = true
-
       const res = await shipmentsAPI.getAll(params)
-      setShipments(res.shipments || [])
+      setShipments(mapShipmentList(res.shipments || []))
       setStatusCounts(res.statusCounts || {})
       setPagination(res.pagination || null)
     } catch (err: any) {

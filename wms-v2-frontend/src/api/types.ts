@@ -37,18 +37,23 @@ export interface ShipmentDimension {
 
 export interface Shipment {
   id: string; trackingNumber: string; referenceId?: string;
+  name?: string; /* alias for display */
   status: string; clientName?: string; clientPhone?: string; clientEmail?: string;
+  customerName?: string;
   shipperName?: string; shipperContact?: string; shipperAddress?: string;
   consigneeName?: string; consigneeContact?: string; consigneeAddress?: string;
   origin?: string; destination?: string;
-  totalBoxes: number; currentBoxCount?: number; palletCount?: number;
-  totalWeight?: number; totalCBM?: number;
+  totalBoxes: number; originalBoxCount?: number;
+  currentBoxCount?: number; palletCount?: number;
+  totalWeight?: number; totalCBM?: number; cbm?: number; /* alias */
   isWarehouseShipment?: boolean; warehouseNotes?: string;
+  qrCode?: string;
   shipmentPhotos?: string[]; description?: string; notes?: string;
   estimatedValue?: number; storageType?: string; specialInstructions?: string;
   companyId?: string; companyProfileId?: string; companyProfile?: CompanyProfile;
   dimensions?: ShipmentDimension[]; boxes?: Box[];
   rackId?: string; rackCode?: string; rackLocation?: string;
+  rackLocations?: string[];
   receivedDate?: string; arrivalDate?: string;
   createdBy?: string; createdByName?: string;
   createdAt: string; updatedAt: string;

@@ -12,6 +12,7 @@ import {
 import { dashboardAPI } from '../../api/client'
 import type { DashboardStats } from '../../api/types'
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel, cn } from '../../lib/utils'
+import { mapShipment } from '../../api/mappers'
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -597,22 +598,25 @@ export default function DashboardPage() {
           <SectionHeader title="Recent Shipments" subtitle="Latest incoming shipments" />
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700/50">
             {recentShipments && recentShipments.length > 0 ? (
-              recentShipments.map((s: any, idx: number) => (
-                <div key={s.id || idx} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                  <div className="shrink-0 w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
-                    <Ship className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              recentShipments.map((s: any, idx: number) => {
+                const mapped = mapShipment(s)
+                return (
+                  <div key={mapped.id || idx} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+                      <Ship className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {mapped.referenceId || mapped.trackingNumber || `SHIP-${String(mapped.id).slice(0, 8)}`}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                        {mapped.clientName || 'Unknown'} · {mapped.totalBoxes || 0} boxes
+                      </p>
+                    </div>
+                    <StatusBadge status={mapped.status || 'PENDING'} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {s.referenceId || s.trackingNumber || `SHIP-${String(s.id).slice(0, 8)}`}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-                      {s.clientName || s.customerName || 'Unknown'} · {s.totalBoxes || s.boxes || 0} boxes
-                    </p>
-                  </div>
-                  <StatusBadge status={s.status || 'PENDING'} />
-                </div>
-              ))
+                )
+              })
             ) : (
               <div className="px-5 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
                 <Ship className="w-8 h-8 mx-auto mb-2 opacity-40" />
