@@ -12,6 +12,8 @@ import {
 import { Html5Qrcode } from 'html5-qrcode';
 import { shipmentsAPI, racksAPI } from '../../services/api';
 import ShipmentDetailModal from '../../components/ShipmentDetailModal';
+import { useSoundAlerts } from './useSoundAlerts';
+import { compressPhoto } from './compressPhoto';
 
 type ScanType = 'rack' | 'shipment' | 'unknown';
 
@@ -87,15 +89,8 @@ export const Scanner: React.FC = () => {
   const lastScanRef = useRef<{ code: string; timestamp: number } | null>(null);
   const SCAN_COOLDOWN_MS = 3000; // 3 seconds cooldown between same QR scans
 
-  // 🔊 Sound alerts - Create shared audio context
-  const audioContextRef = useRef<AudioContext | null>(null);
-
-  const getAudioContext = () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    return audioContextRef.current;
-  };
+  // 🔊 Sound alerts — extracted hook
+  const { playSuccessSound, playErrorSound, playWarningSound } = useSoundAlerts();
 
   // Helper to calculate pallet box counts from palletDetails
   const getPalletBoxCount = useCallback(
@@ -117,119 +112,6 @@ export const Scanner: React.FC = () => {
     []
   );
 
-  const playSuccessSound = () => {
-    try {
-      const audioContext = getAudioContext();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.frequency.value = 800; // High pitch for success
-      oscillator.type = 'sine';
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.3);
-    } catch (err) {
-    }
-  };
-
-  const playErrorSound = () => {
-    try {
-      const audioContext = getAudioContext();
-
-      // Play 3 loud error beeps
-      for (let i = 0; i < 3; i++) {
-        setTimeout(() => {
-          const oscillator = audioContext.createOscillator();
-          const gainNode = audioContext.createGain();
-
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContext.destination);
-
-          oscillator.frequency.value = 200; // Low pitch for error
-          oscillator.type = 'square';
-          gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-
-          oscillator.start(audioContext.currentTime);
-          oscillator.stop(audioContext.currentTime + 0.4);
-        }, i * 500); // 500ms between beeps
-      }
-    } catch (err) {
-    }
-  };
-
-  const playWarningSound = () => {
-    try {
-      const audioContext = getAudioContext();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.frequency.value = 400; // Medium pitch for warning
-      oscillator.type = 'triangle';
-      gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
-
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.8);
-    } catch (err) {
-    }
-  };
-
-  // 📸 Compress photo for mobile upload (reduce 10MB → 500KB)
-  const compressPhoto = async (file: File): Promise<File> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-
-          // Max dimensions 1920x1920 (keeps quality but reduces size)
-          const maxSize = 1920;
-          if (width > height && width > maxSize) {
-            height = (height * maxSize) / width;
-            width = maxSize;
-          } else if (height > maxSize) {
-            width = (width * maxSize) / height;
-            height = maxSize;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                const compressedFile = new File([blob], file.name, {
-                  type: 'image/jpeg',
-                  lastModified: Date.now(),
-                });
-                resolve(compressedFile);
-              } else {
-                resolve(file); // Fallback to original
-              }
-            },
-            'image/jpeg',
-            0.85 // 85% quality (good balance)
-          );
-        };
-        img.src = e.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
-  };
 
   // Fetch authorized users (MANAGER, ADMIN) for move authorization
   const fetchAuthorizedUsers = async () => {
@@ -759,12 +641,6 @@ export const Scanner: React.FC = () => {
   const startScanning = async () => {
     try {
       setError('');
-
-      // Initialize audio context on user interaction (required by browsers)
-      try {
-        getAudioContext();
-      } catch (err) {
-      }
 
       // Check if we have HTTPS or localhost
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';

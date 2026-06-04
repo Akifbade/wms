@@ -1,9 +1,9 @@
 {
   "version": "v2.3.3",
   "buildDate": "Jun 04, 2026",
-  "buildTime": "17:29:16",
-  "commit": "7193b237b",
-  "commitMessage": "refactor: add proper TypeScript types — 76 :any removed, entities types file",
+  "buildTime": "17:53:28",
+  "commit": "5f0c9a4be",
+  "commitMessage": "refactor: centralized localStorage service + proper types (entities.ts)",
   "author": "Super User",
   "environment": "local"
 }
