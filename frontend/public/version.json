@@ -1,9 +1,9 @@
 {
   "version": "v2.3.3",
-  "buildDate": "Jan 19, 2026",
-  "buildTime": "15:14:03",
-  "commit": "0cdb28540",
-  "commitMessage": "fix: Add PENDING status to release check for manually moved shipments",
-  "author": "akifbade46-del",
+  "buildDate": "Jun 04, 2026",
+  "buildTime": "17:29:16",
+  "commit": "7193b237b",
+  "commitMessage": "refactor: add proper TypeScript types — 76 :any removed, entities types file",
+  "author": "Super User",
   "environment": "local"
 }

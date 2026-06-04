@@ -8,6 +8,11 @@ import type {
 // API configuration
 const API_BASE_URL = '/api';
 
+import { getAuthToken, setAuthToken, clearAuthToken } from './storage';
+
+// Re-export for backward compatibility with existing components
+export { getAuthToken, setAuthToken, clearAuthToken };
+
 // Helper to get the backend base URL for uploads (works in both local and production)
 export const getBackendUrl = (): string => {
   // In production, use the same domain (nginx proxies to backend)
@@ -25,29 +30,6 @@ export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Respo
   return fetch(url, options);
 };
 
-// Helper to get auth token
-export const getAuthToken = (): string | null => {
-  const storedToken = localStorage.getItem('authToken') || localStorage.getItem('token');
-
-  if (storedToken && !localStorage.getItem('authToken')) {
-    localStorage.setItem('authToken', storedToken);
-  }
-
-  return storedToken;
-};
-
-// Helper to set auth token
-export const setAuthToken = (token: string): void => {
-  localStorage.setItem('authToken', token);
-  localStorage.setItem('token', token);
-};
-
-// Helper to clear auth token
-export const clearAuthToken = (): void => {
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-};
 
 // Helper to get auth headers
 const getAuthHeaders = (): HeadersInit => {
