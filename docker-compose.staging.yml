@@ -79,10 +79,7 @@ services:
     ports:
       - "4080:80"
     volumes:
-      - ./frontend/nginx-ssl.conf:/etc/nginx/conf.d/default.conf
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-      - /var/lib/letsencrypt:/var/lib/letsencrypt:ro
-      - /var/www/certbot:/var/www/certbot
+      - ./frontend/nginx-staging.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - backend-staging
     networks:
