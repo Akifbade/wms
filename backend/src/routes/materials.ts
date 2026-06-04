@@ -1125,11 +1125,24 @@ async function handleCreateReturn(req: AuthRequest, res: any) {
     // ALWAYS defer restock if there's a pending approval (job can be PENDING_APPROVAL or COMPLETED)
     const shouldDeferRestock = Boolean(pendingJobCompletionApproval);
 
+    // Calculate quantityUsed: what was issued minus what was returned/damaged
+    let calculatedQuantityUsed: number | undefined = undefined;
+    if (issueId) {
+      const materialIssue = await prisma.materialIssue.findUnique({
+        where: { id: issueId },
+        select: { quantity: true }
+      });
+      if (materialIssue) {
+        calculatedQuantityUsed = Math.max(0, materialIssue.quantity - (parsedQuantityGood + parsedQuantityDamaged));
+      }
+    }
+
     const return_ = await prisma.materialReturn.create({
       data: {
         jobId,
         materialId,
         issueId,
+        quantityUsed: calculatedQuantityUsed,
         quantityGood: parsedQuantityGood,
         quantityDamaged: parsedQuantityDamaged,
         rackId,
