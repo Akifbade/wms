@@ -150,14 +150,11 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
   // Load dimensions for this shipment
   const loadDimensions = async () => {
     if (!shipment?.id) {
-      console.log('❌ loadDimensions: No shipment ID');
       return;
     }
     try {
       setLoadingDimensions(true);
-      console.log(`📦 loadDimensions: Fetching dimensions for shipment ${shipment.id}`);
       const response = await shipmentsAPI.getDimensions(shipment.id);
-      console.log('📦 loadDimensions response:', response);
       if (response.dimensions && response.dimensions.length > 0) {
         setDimensions(response.dimensions.map((d: any) => ({
           id: d.id,
@@ -472,11 +469,8 @@ export default function EditShipmentModal({ isOpen, onClose, onSuccess, shipment
             parseFloat(d.length) > 0 && parseFloat(d.width) > 0 && parseFloat(d.height) > 0
           );
           if (validDimensions.length > 0) {
-            console.log('📏 Saving dimensions to API:', validDimensions);
             const dimResult = await shipmentsAPI.saveDimensionsBulk(shipment.id, validDimensions);
-            console.log('📏 Dimensions saved successfully:', dimResult);
           } else {
-            console.log('📏 No valid dimensions to save (all have 0 values)');
           }
         } catch (err: any) {
           console.error('Failed to save dimensions:', err);

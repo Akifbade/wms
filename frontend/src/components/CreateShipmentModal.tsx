@@ -160,7 +160,6 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
     const palletCount = Number(formData.palletCount) || 0;
     const boxesPerPallet = Number(formData.totalBoxCount) || 0;
 
-    console.log('🎯 Generating dimensions - Pallets:', palletCount, 'Boxes:', boxesPerPallet);
 
     // Build new dimensions array from scratch based on counts
     const newDimensions: DimensionEntry[] = [];
@@ -193,7 +192,6 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
       !d.label.startsWith('Pallet ') && !d.label.startsWith('Box ')
     );
 
-    console.log('🎯 New dimensions count:', newDimensions.length + customDimensions.length);
 
     // Only update if actually different
     const finalDimensions = [...newDimensions, ...customDimensions];
@@ -533,7 +531,6 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess }: Crea
       if (dimensions.length > 0) {
         try {
           await shipmentsAPI.saveDimensionsBulk(shipmentId, dimensions);
-          console.log('✅ Saved', dimensions.length, 'dimensions for shipment');
         } catch (err) {
           console.error('Failed to save dimensions:', err);
         }

@@ -32,6 +32,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
     categoryId: '',
     companyProfileId: '',
     capacityTotal: 100,
+    cbmCapacity: 100,
     status: 'ACTIVE',
     length: '',
     width: '',
@@ -158,7 +159,7 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
     setFormData(prev => {
       const next = {
         ...prev,
-        [name]: name === 'capacityTotal' ? Number(value) : value,
+        [name]: (name === 'capacityTotal' || name === 'cbmCapacity') ? Number(value) : value,
       } as typeof prev;
 
       if (name === 'categoryId') {
@@ -257,6 +258,8 @@ export default function CreateRackModal({ isOpen, onClose, onSuccess }: CreateRa
         ...rest,
         qrCode,
         capacityUsed: 0,
+        cbmUsed: 0,
+        cbmCapacity: formData.cbmCapacity || formData.capacityTotal,
         zone: formData.zone.trim() || 'Unassigned', // Same as Bulk Add
         zoneDescription: formData.zoneDescription || '',
         zoneIcon: formData.zoneIcon || '📦',

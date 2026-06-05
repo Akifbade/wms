@@ -67,15 +67,12 @@ export const Layout: React.FC = () => {
 
   useEffect(() => {
     const user = localStorage.getItem('user');
-    console.log('📋 Layout useEffect - user from localStorage:', user);
     if (user) {
       try {
         const userData = JSON.parse(user);
-        console.log('✅ Parsed user data:', userData);
         setCurrentUser(userData);
         const roleInfo = `Role: ${userData.role || 'NO_ROLE'}`;
         setDebugInfo(roleInfo);
-        console.log('🔍 SIDEBAR DEBUG:', roleInfo, userData);
 
         // Redirect worker from dashboard to scanner
         if (userData.role === 'WORKER' && location.pathname === '/dashboard') {

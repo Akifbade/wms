@@ -2,6 +2,19 @@
 # Using Debian-based Node for better Prisma compatibility
 FROM node:18-slim
 
+ARG APP_VERSION
+ENV APP_VERSION=${APP_VERSION:-2.4.0}
+ARG COMMIT_HASH
+ENV COMMIT_HASH=${COMMIT_HASH:-local-dev}
+ARG COMMIT_MESSAGE
+ENV COMMIT_MESSAGE=${COMMIT_MESSAGE:-local-build}
+ARG BRANCH
+ENV BRANCH=${BRANCH:-staging}
+ARG COMMIT_COUNT
+ENV COMMIT_COUNT=${COMMIT_COUNT:-0}
+ARG DEPLOYMENT_STAGE
+ENV DEPLOYMENT_STAGE=${DEPLOYMENT_STAGE:-staging}
+
 WORKDIR /app
 
 # Install OpenSSL for Prisma, MySQL client for backups, Docker CLI for stats, and Chromium for Puppeteer
@@ -66,6 +79,9 @@ EXPOSE 5000
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:5000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Generate version from git before starting
+RUN node scripts/generate-version.js
 
 # Start server in development mode with ts-node (allows running without compilation)
 CMD ["npx", "ts-node", "src/index.ts"]

@@ -129,9 +129,7 @@ const ShipmentReport: React.FC = () => {
     const loadShipmentDetails = async () => {
         try {
             setLoading(true);
-            console.log('📄 Loading shipment report for ID:', id);
             const response = await shipmentsAPI.getById(id!);
-            console.log('📄 Report API response:', response);
             // Backend returns { shipment: {...} }
             setShipment(response.shipment || (response as any).data || response);
         } catch (err: any) {

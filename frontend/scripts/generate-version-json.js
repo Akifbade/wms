@@ -4,7 +4,7 @@ const { execSync } = require('child_process');
 
 function safeExec(cmd) {
   try {
-    return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).toString().trim();
   } catch {
     return null;
   }
@@ -15,46 +15,82 @@ function pad2(n) {
 }
 
 function formatBuildDate(d) {
-  // e.g. "Dec 13, 2025"
   return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
 }
 
 function formatBuildTime(d) {
-  // e.g. "21:33:59"
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 }
 
-const frontendRoot = path.resolve(__dirname, '..');
-const versionTsPath = path.join(frontendRoot, 'src', 'config', 'version.ts');
-const publicVersionJsonPath = path.join(frontendRoot, 'public', 'version.json');
-
-const versionTs = fs.readFileSync(versionTsPath, 'utf8');
-
-// Supports both: export const APP_VERSION = '2.2.76'; and export const APP_VERSION = "v2.2.76";
-// Also accepts optional 'v' prefix
-const match = versionTs.match(/export\s+const\s+APP_VERSION\s*=\s*['\"]v?(\d+\.\d+\.\d+)['\"]/);
-if (!match) {
-  console.error(`[generate-version-json] Could not parse APP_VERSION in ${versionTsPath}`);
-  process.exit(1);
+// Try to read VERSION env var first (set via Docker build arg), then file
+function readVersionFromEnv() {
+  return process.env.APP_VERSION || null;
 }
 
-const appVersion = match[1];
-const now = new Date();
+function readVersionFromFile(filepath) {
+  try {
+    if (fs.existsSync(filepath)) {
+      return fs.readFileSync(filepath, 'utf8').trim().replace(/^v/, '');
+    }
+  } catch {}
+  return null;
+}
 
-const commitHash = process.env.VITE_APP_COMMIT_HASH || safeExec('git rev-parse --short HEAD') || 'local-dev';
-const commitMessage = safeExec('git log -1 --pretty=%s') || 'local-build';
+const frontendRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(frontendRoot, '..');
+const publicVersionJsonPath = path.join(frontendRoot, 'public', 'version.json');
+
+// --- DETERMINE VERSION ---
+let version = '1.0.0';
+
+// 1) Try git tag
+const gitTag = safeExec('git describe --tags --abbrev=0 2>/dev/null');
+if (gitTag && /^v?\d+\.\d+\.\d+/.test(gitTag)) {
+  version = gitTag.replace(/^v/, '');
+} else {
+  // 2) Try VERSION files (multiple locations)
+  version = readVersionFromEnv()
+    || readVersionFromFile(path.join(frontendRoot, 'VERSION'))
+    || readVersionFromFile(path.join(repoRoot, 'VERSION'))
+    || '1.0.0';
+}
+
+// Build number
+const commitCount = process.env.COMMIT_COUNT || safeExec('git rev-list --count HEAD 2>/dev/null') || '0';
+
+// Get git metadata (graceful fallback when .git not available)
+const commitHash = process.env.VITE_APP_COMMIT_HASH
+  || safeExec('git rev-parse --short HEAD')
+  || safeExec('git log --oneline -1 2>/dev/null | awk \'{print $1}\'')
+  || 'local-dev';
+
+const commitMessage = process.env.VITE_APP_COMMIT_MESSAGE
+  || safeExec('git log -1 --pretty=%s')
+  || 'local-build';
+
 const author = safeExec('git log -1 --pretty=%an') || 'local';
+const branch = process.env.VITE_APP_BRANCH
+  || safeExec('git rev-parse --abbrev-ref HEAD')
+  || 'unknown';
 
-// Keep field names aligned with what the UI expects.
+const environment = process.env.VITE_APP_ENV || 
+  (branch === 'staging' ? 'staging' : 
+   branch === 'stable/prisma-mysql-production' ? 'production' : 'development');
+
+const fullVersion = `v${version}+build.${commitCount}`;
+
+const now = new Date();
 const payload = {
-  version: `v${appVersion}`,
+  version: fullVersion,
   buildDate: formatBuildDate(now),
   buildTime: formatBuildTime(now),
   commit: commitHash,
   commitMessage,
   author,
-  environment: process.env.VITE_APP_ENV || 'local',
+  environment,
+  branch,
+  commitCount,
 };
 
 fs.writeFileSync(publicVersionJsonPath, JSON.stringify(payload, null, 2) + '\n');
-console.log(`[generate-version-json] Wrote ${publicVersionJsonPath} -> ${payload.version}`);
+console.log(`[generate-version-json] Wrote ${publicVersionJsonPath} -> ${payload.version} (${payload.environment}, branch: ${payload.branch})`);

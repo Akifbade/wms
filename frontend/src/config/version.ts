@@ -1,80 +1,17 @@
 /**
- * Version Configuration - Auto-updated by GitHub Actions
- * DO NOT EDIT MANUALLY - This file is auto-generated
+ * Version Configuration
+ * Primary source: /version.json (generated during build from git/VERSION)
+ * This fallback is only used during development
  */
 
-export const APP_VERSION = 'v2.3.3';
+// Will be overwritten by generate-version-json.js during build
+export const APP_VERSION = 'v2.4.0';
 
 export const VERSION_INFO = {
-  version: 'v2.3.3',
+  version: APP_VERSION,
   environment: import.meta.env.VITE_APP_ENV || 'development',
   buildDate: new Date().toISOString(),
   commitHash: import.meta.env.VITE_APP_COMMIT_HASH || 'local-dev',
-  commitMessage: 'Fix: Job link from Material Report, CBM update on shipment edit',
-  stage: 'local', // local, staging, or production
+  commitMessage: 'Development build',
+  stage: import.meta.env.VITE_APP_ENV || 'local',
 };
-
-export const DEPLOYMENT_TIMELINE = {
-  local: '2025-11-01',
-  staging: '2025-11-01',
-  production: '2025-10-31',
-};
-
-// Auto-update log
-console.log(`%c🚀 WMS Version: ${APP_VERSION}`, 'color: green; font-weight: bold; font-size: 14px');
-console.log(`%cEnvironment: ${VERSION_INFO.environment}`, 'color: blue');
-console.log(`%cCommit: ${VERSION_INFO.commitHash}`, 'color: gray');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -68,7 +68,6 @@ export const Dashboard: React.FC = () => {
   }
 
   // Debug: Log storage analytics
-  console.log('📊 Dashboard storageAnalytics:', stats?.storageAnalytics);
 
   const statsCards = [
     {
@@ -111,7 +110,7 @@ export const Dashboard: React.FC = () => {
     },
     {
       name: 'Rack Utilization',
-      value: `${stats?.racks?.utilization || 0}%`,
+      value: `${stats?.racks?.cbm?.utilization || 0}%`,
       total: `${stats?.racks?.active || 0} active`,
       icon: UserGroupIcon,
       color: 'text-emerald-600'

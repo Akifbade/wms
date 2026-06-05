@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   PlusIcon,
   QrCodeIcon,
@@ -21,10 +20,15 @@ import {
   SparklesIcon
 } from '@heroicons/react/24/outline';
 import { racksAPI } from '../../services/api';
-import CreateRackModal from '../../components/CreateRackModal';
+import AddRackModal from '../../components/AddRackModal';
 import EditRackModal from '../../components/EditRackModal';
-import BulkAddRackModal from '../../components/BulkAddRackModal';
 import QRCode from 'qrcode';
+import { RackMapView } from './RackMapView';
+import { FloorPlanView } from './FloorPlanView';
+import { RackAnalytics } from './RackAnalytics';
+import ShipmentDetailModal from '../../components/ShipmentDetailModal';
+import PhotoLightbox from '../../components/PhotoLightbox';
+import RackMoveHistory from '../../components/RackMoveHistory';
 
 // Shipment Box Card Component (to avoid hooks in loops)
 const ShipmentBoxCard: React.FC<{
@@ -33,7 +37,8 @@ const ShipmentBoxCard: React.FC<{
   photos: string[];
   assignedDate?: Date;
   onViewShipment?: (shipmentId: string) => void;
-}> = ({ shipment, boxCount, photos, assignedDate, onViewShipment }) => {
+  onPhotoClick?: (photos: string[], index: number) => void;
+}> = ({ shipment, boxCount, photos, assignedDate, onViewShipment, onPhotoClick }) => {
   const [showPhotos, setShowPhotos] = useState(false);
 
   // Calculate days in rack
@@ -124,12 +129,10 @@ const ShipmentBoxCard: React.FC<{
           {showPhotos && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2">
               {photos.map((url: string, idx: number) => (
-                <a
+                <button
                   key={idx}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative block aspect-square rounded-lg overflow-hidden border-2 border-blue-200 hover:border-blue-500 transition-all"
+                  onClick={() => onPhotoClick?.(photos, idx)}
+                  className="group relative block aspect-square rounded-lg overflow-hidden border-2 border-blue-200 hover:border-blue-500 transition-all w-full text-left"
                 >
                   <img
                     src={url}
@@ -139,7 +142,7 @@ const ShipmentBoxCard: React.FC<{
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
                     <span className="text-white text-xl opacity-0 group-hover:opacity-100">🔍</span>
                   </div>
-                </a>
+                </button>
               ))}
             </div>
           )}
@@ -150,14 +153,17 @@ const ShipmentBoxCard: React.FC<{
 };
 
 export const Racks: React.FC = () => {
-  const navigate = useNavigate();
   const [selectedSection, setSelectedSection] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedZone, setSelectedZone] = useState('all'); // NEW: Zone filter
-  const [viewMode, setViewMode] = useState<'zones' | 'grid'>('zones'); // NEW: View toggle
+  const [viewMode, setViewMode] = useState<'zones' | 'grid' | 'map' | 'floorplan' | 'analytics'>('map');
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set()); // NEW: Track expanded zones
   const [racks, setRacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUtilRange, setSelectedUtilRange] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [contentsSearch, setContentsSearch] = useState('');
+  const [darkMode, setDarkMode] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [bulkAddModalOpen, setBulkAddModalOpen] = useState(false); // NEW: Bulk add modal
@@ -172,6 +178,11 @@ export const Racks: React.FC = () => {
   const [bulkQrModalOpen, setBulkQrModalOpen] = useState(false);
   const bulkQrCanvasRefs = useRef<{ [key: string]: HTMLCanvasElement | null }>({});
   const [selectedRacks, setSelectedRacks] = useState<Set<string>>(new Set());
+  const [shipmentModalOpen, setShipmentModalOpen] = useState(false);
+  const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const resolveLogoUrl = (logo?: string | null) => {
     if (!logo) return '';
@@ -197,6 +208,42 @@ export const Racks: React.FC = () => {
     }
   };
 
+  // Calculate utilization based on capacity mode
+  const calcUtilization = (rack: any): number => {
+    const mode = rack.capacityMode || 'FIXED';
+
+    // For FLEXIBLE or BOTH mode, use max of pallet% and box% (most accurate for storage racks)
+    if (mode === 'FLEXIBLE' || mode === 'both') {
+      const palletPct = rack.palletCapacity > 0 ? ((rack.currentPallets || 0) / rack.palletCapacity) * 100 : 0;
+      const boxPct = rack.boxCapacity > 0 ? ((rack.currentBoxes || 0) / rack.boxCapacity) * 100 : 0;
+      const maxPct = Math.max(palletPct, boxPct);
+      if (maxPct > 0) return Math.min(Math.round(maxPct), 100);
+    }
+
+    // Try CBM when available and used > 0
+    if (rack.cbmCapacity && rack.cbmCapacity > 0 && rack.cbmUsed > 0) {
+      return Math.min(Math.round((rack.cbmUsed / rack.cbmCapacity) * 100), 200);
+    }
+
+    // For FLEXIBLE without pallet/box ratio, check capacityUsed
+    if (mode === 'FLEXIBLE') {
+      if (rack.capacityUsed > 0) return 50;
+      return 0;
+    }
+
+    // UNLIMITED: can't calc % — treat occupied as 50%
+    if (mode === 'UNLIMITED') {
+      if (rack.cbmUsed > 0 && rack.cbmCapacity > 0) {
+        return Math.min(Math.round((rack.cbmUsed / rack.cbmCapacity) * 100), 200);
+      }
+      return rack.capacityUsed > 0 ? 50 : 0;
+    }
+
+    // FIXED (default)
+    const total = rack.capacityTotal || 1;
+    return Math.min(Math.round((rack.capacityUsed / total) * 100), 100);
+  };
+
   const filteredRacks = racks.filter((r: any) => {
     const sectionMatch = selectedSection === 'all' || r.code.startsWith(selectedSection);
     const selected = selectedCategory?.toLowerCase();
@@ -212,11 +259,39 @@ export const Racks: React.FC = () => {
       selected === profileName ||
       selected === profileId;
 
-    // NEW: Zone filter
+    // Zone filter
     const zone = r.zone || 'Unassigned';
     const zoneMatch = selectedZone === 'all' || zone === selectedZone;
 
-    return sectionMatch && categoryMatch && zoneMatch;
+    // Utilization range filter
+    const u = calcUtilization(r);
+    let utilMatch = true;
+    if (selectedUtilRange !== 'all') {
+      if (selectedUtilRange === '0') utilMatch = u === 0;
+      else if (selectedUtilRange === '100') utilMatch = u >= 100;
+      else {
+        const [low, high] = selectedUtilRange.split('-').map(Number);
+        utilMatch = u >= low && u <= high;
+      }
+    }
+
+    // Status filter
+    const statusMatch = selectedStatus === 'all' || (r.status || 'ACTIVE') === selectedStatus;
+
+    // Contents search (search in company name, rack code, zone, location)
+    let contentsMatch = true;
+    if (contentsSearch.trim()) {
+      const q = contentsSearch.toLowerCase().trim();
+      contentsMatch =
+        (r.code || '').toLowerCase().includes(q) ||
+        (r.location || '').toLowerCase().includes(q) ||
+        (r.zone || '').toLowerCase().includes(q) ||
+        (r.companyProfile?.name || '').toLowerCase().includes(q) ||
+        (r.companyProfile?.phone || '').toLowerCase().includes(q) ||
+        (r.status || '').toLowerCase().includes(q);
+    }
+
+    return sectionMatch && categoryMatch && zoneMatch && utilMatch && statusMatch && contentsMatch;
   });
 
   // NEW: Get unique zones for filter buttons
@@ -270,6 +345,29 @@ export const Racks: React.FC = () => {
     return <span className="font-semibold">{rack.capacityUsed || 0}/{rack.capacityTotal || 0} boxes</span>;
   };
 
+  // Export all racks to CSV
+  const exportRacksCSV = () => {
+    const headers = ['Code','Zone','Location','Status','Capacity Mode','Capacity Used','Capacity Total','Pallets','Boxes','CBM Used','CBM Capacity','Utilization %','Company','Days Occupied'];
+    const rows = racks.map((r: any) => {
+      const u = calcUtilization(r);
+      const days = r.assignedDate ? Math.floor((Date.now() - new Date(r.assignedDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+      return [
+        r.code, r.zone || 'Unassigned', r.location || '', r.status || 'ACTIVE',
+        r.capacityMode || 'FIXED', r.capacityUsed || 0, r.capacityTotal || 0,
+        r.currentPallets || 0, r.currentBoxes || 0,
+        (r.cbmUsed || 0).toFixed(2), (r.cbmCapacity || 0).toFixed(2),
+        `${u}%`, r.companyProfile?.name || '', days,
+      ].join(',');
+    });
+    const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `racks-export-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const getUtilizationColor = (percentage: number) => {
     if (percentage >= 90) return 'bg-red-500';
     if (percentage >= 75) return 'bg-yellow-500';
@@ -281,14 +379,9 @@ export const Racks: React.FC = () => {
     setLoadingDetails(true);
     try {
       const response = await racksAPI.getById(rack.id);
-      console.log('✅ Rack details loaded:', response.rack);
-      console.log('   - companyProfile:', response.rack?.companyProfile);
-      console.log('   - companyProfile.name:', response.rack?.companyProfile?.name);
-      console.log('   - companyProfile.logo:', response.rack?.companyProfile?.logo);
       setRackDetails(response.rack);
     } catch (err) {
       console.error('❌ Failed to load rack details:', err);
-      console.log('⚠️ Falling back to basic rack data:', rack);
       setRackDetails(rack);
     } finally {
       setLoadingDetails(false);
@@ -458,7 +551,7 @@ export const Racks: React.FC = () => {
   };
 
   return (
-    <div className="p-3 md:p-6 space-y-4 md:space-y-6 pb-20 md:pb-6">
+    <div className={`p-3 md:p-6 space-y-4 md:space-y-6 pb-20 md:pb-6 ${darkMode ? 'racks-dark-mode' : ''}`}>
       {/* Header - Mobile Optimized */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -474,6 +567,7 @@ export const Racks: React.FC = () => {
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900'
                 }`}
+              title="Zone View"
             >
               🏢
             </button>
@@ -483,8 +577,39 @@ export const Racks: React.FC = () => {
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900'
                 }`}
+              title="Grid View"
             >
               📦
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === 'map'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
+              title="Zone Map"
+            >
+              🗺️
+            </button>
+            <button
+              onClick={() => setViewMode('floorplan')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === 'floorplan'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
+              title="Warehouse Floor Plan"
+            >
+              🏗️
+            </button>
+            <button
+              onClick={() => setViewMode('analytics')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === 'analytics'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
+              title="Analytics"
+            >
+              📊
             </button>
           </div>
         </div>
@@ -529,53 +654,110 @@ export const Racks: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium text-gray-500">Total</p>
-                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">{racks.length}</p>
-                </div>
-                <CubeIcon className="h-6 w-6 md:h-10 md:w-10 text-primary-500" />
+          {/* Row 1: Rack Overview */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+            <h3 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-2">
+              <BuildingOfficeIcon className="h-4 w-4" /> RACK OVERVIEW
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-gray-900">{racks.length}</p>
+                <p className="text-xs text-gray-500 mt-1">Total Racks</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-green-600">{racks.filter((r: any) => r.capacityUsed === 0).length}</p>
+                <p className="text-xs text-gray-500 mt-1">Empty</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-blue-600">{racks.filter((r: any) => r.capacityUsed > 0 && r.capacityUsed < (r.capacityTotal || 1)).length}</p>
+                <p className="text-xs text-gray-500 mt-1">In Use</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-red-600">{racks.filter((r: any) => r.capacityUsed >= (r.capacityTotal || 1)).length}</p>
+                <p className="text-xs text-gray-500 mt-1">Full</p>
               </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium text-gray-500">Capacity</p>
-                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">
-                    {racks.reduce((sum: number, r: any) => sum + r.capacityTotal, 0)}
+            {/* Utilization Bar */}
+            {(() => {
+              const occupied = racks.filter((r: any) => r.capacityUsed > 0).length;
+              const utilPct = racks.length > 0 ? Math.round((occupied / racks.length) * 100) : 0;
+              return (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>Occupancy</span>
+                    <span className="font-semibold text-gray-700">{utilPct}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${utilPct >= 90 ? 'bg-gradient-to-r from-yellow-500 to-red-500' : utilPct >= 70 ? 'bg-yellow-500' : 'bg-gradient-to-r from-green-500 to-blue-500'}`}
+                      style={{ width: `${utilPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{occupied} of {racks.length} racks occupied</p>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Row 2: CBM Summary */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+            <h3 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-2">
+              <CubeIcon className="h-4 w-4" /> CBM CAPACITY
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-gray-900">
+                  {racks.reduce((sum: number, r: any) => sum + ((r as any).cbmCapacity || 0), 0).toFixed(0)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Total m³</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-blue-600">
+                  {racks.reduce((sum: number, r: any) => sum + ((r as any).cbmUsed || 0), 0).toFixed(1)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Used m³</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-green-600">
+                  {(racks.reduce((sum: number, r: any) => sum + ((r as any).cbmCapacity || 0), 0) - racks.reduce((sum: number, r: any) => sum + ((r as any).cbmUsed || 0), 0)).toFixed(1)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Available m³</p>
+              </div>
+              <div className="text-center">
+                {(() => {
+                  const totalCbm = racks.reduce((sum: number, r: any) => sum + ((r as any).cbmCapacity || 0), 0);
+                  const usedCbm = racks.reduce((sum: number, r: any) => sum + ((r as any).cbmUsed || 0), 0);
+                  const pct = totalCbm > 0 ? Math.round((usedCbm / totalCbm) * 100) : 0;
+                  return (
+                    <>
+                      <p className={`text-2xl md:text-3xl font-bold ${pct >= 90 ? 'text-red-600' : pct >= 70 ? 'text-yellow-600' : 'text-emerald-600'}`}>
+                        {pct}%
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Utilization</p>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+            {/* CBM Utilization Bar */}
+            {(() => {
+              const totalCbm = racks.reduce((sum: number, r: any) => sum + ((r as any).cbmCapacity || 0), 0);
+              const usedCbm = racks.reduce((sum: number, r: any) => sum + ((r as any).cbmUsed || 0), 0);
+              const pct = totalCbm > 0 ? Math.round((usedCbm / totalCbm) * 100) : 0;
+              return (
+                <div className="mt-3">
+                  <div className="w-full bg-purple-100 rounded-full h-3 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-700 ${pct >= 90 ? 'bg-gradient-to-r from-purple-500 to-red-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-gradient-to-r from-purple-500 to-blue-500'}`}
+                      style={{ width: `${Math.min(pct, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-purple-600 mt-1">
+                    {usedCbm.toFixed(1)} / {totalCbm.toFixed(0)} m³ used
                   </p>
                 </div>
-                <ChartBarIcon className="h-6 w-6 md:h-10 md:w-10 text-blue-500" />
-              </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium text-gray-500">Occupied</p>
-                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">
-                    {racks.reduce((sum: number, r: any) => sum + r.capacityUsed, 0)}
-                  </p>
-                </div>
-                <div className="text-green-600 text-xs md:text-sm font-medium">
-                  {racks.length > 0 ? Math.round((racks.reduce((sum: number, r: any) => sum + r.capacityUsed, 0) / racks.reduce((sum: number, r: any) => sum + r.capacityTotal, 0)) * 100) : 0}%
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium text-gray-500">Available</p>
-                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">
-                    {racks.reduce((sum: number, r: any) => sum + (r.capacityTotal - r.capacityUsed), 0)}
-                  </p>
-                </div>
-                <div className="text-blue-600 text-xs md:text-sm font-medium">
-                  {racks.length > 0 ? Math.round((racks.reduce((sum: number, r: any) => sum + (r.capacityTotal - r.capacityUsed), 0) / racks.reduce((sum: number, r: any) => sum + r.capacityTotal, 0)) * 100) : 0}%
-                </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         </>
       )}
@@ -694,8 +876,181 @@ export const Racks: React.FC = () => {
         </div>
       </div>
 
-      {/* Zone View or Grid View */}
-      {viewMode === 'zones' ? (
+      {/* Enhanced Filters + Actions */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Utilization Range Filter */}
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-semibold text-gray-500 mr-1">📊 Util:</span>
+            {['all','0','1-25','26-50','51-75','76-99','100'].map((range) => (
+              <button
+                key={range}
+                onClick={() => setSelectedUtilRange(range)}
+                className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors ${
+                  selectedUtilRange === range
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {range === 'all' ? 'All' : range === '100' ? '100%+' : `${range}%`}
+              </button>
+            ))}
+          </div>
+          <div className="w-px h-6 bg-gray-200" />
+          {/* Status Filter */}
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-semibold text-gray-500 mr-1">Status:</span>
+            {['all','ACTIVE','RESERVED','MAINTENANCE'].map((s) => (
+              <button
+                key={s}
+                onClick={() => setSelectedStatus(s)}
+                className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors ${
+                  selectedStatus === s
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {s === 'all' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
+          <div className="w-px h-6 bg-gray-200" />
+          {/* Search within contents */}
+          <div className="relative flex-1 min-w-[150px] max-w-[250px]">
+            <input
+              type="text"
+              placeholder="🔍 Search contents..."
+              value={contentsSearch}
+              onChange={(e) => setContentsSearch(e.target.value)}
+              className="w-full pl-2 pr-6 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            />
+            {contentsSearch && (
+              <button onClick={() => setContentsSearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">✕</button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Actions Row: Dark Mode + Export CSV */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              darkMode ? 'bg-gray-800 text-yellow-300 border border-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {darkMode ? '🌙 Dark' : '☀️ Light'}
+          </button>
+          <button
+            onClick={exportRacksCSV}
+            className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+          >
+            📥 Export CSV
+          </button>
+        </div>
+        <div className="text-xs text-gray-400">
+          {filteredRacks.length} of {racks.length} racks shown
+        </div>
+      </div>
+
+      {/* Dark mode styles */}
+      {darkMode && (
+        <style>{`
+          .racks-dark-mode .bg-white { background-color: #1f2937 !important; border-color: #374151 !important; }
+          .racks-dark-mode .text-gray-900 { color: #f9fafb !important; }
+          .racks-dark-mode .text-gray-500 { color: #9ca3af !important; }
+          .racks-dark-mode .text-gray-600 { color: #d1d5db !important; }
+          .racks-dark-mode .text-gray-400 { color: #9ca3af !important; }
+          .racks-dark-mode .bg-gray-50 { background-color: #111827 !important; }
+          .racks-dark-mode .bg-gray-100 { background-color: #1f2937 !important; }
+          .racks-dark-mode .bg-gray-200 { background-color: #374151 !important; }
+          .racks-dark-mode .border-gray-200 { border-color: #374151 !important; }
+          .racks-dark-mode .border-gray-100 { border-color: #374151 !important; }
+        `}</style>
+      )}
+
+      {/* Zone View or Grid View or Map View or Floor Plan or Analytics */}
+      {viewMode === 'analytics' ? (
+        <RackAnalytics racks={filteredRacks} />
+      ) : viewMode === 'floorplan' ? (
+        <FloorPlanView racks={filteredRacks} onRackClick={handleRackClick} />
+      ) : viewMode === 'map' ? (
+        <RackMapView racks={filteredRacks} zones={uniqueZones as any} onRackClick={handleRackClick} />
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {filteredRacks.map((rack: any) => {
+            const utilization = calcUtilization(rack);
+            const isReserved = rack.status === 'RESERVED';
+            const isMaintenance = rack.status === 'MAINTENANCE';
+            const isFull = utilization >= 100;
+
+            let cardBg = 'bg-white border-green-200';
+            let statusBadge = 'bg-green-100 text-green-700';
+            let statusText = 'Empty';
+            if (isReserved) { cardBg = 'bg-blue-50 border-blue-300'; statusBadge = 'bg-blue-100 text-blue-700'; statusText = 'Reserved'; }
+            else if (isMaintenance) { cardBg = 'bg-amber-50 border-amber-300'; statusBadge = 'bg-amber-100 text-amber-700'; statusText = 'Maintenance'; }
+            else if (isFull) { cardBg = 'bg-red-50 border-red-300'; statusBadge = 'bg-red-100 text-red-700'; statusText = 'Full'; }
+            else if (utilization > 0) { cardBg = 'bg-white border-lime-300'; statusBadge = 'bg-lime-100 text-lime-700'; statusText = `${utilization}%`; }
+
+            return (
+              <button
+                key={rack.id}
+                onClick={() => handleRackClick(rack)}
+                className={`group relative flex flex-col rounded-xl border-2 p-3 text-left transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${cardBg}`}
+              >
+                {/* Top: Code & Status */}
+                <div className="flex items-start justify-between mb-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{rack.code}</p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {rack.zone || 'Unassigned'}
+                      {rack.location ? ` · ${rack.location}` : ''}
+                    </p>
+                  </div>
+                  <span className={`flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusBadge}`}>
+                    {statusText}
+                  </span>
+                </div>
+
+                {/* Utilization Bar */}
+                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden mb-2">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${
+                      isFull ? 'bg-red-500' : utilization >= 90 ? 'bg-orange-500' : utilization >= 70 ? 'bg-yellow-500' : utilization >= 50 ? 'bg-lime-500' : utilization > 0 ? 'bg-green-500' : 'bg-gray-200'
+                    }`}
+                    style={{ width: `${Math.min(utilization, 100)}%` }}
+                  />
+                </div>
+
+                {/* Bottom Stats */}
+                <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-auto">
+                  <span className="inline-flex items-center gap-0.5 bg-gray-50 px-1.5 py-0.5 rounded">
+                    📦 {rack.capacityUsed || 0}/{rack.capacityTotal || 0}
+                  </span>
+                  {rack.cbmUsed > 0 && (
+                    <span className="inline-flex items-center gap-0.5 bg-purple-50 px-1.5 py-0.5 rounded text-purple-600">
+                      📐 {rack.cbmUsed.toFixed(1)}m³
+                    </span>
+                  )}
+                  {rack.companyProfile?.name && (
+                    <span className="inline-flex items-center gap-0.5 bg-amber-50 px-1.5 py-0.5 rounded text-amber-600 truncate max-w-[80px]">
+                      🏢 {rack.companyProfile.name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Full rack pulse */}
+                {isFull && (
+                  <div className="absolute inset-0 rounded-xl border-2 border-red-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 rounded-xl bg-red-100/20 animate-pulse" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      ) : viewMode === 'zones' ? (
         /* Zone Accordion View */
         <div className="space-y-4">
           {Object.keys(racksByZone).sort((a, b) => {
@@ -712,7 +1067,12 @@ export const Racks: React.FC = () => {
 
             const totalCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.capacityTotal || 0), 0);
             const usedCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.capacityUsed || 0), 0);
-            const utilizationPercent = totalCapacity > 0 ? Math.round((usedCapacity / totalCapacity) * 100) : 0;
+            const totalCbmCap = zoneRacks.reduce((sum: number, r: any) => sum + ((r as any).cbmCapacity || 0), 0);
+            const totalCbmUsed = zoneRacks.reduce((sum: number, r: any) => sum + ((r as any).cbmUsed || 0), 0);
+            // Prefer CBM-based utilization for zone-level display
+            const utilizationPercent = totalCbmCap > 0
+              ? Math.round((totalCbmUsed / totalCbmCap) * 100)
+              : totalCapacity > 0 ? Math.round((usedCapacity / totalCapacity) * 100) : 0;
 
             // Get zone icon and description from first rack in zone (all racks in zone should have same icon/description)
             const zoneIcon = zoneRacks[0]?.zoneIcon || (zoneName === 'Unassigned' ? '📦' : '🏢');
@@ -868,10 +1228,7 @@ export const Racks: React.FC = () => {
                   <div className="px-6 py-4 bg-gray-50 border-t-2 border-gray-200">
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 overflow-x-auto">
                       {zoneRacks.map((rack: any) => {
-                        const totalCapacity = rack.capacityTotal && rack.capacityTotal > 0 ? rack.capacityTotal : 1;
-                        const utilization = typeof rack.utilization === 'number'
-                          ? rack.utilization
-                          : Math.round((rack.capacityUsed / totalCapacity) * 100);
+                        const utilization = calcUtilization(rack);
 
                         const uniqueShipments = new Set();
                         if (rack.boxes && Array.isArray(rack.boxes)) {
@@ -1024,10 +1381,7 @@ export const Racks: React.FC = () => {
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {filteredRacks.map((rack: any) => {
-              const totalCapacity = rack.capacityTotal && rack.capacityTotal > 0 ? rack.capacityTotal : 1;
-              const utilization = typeof rack.utilization === 'number'
-                ? rack.utilization
-                : Math.round((rack.capacityUsed / totalCapacity) * 100);
+              const utilization = calcUtilization(rack);
 
               // Count unique shipments from boxes
               const uniqueShipments = new Set();
@@ -1039,7 +1393,7 @@ export const Racks: React.FC = () => {
                 });
               }
               const shipmentCount = uniqueShipments.size;
-              const available = Math.max(totalCapacity - rack.capacityUsed, 0);
+              const available = Math.max(rack.capacityTotal - rack.capacityUsed, 0);
 
               return (
                 <div
@@ -1238,11 +1592,12 @@ export const Racks: React.FC = () => {
         </div>
       )}
 
-      {/* Create Rack Modal */}
-      <CreateRackModal
+      {/* Add Rack Modal */}
+      <AddRackModal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onSuccess={loadRacks}
+        defaultMode="single"
       />
 
       {/* Edit Rack Modal */}
@@ -1532,8 +1887,13 @@ export const Racks: React.FC = () => {
                                         photos={allPhotos}
                                         assignedDate={firstBox.assignedAt}
                                         onViewShipment={(id) => {
-                                          setDetailsModalOpen(false);
-                                          navigate(`/shipment-report/${id}`);
+                                          setSelectedShipmentId(id);
+                                          setShipmentModalOpen(true);
+                                        }}
+                                        onPhotoClick={(photos, idx) => {
+                                          setLightboxPhotos(photos);
+                                          setLightboxIndex(idx);
+                                          setLightboxOpen(true);
                                         }}
                                       />
                                     );
@@ -1553,6 +1913,23 @@ export const Racks: React.FC = () => {
                     )}
                   </div>
                 </div>
+
+                {/* Move History Section */}
+                {rackDetails?.id && (
+                  <div className="px-6 pt-4 pb-2">
+                    <details className="group">
+                      <summary className="flex items-center gap-2 text-base font-bold text-gray-800 cursor-pointer hover:text-amber-700 transition-colors list-none">
+                        <span className="text-xl">🔄</span>
+                        Move History
+                        <span className="text-xs text-gray-400 group-open:hidden">▼</span>
+                        <span className="text-xs text-gray-400 hidden group-open:inline">▲</span>
+                      </summary>
+                      <div className="mt-3">
+                        <RackMoveHistory rackId={rackDetails.id} />
+                      </div>
+                    </details>
+                  </div>
+                )}
 
                 {companyFilter && (
                   <div className="px-6 pb-4 -mt-2">
@@ -1709,13 +2086,14 @@ export const Racks: React.FC = () => {
       )}
 
       {/* Bulk Add Modal */}
-      <BulkAddRackModal
+      <AddRackModal
         isOpen={bulkAddModalOpen}
         onClose={() => setBulkAddModalOpen(false)}
         onSuccess={() => {
           loadRacks();
           setBulkAddModalOpen(false);
         }}
+        defaultMode="bulk"
       />
 
       {/* Bulk CBM Capacity Modal */}
@@ -1820,6 +2198,32 @@ export const Racks: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Shipment Detail Modal — opens inside rack context */}
+      {shipmentModalOpen && selectedShipmentId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShipmentModalOpen(false)} />
+          <div className="relative z-10 max-w-4xl w-full max-h-[95vh] overflow-y-auto">
+            <ShipmentDetailModal
+              isOpen={shipmentModalOpen}
+              onClose={() => setShipmentModalOpen(false)}
+              shipmentId={selectedShipmentId}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Photo Lightbox */}
+      {lightboxOpen && lightboxPhotos.length > 0 && (
+        <div className="fixed inset-0 z-[70]">
+          <PhotoLightbox
+            photos={lightboxPhotos}
+            currentIndex={lightboxIndex}
+            onClose={() => setLightboxOpen(false)}
+            onIndexChange={(idx) => setLightboxIndex(idx)}
+          />
         </div>
       )}
     </div>

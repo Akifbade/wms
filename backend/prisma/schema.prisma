@@ -405,7 +405,8 @@ model Shipment {
   clientEmail      String?
   description      String?
   estimatedValue   Float?
-  notes            String?
+  notes            String?  @db.Text
+  isPinned         Boolean  @default(false)
   qrCode           String    @unique // Master QR for shipment
   status           String    @default("ACTIVE") // ACTIVE, PARTIAL, RELEASED
   assignedAt       DateTime?

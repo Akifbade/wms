@@ -219,7 +219,6 @@ export const PaymentBeforeReleaseModal: React.FC<PaymentBeforeReleaseModalProps>
 
       // 🎯 CONTRACT-BASED: Create invoice with ZERO amount (included in monthly contract)
       if (isContractCustomer) {
-        console.log('📋 CONTRACT CUSTOMER - Creating zero-amount invoice');
 
         const lineItems = [
           {
@@ -256,7 +255,6 @@ export const PaymentBeforeReleaseModal: React.FC<PaymentBeforeReleaseModalProps>
       const settings = await billingAPI.getSettings();
 
       // 🔍 DEBUG: Log all shipment data to find the issue
-      console.log('🔍 INVOICE DEBUG - Full Shipment Data:', shipment);
       console.log('🔍 CBM Values:', {
         cbm: shipment.cbm,
         totalCBM: shipment.totalCBM,
@@ -268,8 +266,6 @@ export const PaymentBeforeReleaseModal: React.FC<PaymentBeforeReleaseModalProps>
         customRatePerCBMPerDay: shipment.customRatePerCBMPerDay,
         customRatePerBoxPerDay: shipment.customRatePerBoxPerDay,
       });
-      console.log('🔍 Settings from Database:', settings);
-      console.log('🔍 Settings Rate Type:', settings.storageRateType);
       console.log('🔍 Settings Rates:', {
         storageRatePerBox: settings.storageRatePerBox,
         storageRatePerCBM: settings.storageRatePerCBM,
@@ -410,7 +406,6 @@ export const PaymentBeforeReleaseModal: React.FC<PaymentBeforeReleaseModalProps>
 
       // ✅ CONTRACT CUSTOMER - Skip payment, just release
       if (isContractCustomer) {
-        console.log('📋 CONTRACT RELEASE - No payment required');
 
         // Mark invoice as paid (contract covered)
         if (invoice) {

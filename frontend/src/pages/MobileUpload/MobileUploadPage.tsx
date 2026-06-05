@@ -51,15 +51,12 @@ export default function MobileUploadPage() {
     const checkUploadStatus = async () => {
         try {
             const authToken = localStorage.getItem('authToken');
-            console.log(`[MobileUpload] Checking status for return: ${returnId}`);
-            console.log(`[MobileUpload] Token present: ${!!authToken}, length: ${authToken?.length || 0}`);
             
             const response = await axios.get(`/api/mobile-upload/${returnId}/status`, {
                 headers: {
                     'Authorization': `Bearer ${authToken}`
                 }
             });
-            console.log('[MobileUpload] Status response:', response.data);
             setUploadStatus(response.data);
 
             if (response.data.uploaded) {
@@ -111,7 +108,6 @@ export default function MobileUploadPage() {
     const uploadFile = async (file: File) => {
         setUploading(true);
         setError(null);
-        console.log('[MobileUpload] Starting upload:', file.name, file.size, 'bytes');
 
         try {
             const authToken = localStorage.getItem('authToken');
@@ -129,7 +125,6 @@ export default function MobileUploadPage() {
             await checkUploadStatus();
             
             if (response.data.uploaded) {
-                console.log('[MobileUpload] ✅ Upload successful!');
                 alert('✅ Physical report uploaded successfully! You can close this page.');
             }
 

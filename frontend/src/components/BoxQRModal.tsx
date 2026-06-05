@@ -67,8 +67,6 @@ export default function BoxQRModal({ isOpen, onClose, shipmentId, shipmentRef }:
         .then(r => r.json())
         .then(d => {
           const brandingData = d?.branding || null;
-          console.log('✅ BoxQRModal: Loaded branding:', brandingData);
-          console.log('   - logoUrl:', brandingData?.logoUrl);
           setBranding(brandingData);
         })
         .catch((err) => {
