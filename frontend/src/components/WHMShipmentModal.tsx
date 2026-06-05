@@ -967,8 +967,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
 
   // 🎯 STEP WIZARD STATE (must be before early return for hooks ordering)
   const [currentStep, setCurrentStep] = useState(0);
-  const totalSteps = 5;
-
+  const totalSteps = 1;
   const stepLabels = [
     { label: 'Client Info', icon: '👤', desc: 'Client & company details' },
     { label: 'Shipment Details', icon: '📋', desc: 'Intake mode, pallets, boxes' },
@@ -2284,7 +2283,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white tracking-tight">New Shipment Intake</h2>
-                <p className="text-slate-400 text-xs">Warehouse Management System • {stepLabels[currentStep].label}</p>
+                <p className="text-slate-400 text-xs">Warehouse Management System • New Shipment Intake</p>
               </div>
             </div>
             <button
@@ -2296,12 +2295,10 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </svg>
             </button>
           </div>
-          {/* Step Indicator */}
-          {renderStepIndicator()}
         </div>
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto max-h-[calc(90vh-220px)]">
+        <div className="overflow-y-auto max-h-[calc(90vh-160px)]">
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
 
             {/* Messages */}
@@ -2340,97 +2337,25 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               </div>
             )}
 
-            {/* Current Step Content */}
-            <div className="min-h-[300px]">
-              {currentStep === 0 && renderClientInfoStep()}
-              {currentStep === 1 && renderShipmentDetailsStep()}
-              {currentStep === 2 && renderDimensionsStep()}
-              {currentStep === 3 && renderPhotosAndNotesStep()}
-              {currentStep === 4 && renderReviewStep()}
+            {/* All Sections */}
+            <div className="space-y-6 animate-fadeIn">
+              {renderClientInfoStep()}
+              {renderShipmentDetailsStep()}
+              {renderDimensionsStep()}
+              {renderPhotosAndNotesStep()}
+              {renderReviewStep()}
             </div>
           </form>
         </div>
 
-        {/* Navigation Footer */}
+        {/* Footer */}
         <div className="bg-gray-50/80 backdrop-blur-sm border-t border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Left: Step info */}
-            <div className="hidden sm:block">
-              <span className="text-xs text-gray-500">
-                Step {currentStep + 1} of {totalSteps}
-              </span>
-              <span className="text-xs text-gray-400 ml-2">—</span>
-              <span className="text-xs font-medium text-gray-600 ml-2">{stepLabels[currentStep].label}</span>
-            </div>
-
-            {/* Right: Buttons */}
-            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-              {currentStep > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(prev => prev - 1)}
-                  className="px-5 py-2.5 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200 flex items-center gap-2"
-                  disabled={loading}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Back
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-5 py-2.5 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200"
-                  disabled={loading}
-                >
-                  Cancel
-                </button>
-              )}
-
-              {currentStep < totalSteps - 1 ? (
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(prev => prev + 1)}
-                  className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-blue-200 flex items-center gap-2"
-                >
-                  Next
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200"
-                    disabled={loading}
-                  >
-                    Reset
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-8 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-sm font-bold hover:from-emerald-600 hover:to-green-700 transition-all duration-200 shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Creating...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Create Shipment
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
+          <div className="flex items-center justify-end gap-3">
+            <button type="button" onClick={onClose} className="px-5 py-2.5 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200">Cancel</button>
+            <button type="submit" className="px-8 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-sm font-bold hover:from-emerald-600 hover:to-green-700 transition-all duration-200 shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={loading}>
+              {loading ? (<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>Creating...</>) : (<><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Create Shipment</>)}
+            </button>
           </div>
         </div>
       </div>
