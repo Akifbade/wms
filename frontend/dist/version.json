@@ -1,11 +1,11 @@
 {
-  "version": "v2.4.0+build.981",
+  "version": "v2.4.0+build.982",
   "buildDate": "Jun 05, 2026",
-  "buildTime": "11:52:58",
-  "commit": "45839fd4b",
-  "commitMessage": "fix(racks): Fix TDZ bug - calcUtilization defined after filteredRacks",
+  "buildTime": "12:22:40",
+  "commit": "e16bce15c",
+  "commitMessage": "feat(racks): Shipment modal in-rack, photo lightbox, move history timeline",
   "author": "Akif QGO",
   "environment": "staging",
   "branch": "staging",
-  "commitCount": "981"
+  "commitCount": "982"
 }

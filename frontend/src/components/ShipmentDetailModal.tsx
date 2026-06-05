@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { shipmentsAPI } from '../services/api';
 import LiveChargesPreview from './LiveChargesPreview';
 import { ShipmentPhoto } from './ShipmentPhoto';
+import PhotoLightbox from './PhotoLightbox';
 import CustomChargesModal from './CustomChargesModal';
 import { AdvancePaymentModal } from './AdvancePaymentModal';
 
@@ -188,6 +189,9 @@ function BoxDistributionSection({ shipmentId, shipmentStatus }: BoxDistributionP
   const [loading, setLoading] = useState(false);
   const [rackDistribution, setRackDistribution] = useState<Record<string, any[]>>({});
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   useEffect(() => {
     loadBoxes();
@@ -390,6 +394,11 @@ function BoxDistributionSection({ shipmentId, shipmentStatus }: BoxDistributionP
                 status={shipmentStatus as 'RELEASED' | 'ACTIVE' | 'PARTIAL' | 'IN_STORAGE' | undefined}
                 showStamp={true}
                 className="aspect-square"
+                onPhotoClick={(photoUrl, photoIdx) => {
+                  setLightboxPhotos(photoUrls);
+                  setLightboxIndex(photoIdx);
+                  setLightboxOpen(true);
+                }}
               />
             ))}
           </div>
@@ -414,6 +423,16 @@ function BoxDistributionSection({ shipmentId, shipmentStatus }: BoxDistributionP
           </div>
         </div>
       </div>
+
+      {/* Photo Lightbox */}
+      {lightboxOpen && (
+        <PhotoLightbox
+          photos={lightboxPhotos}
+          currentIndex={lightboxIndex}
+          onClose={() => setLightboxOpen(false)}
+          onIndexChange={(idx) => setLightboxIndex(idx)}
+        />
+      )}
     </div>
   );
 }

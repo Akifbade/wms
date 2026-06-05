@@ -7,6 +7,7 @@ interface ShipmentPhotoProps {
     status?: 'RELEASED' | 'ACTIVE' | 'PARTIAL' | 'IN_STORAGE';
     className?: string;
     onClick?: () => void;
+    onPhotoClick?: (photoUrl: string, index: number) => void;
     showStamp?: boolean; // Show "RELEASED" stamp overlay
 }
 
@@ -21,6 +22,7 @@ export const ShipmentPhoto: React.FC<ShipmentPhotoProps> = ({
     status,
     className = '',
     onClick,
+    onPhotoClick,
     showStamp = true,
 }) => {
     // Fix: Prepend backend URL if photo path is relative
@@ -34,7 +36,7 @@ export const ShipmentPhoto: React.FC<ShipmentPhotoProps> = ({
                 src={fullPhotoUrl}
                 alt={`Photo ${index + 1}`}
                 className="w-full h-20 object-cover rounded-lg border-2 border-gray-300 hover:border-indigo-500 cursor-pointer transition-all hover:scale-105"
-                onClick={onClick || (() => window.open(fullPhotoUrl, '_blank'))}
+                onClick={onClick || (onPhotoClick ? () => onPhotoClick(fullPhotoUrl, index) : () => window.open(fullPhotoUrl, '_blank'))}
             />
 
             {/* Hover overlay with zoom icon */}

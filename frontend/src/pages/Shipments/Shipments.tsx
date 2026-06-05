@@ -30,6 +30,7 @@ import { WithdrawalModal } from '../../components/WithdrawalModal';
 import WHMShipmentModal from '../../components/WHMShipmentModal';
 import EditShipmentModal from '../../components/EditShipmentModal';
 import ShipmentDetailModal from '../../components/ShipmentDetailModal';
+import PhotoLightbox from '../../components/PhotoLightbox';
 import BoxQRModal from '../../components/BoxQRModal';
 import ShipmentsPrintReport from '../../components/ShipmentsPrintReport';
 
@@ -59,6 +60,12 @@ export const Shipments: React.FC = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  // Rack popup state
+  const [rackPopup, setRackPopup] = useState<any>(null);
+
+  // Bulk select state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Debounced search - wait 500ms after user stops typing
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -260,23 +267,56 @@ export const Shipments: React.FC = () => {
     </div>
   );
 
+  // Indeterminate checkbox component for select-all
+  const IndeterminateCheckbox = ({ checked, indeterminate, onChange }: { checked: boolean; indeterminate: boolean; onChange: () => void }) => {
+    const ref = React.useRef<HTMLInputElement>(null);
+    React.useEffect(() => {
+      if (ref.current) ref.current.indeterminate = indeterminate;
+    }, [indeterminate]);
+    return (
+      <input
+        ref={ref}
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+      />
+    );
+  };
+
   const ShipmentCard = ({ shipment }: { shipment: any }) => {
     const days = getDaysStored(shipment);
     // ✅ FIX: Check if boxes exist for moved shipments (backend now updates status properly)
     const canRelease = ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE', 'PARTIAL'].includes(shipment.status) &&
       (shipment.currentBoxCount > 0 || (shipment.boxes && shipment.boxes.length > 0));
     const photos = shipment.shipmentPhotos || [];
-    const firstRackId = shipment.boxes?.find((b: any) => b.rackId)?.rackId;
     const isReleased = shipment.status === 'RELEASED';
     const isContract = shipment.companyProfile?.hasContract; // Assuming this field exists or logic
 
     return (
-      <div className="relative bg-white rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-all p-2 md:p-4 overflow-hidden group">
+      <div className={`relative bg-white rounded-xl border shadow-sm hover:shadow-md transition-all p-2 md:p-4 overflow-hidden group ${days > 60 ? 'border-red-300 bg-red-50/30' : days > 30 ? 'border-amber-300 bg-amber-50/30' : 'border-blue-100'}`}>
         {/* Stamps & Badges */}
         {isReleased && <ReleasedStamp />}
         {isContract ? <ContractBadge /> : <PrepaidBadge />}
 
         <div className="flex flex-col md:flex-row gap-2 md:gap-4 relative z-10">
+          {/* Bulk select checkbox — table view only */}
+          {viewMode === 'table' && (
+            <div className="flex items-center pl-1">
+              <input
+                type="checkbox"
+                checked={selectedIds.has(shipment.id)}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  const next = new Set(selectedIds);
+                  if (next.has(shipment.id)) next.delete(shipment.id);
+                  else next.add(shipment.id);
+                  setSelectedIds(next);
+                }}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+            </div>
+          )}
           {/* Left: Photo & Basic Info */}
           <div className="flex gap-2 md:gap-4 md:w-1/3">
             {/* Photo Thumbnail */}
@@ -340,14 +380,14 @@ export const Shipments: React.FC = () => {
               <p className="font-semibold text-slate-700">
                 {shipment.cbm ? `${Number(shipment.cbm).toFixed(2)} m³` : '-'}
                 <span className="text-slate-300 mx-1">|</span>
-                {shipment.weight ? `${shipment.weight} kg` : '-'}
+                {shipment.weight != null ? `${shipment.weight} kg` : '-'}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-slate-400 flex items-center gap-1"><MapPinIcon className="h-3 w-3" /> Location</p>
               {shipment.rackLocations && shipment.rackLocations !== 'N/A' ? (
                 <button
-                  onClick={() => firstRackId && navigate(`/racks?highlight=${firstRackId}`)}
+                  onClick={() => setRackPopup(shipment)}
                   className="font-bold text-blue-600 hover:underline cursor-pointer"
                 >
                   {shipment.rackLocations}
@@ -559,25 +599,38 @@ export const Shipments: React.FC = () => {
                 const totalBoxes = items.reduce((sum: number, s: any) => sum + (s.currentBoxCount || 0), 0);
 
                 return (
-                  <div key={company} className="bg-white rounded-xl border border-blue-100 shadow-sm overflow-hidden">
+                  <div key={company} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${company === 'Unassigned' ? 'border-slate-200' : 'border-blue-100'}`}>
                     <button
                       onClick={() => toggleFolder(company)}
-                      className="w-full px-6 py-4 flex items-center justify-between hover:bg-blue-50/50 transition-colors group"
+                      className={`w-full px-6 py-4 flex items-center justify-between transition-colors group ${company === 'Unassigned' ? 'hover:bg-slate-50/50' : 'hover:bg-blue-50/50'}`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${isOpen ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100'}`}>
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                          company === 'Unassigned'
+                            ? (isOpen ? 'bg-slate-500 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200')
+                            : (isOpen ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100')
+                        }`}>
                           {isOpen ? <ChevronDownIcon className="h-6 w-6" /> : <ChevronRightIcon className="h-6 w-6" />}
                         </div>
                         <div className="text-left">
-                          <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-800 transition-colors">{company}</h3>
+                          <h3 className={`text-lg font-bold transition-colors ${company === 'Unassigned' ? 'text-slate-500 group-hover:text-slate-700' : 'text-slate-800 group-hover:text-blue-800'}`}>
+                            {company === 'Unassigned' ? '🚫 Unassigned' : company}
+                          </h3>
                           <p className="text-sm text-slate-500">{items.length} shipments · {totalBoxes} pieces</p>
                         </div>
                       </div>
-                      {stored > 0 && (
-                        <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
-                          {stored} Active
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {company === 'Unassigned' && (
+                          <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">
+                            {items.length}
+                          </span>
+                        )}
+                        {stored > 0 && company !== 'Unassigned' && (
+                          <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
+                            {stored} Active
+                          </span>
+                        )}
+                      </div>
                     </button>
 
                     {isOpen && (
@@ -595,6 +648,26 @@ export const Shipments: React.FC = () => {
         ) : (
           /* TABLE VIEW */
           <div className="space-y-2 md:space-y-4">
+            {/* Table header — bulk select column label */}
+            {shipments.length > 0 && (
+              <div className="flex items-center gap-2 md:gap-4 px-2 py-2 text-xs text-slate-500 font-medium border-b border-slate-100">
+                <IndeterminateCheckbox
+                  checked={selectedIds.size === shipments.length}
+                  indeterminate={selectedIds.size > 0 && selectedIds.size < shipments.length}
+                  onChange={() => {
+                    if (selectedIds.size === shipments.length) {
+                      setSelectedIds(new Set());
+                    } else {
+                      setSelectedIds(new Set(shipments.map(s => s.id)));
+                    }
+                  }}
+                />
+                <span>Select All</span>
+                {selectedIds.size > 0 && (
+                  <span className="text-blue-600 font-semibold">{selectedIds.size} selected</span>
+                )}
+              </div>
+            )}
             {shipments.map((shipment: any) => (
               <ShipmentCard key={shipment.id} shipment={shipment} />
             ))}
@@ -648,66 +721,84 @@ export const Shipments: React.FC = () => {
         shipmentRef={selectedShipment?.referenceId || ''}
       />
 
-      {/* Photo Lightbox */}
-      {lightboxOpen && lightboxPhotos.length > 0 && (
-        <div
-          className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center backdrop-blur-sm"
-          onClick={() => setLightboxOpen(false)}
-        >
-          <button
-            onClick={() => setLightboxOpen(false)}
-            className="absolute top-6 right-6 p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all z-50"
-          >
-            <XMarkIcon className="h-8 w-8" />
-          </button>
-
-          {lightboxPhotos.length > 1 && (
+      {/* Floating action bar for bulk select */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-2xl z-40 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between">
+          <span className="text-sm font-semibold text-slate-700">{selectedIds.size} selected</span>
+          <div className="flex items-center gap-3">
             <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => (prev - 1 + lightboxPhotos.length) % lightboxPhotos.length); }}
-              className="absolute left-6 p-3 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all z-50"
+              onClick={() => setSelectedIds(new Set())}
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
             >
-              <ChevronLeftIcon className="h-8 w-8" />
+              Clear
             </button>
-          )}
+            <button
+              onClick={() => {
+                alert(`Release ${selectedIds.size} shipment(s) - bulk release coming soon`);
+              }}
+              className="px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-md hover:shadow-lg transition-all"
+            >
+              Release Selected
+            </button>
+          </div>
+        </div>
+      )}
 
-          <div className="max-w-[90vw] max-h-[85vh] relative" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={lightboxPhotos[lightboxIndex].startsWith('http') ? lightboxPhotos[lightboxIndex] : `${getBackendUrl()}${lightboxPhotos[lightboxIndex]}`}
-              alt={`Photo ${lightboxIndex + 1}`}
-              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
-            />
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-4 py-1.5 rounded-full backdrop-blur-md">
-              {lightboxIndex + 1} / {lightboxPhotos.length}
+      {/* Rack Info Popup */}
+      {rackPopup && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          onClick={() => setRackPopup(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl border border-slate-200 p-6 max-w-sm w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg text-slate-800">Rack Details</h3>
+              <button
+                onClick={() => setRackPopup(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">Rack Code</p>
+                <p className="text-base font-bold text-slate-800 mt-0.5">{rackPopup.rackLocations || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">Zone</p>
+                <p className="text-base font-semibold text-slate-700 mt-0.5">{rackPopup.zone || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">Boxes on Rack</p>
+                <p className="text-base font-semibold text-slate-700 mt-0.5">
+                  {rackPopup.currentBoxCount || 0} / {rackPopup.originalBoxCount || 0}
+                </p>
+              </div>
+              {rackPopup.rackLocations && (
+                <a
+                  href={`/racks?highlight=${rackPopup.boxes?.find((b: any) => b.rackId)?.rackId || ''}`}
+                  className="block w-full text-center mt-2 px-4 py-2.5 bg-blue-50 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  View in Racks →
+                </a>
+              )}
             </div>
           </div>
-
-          {lightboxPhotos.length > 1 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => (prev + 1) % lightboxPhotos.length); }}
-              className="absolute right-6 p-3 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all z-50"
-            >
-              <ChevronRightIcon className="h-8 w-8" />
-            </button>
-          )}
-
-          {lightboxPhotos.length > 1 && (
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 p-2 bg-black/40 rounded-xl backdrop-blur-md overflow-x-auto max-w-[90vw]">
-              {lightboxPhotos.map((photo, idx) => (
-                <button
-                  key={idx}
-                  onClick={(e) => { e.stopPropagation(); setLightboxIndex(idx); }}
-                  className={`w-12 h-12 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${idx === lightboxIndex ? 'border-blue-500 scale-110 shadow-lg' : 'border-transparent opacity-50 hover:opacity-100'}`}
-                >
-                  <img
-                    src={photo.startsWith('http') ? photo : `${getBackendUrl()}${photo}`}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
         </div>
+      )}
+
+      {/* Photo Lightbox */}
+      {lightboxOpen && lightboxPhotos.length > 0 && (
+        <PhotoLightbox
+          photos={lightboxPhotos.map(p => p.startsWith('http') ? p : `${getBackendUrl()}${p}`)}
+          currentIndex={lightboxIndex}
+          onClose={() => setLightboxOpen(false)}
+          onIndexChange={(idx) => setLightboxIndex(idx)}
+        />
       )}
     </div>
   );
