@@ -83,11 +83,11 @@ services:
       dockerfile: Dockerfile
       args:
         APP_VERSION: ${APP_VERSION:-2.4.0}
-        VITE_APP_COMMIT_HASH: ${VITE_APP_COMMIT_HASH:-local-dev}
-        VITE_APP_COMMIT_MESSAGE: ${VITE_APP_COMMIT_MESSAGE:-local-build}
+        VITE_APP_COMMIT_HASH: ""
+        VITE_APP_COMMIT_MESSAGE: ""
         VITE_APP_BRANCH: ${VITE_APP_BRANCH:-staging}
         VITE_APP_ENV: staging
-        COMMIT_COUNT: ${COMMIT_COUNT:-0}
+        COMMIT_COUNT: ""
     container_name: wms-frontend-staging
     restart: unless-stopped
     ports:
