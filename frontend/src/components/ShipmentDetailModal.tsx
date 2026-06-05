@@ -44,6 +44,10 @@ function MoveHistorySection({ shipmentId }: { shipmentId: string }) {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // Lightbox state for move history photos
+  const [moveLightboxOpen, setMoveLightboxOpen] = useState(false);
+  const [moveLightboxPhotos, setMoveLightboxPhotos] = useState<string[]>([]);
+  const [moveLightboxIndex, setMoveLightboxIndex] = useState(0);
 
   useEffect(() => {
     if (expanded) {
@@ -147,8 +151,12 @@ function MoveHistorySection({ shipmentId }: { shipmentId: string }) {
                                   key={pIdx}
                                   src={photo}
                                   alt={`Before ${pIdx + 1}`}
-                                  className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80"
-                                  onClick={() => window.open(photo, '_blank')}
+                                  className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-blue-400 transition-all"
+                                  onClick={() => {
+                                    setMoveLightboxPhotos(move.oldPhotos);
+                                    setMoveLightboxIndex(pIdx);
+                                    setMoveLightboxOpen(true);
+                                  }}
                                 />
                               ))}
                             </div>
@@ -163,8 +171,12 @@ function MoveHistorySection({ shipmentId }: { shipmentId: string }) {
                                   key={pIdx}
                                   src={photo}
                                   alt={`After ${pIdx + 1}`}
-                                  className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80"
-                                  onClick={() => window.open(photo, '_blank')}
+                                  className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-blue-400 transition-all"
+                                  onClick={() => {
+                                    setMoveLightboxPhotos(move.newPhotos);
+                                    setMoveLightboxIndex(pIdx);
+                                    setMoveLightboxOpen(true);
+                                  }}
                                 />
                               ))}
                             </div>
@@ -178,6 +190,15 @@ function MoveHistorySection({ shipmentId }: { shipmentId: string }) {
             </div>
           )}
         </div>
+      )}
+      {/* Move history photos lightbox */}
+      {moveLightboxOpen && moveLightboxPhotos.length > 0 && (
+        <PhotoLightbox
+          photos={moveLightboxPhotos}
+          currentIndex={moveLightboxIndex}
+          onClose={() => setMoveLightboxOpen(false)}
+          onIndexChange={(idx) => setMoveLightboxIndex(idx)}
+        />
       )}
     </div>
   );
