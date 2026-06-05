@@ -26,6 +26,7 @@ import EditRackModal from '../../components/EditRackModal';
 import QRCode from 'qrcode';
 import { RackMapView } from './RackMapView';
 import { FloorPlanView } from './FloorPlanView';
+import { RackAnalytics } from './RackAnalytics';
 
 // Shipment Box Card Component (to avoid hooks in loops)
 const ShipmentBoxCard: React.FC<{
@@ -155,10 +156,14 @@ export const Racks: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedZone, setSelectedZone] = useState('all'); // NEW: Zone filter
-  const [viewMode, setViewMode] = useState<'zones' | 'grid' | 'map' | 'floorplan'>('map');
+  const [viewMode, setViewMode] = useState<'zones' | 'grid' | 'map' | 'floorplan' | 'analytics'>('map');
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set()); // NEW: Track expanded zones
   const [racks, setRacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUtilRange, setSelectedUtilRange] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [contentsSearch, setContentsSearch] = useState('');
+  const [darkMode, setDarkMode] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [bulkAddModalOpen, setBulkAddModalOpen] = useState(false); // NEW: Bulk add modal
@@ -213,11 +218,39 @@ export const Racks: React.FC = () => {
       selected === profileName ||
       selected === profileId;
 
-    // NEW: Zone filter
+    // Zone filter
     const zone = r.zone || 'Unassigned';
     const zoneMatch = selectedZone === 'all' || zone === selectedZone;
 
-    return sectionMatch && categoryMatch && zoneMatch;
+    // Utilization range filter
+    const u = calcUtilization(r);
+    let utilMatch = true;
+    if (selectedUtilRange !== 'all') {
+      if (selectedUtilRange === '0') utilMatch = u === 0;
+      else if (selectedUtilRange === '100') utilMatch = u >= 100;
+      else {
+        const [low, high] = selectedUtilRange.split('-').map(Number);
+        utilMatch = u >= low && u <= high;
+      }
+    }
+
+    // Status filter
+    const statusMatch = selectedStatus === 'all' || (r.status || 'ACTIVE') === selectedStatus;
+
+    // Contents search (search in company name, rack code, zone, location)
+    let contentsMatch = true;
+    if (contentsSearch.trim()) {
+      const q = contentsSearch.toLowerCase().trim();
+      contentsMatch =
+        (r.code || '').toLowerCase().includes(q) ||
+        (r.location || '').toLowerCase().includes(q) ||
+        (r.zone || '').toLowerCase().includes(q) ||
+        (r.companyProfile?.name || '').toLowerCase().includes(q) ||
+        (r.companyProfile?.phone || '').toLowerCase().includes(q) ||
+        (r.status || '').toLowerCase().includes(q);
+    }
+
+    return sectionMatch && categoryMatch && zoneMatch && utilMatch && statusMatch && contentsMatch;
   });
 
   // NEW: Get unique zones for filter buttons
@@ -305,6 +338,29 @@ export const Racks: React.FC = () => {
 
     // FIXED mode (default)
     return <span className="font-semibold">{rack.capacityUsed || 0}/{rack.capacityTotal || 0} boxes</span>;
+  };
+
+  // Export all racks to CSV
+  const exportRacksCSV = () => {
+    const headers = ['Code','Zone','Location','Status','Capacity Mode','Capacity Used','Capacity Total','Pallets','Boxes','CBM Used','CBM Capacity','Utilization %','Company','Days Occupied'];
+    const rows = racks.map((r: any) => {
+      const u = calcUtilization(r);
+      const days = r.assignedDate ? Math.floor((Date.now() - new Date(r.assignedDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+      return [
+        r.code, r.zone || 'Unassigned', r.location || '', r.status || 'ACTIVE',
+        r.capacityMode || 'FIXED', r.capacityUsed || 0, r.capacityTotal || 0,
+        r.currentPallets || 0, r.currentBoxes || 0,
+        (r.cbmUsed || 0).toFixed(2), (r.cbmCapacity || 0).toFixed(2),
+        `${u}%`, r.companyProfile?.name || '', days,
+      ].join(',');
+    });
+    const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `racks-export-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const getUtilizationColor = (percentage: number) => {
@@ -490,7 +546,7 @@ export const Racks: React.FC = () => {
   };
 
   return (
-    <div className="p-3 md:p-6 space-y-4 md:space-y-6 pb-20 md:pb-6">
+    <div className={`p-3 md:p-6 space-y-4 md:space-y-6 pb-20 md:pb-6 ${darkMode ? 'racks-dark-mode' : ''}`}>
       {/* Header - Mobile Optimized */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -539,6 +595,16 @@ export const Racks: React.FC = () => {
               title="Warehouse Floor Plan"
             >
               🏗️
+            </button>
+            <button
+              onClick={() => setViewMode('analytics')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === 'analytics'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
+              title="Analytics"
+            >
+              📊
             </button>
           </div>
         </div>
@@ -805,8 +871,104 @@ export const Racks: React.FC = () => {
         </div>
       </div>
 
-      {/* Zone View or Grid View or Map View or Floor Plan */}
-      {viewMode === 'floorplan' ? (
+      {/* Enhanced Filters + Actions */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Utilization Range Filter */}
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-semibold text-gray-500 mr-1">📊 Util:</span>
+            {['all','0','1-25','26-50','51-75','76-99','100'].map((range) => (
+              <button
+                key={range}
+                onClick={() => setSelectedUtilRange(range)}
+                className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors ${
+                  selectedUtilRange === range
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {range === 'all' ? 'All' : range === '100' ? '100%+' : `${range}%`}
+              </button>
+            ))}
+          </div>
+          <div className="w-px h-6 bg-gray-200" />
+          {/* Status Filter */}
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-semibold text-gray-500 mr-1">Status:</span>
+            {['all','ACTIVE','RESERVED','MAINTENANCE'].map((s) => (
+              <button
+                key={s}
+                onClick={() => setSelectedStatus(s)}
+                className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors ${
+                  selectedStatus === s
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {s === 'all' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
+          <div className="w-px h-6 bg-gray-200" />
+          {/* Search within contents */}
+          <div className="relative flex-1 min-w-[150px] max-w-[250px]">
+            <input
+              type="text"
+              placeholder="🔍 Search contents..."
+              value={contentsSearch}
+              onChange={(e) => setContentsSearch(e.target.value)}
+              className="w-full pl-2 pr-6 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            />
+            {contentsSearch && (
+              <button onClick={() => setContentsSearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">✕</button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Actions Row: Dark Mode + Export CSV */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              darkMode ? 'bg-gray-800 text-yellow-300 border border-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {darkMode ? '🌙 Dark' : '☀️ Light'}
+          </button>
+          <button
+            onClick={exportRacksCSV}
+            className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+          >
+            📥 Export CSV
+          </button>
+        </div>
+        <div className="text-xs text-gray-400">
+          {filteredRacks.length} of {racks.length} racks shown
+        </div>
+      </div>
+
+      {/* Dark mode styles */}
+      {darkMode && (
+        <style>{`
+          .racks-dark-mode .bg-white { background-color: #1f2937 !important; border-color: #374151 !important; }
+          .racks-dark-mode .text-gray-900 { color: #f9fafb !important; }
+          .racks-dark-mode .text-gray-500 { color: #9ca3af !important; }
+          .racks-dark-mode .text-gray-600 { color: #d1d5db !important; }
+          .racks-dark-mode .text-gray-400 { color: #9ca3af !important; }
+          .racks-dark-mode .bg-gray-50 { background-color: #111827 !important; }
+          .racks-dark-mode .bg-gray-100 { background-color: #1f2937 !important; }
+          .racks-dark-mode .bg-gray-200 { background-color: #374151 !important; }
+          .racks-dark-mode .border-gray-200 { border-color: #374151 !important; }
+          .racks-dark-mode .border-gray-100 { border-color: #374151 !important; }
+        `}</style>
+      )}
+
+      {/* Zone View or Grid View or Map View or Floor Plan or Analytics */}
+      {viewMode === 'analytics' ? (
+        <RackAnalytics racks={filteredRacks} />
+      ) : viewMode === 'floorplan' ? (
         <FloorPlanView racks={filteredRacks} onRackClick={handleRackClick} />
       ) : viewMode === 'map' ? (
         <RackMapView racks={filteredRacks} zones={uniqueZones as any} onRackClick={handleRackClick} />
@@ -814,7 +976,6 @@ export const Racks: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {filteredRacks.map((rack: any) => {
             const utilization = calcUtilization(rack);
-            const mode = rack.capacityMode || 'FIXED';
             const isReserved = rack.status === 'RESERVED';
             const isMaintenance = rack.status === 'MAINTENANCE';
             const isFull = utilization >= 100;
