@@ -139,6 +139,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       // Handle both single status and array of statuses
       if (Array.isArray(status)) {
         where.status = { in: status as string[] };
+      } else if (typeof status === 'string' && status.includes(',')) {
+        where.status = { in: status.split(',') };
       } else {
         where.status = status;
       }

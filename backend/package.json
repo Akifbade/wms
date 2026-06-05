@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon src/index.ts",
-    "build": "tsc",
+    "build": "node scripts/generate-version.js && tsc",
     "start": "node dist/index.js",
     "migrate": "prisma migrate dev",
     "generate": "prisma generate",

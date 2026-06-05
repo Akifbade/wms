@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   PlusIcon,
   QrCodeIcon,
@@ -27,6 +26,9 @@ import QRCode from 'qrcode';
 import { RackMapView } from './RackMapView';
 import { FloorPlanView } from './FloorPlanView';
 import { RackAnalytics } from './RackAnalytics';
+import ShipmentDetailModal from '../../components/ShipmentDetailModal';
+import PhotoLightbox from '../../components/PhotoLightbox';
+import RackMoveHistory from '../../components/RackMoveHistory';
 
 // Shipment Box Card Component (to avoid hooks in loops)
 const ShipmentBoxCard: React.FC<{
@@ -35,7 +37,8 @@ const ShipmentBoxCard: React.FC<{
   photos: string[];
   assignedDate?: Date;
   onViewShipment?: (shipmentId: string) => void;
-}> = ({ shipment, boxCount, photos, assignedDate, onViewShipment }) => {
+  onPhotoClick?: (photos: string[], index: number) => void;
+}> = ({ shipment, boxCount, photos, assignedDate, onViewShipment, onPhotoClick }) => {
   const [showPhotos, setShowPhotos] = useState(false);
 
   // Calculate days in rack
@@ -126,12 +129,10 @@ const ShipmentBoxCard: React.FC<{
           {showPhotos && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2">
               {photos.map((url: string, idx: number) => (
-                <a
+                <button
                   key={idx}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative block aspect-square rounded-lg overflow-hidden border-2 border-blue-200 hover:border-blue-500 transition-all"
+                  onClick={() => onPhotoClick?.(photos, idx)}
+                  className="group relative block aspect-square rounded-lg overflow-hidden border-2 border-blue-200 hover:border-blue-500 transition-all w-full text-left"
                 >
                   <img
                     src={url}
@@ -141,7 +142,7 @@ const ShipmentBoxCard: React.FC<{
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
                     <span className="text-white text-xl opacity-0 group-hover:opacity-100">🔍</span>
                   </div>
-                </a>
+                </button>
               ))}
             </div>
           )}
@@ -152,7 +153,6 @@ const ShipmentBoxCard: React.FC<{
 };
 
 export const Racks: React.FC = () => {
-  const navigate = useNavigate();
   const [selectedSection, setSelectedSection] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedZone, setSelectedZone] = useState('all'); // NEW: Zone filter
@@ -178,6 +178,11 @@ export const Racks: React.FC = () => {
   const [bulkQrModalOpen, setBulkQrModalOpen] = useState(false);
   const bulkQrCanvasRefs = useRef<{ [key: string]: HTMLCanvasElement | null }>({});
   const [selectedRacks, setSelectedRacks] = useState<Set<string>>(new Set());
+  const [shipmentModalOpen, setShipmentModalOpen] = useState(false);
+  const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const resolveLogoUrl = (logo?: string | null) => {
     if (!logo) return '';
@@ -1882,8 +1887,13 @@ export const Racks: React.FC = () => {
                                         photos={allPhotos}
                                         assignedDate={firstBox.assignedAt}
                                         onViewShipment={(id) => {
-                                          setDetailsModalOpen(false);
-                                          navigate(`/shipment-report/${id}`);
+                                          setSelectedShipmentId(id);
+                                          setShipmentModalOpen(true);
+                                        }}
+                                        onPhotoClick={(photos, idx) => {
+                                          setLightboxPhotos(photos);
+                                          setLightboxIndex(idx);
+                                          setLightboxOpen(true);
                                         }}
                                       />
                                     );
@@ -1903,6 +1913,23 @@ export const Racks: React.FC = () => {
                     )}
                   </div>
                 </div>
+
+                {/* Move History Section */}
+                {rackDetails?.id && (
+                  <div className="px-6 pt-4 pb-2">
+                    <details className="group">
+                      <summary className="flex items-center gap-2 text-base font-bold text-gray-800 cursor-pointer hover:text-amber-700 transition-colors list-none">
+                        <span className="text-xl">🔄</span>
+                        Move History
+                        <span className="text-xs text-gray-400 group-open:hidden">▼</span>
+                        <span className="text-xs text-gray-400 hidden group-open:inline">▲</span>
+                      </summary>
+                      <div className="mt-3">
+                        <RackMoveHistory rackId={rackDetails.id} />
+                      </div>
+                    </details>
+                  </div>
+                )}
 
                 {companyFilter && (
                   <div className="px-6 pb-4 -mt-2">
@@ -2171,6 +2198,32 @@ export const Racks: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Shipment Detail Modal — opens inside rack context */}
+      {shipmentModalOpen && selectedShipmentId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShipmentModalOpen(false)} />
+          <div className="relative z-10 max-w-4xl w-full max-h-[95vh] overflow-y-auto">
+            <ShipmentDetailModal
+              isOpen={shipmentModalOpen}
+              onClose={() => setShipmentModalOpen(false)}
+              shipmentId={selectedShipmentId}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Photo Lightbox */}
+      {lightboxOpen && lightboxPhotos.length > 0 && (
+        <div className="fixed inset-0 z-[70]">
+          <PhotoLightbox
+            photos={lightboxPhotos}
+            currentIndex={lightboxIndex}
+            onClose={() => setLightboxOpen(false)}
+            onIndexChange={(idx) => setLightboxIndex(idx)}
+          />
         </div>
       )}
     </div>

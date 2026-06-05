@@ -44,7 +44,8 @@ import backupsRoutes from './routes/backups'; // NEW: Backup management
 import systemRoutes from './routes/system'; // NEW: System monitoring
 import financeRoutes from './routes/finance'; // NEW: Finance dashboard
 import emailRoutes from './routes/email'; // NEW: Email notification system
-import { startAllNotificationJobs } from './cron/notificationJobs'; // NEW: Notification cron jobs
+import qrRoutes from './routes/qr-generator'; // NEW: QR code generation
+import { startAllNotificationJobs } from './cron/notificationJobs';
 import { initializeBackupCron } from './cron/backupJobs'; // NEW: Auto backup cron jobs
 
 // Load environment variables FIRST (but allow env vars to override .env)
@@ -157,6 +158,7 @@ app.get('/api/version', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/email', emailRoutes); // NEW: Email notification system
+app.use('/api/qr', qrRoutes); // NEW: QR code generation
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/racks', rackRoutes);
 app.use('/api/dashboard', dashboardRoutes);
