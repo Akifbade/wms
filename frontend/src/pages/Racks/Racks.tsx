@@ -21,10 +21,11 @@ import {
   SparklesIcon
 } from '@heroicons/react/24/outline';
 import { racksAPI } from '../../services/api';
-import CreateRackModal from '../../components/CreateRackModal';
+import AddRackModal from '../../components/AddRackModal';
 import EditRackModal from '../../components/EditRackModal';
-import BulkAddRackModal from '../../components/BulkAddRackModal';
 import QRCode from 'qrcode';
+import { RackMapView } from './RackMapView';
+import { FloorPlanView } from './FloorPlanView';
 
 // Shipment Box Card Component (to avoid hooks in loops)
 const ShipmentBoxCard: React.FC<{
@@ -154,7 +155,7 @@ export const Racks: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedZone, setSelectedZone] = useState('all'); // NEW: Zone filter
-  const [viewMode, setViewMode] = useState<'zones' | 'grid'>('zones'); // NEW: View toggle
+  const [viewMode, setViewMode] = useState<'zones' | 'grid' | 'map' | 'floorplan'>('map');
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set()); // NEW: Track expanded zones
   const [racks, setRacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -247,6 +248,42 @@ export const Racks: React.FC = () => {
     acc[zone].push(rack);
     return acc;
   }, {});
+
+  // Calculate utilization based on capacity mode
+  const calcUtilization = (rack: any): number => {
+    const mode = rack.capacityMode || 'FIXED';
+
+    // For FLEXIBLE or BOTH mode, use max of pallet% and box% (most accurate for storage racks)
+    if (mode === 'FLEXIBLE' || mode === 'both') {
+      const palletPct = rack.palletCapacity > 0 ? ((rack.currentPallets || 0) / rack.palletCapacity) * 100 : 0;
+      const boxPct = rack.boxCapacity > 0 ? ((rack.currentBoxes || 0) / rack.boxCapacity) * 100 : 0;
+      const maxPct = Math.max(palletPct, boxPct);
+      if (maxPct > 0) return Math.min(Math.round(maxPct), 100);
+    }
+
+    // Try CBM when available and used > 0
+    if (rack.cbmCapacity && rack.cbmCapacity > 0 && rack.cbmUsed > 0) {
+      return Math.min(Math.round((rack.cbmUsed / rack.cbmCapacity) * 100), 200);
+    }
+
+    // For FLEXIBLE without pallet/box ratio, check capacityUsed
+    if (mode === 'FLEXIBLE') {
+      if (rack.capacityUsed > 0) return 50;
+      return 0;
+    }
+
+    // UNLIMITED: can't calc % — treat occupied as 50%
+    if (mode === 'UNLIMITED') {
+      if (rack.cbmUsed > 0 && rack.cbmCapacity > 0) {
+        return Math.min(Math.round((rack.cbmUsed / rack.cbmCapacity) * 100), 200);
+      }
+      return rack.capacityUsed > 0 ? 50 : 0;
+    }
+
+    // FIXED (default)
+    const total = rack.capacityTotal || 1;
+    return Math.min(Math.round((rack.capacityUsed / total) * 100), 100);
+  };
 
   // NEW: Render capacity based on mode (INFORMATIVE VERSION)
   const renderCapacity = (rack: any) => {
@@ -469,6 +506,7 @@ export const Racks: React.FC = () => {
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900'
                 }`}
+              title="Zone View"
             >
               🏢
             </button>
@@ -478,8 +516,29 @@ export const Racks: React.FC = () => {
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900'
                 }`}
+              title="Grid View"
             >
               📦
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === 'map'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
+              title="Zone Map"
+            >
+              🗺️
+            </button>
+            <button
+              onClick={() => setViewMode('floorplan')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === 'floorplan'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
+              title="Warehouse Floor Plan"
+            >
+              🏗️
             </button>
           </div>
         </div>
@@ -524,53 +583,110 @@ export const Racks: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium text-gray-500">Total</p>
-                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">{racks.length}</p>
-                </div>
-                <CubeIcon className="h-6 w-6 md:h-10 md:w-10 text-primary-500" />
+          {/* Row 1: Rack Overview */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+            <h3 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-2">
+              <BuildingOfficeIcon className="h-4 w-4" /> RACK OVERVIEW
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-gray-900">{racks.length}</p>
+                <p className="text-xs text-gray-500 mt-1">Total Racks</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-green-600">{racks.filter((r: any) => r.capacityUsed === 0).length}</p>
+                <p className="text-xs text-gray-500 mt-1">Empty</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-blue-600">{racks.filter((r: any) => r.capacityUsed > 0 && r.capacityUsed < (r.capacityTotal || 1)).length}</p>
+                <p className="text-xs text-gray-500 mt-1">In Use</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-red-600">{racks.filter((r: any) => r.capacityUsed >= (r.capacityTotal || 1)).length}</p>
+                <p className="text-xs text-gray-500 mt-1">Full</p>
               </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium text-gray-500">Capacity</p>
-                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">
-                    {racks.reduce((sum: number, r: any) => sum + r.capacityTotal, 0)}
+            {/* Utilization Bar */}
+            {(() => {
+              const occupied = racks.filter((r: any) => r.capacityUsed > 0).length;
+              const utilPct = racks.length > 0 ? Math.round((occupied / racks.length) * 100) : 0;
+              return (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>Occupancy</span>
+                    <span className="font-semibold text-gray-700">{utilPct}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${utilPct >= 90 ? 'bg-gradient-to-r from-yellow-500 to-red-500' : utilPct >= 70 ? 'bg-yellow-500' : 'bg-gradient-to-r from-green-500 to-blue-500'}`}
+                      style={{ width: `${utilPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{occupied} of {racks.length} racks occupied</p>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Row 2: CBM Summary */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+            <h3 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-2">
+              <CubeIcon className="h-4 w-4" /> CBM CAPACITY
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-gray-900">
+                  {racks.reduce((sum: number, r: any) => sum + ((r as any).cbmCapacity || 0), 0).toFixed(0)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Total m³</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-blue-600">
+                  {racks.reduce((sum: number, r: any) => sum + ((r as any).cbmUsed || 0), 0).toFixed(1)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Used m³</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl md:text-3xl font-bold text-green-600">
+                  {(racks.reduce((sum: number, r: any) => sum + ((r as any).cbmCapacity || 0), 0) - racks.reduce((sum: number, r: any) => sum + ((r as any).cbmUsed || 0), 0)).toFixed(1)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Available m³</p>
+              </div>
+              <div className="text-center">
+                {(() => {
+                  const totalCbm = racks.reduce((sum: number, r: any) => sum + ((r as any).cbmCapacity || 0), 0);
+                  const usedCbm = racks.reduce((sum: number, r: any) => sum + ((r as any).cbmUsed || 0), 0);
+                  const pct = totalCbm > 0 ? Math.round((usedCbm / totalCbm) * 100) : 0;
+                  return (
+                    <>
+                      <p className={`text-2xl md:text-3xl font-bold ${pct >= 90 ? 'text-red-600' : pct >= 70 ? 'text-yellow-600' : 'text-emerald-600'}`}>
+                        {pct}%
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Utilization</p>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+            {/* CBM Utilization Bar */}
+            {(() => {
+              const totalCbm = racks.reduce((sum: number, r: any) => sum + ((r as any).cbmCapacity || 0), 0);
+              const usedCbm = racks.reduce((sum: number, r: any) => sum + ((r as any).cbmUsed || 0), 0);
+              const pct = totalCbm > 0 ? Math.round((usedCbm / totalCbm) * 100) : 0;
+              return (
+                <div className="mt-3">
+                  <div className="w-full bg-purple-100 rounded-full h-3 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-700 ${pct >= 90 ? 'bg-gradient-to-r from-purple-500 to-red-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-gradient-to-r from-purple-500 to-blue-500'}`}
+                      style={{ width: `${Math.min(pct, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-purple-600 mt-1">
+                    {usedCbm.toFixed(1)} / {totalCbm.toFixed(0)} m³ used
                   </p>
                 </div>
-                <ChartBarIcon className="h-6 w-6 md:h-10 md:w-10 text-blue-500" />
-              </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium text-gray-500">Occupied</p>
-                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">
-                    {racks.reduce((sum: number, r: any) => sum + r.capacityUsed, 0)}
-                  </p>
-                </div>
-                <div className="text-green-600 text-xs md:text-sm font-medium">
-                  {racks.length > 0 ? Math.round((racks.reduce((sum: number, r: any) => sum + r.capacityUsed, 0) / racks.reduce((sum: number, r: any) => sum + r.capacityTotal, 0)) * 100) : 0}%
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium text-gray-500">Available</p>
-                  <p className="text-xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">
-                    {racks.reduce((sum: number, r: any) => sum + (r.capacityTotal - r.capacityUsed), 0)}
-                  </p>
-                </div>
-                <div className="text-blue-600 text-xs md:text-sm font-medium">
-                  {racks.length > 0 ? Math.round((racks.reduce((sum: number, r: any) => sum + (r.capacityTotal - r.capacityUsed), 0) / racks.reduce((sum: number, r: any) => sum + r.capacityTotal, 0)) * 100) : 0}%
-                </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         </>
       )}
@@ -689,8 +805,12 @@ export const Racks: React.FC = () => {
         </div>
       </div>
 
-      {/* Zone View or Grid View */}
-      {viewMode === 'zones' ? (
+      {/* Zone View or Grid View or Map View or Floor Plan */}
+      {viewMode === 'floorplan' ? (
+        <FloorPlanView racks={filteredRacks} onRackClick={handleRackClick} />
+      ) : viewMode === 'map' ? (
+        <RackMapView racks={filteredRacks} zones={uniqueZones as any} onRackClick={handleRackClick} />
+      ) : viewMode === 'zones' ? (
         /* Zone Accordion View */
         <div className="space-y-4">
           {Object.keys(racksByZone).sort((a, b) => {
@@ -707,7 +827,12 @@ export const Racks: React.FC = () => {
 
             const totalCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.capacityTotal || 0), 0);
             const usedCapacity = zoneRacks.reduce((sum: number, r: any) => sum + (r.capacityUsed || 0), 0);
-            const utilizationPercent = totalCapacity > 0 ? Math.round((usedCapacity / totalCapacity) * 100) : 0;
+            const totalCbmCap = zoneRacks.reduce((sum: number, r: any) => sum + ((r as any).cbmCapacity || 0), 0);
+            const totalCbmUsed = zoneRacks.reduce((sum: number, r: any) => sum + ((r as any).cbmUsed || 0), 0);
+            // Prefer CBM-based utilization for zone-level display
+            const utilizationPercent = totalCbmCap > 0
+              ? Math.round((totalCbmUsed / totalCbmCap) * 100)
+              : totalCapacity > 0 ? Math.round((usedCapacity / totalCapacity) * 100) : 0;
 
             // Get zone icon and description from first rack in zone (all racks in zone should have same icon/description)
             const zoneIcon = zoneRacks[0]?.zoneIcon || (zoneName === 'Unassigned' ? '📦' : '🏢');
@@ -863,10 +988,7 @@ export const Racks: React.FC = () => {
                   <div className="px-6 py-4 bg-gray-50 border-t-2 border-gray-200">
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 overflow-x-auto">
                       {zoneRacks.map((rack: any) => {
-                        const totalCapacity = rack.capacityTotal && rack.capacityTotal > 0 ? rack.capacityTotal : 1;
-                        const utilization = typeof rack.utilization === 'number'
-                          ? rack.utilization
-                          : Math.round((rack.capacityUsed / totalCapacity) * 100);
+                        const utilization = calcUtilization(rack);
 
                         const uniqueShipments = new Set();
                         if (rack.boxes && Array.isArray(rack.boxes)) {
@@ -1019,10 +1141,7 @@ export const Racks: React.FC = () => {
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {filteredRacks.map((rack: any) => {
-              const totalCapacity = rack.capacityTotal && rack.capacityTotal > 0 ? rack.capacityTotal : 1;
-              const utilization = typeof rack.utilization === 'number'
-                ? rack.utilization
-                : Math.round((rack.capacityUsed / totalCapacity) * 100);
+              const utilization = calcUtilization(rack);
 
               // Count unique shipments from boxes
               const uniqueShipments = new Set();
@@ -1034,7 +1153,7 @@ export const Racks: React.FC = () => {
                 });
               }
               const shipmentCount = uniqueShipments.size;
-              const available = Math.max(totalCapacity - rack.capacityUsed, 0);
+              const available = Math.max(rack.capacityTotal - rack.capacityUsed, 0);
 
               return (
                 <div
@@ -1233,11 +1352,12 @@ export const Racks: React.FC = () => {
         </div>
       )}
 
-      {/* Create Rack Modal */}
-      <CreateRackModal
+      {/* Add Rack Modal */}
+      <AddRackModal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onSuccess={loadRacks}
+        defaultMode="single"
       />
 
       {/* Edit Rack Modal */}
@@ -1704,13 +1824,14 @@ export const Racks: React.FC = () => {
       )}
 
       {/* Bulk Add Modal */}
-      <BulkAddRackModal
+      <AddRackModal
         isOpen={bulkAddModalOpen}
         onClose={() => setBulkAddModalOpen(false)}
         onSuccess={() => {
           loadRacks();
           setBulkAddModalOpen(false);
         }}
+        defaultMode="bulk"
       />
 
       {/* Bulk CBM Capacity Modal */}
