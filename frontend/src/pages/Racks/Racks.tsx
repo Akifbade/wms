@@ -810,6 +810,80 @@ export const Racks: React.FC = () => {
         <FloorPlanView racks={filteredRacks} onRackClick={handleRackClick} />
       ) : viewMode === 'map' ? (
         <RackMapView racks={filteredRacks} zones={uniqueZones as any} onRackClick={handleRackClick} />
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {filteredRacks.map((rack: any) => {
+            const utilization = calcUtilization(rack);
+            const mode = rack.capacityMode || 'FIXED';
+            const isReserved = rack.status === 'RESERVED';
+            const isMaintenance = rack.status === 'MAINTENANCE';
+            const isFull = utilization >= 100;
+
+            let cardBg = 'bg-white border-green-200';
+            let statusBadge = 'bg-green-100 text-green-700';
+            let statusText = 'Empty';
+            if (isReserved) { cardBg = 'bg-blue-50 border-blue-300'; statusBadge = 'bg-blue-100 text-blue-700'; statusText = 'Reserved'; }
+            else if (isMaintenance) { cardBg = 'bg-amber-50 border-amber-300'; statusBadge = 'bg-amber-100 text-amber-700'; statusText = 'Maintenance'; }
+            else if (isFull) { cardBg = 'bg-red-50 border-red-300'; statusBadge = 'bg-red-100 text-red-700'; statusText = 'Full'; }
+            else if (utilization > 0) { cardBg = 'bg-white border-lime-300'; statusBadge = 'bg-lime-100 text-lime-700'; statusText = `${utilization}%`; }
+
+            return (
+              <button
+                key={rack.id}
+                onClick={() => handleRackClick(rack)}
+                className={`group relative flex flex-col rounded-xl border-2 p-3 text-left transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${cardBg}`}
+              >
+                {/* Top: Code & Status */}
+                <div className="flex items-start justify-between mb-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{rack.code}</p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {rack.zone || 'Unassigned'}
+                      {rack.location ? ` · ${rack.location}` : ''}
+                    </p>
+                  </div>
+                  <span className={`flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusBadge}`}>
+                    {statusText}
+                  </span>
+                </div>
+
+                {/* Utilization Bar */}
+                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden mb-2">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${
+                      isFull ? 'bg-red-500' : utilization >= 90 ? 'bg-orange-500' : utilization >= 70 ? 'bg-yellow-500' : utilization >= 50 ? 'bg-lime-500' : utilization > 0 ? 'bg-green-500' : 'bg-gray-200'
+                    }`}
+                    style={{ width: `${Math.min(utilization, 100)}%` }}
+                  />
+                </div>
+
+                {/* Bottom Stats */}
+                <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-auto">
+                  <span className="inline-flex items-center gap-0.5 bg-gray-50 px-1.5 py-0.5 rounded">
+                    📦 {rack.capacityUsed || 0}/{rack.capacityTotal || 0}
+                  </span>
+                  {rack.cbmUsed > 0 && (
+                    <span className="inline-flex items-center gap-0.5 bg-purple-50 px-1.5 py-0.5 rounded text-purple-600">
+                      📐 {rack.cbmUsed.toFixed(1)}m³
+                    </span>
+                  )}
+                  {rack.companyProfile?.name && (
+                    <span className="inline-flex items-center gap-0.5 bg-amber-50 px-1.5 py-0.5 rounded text-amber-600 truncate max-w-[80px]">
+                      🏢 {rack.companyProfile.name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Full rack pulse */}
+                {isFull && (
+                  <div className="absolute inset-0 rounded-xl border-2 border-red-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 rounded-xl bg-red-100/20 animate-pulse" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
       ) : viewMode === 'zones' ? (
         /* Zone Accordion View */
         <div className="space-y-4">
