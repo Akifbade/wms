@@ -3142,5 +3142,338 @@ router.get('/:shipmentId/dimensions/status', authorizeRoles('ADMIN', 'MANAGER', 
   }
 });
 
+// ============================================
+// BATCH RELEASE SHIPMENTS
+// ============================================
+router.post('/batch/release', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.body;
+    const companyId = req.user!.companyId;
+    const userId = req.user!.id;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' });
+    }
+
+    // Verify all shipments belong to company and are not already released
+    const shipments = await prisma.shipment.findMany({
+      where: {
+        id: { in: ids },
+        companyId,
+        status: { not: 'RELEASED' },
+      },
+    });
+
+    if (shipments.length === 0) {
+      return res.status(404).json({ error: 'No matching shipments found to release' });
+    }
+
+    const now = new Date();
+
+    const result = await prisma.shipment.updateMany({
+      where: {
+        id: { in: shipments.map(s => s.id) },
+        companyId,
+      },
+      data: {
+        status: 'RELEASED',
+        releasedAt: now,
+        releasedById: userId,
+      },
+    });
+
+    res.json({
+      success: true,
+      count: result.count,
+    });
+  } catch (error) {
+    console.error('Batch release error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================
+// DUPLICATE SHIPMENT
+// ============================================
+router.post('/:id/duplicate', authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+    const userId = req.user!.id;
+
+    const source = await prisma.shipment.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!source) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    const now = new Date();
+    const timestamp = Date.now();
+
+    // Create new shipment based on source data
+    const duplicate = await prisma.shipment.create({
+      data: {
+        name: source.name,
+        referenceId: `${source.referenceId}-copy`,
+        originalBoxCount: source.originalBoxCount,
+        currentBoxCount: source.currentBoxCount,
+        palletCount: source.palletCount,
+        boxesPerPallet: source.boxesPerPallet,
+        type: source.type,
+        clientName: source.clientName,
+        clientPhone: source.clientPhone,
+        clientEmail: source.clientEmail,
+        description: source.description,
+        estimatedValue: source.estimatedValue,
+        notes: source.notes,
+        isPinned: false,
+        companyId,
+        companyProfileId: source.companyProfileId,
+        qrCode: `SHIPMENT_${timestamp}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+        arrivalDate: now,
+        status: 'PENDING',
+        createdById: userId,
+        isWarehouseShipment: source.isWarehouseShipment,
+        category: source.category,
+        awbNumber: source.awbNumber,
+        flightNumber: source.flightNumber,
+        origin: source.origin,
+        destination: source.destination,
+        customerName: source.customerName,
+        shipper: source.shipper,
+        consignee: source.consignee,
+        length: source.length,
+        width: source.width,
+        height: source.height,
+        cbm: source.cbm,
+        weight: source.weight,
+      },
+      include: {
+        companyProfile: {
+          select: { id: true, name: true },
+        },
+        createdBy: {
+          select: { id: true, name: true, email: true, role: true },
+        },
+      },
+    });
+
+    // If source had boxes, duplicate them
+    const sourceBoxes = await prisma.shipmentBox.findMany({
+      where: { shipmentId: id },
+    });
+
+    if (sourceBoxes.length > 0) {
+      const newBoxes = sourceBoxes.map((box, index) => ({
+        shipmentId: duplicate.id,
+        boxNumber: index + 1,
+        qrCode: `${duplicate.qrCode}-BOX${String(index + 1).padStart(3, '0')}`,
+        status: 'PENDING' as const,
+        companyId,
+      }));
+
+      await prisma.shipmentBox.createMany({
+        data: newBoxes,
+      });
+    }
+
+    res.status(201).json({ shipment: duplicate });
+  } catch (error) {
+    console.error('Duplicate shipment error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================
+// UPDATE SHIPMENT NOTES
+// ============================================
+router.put('/:id/notes', authorizeRoles('ADMIN', 'MANAGER', 'WORKER'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const companyId = req.user!.companyId;
+
+    if (notes === undefined || notes === null) {
+      return res.status(400).json({ error: 'notes field is required' });
+    }
+
+    const existing = await prisma.shipment.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    const updated = await prisma.shipment.update({
+      where: { id },
+      data: { notes: String(notes) },
+      include: {
+        companyProfile: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    res.json({ shipment: updated });
+  } catch (error) {
+    console.error('Update notes error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================
+// GET SHIPMENT ACTIVITY
+// ============================================
+router.get('/:id/activity', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+
+    const shipment = await prisma.shipment.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    // Last 5 moves from rack activity
+    const recentMoves = await prisma.rackActivity.findMany({
+      where: {
+        companyId,
+        activityType: 'MOVE',
+        itemDetails: { contains: id },
+      },
+      include: {
+        rack: { select: { id: true, code: true } },
+        user: { select: { id: true, name: true } },
+      },
+      orderBy: { timestamp: 'desc' },
+      take: 5,
+    });
+
+    // Last photo upload time - check shipment boxes for photos
+    const boxesWithPhotos = await prisma.shipmentBox.findMany({
+      where: {
+        shipmentId: id,
+        photos: { not: null },
+      },
+      select: { photos: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 1,
+    });
+
+    let lastPhotoTime: string | null = null;
+    if (boxesWithPhotos.length > 0) {
+      lastPhotoTime = boxesWithPhotos[0].updatedAt.toISOString();
+    }
+
+    // Status changes - check rack activities related to this shipment
+    const statusActivities = await prisma.rackActivity.findMany({
+      where: {
+        companyId,
+        itemDetails: { contains: id },
+        activityType: { in: ['ASSIGN', 'RELEASE'] },
+      },
+      include: {
+        rack: { select: { id: true, code: true } },
+        user: { select: { id: true, name: true } },
+      },
+      orderBy: { timestamp: 'desc' },
+      take: 10,
+    });
+
+    // Build activity timeline
+    const activity: any[] = [];
+
+    // Add move activities
+    for (const move of recentMoves) {
+      let details: any = {};
+      try { details = JSON.parse(move.itemDetails || '{}'); } catch (e) {}
+      activity.push({
+        type: 'move',
+        timestamp: move.timestamp,
+        user: move.user?.name || 'System',
+        description: details.description || `Moved on rack ${move.rack?.code || 'unknown'}`,
+        details: {
+          direction: details.direction,
+          fromRack: details.fromRack,
+          toRack: details.toRack,
+          boxCount: details.boxCount,
+          reason: details.reason,
+        },
+      });
+    }
+
+    // Add status change activities
+    for (const sa of statusActivities) {
+      activity.push({
+        type: 'status_change',
+        timestamp: sa.timestamp,
+        user: sa.user?.name || 'System',
+        description: `${sa.activityType === 'ASSIGN' ? 'Assigned to' : 'Released from'} rack ${sa.rack?.code || 'unknown'}`,
+        details: {
+          activityType: sa.activityType,
+          rackCode: sa.rack?.code,
+          notes: sa.notes,
+        },
+      });
+    }
+
+    // Sort by timestamp descending
+    activity.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    res.json({
+      success: true,
+      activity: activity.slice(0, 20), // Limit to most recent 20 entries
+      summary: {
+        lastPhotoTime,
+        totalMoves: recentMoves.length,
+        totalStatusChanges: statusActivities.length,
+      },
+    });
+  } catch (error) {
+    console.error('Get activity error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================
+// TOGGLE PIN SHIPMENT
+// ============================================
+router.put('/:id/pin', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+
+    const existing = await prisma.shipment.findFirst({
+      where: { id, companyId },
+      select: { id: true, isPinned: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    const newPinnedState = !existing.isPinned;
+
+    await prisma.shipment.update({
+      where: { id },
+      data: { isPinned: newPinnedState },
+    });
+
+    res.json({
+      success: true,
+      isPinned: newPinnedState,
+    });
+  } catch (error) {
+    console.error('Toggle pin error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
 

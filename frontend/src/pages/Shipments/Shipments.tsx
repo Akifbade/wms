@@ -1,35 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  PlusIcon,
-  MagnifyingGlassIcon,
-  QrCodeIcon,
-  EyeIcon,
-  PencilIcon,
-  TrashIcon,
-  ArrowRightOnRectangleIcon,
-  DocumentTextIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-  CubeIcon,
-  ClockIcon,
-  MapPinIcon,
-  XMarkIcon,
-  PhotoIcon,
-  CalendarDaysIcon,
-  UserIcon,
-  TableCellsIcon,
-  FolderIcon,
-  BuildingOfficeIcon,
-  ScaleIcon,
-  ArrowsUpDownIcon,
-  CheckCircleIcon,
-  ExclamationCircleIcon,
-  TruckIcon,
-  InboxArrowDownIcon,
-  SquaresPlusIcon,
-  FireIcon,
-  ShieldExclamationIcon,
+  PlusIcon, MagnifyingGlassIcon, QrCodeIcon, EyeIcon, PencilIcon, TrashIcon,
+  ArrowRightOnRectangleIcon, DocumentTextIcon, ChevronDownIcon, ChevronRightIcon,
+  CubeIcon, ClockIcon, MapPinIcon, XMarkIcon, PhotoIcon, CalendarDaysIcon,
+  UserIcon, TableCellsIcon, FolderIcon, BuildingOfficeIcon, ScaleIcon,
+  ArrowsUpDownIcon, CheckCircleIcon, ExclamationCircleIcon, TruckIcon,
+  InboxArrowDownIcon, SquaresPlusIcon, FireIcon, ShieldExclamationIcon,
+  StarIcon, DocumentDuplicateIcon, PrinterIcon, AdjustmentsHorizontalIcon,
+  ArrowPathIcon, ChevronUpIcon, PencilSquareIcon,
 } from '@heroicons/react/24/outline';
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { shipmentsAPI, getBackendUrl } from '../../services/api';
 import { WithdrawalModal } from '../../components/WithdrawalModal';
 import WHMShipmentModal from '../../components/WHMShipmentModal';
@@ -39,40 +19,66 @@ import PhotoLightbox from '../../components/PhotoLightbox';
 import BoxQRModal from '../../components/BoxQRModal';
 import ShipmentsPrintReport from '../../components/ShipmentsPrintReport';
 
-// ─── Animated Counter ────────────────────────────────────────
+// ── HELPERS ─────────────────────────────────
+const getAuthHeaders = () => ({ 'Authorization': `Bearer ${localStorage.getItem('authToken')}`, 'Content-Type': 'application/json' });
 const AnimatedCounter = ({ value, suffix = '' }: { value: number; suffix?: string }) => {
-  const [display, setDisplay] = useState(0);
-  const ref = useRef<number | null>(null);
+  const [d, setD] = useState(0); const r = useRef<number | null>(null);
   useEffect(() => {
-    const start = display;
-    const diff = value - start;
-    if (diff === 0) return;
-    const duration = 600;
-    const startTime = performance.now();
-    const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(Math.round(start + diff * eased));
-      if (progress < 1) ref.current = requestAnimationFrame(animate);
+    const start = d; const diff = value - start; if (diff === 0) return;
+    const dur = 600, st = performance.now();
+    const anim = (now: number) => {
+      const p = Math.min((now - st) / dur, 1), e = 1 - Math.pow(1 - p, 3);
+      setD(Math.round(start + diff * e));
+      if (p < 1) r.current = requestAnimationFrame(anim);
     };
-    ref.current = requestAnimationFrame(animate);
-    return () => { if (ref.current) cancelAnimationFrame(ref.current); };
+    r.current = requestAnimationFrame(anim);
+    return () => { if (r.current) cancelAnimationFrame(r.current); };
   }, [value]);
-  return <>{display}{suffix}</>;
+  return <>{d}{suffix}</>;
 };
 
-// ─── Main Component ──────────────────────────────────────────
+const formatDate = (ds: string) => !ds ? 'N/A' : new Date(ds).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+const getDays = (s: any) => { const src = s?.arrivalDate || s?.receivedDate || s?.createdAt; if (!src) return 0; return Math.max(0, Math.ceil((Date.now() - new Date(src).getTime()) / 86400000)); };
+const statusGroup = (status: string) => ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE'].includes(status) ? 'stored' : status === 'PENDING' ? 'pending' : status === 'PARTIAL' ? 'partial' : status === 'RELEASED' ? 'released' : 'unknown';
+
+const healthMeta = (days: number) =>
+  days > 60 ? { label: 'Critical', color: 'text-red-600 bg-red-50 border-red-200', icon: FireIcon, pulse: 'animate-pulse-soft' }
+    : days > 30 ? { label: 'Warning', color: 'text-amber-600 bg-amber-50 border-amber-200', icon: ExclamationCircleIcon, pulse: '' }
+      : { label: 'Good', color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: CheckCircleIcon, pulse: '' };
+
+const getBackendPhoto = (p: string) => p.startsWith('http') ? p : `${getBackendUrl()}${p}`;
+
+// ── AUTH FETCH ──────────────────────────────
+const authFetch = async (url: string, opts: RequestInit = {}) => {
+  const token = localStorage.getItem('authToken');
+  return fetch(url, { ...opts, headers: { ...opts.headers, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
+};
+
+// ═══════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════
 export const Shipments: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeStatus, setActiveStatus] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'folders' | 'table'>('folders');
+  const [viewMode, setViewMode] = useState<'folders' | 'table' | 'kanban'>('folders');
   const [sortBy, setSortBy] = useState<string>('date_desc');
+  const [allShipments, setAllShipments] = useState<any[]>([]);
   const [shipments, setShipments] = useState<any[]>([]);
   const [statusCounts, setStatusCounts] = useState({ all: 0, pending: 0, in_storage: 0, partial: 0, released: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [animReady, setAnimReady] = useState(false);
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('wms-pinned') || '[]')); } catch { return new Set<string>(); } });
+  const [columnFields, setColumnFields] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('wms-columns') || '["pieces","cbm","location","arrival"]'); } catch { return ['pieces', 'cbm', 'location', 'arrival']; } });
+
+  // Filters state
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterZone, setFilterZone] = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
+  const [filterDaysMin, setFilterDaysMin] = useState(0);
+  const [filterDaysMax, setFilterDaysMax] = useState(999);
 
   // Modals
   const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
@@ -91,36 +97,73 @@ export const Shipments: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
+  // Inline notes
+  const [notesEditing, setNotesEditing] = useState<string | null>(null);
+  const [notesText, setNotesText] = useState('');
+
+  // Activity timeline
+  const [activityOpen, setActivityOpen] = useState<string | null>(null);
+  const [activityData, setActivityData] = useState<Record<string, any[]>>({});
+  const [activityLoading, setActivityLoading] = useState<string | null>(null);
+
+  // Column customization
+  const [columnPickerOpen, setColumnPickerOpen] = useState(false);
+  const colPickerRef = useRef<HTMLDivElement>(null);
+
   // Sort dropdown
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
+  // Pagination
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(1);
+
+  // Drag state (kanban)
+  const [dragShipmentId, setDragShipmentId] = useState<string | null>(null);
+
+  // Storage rate (default 5 per day)
+  const [storageRate, setStorageRate] = useState(() => { try { return Number(localStorage.getItem('wms-storage-rate')) || 5; } catch { return 5; } });
+
   useEffect(() => { requestAnimationFrame(() => setAnimReady(true)); }, []);
+  useEffect(() => { localStorage.setItem('wms-pinned', JSON.stringify([...pinnedIds])); }, [pinnedIds]);
+  useEffect(() => { localStorage.setItem('wms-columns', JSON.stringify(columnFields)); }, [columnFields]);
+  useEffect(() => { localStorage.setItem('wms-storage-rate', String(storageRate)); }, [storageRate]);
+
   useEffect(() => { const t = setTimeout(() => setDebouncedSearch(searchTerm), 500); return () => clearTimeout(t); }, [searchTerm]);
-  useEffect(() => { loadShipments(); }, [activeStatus, debouncedSearch, sortBy]);
+  useEffect(() => { loadShipments(); }, [activeStatus, debouncedSearch, sortBy, filterDateFrom, filterDateTo, filterZone, filterCompany, filterDaysMin, filterDaysMax]);
+
+  // Close column picker
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (colPickerRef.current && !colPickerRef.current.contains(e.target as Node)) setColumnPickerOpen(false); };
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  // Close sort filter
   useEffect(() => {
     const h = (e: MouseEvent) => { if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h);
   }, []);
 
   const loadShipments = async () => {
     try {
       setLoading(true);
       const allData: any = await shipmentsAPI.getAll({ limit: 2000 });
-      const allShipments = allData.shipments || [];
+      const allShips = allData.shipments || [];
+      setAllShipments(allShips);
+
       const counts = {
-        all: allShipments.length,
-        pending: allShipments.filter((s: any) => s.status === 'PENDING').length,
-        in_storage: allShipments.filter((s: any) => ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE'].includes(s.status)).length,
-        partial: allShipments.filter((s: any) => s.status === 'PARTIAL').length,
-        released: allShipments.filter((s: any) => s.status === 'RELEASED').length,
+        all: allShips.length,
+        pending: allShips.filter((s: any) => s.status === 'PENDING').length,
+        in_storage: allShips.filter((s: any) => ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE'].includes(s.status)).length,
+        partial: allShips.filter((s: any) => s.status === 'PARTIAL').length,
+        released: allShips.filter((s: any) => s.status === 'RELEASED').length,
       };
       setStatusCounts(counts);
-      let filtered = allShipments;
+
+      let filtered = allShips;
       if (activeStatus !== 'all') {
         const m: Record<string, string[]> = { pending: ['PENDING'], in_storage: ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE'], partial: ['PARTIAL'], released: ['RELEASED'] };
-        filtered = allShipments.filter((s: any) => m[activeStatus]?.includes(s.status));
+        filtered = allShips.filter((s: any) => m[activeStatus]?.includes(s.status));
       }
       if (debouncedSearch.trim()) {
         const q = debouncedSearch.toLowerCase();
@@ -129,9 +172,21 @@ export const Shipments: React.FC = () => {
           s.clientPhone?.toLowerCase().includes(q) || s.companyProfile?.name?.toLowerCase().includes(q) ||
           s.rackLocation?.toLowerCase().includes(q));
       }
-      const sorted = [...filtered].sort((a: any, b: any) => {
+
+      // Advanced filters
+      if (filterDateFrom) filtered = filtered.filter((s: any) => new Date(s.arrivalDate || s.createdAt) >= new Date(filterDateFrom));
+      if (filterDateTo) filtered = filtered.filter((s: any) => new Date(s.arrivalDate || s.createdAt) <= new Date(filterDateTo + 'T23:59:59'));
+      if (filterZone) filtered = filtered.filter((s: any) => s.zone?.toLowerCase().includes(filterZone.toLowerCase()));
+      if (filterCompany) filtered = filtered.filter((s: any) => s.companyProfile?.name?.toLowerCase().includes(filterCompany.toLowerCase()));
+      filtered = filtered.filter((s: any) => { const d = getDays(s); return d >= filterDaysMin && d <= filterDaysMax; });
+
+      // Pin sorting: pinned first
+      const pinned = filtered.filter((s: any) => pinnedIds.has(s.id));
+      const unpinned = filtered.filter((s: any) => !pinnedIds.has(s.id));
+
+      const sorted = [...pinned, ...unpinned].sort((a: any, b: any) => {
         const gc = (s: any) => new Date(s.createdAt || 0).getTime();
-        const gd = (s: any) => { const src = s.arrivalDate || s.receivedDate || s.createdAt; if (!src) return 0; return Math.ceil((Date.now() - new Date(src).getTime()) / 86400000); };
+        const gd = (s: any) => getDays(s);
         switch (sortBy) {
           case 'date_desc': return gc(b) - gc(a);
           case 'date_asc': return gc(a) - gc(b);
@@ -147,42 +202,130 @@ export const Shipments: React.FC = () => {
         }
       });
       setShipments(sorted);
+      setPage(1);
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
+  // Pagination
+  const totalPages = Math.ceil(shipments.length / PAGE_SIZE);
+  const paginatedShipments = shipments.slice(0, page * PAGE_SIZE);
+  const hasMore = page < totalPages;
+
+  // ── ACTIONS ────────────────────────────────
   const handleDelete = async (id: string) => {
-    const s = shipments.find(s => s.id === id);
-    if (!confirm(`Delete shipment ${s?.referenceId}?\n\nThis cannot be undone.`)) return;
+    if (!confirm(`Delete shipment?`)) return;
     try { await shipmentsAPI.delete(id); loadShipments(); } catch (err: any) { alert('Error: ' + err.message); }
   };
 
-  const handleReleaseClick = (shipment: any) => { setSelectedShipment(shipment); setWithdrawalModalOpen(true); };
-
-  const getDaysStored = (shipment: any) => {
-    const src = shipment?.arrivalDate || shipment?.receivedDate || shipment?.createdAt;
-    if (!src) return 0;
-    return Math.max(0, Math.ceil((Date.now() - new Date(src).getTime()) / 86400000));
+  const handleDuplicate = async (id: string) => {
+    try {
+      const res = await authFetch(`/api/shipments/${id}/duplicate`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) loadShipments();
+      else alert('Error: ' + (data.message || 'Duplicate failed'));
+    } catch (err: any) { alert('Error: ' + err.message); }
   };
 
-  const formatDate = (dateString: string) => !dateString ? 'N/A' : new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-
-  const getStatusMeta = (status: string) => {
-    switch (status) {
-      case 'PENDING': return { label: 'Pending', icon: ClockIcon, bg: 'bg-amber-100 text-amber-700 border-amber-200', dot: 'bg-amber-400' };
-      case 'IN_WAREHOUSE': case 'IN_STORAGE': case 'ACTIVE': return { label: 'Stored', icon: CheckCircleIcon, bg: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-400' };
-      case 'PARTIAL': return { label: 'Partial', icon: ExclamationCircleIcon, bg: 'bg-orange-100 text-orange-700 border-orange-200', dot: 'bg-orange-400' };
-      case 'RELEASED': return { label: 'Released', icon: TruckIcon, bg: 'bg-blue-100 text-blue-700 border-blue-200', dot: 'bg-blue-400' };
-      default: return { label: status, icon: CubeIcon, bg: 'bg-gray-100 text-gray-700 border-gray-200', dot: 'bg-gray-400' };
-    }
+  const handleTogglePin = async (id: string) => {
+    const next = new Set(pinnedIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setPinnedIds(next);
+    // Also call API to persist on server
+    try { await authFetch(`/api/shipments/${id}/pin`, { method: 'PUT' }); } catch {}
   };
 
-  const accentColors: Record<string, string> = {
-    all: 'from-blue-600 to-indigo-600',
-    pending: 'from-amber-500 to-orange-500',
-    in_storage: 'from-emerald-500 to-teal-500',
-    partial: 'from-orange-500 to-red-500',
-    released: 'from-slate-500 to-gray-600',
+  const handleSaveNote = async (id: string) => {
+    try {
+      await authFetch(`/api/shipments/${id}/notes`, { method: 'PUT', body: JSON.stringify({ notes: notesText }) });
+      setNotesEditing(null);
+      loadShipments();
+    } catch (err: any) { alert('Error: ' + err.message); }
   };
+
+  const handleBatchRelease = async () => {
+    if (!confirm(`Release ${selectedIds.size} shipment(s)?`)) return;
+    try {
+      const res = await authFetch('/api/shipments/batch/release', { method: 'POST', body: JSON.stringify({ ids: [...selectedIds] }) });
+      const data = await res.json();
+      if (data.success) { setSelectedIds(new Set()); loadShipments(); }
+      else alert('Error: ' + (data.message || 'Batch release failed'));
+    } catch (err: any) { alert('Error: ' + err.message); }
+  };
+
+  const handleLoadActivity = async (id: string) => {
+    if (activityOpen === id) { setActivityOpen(null); return; }
+    setActivityOpen(id);
+    if (activityData[id]) return;
+    setActivityLoading(id);
+    try {
+      const res = await authFetch(`/api/shipments/${id}/activity`);
+      const data = await res.json();
+      if (data.success) setActivityData(prev => ({ ...prev, [id]: data.activity || [] }));
+    } catch {} finally { setActivityLoading(null); }
+  };
+
+  const handlePrintLabel = (shipment: any) => {
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>Label - ${shipment.referenceId}</title>
+      <style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse}td{padding:8px;border:1px solid #ccc}.label{border:2px solid #000;padding:20px;margin-bottom:20px;text-align:center}h1{font-size:24px;margin:0 0 10px}.qr{font-family:monospace;font-size:18px;margin:10px 0}.ref{font-size:14px;color:#666}</style></head><body>
+      <div class="label"><h1>📦 SHIPMENT LABEL</h1>
+      <p class="ref">Ref: ${shipment.referenceId}</p>
+      <p><strong>Client:</strong> ${shipment.clientName || 'N/A'}</p>
+      <p><strong>Company:</strong> ${shipment.companyProfile?.name || 'N/A'}</p>
+      <p><strong>Boxes:</strong> ${shipment.currentBoxCount || 0} / ${shipment.originalBoxCount || 0}</p>
+      <p><strong>Location:</strong> ${shipment.rackLocations || 'Unassigned'}</p>
+      <p><strong>Arrival:</strong> ${formatDate(shipment.arrivalDate)}</p>
+      ${shipment.qrCode ? `<p class="qr">QR: ${shipment.qrCode}</p>` : ''}
+      <p style="margin-top:20px;font-size:10px;color:#999">Generated ${new Date().toLocaleString()}</p>
+      </div>
+      <script>window.print();window.close();</script></body></html>`);
+    win.document.close();
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['Reference ID', 'Client Name', 'Company', 'Status', 'Boxes', 'CBM', 'Weight', 'Location', 'Arrival Date', 'Days Stored', 'Created By'];
+    const rows = shipments.map((s: any) => [
+      s.referenceId, s.clientName, s.companyProfile?.name || '', s.status,
+      `${s.currentBoxCount}/${s.originalBoxCount}`,
+      s.cbm ? Number(s.cbm).toFixed(2) : '', s.weight || '',
+      s.rackLocations || '', formatDate(s.arrivalDate || s.createdAt),
+      getDays(s), s.createdBy?.name || 'System'
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `shipments_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  // ── STATUS HANDLERS ────────────────────────
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    try {
+      // Optimistic update
+      setShipments(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s));
+      await shipmentsAPI.update(id, { status: newStatus });
+      loadShipments();
+    } catch { loadShipments(); }
+  };
+
+  // ── KANBAN DRAG & DROP ─────────────────────
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDragShipmentId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+  };
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
+  const handleDrop = (e: React.DragEvent, targetStatus: string) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain') || dragShipmentId;
+    if (id) handleStatusChange(id, targetStatus);
+    setDragShipmentId(null);
+  };
+
+  // ── HELPERS ─────────────────────────────────
+  const accentColors: Record<string, string> = { all: 'from-blue-600 to-indigo-600', pending: 'from-amber-500 to-orange-500', in_storage: 'from-emerald-500 to-teal-500', partial: 'from-orange-500 to-red-500', released: 'from-slate-500 to-gray-600' };
   const accentColor = accentColors[activeStatus] || accentColors.all;
   const accentBg = activeStatus === 'all' ? 'bg-blue-500' : activeStatus === 'pending' ? 'bg-amber-500' : activeStatus === 'in_storage' ? 'bg-emerald-500' : activeStatus === 'partial' ? 'bg-orange-500' : 'bg-slate-500';
 
@@ -201,45 +344,67 @@ export const Shipments: React.FC = () => {
     { key: 'released', label: 'Released', count: statusCounts.released, icon: TruckIcon },
   ];
 
-  // Group by company
-  const groupedByCompany = [...shipments].sort((a, b) => new Date(b.arrivalDate || b.createdAt || 0).getTime() - new Date(a.arrivalDate || a.createdAt || 0).getTime())
-    .reduce((acc: any, s: any) => { const c = s.companyProfile?.name || 'Unassigned'; if (!acc[c]) acc[c] = []; acc[c].push(s); return acc; }, {} as Record<string, any[]>);
+  const allFieldOptions = [
+    { key: 'pieces', label: 'Pieces', icon: CubeIcon },
+    { key: 'cbm', label: 'CBM / Weight', icon: ScaleIcon },
+    { key: 'location', label: 'Location', icon: MapPinIcon },
+    { key: 'arrival', label: 'Arrival Date', icon: CalendarDaysIcon },
+    { key: 'createdBy', label: 'Created By', icon: UserIcon },
+    { key: 'company', label: 'Company', icon: BuildingOfficeIcon },
+    { key: 'duration', label: 'Duration', icon: ClockIcon },
+  ];
+
+  // Unassigned / grouped
+  const groupedByCompany = useMemo(() => {
+    const sorted = [...shipments].sort((a, b) => new Date(b.arrivalDate || b.createdAt || 0).getTime() - new Date(a.arrivalDate || a.createdAt || 0).getTime());
+    return sorted.reduce((acc: any, s: any) => { const c = s.companyProfile?.name || 'Unassigned'; if (!acc[c]) acc[c] = []; acc[c].push(s); return acc; }, {} as Record<string, any[]>);
+  }, [shipments]);
   const sortedFolderNames = Object.keys(groupedByCompany).sort((a, b) => Math.max(...groupedByCompany[b].map((s: any) => new Date(s.arrivalDate || s.createdAt || 0).getTime())) - Math.max(...groupedByCompany[a].map((s: any) => new Date(s.arrivalDate || s.createdAt || 0).getTime())));
   const toggleFolder = (name: string) => { const n = new Set(expandedFolders); n.has(name) ? n.delete(name) : n.add(name); setExpandedFolders(n); };
+
+  // Kanban columns
+  const kanbanColumns = [
+    { key: 'PENDING', label: 'Pending', icon: ClockIcon, color: 'border-t-amber-400 bg-amber-50/30', countColor: 'bg-amber-100 text-amber-700' },
+    { key: 'IN_STORAGE', label: 'Stored', icon: CheckCircleIcon, color: 'border-t-emerald-400 bg-emerald-50/30', countColor: 'bg-emerald-100 text-emerald-700' },
+    { key: 'PARTIAL', label: 'Partial', icon: ExclamationCircleIcon, color: 'border-t-orange-400 bg-orange-50/30', countColor: 'bg-orange-100 text-orange-700' },
+    { key: 'RELEASED', label: 'Released', icon: TruckIcon, color: 'border-t-blue-400 bg-blue-50/30', countColor: 'bg-blue-100 text-blue-700' },
+  ];
+
+  const getKanbanShipments = (statusKey: string) => {
+    const statuses = statusKey === 'IN_STORAGE' ? ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE'] : [statusKey];
+    return shipments.filter((s: any) => {
+      if (debouncedSearch.trim()) {
+        const q = debouncedSearch.toLowerCase();
+        if (!s.clientName?.toLowerCase().includes(q) && !s.referenceId?.toLowerCase().includes(q)) return false;
+      }
+      return statuses.includes(s.status);
+    });
+  };
 
   // ═══════════════════════════════════════════════
   // SUB-COMPONENTS
   // ═══════════════════════════════════════════════
 
-  // ── Photo Gallery Strip ────────────────────────
+  // ── Photo Strip ────────────────────────────
   const PhotoStrip = ({ photos, onPhotoClick, maxShow = 4 }: { photos: string[]; onPhotoClick: (photos: string[], index: number) => void; maxShow?: number }) => {
     if (!photos || photos.length === 0) return null;
     const shown = photos.slice(0, maxShow);
     const remaining = photos.length - maxShow;
     return (
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 flex-wrap">
         {shown.map((photo, idx) => (
           <button key={idx} onClick={() => onPhotoClick(photos, idx)}
-            className="relative group/thumb flex-shrink-0 w-10 h-10 md:w-14 md:h-14 rounded-xl overflow-hidden border-2 border-white/60 shadow-sm hover:shadow-md hover:border-blue-400 transition-all hover:scale-105 active:scale-95"
-          >
-            <img
-              src={photo.startsWith('http') ? photo : `${getBackendUrl()}${photo}`}
-              alt={`Photo ${idx + 1}`}
-              className="w-full h-full object-cover"
-            />
+            className="relative group/thumb flex-shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-xl overflow-hidden border-2 border-white/60 shadow-sm hover:shadow-md hover:border-blue-400 transition-all hover:scale-105 active:scale-95">
+            <img src={getBackendPhoto(photo)} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/30 transition-all rounded-xl flex items-center justify-center">
               <PhotoIcon className="h-4 w-4 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity drop-shadow" />
             </div>
-            {/* Number badge */}
-            <div className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[8px] font-bold px-1 py-0.5 rounded-md backdrop-blur-sm">
-              {idx + 1}
-            </div>
+            <div className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[8px] font-bold px-1 py-0.5 rounded-md backdrop-blur-sm">{idx + 1}</div>
           </button>
         ))}
         {remaining > 0 && (
           <button onClick={() => onPhotoClick(photos, maxShow)}
-            className="flex-shrink-0 w-10 h-10 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border-2 border-slate-300 flex items-center justify-center text-slate-500 text-xs font-bold hover:border-blue-400 hover:bg-blue-50 transition-all hover:scale-105 cursor-pointer"
-          >
+            className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border-2 border-slate-300 flex items-center justify-center text-slate-500 text-xs font-bold hover:border-blue-400 hover:bg-blue-50 transition-all hover:scale-105 cursor-pointer">
             +{remaining}
           </button>
         )}
@@ -247,198 +412,254 @@ export const Shipments: React.FC = () => {
     );
   };
 
-  // ── Day Ring ───────────────────────────────────
-  const DayRing = ({ days, size = 40 }: { days: number; size?: number }) => {
-    const radius = (size - 8) / 2;
-    const circumference = 2 * Math.PI * radius;
+  // ── Day Ring ───────────────────────────────
+  const DayRing = ({ days, size = 32 }: { days: number; size?: number }) => {
+    const r = (size - 8) / 2, circ = 2 * Math.PI * r;
     const pct = Math.min(100, (days / 90) * 100);
-    const strokeColor = days > 60 ? '#ef4444' : days > 30 ? '#f59e0b' : '#10b981';
+    const stroke = days > 60 ? '#ef4444' : days > 30 ? '#f59e0b' : '#10b981';
     return (
       <svg width={size} height={size} className="transform -rotate-90 flex-shrink-0 drop-shadow-sm">
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#e2e8f0" strokeWidth="4" />
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={strokeColor} strokeWidth="4"
-          strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference - (pct / 100) * circumference}
-          className="transition-all duration-1000 ease-out" />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e2e8f0" strokeWidth="4" />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round"
+          strokeDasharray={circ} strokeDashoffset={circ - (pct / 100) * circ} className="transition-all duration-1000 ease-out" />
         <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="700"
-          fill={days > 60 ? '#ef4444' : days > 30 ? '#d97706' : '#059669'}
-          className="transform rotate-90" transform-origin="center">
-          {days}d
-        </text>
+          fill={days > 60 ? '#ef4444' : days > 30 ? '#d97706' : '#059669'} className="transform rotate-90" transform-origin="center">{days}d</text>
       </svg>
     );
   };
 
-  // ── Age Bar ───────────────────────────────────
-  const AgeBar = ({ days }: { days: number }) => {
-    const pct = Math.min(100, (days / 90) * 100);
-    const color = days > 60 ? 'bg-red-400' : days > 30 ? 'bg-amber-400' : 'bg-emerald-400';
+  // ── Health Badge ───────────────────────────
+  const HealthBadge = ({ days }: { days: number }) => {
+    const meta = healthMeta(days); const Icon = meta.icon;
     return (
-      <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-1000 ease-out ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-    );
-  };
-
-  // ── Status Badge ───────────────────────────────
-  const StatusBadge = ({ status }: { status: string }) => {
-    const meta = getStatusMeta(status);
-    const Icon = meta.icon;
-    return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border shadow-sm ${meta.bg}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${meta.dot} animate-pulse-soft`} />
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shadow-sm ${meta.color} ${meta.pulse}`}>
         <Icon className="h-3 w-3" />
         {meta.label}
       </span>
     );
   };
 
-  // ── Indeterminate Checkbox ─────────────────────
+  // ── Status Badge ───────────────────────────
+  const StatusBadge = ({ status, size = 'sm' }: { status: string; size?: 'sm' | 'xs' }) => {
+    const meta: Record<string, any> = {
+      PENDING: { label: 'Pending', icon: ClockIcon, bg: 'bg-amber-100 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
+      IN_WAREHOUSE: { label: 'Stored', icon: CheckCircleIcon, bg: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-400' },
+      IN_STORAGE: { label: 'Stored', icon: CheckCircleIcon, bg: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-400' },
+      ACTIVE: { label: 'Stored', icon: CheckCircleIcon, bg: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-400' },
+      PARTIAL: { label: 'Partial', icon: ExclamationCircleIcon, bg: 'bg-orange-100 text-orange-700 border-orange-200', dot: 'bg-orange-400' },
+      RELEASED: { label: 'Released', icon: TruckIcon, bg: 'bg-blue-100 text-blue-700 border-blue-200', dot: 'bg-blue-400' },
+    };
+    const m = meta[status] || { label: status, icon: CubeIcon, bg: 'bg-gray-100 text-gray-700 border-gray-200', dot: 'bg-gray-400' };
+    const Icon = m.icon;
+    const cls = size === 'xs' ? 'px-1.5 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[11px]';
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-full font-bold border shadow-sm ${cls} ${m.bg}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${m.dot} animate-pulse-soft`} />
+        <Icon className="h-3 w-3" />
+        {m.label}
+      </span>
+    );
+  };
+
+  // ── Indeterminate Checkbox ─────────────────
   const IndeterminateCheckbox = ({ checked, indeterminate, onChange }: { checked: boolean; indeterminate: boolean; onChange: () => void }) => {
     const ref = useRef<HTMLInputElement>(null);
     useEffect(() => { if (ref.current) ref.current.indeterminate = indeterminate; }, [indeterminate]);
     return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />;
   };
 
-  // ── Shipment Card ──────────────────────────────
-  const ShipmentCard = ({ shipment }: { shipment: any }) => {
-    const days = getDaysStored(shipment);
-    const canRelease = ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE', 'PARTIAL'].includes(shipment.status) && (shipment.currentBoxCount > 0 || (shipment.boxes && shipment.boxes.length > 0));
+  // ── Action Button ──────────────────────────
+  const ActionBtn = ({ icon: Icon, color, onClick, title, disabled }: { icon: any; color: string; onClick: () => void; title: string; disabled?: boolean }) => {
+    const colors: Record<string, string> = {
+      blue: 'text-blue-600 hover:bg-blue-50', purple: 'text-purple-600 hover:bg-purple-50',
+      amber: 'text-amber-600 hover:bg-amber-50', emerald: 'text-emerald-600 hover:bg-emerald-50',
+      indigo: 'text-indigo-600 hover:bg-indigo-50', red: 'text-red-400 hover:text-red-600 hover:bg-red-50',
+      slate: 'text-slate-500 hover:text-slate-700 hover:bg-slate-100',
+    };
+    return (
+      <button onClick={onClick} disabled={disabled}
+        className={`p-1.5 md:p-2 rounded-xl transition-all duration-200 hover:scale-110 active:scale-90 ${colors[color]} relative overflow-hidden group/btn ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+        title={title}>
+        <Icon className="h-4 md:h-4.5 w-4 md:w-4.5 relative z-10" />
+      </button>
+    );
+  };
+
+  // ── Age Bar ────────────────────────────────
+  const AgeBar = ({ days }: { days: number }) => (
+    <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+      <div className={`h-full rounded-full transition-all duration-1000 ease-out ${days > 60 ? 'bg-red-400' : days > 30 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+        style={{ width: `${Math.min(100, (days / 90) * 100)}%` }} />
+    </div>
+  );
+
+  // ── Info Field ─────────────────────────────
+  const InfoField = ({ icon: Icon, label, value, isBtn, onClick }: { icon: any; label: string; value: string | React.ReactNode; isBtn?: boolean; onClick?: () => void }) => (
+    <div className="rounded-xl border border-slate-100 p-2.5 bg-white/60 hover:bg-white/90 transition-colors">
+      <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider flex items-center gap-1 mb-0.5"><Icon className="h-3 w-3" />{label}</p>
+      {isBtn ? (
+        <button onClick={onClick} className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors">{value}</button>
+      ) : (
+        <p className="text-sm font-bold text-slate-700">{value}</p>
+      )}
+    </div>
+  );
+
+  // ── Storage Cost Preview ───────────────────
+  const StorageCost = ({ days }: { days: number }) => {
+    const cost = days * storageRate;
+    if (days === 0) return null;
+    return (
+      <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+        💰 Est. ₹{cost.toLocaleString()} (@ ₹{storageRate}/day)
+      </div>
+    );
+  };
+
+  // ── Activity Timeline ──────────────────────
+  const ActivityTimeline = ({ shipmentId }: { shipmentId: string }) => {
+    const items = activityData[shipmentId] || [];
+    const loading = activityLoading === shipmentId;
+    if (loading) return <div className="text-xs text-slate-400 py-2 text-center animate-pulse">Loading activity...</div>;
+    if (items.length === 0) return <div className="text-xs text-slate-400 py-2 text-center">No recent activity</div>;
+    return (
+      <div className="space-y-2 py-1">
+        {items.map((item: any, idx: number) => (
+          <div key={idx} className="flex items-start gap-2 text-xs">
+            <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${item.type === 'move' ? 'bg-amber-400' : item.type === 'photo' ? 'bg-blue-400' : item.type === 'status' ? 'bg-emerald-400' : 'bg-slate-300'}`} />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-slate-700">{item.description}</p>
+              <p className="text-[10px] text-slate-400">{item.timestamp ? formatDate(item.timestamp) : ''}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ── Shipment Card ──────────────────────────
+  const ShipmentCard = ({ shipment, compact = false, index }: { shipment: any; compact?: boolean; index?: number }) => {
+    const days = getDays(shipment);
+    const canRelease = ['IN_WAREHOUSE', 'IN_STORAGE', 'ACTIVE', 'PARTIAL'].includes(shipment.status) && (shipment.currentBoxCount > 0);
     const photos = shipment.shipmentPhotos || [];
     const isReleased = shipment.status === 'RELEASED';
     const hasRack = shipment.rackLocations && shipment.rackLocations !== 'N/A';
+    const isPinned = pinnedIds.has(shipment.id);
+    const health = healthMeta(days);
+    const HealthIcon = health.icon;
     const cardRef = useRef<HTMLDivElement>(null);
 
-    // 3D tilt
     const handleMouseMove = (e: React.MouseEvent) => {
-      if (!cardRef.current || window.innerWidth < 768) return;
-      const rect = cardRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left, y = e.clientY - rect.top;
-      const cx = rect.width / 2, cy = rect.height / 2;
-      cardRef.current.style.transform = `perspective(800px) rotateX(${((y - cy) / cy) * -6}deg) rotateY(${((x - cx) / cx) * 6}deg) scale3d(1.015, 1.015, 1.015)`;
+      if (!cardRef.current || window.innerWidth < 768 || compact) return;
+      const r = cardRef.current.getBoundingClientRect();
+      cardRef.current.style.transform = `perspective(800px) rotateX(${((e.clientY - r.top - r.height / 2) / (r.height / 2)) * -6}deg) rotateY(${((e.clientX - r.left - r.width / 2) / (r.width / 2)) * 6}deg) scale3d(1.015,1.015,1.015)`;
     };
-    const handleMouseLeave = () => { if (cardRef.current) cardRef.current.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)'; };
-
-    const statusTheme = isReleased
-      ? 'border-blue-200 bg-white'
-      : days > 60
-        ? 'border-red-200 bg-gradient-to-br from-white to-red-50/40'
-        : days > 30
-          ? 'border-amber-200 bg-gradient-to-br from-white to-amber-50/30'
-          : 'border-slate-200 bg-white';
-
-    const handlePhotoClick = (allPhotos: string[], idx: number) => {
-      setLightboxPhotos(allPhotos);
-      setLightboxIndex(idx);
-      setLightboxOpen(true);
-    };
+    const handleMouseLeave = () => { if (cardRef.current) cardRef.current.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)'; };
 
     return (
       <div ref={cardRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
-        className={`relative rounded-2xl border shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group animate-fadeIn ${statusTheme}`}
-        style={{ transformStyle: 'preserve-3d', transition: 'transform 0.2s ease, box-shadow 0.3s ease' }}
-      >
-        {/* Hover glow */}
+        className={`relative rounded-2xl border shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group animate-fadeIn ${compact ? 'p-2' : ''} ${
+          isReleased ? 'border-blue-200 bg-white' : days > 60 ? 'border-red-200 bg-gradient-to-br from-white to-red-50/40' : days > 30 ? 'border-amber-200 bg-gradient-to-br from-white to-amber-50/30' : 'border-slate-200 bg-white'
+        }`} style={{ transformStyle: 'preserve-3d' }}>
+        {/* Glow */}
         <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/0 via-blue-500/0 to-emerald-500/0 group-hover:from-blue-500/5 group-hover:via-blue-500/5 group-hover:to-emerald-500/5 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-all duration-500 pointer-events-none" />
-
-        {/* Age bar */}
         {!isReleased && <div className="absolute top-0 left-0 right-0 h-1 z-10 rounded-t-2xl overflow-hidden"><AgeBar days={days} /></div>}
+        {isReleased && <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 select-none"><div className="transform -rotate-12 opacity-[0.04]"><span className="text-6xl font-black text-blue-600 tracking-[0.3em]">RELEASED</span></div></div>}
 
-        {/* RELEASED watermark */}
-        {isReleased && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 select-none">
-            <div className="transform -rotate-12 opacity-[0.04]">
-              <span className="text-6xl font-black text-blue-600 tracking-[0.3em]">RELEASED</span>
-            </div>
-          </div>
-        )}
-
-        <div className="relative z-10 p-4 md:p-5">
-          {/* ── TOP ROW: Checkbox + Client Info ── */}
-          <div className="flex items-start gap-3 mb-3">
-            {viewMode === 'table' && (
+        <div className="relative z-10 p-3 md:p-4">
+          {/* ── TOP ROW ── */}
+          <div className="flex items-start gap-2 mb-2">
+            {(viewMode === 'table' || viewMode === 'kanban') && (
               <div className="flex items-center pt-0.5" onClick={e => e.stopPropagation()}>
                 <input type="checkbox" checked={selectedIds.has(shipment.id)}
                   onChange={() => { const n = new Set(selectedIds); n.has(shipment.id) ? n.delete(shipment.id) : n.add(shipment.id); setSelectedIds(n); }}
                   className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
               </div>
             )}
-
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-sm md:text-base font-bold text-slate-800 truncate max-w-[200px] md:max-w-[280px]" title={shipment.clientName}>
-                  {shipment.clientName}
-                </h3>
-                <StatusBadge status={shipment.status} />
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {isPinned && <StarIconSolid className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />}
+                <h3 className="text-sm md:text-base font-bold text-slate-800 truncate max-w-[160px] md:max-w-[240px]" title={shipment.clientName}>{shipment.clientName}</h3>
+                <StatusBadge status={shipment.status} size={compact ? 'xs' : 'sm'} />
+                {!compact && <HealthBadge days={days} />}
               </div>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-0.5">
                 <p className="text-[11px] font-mono text-slate-400">{shipment.referenceId}</p>
                 <span className="text-slate-300">·</span>
-                <DayRing days={days} size={32} />
+                <DayRing days={days} size={compact ? 24 : 32} />
               </div>
-              {shipment.companyProfile && (
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-100">
-                    <BuildingOfficeIcon className="h-3 w-3" />
-                    {shipment.companyProfile.name}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* ── PHOTO STRIP ── */}
-          {photos.length > 0 && (
-            <div className="mb-3">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <PhotoIcon className="h-3.5 w-3.5 text-blue-500" />
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Photos ({photos.length})
-                </span>
-              </div>
-              <PhotoStrip photos={photos} onPhotoClick={handlePhotoClick} maxShow={5} />
+          {/* ── PHOTO STRIP (non-compact) ── */}
+          {!compact && photos.length > 0 && (
+            <div className="mb-2">
+              <div className="flex items-center gap-1.5 mb-1"><PhotoIcon className="h-3 w-3 text-blue-500" /><span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Photos ({photos.length})</span></div>
+              <PhotoStrip photos={photos} onPhotoClick={(all, idx) => { setLightboxPhotos(all); setLightboxIndex(idx); setLightboxOpen(true); }} maxShow={4} />
             </div>
           )}
 
-          {/* ── INFO GRID ── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-3">
-            {[
-              { icon: CubeIcon, label: 'Pieces', value: `${shipment.currentBoxCount}`, sub: `/ ${shipment.originalBoxCount}`, onClick: undefined },
-              { icon: ScaleIcon, label: 'CBM / Wgt', value: shipment.cbm ? `${Number(shipment.cbm).toFixed(2)}` : '-', sub: shipment.weight != null ? `${shipment.weight}kg` : '', onClick: undefined },
-              { icon: MapPinIcon, label: 'Location', value: hasRack ? shipment.rackLocations : '—', isBtn: hasRack, onClick: () => setRackPopup(shipment) },
-              { icon: CalendarDaysIcon, label: 'Arrival', value: formatDate(shipment.arrivalDate || shipment.createdAt), sub: undefined, onClick: undefined },
-            ].map((item, idx) => (
-              <div key={idx} className="rounded-xl border border-slate-100 p-2.5 bg-white/60 hover:bg-white/90 transition-colors">
-                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider flex items-center gap-1 mb-1">
-                  <item.icon className="h-3 w-3" />
-                  {item.label}
-                </p>
-                {item.isBtn ? (
-                  <button onClick={item.onClick} className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors">
-                    {item.value}
-                  </button>
-                ) : (
-                  <p className="text-sm font-bold text-slate-700">
-                    {item.value}
-                    {item.sub && <span className="text-slate-300 font-normal">{item.sub}</span>}
-                  </p>
-                )}
+          {/* ── INFO GRID (compact conditional) ── */}
+          {!compact && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 md:gap-2 mb-2">
+              {columnFields.includes('pieces') && <InfoField icon={CubeIcon} label="Pieces" value={`${shipment.currentBoxCount} / ${shipment.originalBoxCount}`} />}
+              {columnFields.includes('cbm') && <InfoField icon={ScaleIcon} label="CBM / Wgt" value={`${shipment.cbm ? Number(shipment.cbm).toFixed(2) : '-'}${shipment.weight != null ? ` | ${shipment.weight}kg` : ''}`} />}
+              {columnFields.includes('location') && <InfoField icon={MapPinIcon} label="Location" value={hasRack ? shipment.rackLocations : '—'} isBtn={hasRack} onClick={() => setRackPopup(shipment)} />}
+              {columnFields.includes('arrival') && <InfoField icon={CalendarDaysIcon} label="Arrival" value={formatDate(shipment.arrivalDate || shipment.createdAt)} />}
+              {columnFields.includes('createdBy') && <InfoField icon={UserIcon} label="Created By" value={shipment.createdBy?.name || 'System'} />}
+              {columnFields.includes('company') && shipment.companyProfile && <InfoField icon={BuildingOfficeIcon} label="Company" value={shipment.companyProfile.name} />}
+              {columnFields.includes('duration') && <InfoField icon={ClockIcon} label="Duration" value={`${days} days`} />}
+            </div>
+          )}
+
+          {/* ── STORAGE COST ── */}
+          {!compact && <StorageCost days={days} />}
+
+          {/* ── INLINE NOTES ── */}
+          {!compact && notesEditing === shipment.id ? (
+            <div className="mb-2 p-2 bg-blue-50 rounded-xl border border-blue-100">
+              <textarea value={notesText} onChange={e => setNotesText(e.target.value)} rows={2}
+                className="w-full text-xs p-2 rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none bg-white"
+                placeholder="Add a note..." />
+              <div className="flex gap-2 mt-1">
+                <button onClick={() => handleSaveNote(shipment.id)} className="px-3 py-1 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Save</button>
+                <button onClick={() => setNotesEditing(null)} className="px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
               </div>
-            ))}
-          </div>
+            </div>
+          ) : !compact && shipment.notes ? (
+            <div className="mb-2 flex items-start gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100">
+              <PencilSquareIcon className="h-3.5 w-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
+              <p className="text-[11px] text-slate-600 flex-1">{shipment.notes}</p>
+              <button onClick={() => { setNotesEditing(shipment.id); setNotesText(shipment.notes || ''); }}
+                className="text-blue-600 hover:text-blue-800 text-[10px] font-semibold flex-shrink-0">Edit</button>
+            </div>
+          ) : null}
+
+          {/* ── ACTIVITY TIMELINE TOGGLE ── */}
+          {!compact && (
+            <div className="mb-1">
+              <button onClick={() => handleLoadActivity(shipment.id)}
+                className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
+                <ArrowPathIcon className={`h-3 w-3 ${activityOpen === shipment.id ? 'rotate-180' : ''} transition-transform`} />
+                {activityOpen === shipment.id ? 'Hide Activity' : 'Show Activity'}
+              </button>
+              {activityOpen === shipment.id && <ActivityTimeline shipmentId={shipment.id} />}
+            </div>
+          )}
 
           {/* ── ACTIONS ── */}
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-            <p className="text-[10px] text-slate-400 flex items-center gap-1">
-              <UserIcon className="h-3 w-3" />
-              {shipment.createdBy?.name || 'System'}
-            </p>
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-1">
+            <p className="text-[10px] text-slate-400 flex items-center gap-1"><UserIcon className="h-3 w-3" />{shipment.createdBy?.name || 'System'}</p>
             <div className="flex items-center gap-0.5">
+              {!compact && <ActionBtn icon={isPinned ? StarIconSolid : StarIcon} color="amber" onClick={() => handleTogglePin(shipment.id)} title={isPinned ? 'Unpin' : 'Pin'} />}
               <ActionBtn icon={EyeIcon} color="blue" onClick={() => { setSelectedShipment(shipment); setDetailModalOpen(true); }} title="Details" />
               <ActionBtn icon={QrCodeIcon} color="purple" onClick={() => { setSelectedShipment(shipment); setQrModalOpen(true); }} title="QR" />
               <ActionBtn icon={PencilIcon} color="amber" onClick={() => { setSelectedShipment(shipment); setEditModalOpen(true); }} title="Edit" />
-              {canRelease && <ActionBtn icon={ArrowRightOnRectangleIcon} color="emerald" onClick={() => handleReleaseClick(shipment)} title="Release" />}
-              <ActionBtn icon={DocumentTextIcon} color="indigo" onClick={() => window.open(`/shipment-report/${shipment.id}`, '_blank')} title="Report" />
-              <ActionBtn icon={TrashIcon} color="red" onClick={() => handleDelete(shipment.id)} title="Delete" />
+              {canRelease && <ActionBtn icon={ArrowRightOnRectangleIcon} color="emerald" onClick={() => { setSelectedShipment(shipment); setWithdrawalModalOpen(true); }} title="Release" />}
+              <ActionBtn icon={DocumentDuplicateIcon} color="indigo" onClick={() => handleDuplicate(shipment.id)} title="Duplicate" />
+              <ActionBtn icon={PrinterIcon} color="slate" onClick={() => handlePrintLabel(shipment)} title="Print Label" />
+              <ActionBtn icon={PencilSquareIcon} color="blue" onClick={() => { setNotesEditing(shipment.id); setNotesText(shipment.notes || ''); }} title="Add Note" />
+              {!compact && <ActionBtn icon={TrashIcon} color="red" onClick={() => handleDelete(shipment.id)} title="Delete" />}
             </div>
           </div>
         </div>
@@ -446,44 +667,43 @@ export const Shipments: React.FC = () => {
     );
   };
 
-  // ── Action Button ──────────────────────────────
-  const ActionBtn = ({ icon: Icon, color, onClick, title }: { icon: any; color: string; onClick: () => void; title: string }) => {
-    const colors: Record<string, string> = {
-      blue: 'text-blue-600 hover:bg-blue-50',
-      purple: 'text-purple-600 hover:bg-purple-50',
-      amber: 'text-amber-600 hover:bg-amber-50',
-      emerald: 'text-emerald-600 hover:bg-emerald-50',
-      indigo: 'text-indigo-600 hover:bg-indigo-50',
-      red: 'text-red-400 hover:text-red-600 hover:bg-red-50',
-    };
+  // ── Kanban Card ────────────────────────────
+  const KanbanCard = ({ shipment }: { shipment: any }) => {
+    const days = getDays(shipment);
+    const photos = shipment.shipmentPhotos || [];
     return (
-      <button onClick={onClick}
-        className={`p-1.5 md:p-2 rounded-xl transition-all duration-200 hover:scale-110 active:scale-90 ${colors[color]} relative overflow-hidden group/btn`}
-        title={title}>
-        <Icon className="h-4 md:h-4.5 w-4 md:w-4.5 relative z-10" />
-        <span className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover/btn:opacity-100 transition-opacity rounded-xl" />
-      </button>
+      <div draggable onDragStart={e => handleDragStart(e, shipment.id)}
+        className={`bg-white rounded-xl border shadow-sm hover:shadow-md transition-all p-2.5 cursor-grab active:cursor-grabbing ${
+          days > 60 ? 'border-l-4 border-l-red-400' : days > 30 ? 'border-l-4 border-l-amber-400' : 'border-l-4 border-l-emerald-400 border-slate-200'
+        } ${dragShipmentId === shipment.id ? 'opacity-50 scale-95' : ''}`}>
+        <div className="flex items-start gap-1.5 mb-1">
+          {pinnedIds.has(shipment.id) && <StarIconSolid className="h-3 w-3 text-amber-400 flex-shrink-0 mt-0.5" />}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-slate-800 truncate">{shipment.clientName}</p>
+            <p className="text-[10px] font-mono text-slate-400">{shipment.referenceId}</p>
+          </div>
+          <DayRing days={days} size={22} />
+        </div>
+        {photos.length > 0 && (
+          <div className="flex gap-1 mb-1">
+            {photos.slice(0, 3).map((p: string, i: number) => (
+              <img key={i} src={getBackendPhoto(p)} alt="" className="w-8 h-8 rounded-lg object-cover border border-slate-100" />
+            ))}
+          </div>
+        )}
+        <div className="flex items-center justify-between text-[10px] text-slate-500">
+          <span>📦 {shipment.currentBoxCount}/{shipment.originalBoxCount}</span>
+          <span>{shipment.rackLocations || '—'}</span>
+        </div>
+      </div>
     );
   };
 
-  // ── Skeleton ───────────────────────────────────
+  // ── Skeleton ───────────────────────────────
   const SkeletonCard = () => (
     <div className="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse">
-      <div className="flex items-start gap-3 mb-4">
-        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex-shrink-0" />
-        <div className="flex-1 space-y-2">
-          <div className="h-4 bg-slate-100 rounded w-3/4" />
-          <div className="h-3 bg-slate-100 rounded w-1/2" />
-        </div>
-      </div>
-      <div className="grid grid-cols-4 gap-3 mb-4">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="bg-slate-50 rounded-xl p-3 space-y-2">
-            <div className="h-2 bg-slate-100 rounded w-1/2" />
-            <div className="h-4 bg-slate-100 rounded w-2/3" />
-          </div>
-        ))}
-      </div>
+      <div className="flex items-start gap-3 mb-4"><div className="w-14 h-14 bg-slate-100 rounded-2xl flex-shrink-0" /><div className="flex-1 space-y-2"><div className="h-4 bg-slate-100 rounded w-3/4" /><div className="h-3 bg-slate-100 rounded w-1/2" /></div></div>
+      <div className="grid grid-cols-4 gap-3 mb-4">{[1, 2, 3, 4].map(i => <div key={i} className="bg-slate-50 rounded-xl p-3 space-y-2"><div className="h-2 bg-slate-100 rounded w-1/2" /><div className="h-4 bg-slate-100 rounded w-2/3" /></div>)}</div>
       <div className="h-8 bg-slate-50 rounded-xl" />
     </div>
   );
@@ -492,10 +712,7 @@ export const Shipments: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto px-3 md:px-6 py-4 md:py-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="h-8 bg-slate-100 rounded-xl w-48 animate-pulse" />
-            <div className="h-10 bg-slate-100 rounded-xl w-32 animate-pulse" />
-          </div>
+          <div className="flex items-center justify-between mb-6"><div className="h-8 bg-slate-100 rounded-xl w-48 animate-pulse" /><div className="h-10 bg-slate-100 rounded-xl w-32 animate-pulse" /></div>
           <div className="space-y-4">{[1, 2, 3].map(i => <SkeletonCard key={i} />)}</div>
         </div>
       </div>
@@ -507,10 +724,8 @@ export const Shipments: React.FC = () => {
   // ═══════════════════════════════════════════════════
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-
-      {/* ═══ ANIMATED GRADIENT HEADER ═══ */}
+      {/* ═══ HEADER ═══ */}
       <div className="relative overflow-hidden">
-        {/* Animated background blobs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className={`absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl opacity-20 animate-blob bg-gradient-to-r ${accentColor}`} />
           <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full blur-3xl opacity-20 animate-blob animation-delay-2000 bg-gradient-to-r from-violet-500 to-fuchsia-500" />
@@ -518,8 +733,8 @@ export const Shipments: React.FC = () => {
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-3 md:px-6 pt-4 md:pt-6 pb-2 md:pb-4">
-          {/* Title + Actions */}
-          <div className={`flex items-center justify-between mb-4 md:mb-6 transition-all duration-700 ${animReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+          {/* ── Title + Actions ── */}
+          <div className={`flex items-center justify-between mb-3 md:mb-4 transition-all duration-700 ${animReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
             <div>
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 rounded-2xl bg-gradient-to-br ${accentColor} shadow-lg shadow-blue-200/30 ring-1 ring-white/20`}>
@@ -531,109 +746,159 @@ export const Shipments: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            <div className="flex items-center gap-2 md:gap-3">
-              {/* View Toggle */}
+            <div className="flex items-center gap-1.5 md:gap-3">
+              {/* View Toggle - 3 views */}
               <div className="flex p-0.5 rounded-xl border shadow-sm bg-white border-slate-200">
-                <button onClick={() => setViewMode('folders')}
-                  className={`p-2 rounded-lg transition-all ${viewMode === 'folders' ? `${accentBg} text-white shadow-md` : 'text-slate-400 hover:text-slate-600'}`}
-                  title="Folder View">
-                  <FolderIcon className="h-4 w-4" />
-                </button>
-                <button onClick={() => setViewMode('table')}
-                  className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? `${accentBg} text-white shadow-md` : 'text-slate-400 hover:text-slate-600'}`}
-                  title="Table View">
-                  <TableCellsIcon className="h-4 w-4" />
-                </button>
+                <button onClick={() => setViewMode('folders')} className={`p-2 rounded-lg transition-all ${viewMode === 'folders' ? `${accentBg} text-white shadow-md` : 'text-slate-400 hover:text-slate-600'}`} title="Folder View"><FolderIcon className="h-4 w-4" /></button>
+                <button onClick={() => setViewMode('table')} className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? `${accentBg} text-white shadow-md` : 'text-slate-400 hover:text-slate-600'}`} title="Table View"><TableCellsIcon className="h-4 w-4" /></button>
+                <button onClick={() => setViewMode('kanban')} className={`p-2 rounded-lg transition-all ${viewMode === 'kanban' ? `${accentBg} text-white shadow-md` : 'text-slate-400 hover:text-slate-600'}`} title="Kanban Board"><SquaresPlusIcon className="h-4 w-4" /></button>
               </div>
-
               <ShipmentsPrintReport shipments={shipments} searchTerm={searchTerm} activeTab={activeStatus} warehouseFilter="all" />
-
-              <button onClick={() => setCreateModalOpen(true)}
-                className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-5 py-2 md:py-2.5 bg-gradient-to-r ${accentColor} text-white text-xs md:text-sm font-bold rounded-xl hover:shadow-lg active:scale-95 transition-all shadow-md hover:shadow-xl`}>
-                <PlusIcon className="h-4 md:h-5 w-4 md:w-5" />
-                <span className="hidden sm:inline">New Shipment</span>
+              <button onClick={() => setCreateModalOpen(true)} className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-5 py-2 md:py-2.5 bg-gradient-to-r ${accentColor} text-white text-xs md:text-sm font-bold rounded-xl hover:shadow-lg active:scale-95 transition-all shadow-md hover:shadow-xl`}>
+                <PlusIcon className="h-4 md:h-5 w-4 md:w-5" /><span className="hidden sm:inline">New</span>
               </button>
             </div>
           </div>
 
-          {/* ═══ STATS ROW ═══ */}
-          <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6 transition-all duration-700 delay-100 ${animReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-            {getStats().map((stat) => {
+          {/* ── STATS ROW ── */}
+          <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-3 transition-all duration-700 delay-100 ${animReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+            {getStats().map(stat => {
               const Icon = stat.icon;
               return (
                 <div key={stat.label} className="relative group rounded-2xl border p-3 md:p-4 shadow-sm hover:shadow-lg transition-all duration-300 bg-white/70 border-slate-100 hover:bg-white/90">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] md:text-xs text-slate-400 font-medium uppercase tracking-wider">{stat.label}</p>
-                      <p className="text-lg md:text-2xl font-bold text-slate-800 mt-0.5">
-                        <AnimatedCounter value={stat.value} />
-                      </p>
-                    </div>
-                    <div className={`p-2 md:p-2.5 rounded-2xl bg-gradient-to-br ${stat.color} text-white ring-2 ${stat.ring} group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 shadow-md`}>
-                      <Icon className="h-4 md:h-5 w-4 md:w-5" />
-                    </div>
+                    <div><p className="text-[10px] md:text-xs text-slate-400 font-medium uppercase tracking-wider">{stat.label}</p><p className="text-lg md:text-2xl font-bold text-slate-800 mt-0.5"><AnimatedCounter value={stat.value} /></p></div>
+                    <div className={`p-2 md:p-2.5 rounded-2xl bg-gradient-to-br ${stat.color} text-white ring-2 ${stat.ring} group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 shadow-md`}><Icon className="h-4 md:h-5 w-4 md:w-5" /></div>
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* ═══ SEARCH + SORT + TABS ═══ */}
+          {/* ── SEARCH + TOOLBAR ── */}
           <div className={`transition-all duration-700 delay-200 ${animReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-            <div className="flex gap-2 md:gap-4 mb-3">
-              <div className="relative flex-1">
+            <div className="flex flex-wrap gap-2 mb-3">
+              {/* Search */}
+              <div className="relative flex-1 min-w-[200px]">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input type="text" placeholder="Search by name, ID, company, location..."
-                  value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                <input type="text" placeholder="Search by name, ID, company, location..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                   className="w-full pl-9 pr-9 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all shadow-sm placeholder:text-slate-400" />
-                {searchTerm && (
-                  <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <XMarkIcon className="h-4 w-4 text-slate-400 hover:text-slate-600 transition-colors" />
-                  </button>
-                )}
+                {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2"><XMarkIcon className="h-4 w-4 text-slate-400 hover:text-slate-600 transition-colors" /></button>}
               </div>
+
+              {/* Filter toggle */}
+              <button onClick={() => setFiltersOpen(!filtersOpen)}
+                className={`flex items-center gap-1.5 px-3 py-2.5 text-sm rounded-2xl border transition-all shadow-sm ${filtersOpen ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                <AdjustmentsHorizontalIcon className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Filters</span>
+              </button>
+
               {/* Sort */}
               <div className="relative" ref={filterRef}>
-                <button onClick={() => setFilterOpen(!filterOpen)}
-                  className="flex items-center gap-2 px-3 py-2.5 text-sm rounded-2xl border transition-all shadow-sm bg-white border-slate-200 text-slate-600 hover:bg-slate-50">
-                  <ArrowsUpDownIcon className="h-4 w-4" />
-                  <span className="hidden sm:inline text-xs">Sort</span>
+                <button onClick={() => setFilterOpen(!filterOpen)} className="flex items-center gap-1.5 px-3 py-2.5 text-sm rounded-2xl border transition-all shadow-sm bg-white border-slate-200 text-slate-600 hover:bg-slate-50">
+                  <ArrowsUpDownIcon className="h-4 w-4" /><span className="hidden sm:inline text-xs">Sort</span>
                 </button>
                 {filterOpen && (
                   <div className="absolute right-0 mt-1 w-48 rounded-2xl border shadow-xl z-30 backdrop-blur-xl overflow-hidden bg-white/95 border-slate-200">
-                    {[
-                      { v: 'date_desc', l: '📅 Newest First' },
-                      { v: 'date_asc', l: '📅 Oldest First' },
-                      { v: 'name_asc', l: '🔤 Name A-Z' },
-                      { v: 'name_desc', l: '🔤 Name Z-A' },
-                      { v: 'duration_desc', l: '⏱️ Longest Stored' },
-                      { v: 'duration_asc', l: '⏱️ Shortest Stored' },
-                      { v: 'cbm_desc', l: '📦 CBM ↓' },
-                      { v: 'cbm_asc', l: '📦 CBM ↑' },
-                      { v: 'pieces_desc', l: '🔢 Pieces ↓' },
-                      { v: 'pieces_asc', l: '🔢 Pieces ↑' },
+                    {[{ v: 'date_desc', l: '📅 Newest' }, { v: 'date_asc', l: '📅 Oldest' }, { v: 'name_asc', l: '🔤 A-Z' }, { v: 'name_desc', l: '🔤 Z-A' },
+                      { v: 'duration_desc', l: '⏱️ Longest' }, { v: 'duration_asc', l: '⏱️ Shortest' }, { v: 'cbm_desc', l: '📦 CBM ↓' }, { v: 'cbm_asc', l: '📦 CBM ↑' },
+                      { v: 'pieces_desc', l: '🔢 Pieces ↓' }, { v: 'pieces_asc', l: '🔢 Pieces ↑' },
                     ].map(opt => (
                       <button key={opt.v} onClick={() => { setSortBy(opt.v); setFilterOpen(false); }}
-                        className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${sortBy === opt.v ? `${accentBg} text-white` : 'text-slate-600 hover:bg-slate-50'}`}>
-                        {opt.l}
-                      </button>
+                        className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${sortBy === opt.v ? `${accentBg} text-white` : 'text-slate-600 hover:bg-slate-50'}`}>{opt.l}</button>
                     ))}
                   </div>
                 )}
               </div>
+
+              {/* Column picker */}
+              <div className="relative" ref={colPickerRef}>
+                <button onClick={() => setColumnPickerOpen(!columnPickerOpen)}
+                  className="flex items-center gap-1.5 px-3 py-2.5 text-sm rounded-2xl border transition-all shadow-sm bg-white border-slate-200 text-slate-600 hover:bg-slate-50">
+                  <TableCellsIcon className="h-4 w-4" /><span className="hidden sm:inline text-xs">Columns</span>
+                </button>
+                {columnPickerOpen && (
+                  <div className="absolute right-0 mt-1 w-52 rounded-2xl border shadow-xl z-30 backdrop-blur-xl overflow-hidden bg-white/95 border-slate-200 p-3">
+                    <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">Visible Fields</p>
+                    <div className="space-y-1.5">
+                      {allFieldOptions.map(f => (
+                        <label key={f.key} className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={columnFields.includes(f.key)}
+                            onChange={() => setColumnFields(prev => prev.includes(f.key) ? prev.filter(k => k !== f.key) : [...prev, f.key])}
+                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                          <f.icon className="h-3.5 w-3.5 text-slate-400" />
+                          <span className="text-xs text-slate-700">{f.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Export CSV */}
+              <button onClick={handleExportCSV}
+                className="flex items-center gap-1.5 px-3 py-2.5 text-sm rounded-2xl border transition-all shadow-sm bg-white border-slate-200 text-slate-600 hover:bg-slate-50">
+                <DocumentTextIcon className="h-4 w-4" /><span className="hidden sm:inline text-xs">CSV</span>
+              </button>
             </div>
 
-            {/* ═══ TABS ═══ */}
+            {/* ── ADVANCED FILTERS PANEL ── */}
+            {filtersOpen && (
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200 p-4 mb-3 shadow-sm animate-slideDown">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block mb-1">From Date</label>
+                    <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block mb-1">To Date</label>
+                    <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block mb-1">Zone</label>
+                    <input type="text" placeholder="e.g. A, B, C..." value={filterZone} onChange={e => setFilterZone(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block mb-1">Company</label>
+                    <input type="text" placeholder="Company name..." value={filterCompany} onChange={e => setFilterCompany(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block mb-1">Days: {filterDaysMin}–{filterDaysMax === 999 ? 'Any' : filterDaysMax}</label>
+                    <div className="flex items-center gap-2">
+                      <input type="range" min={0} max={180} value={filterDaysMin} onChange={e => setFilterDaysMin(Number(e.target.value))}
+                        className="flex-1 accent-blue-500" />
+                      <span className="text-xs text-slate-400 font-medium w-6 text-right">{filterDaysMin}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="range" min={0} max={180} value={filterDaysMax === 999 ? 180 : filterDaysMax} onChange={e => setFilterDaysMax(e.target.value === '180' ? 999 : Number(e.target.value))}
+                        className="flex-1 accent-blue-500" />
+                      <span className="text-xs text-slate-400 font-medium w-6 text-right">{filterDaysMax === 999 ? '∞' : filterDaysMax}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterZone(''); setFilterCompany(''); setFilterDaysMin(0); setFilterDaysMax(999); }}
+                    className="px-4 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">Clear All</button>
+                  <div className="flex items-center gap-1 ml-auto">
+                    <label className="text-[10px] text-slate-500 uppercase tracking-wider">Rate (₹/day):</label>
+                    <input type="number" value={storageRate} onChange={e => setStorageRate(Math.max(1, Number(e.target.value)))}
+                      className="w-16 px-2 py-1 text-xs rounded-xl border border-slate-200 bg-white text-center" min={1} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── TABS ── */}
             <div className="flex gap-1 overflow-x-auto no-scrollbar pb-0.5">
               {tabs.map(tab => {
-                const Icon = tab.icon;
-                const isActive = activeStatus === tab.key;
+                const Icon = tab.icon; const isActive = activeStatus === tab.key;
                 return (
                   <button key={tab.key} onClick={() => { setActiveStatus(tab.key); setSelectedIds(new Set()); }}
-                    className={`relative flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs md:text-sm font-medium transition-all whitespace-nowrap rounded-xl ${
-                      isActive ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                    }`}>
+                    className={`relative flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs md:text-sm font-medium transition-all whitespace-nowrap rounded-xl ${isActive ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
                     <Icon className={`h-4 w-4 ${isActive ? 'text-blue-500' : 'text-slate-400'}`} />
                     {tab.label}
                     <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -652,26 +917,49 @@ export const Shipments: React.FC = () => {
       <div className="max-w-7xl mx-auto px-3 md:px-6 pb-24 md:pb-10">
         {error && (
           <div className="mb-4 md:mb-6 bg-red-50 text-red-700 px-4 py-3 rounded-2xl border border-red-100 flex items-center gap-2 animate-fadeIn shadow-sm">
-            <ShieldExclamationIcon className="h-5 w-5 flex-shrink-0" />
-            <span className="text-sm">{error}</span>
-            <button onClick={() => setError('')} className="ml-auto p-1 hover:bg-red-100 rounded-lg transition-colors">
-              <XMarkIcon className="h-4 w-4" />
-            </button>
+            <ShieldExclamationIcon className="h-5 w-5 flex-shrink-0" /><span className="text-sm">{error}</span>
+            <button onClick={() => setError('')} className="ml-auto p-1 hover:bg-red-100 rounded-lg"><XMarkIcon className="h-4 w-4" /></button>
           </div>
         )}
 
         {!loading && shipments.length === 0 && (
           <div className="text-center py-16 md:py-24 animate-fadeIn">
-            <div className={`w-20 h-20 mx-auto mb-6 rounded-3xl flex items-center justify-center shadow-inner bg-gradient-to-br ${accentColor}`}>
-              <CubeIcon className="h-10 w-10 text-white/60" />
-            </div>
+            <div className={`w-20 h-20 mx-auto mb-6 rounded-3xl flex items-center justify-center shadow-inner bg-gradient-to-br ${accentColor}`}><CubeIcon className="h-10 w-10 text-white/60" /></div>
             <h3 className="text-lg font-bold text-slate-700 mb-2">No shipments found</h3>
             <p className="text-sm text-slate-400 mb-6">Try adjusting your search or filters</p>
-            <button onClick={() => setCreateModalOpen(true)}
-              className={`inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r ${accentColor} text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all shadow-md active:scale-95`}>
-              <PlusIcon className="h-4 w-4" />
-              Create Shipment
-            </button>
+            <button onClick={() => setCreateModalOpen(true)} className={`inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r ${accentColor} text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all shadow-md active:scale-95`}>
+              <PlusIcon className="h-4 w-4" />Create Shipment</button>
+          </div>
+        )}
+
+        {/* ══ KANBAN VIEW ══ */}
+        {viewMode === 'kanban' && shipments.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 animate-fadeIn">
+            {kanbanColumns.map(col => {
+              const colShipments = getKanbanShipments(col.key);
+              const Icon = col.icon;
+              return (
+                <div key={col.key}
+                  onDragOver={handleDragOver} onDrop={e => handleDrop(e, col.key)}
+                  className={`rounded-2xl border border-t-4 ${col.color} bg-white shadow-sm min-h-[300px]`}>
+                  {/* Column header */}
+                  <div className="px-3 py-2.5 flex items-center justify-between border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-4 w-4 text-slate-500" />
+                      <span className="text-sm font-bold text-slate-700">{col.label}</span>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${col.countColor}`}>{colShipments.length}</span>
+                  </div>
+                  {/* Cards */}
+                  <div className="p-2 space-y-2 min-h-[200px]">
+                    {colShipments.map(s => <KanbanCard key={s.id} shipment={s} />)}
+                    {colShipments.length === 0 && (
+                      <div className="text-center py-8 text-xs text-slate-400">Drop shipments here</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -691,15 +979,10 @@ export const Shipments: React.FC = () => {
                 <div key={company}
                   className={`rounded-2xl border shadow-sm overflow-hidden transition-all duration-300 ${isOpen ? 'shadow-lg' : 'hover:shadow-md'} bg-white border-slate-200`}
                   style={{ animationDelay: `${folderIdx * 80}ms`, animationFillMode: 'both' }}>
-                  
                   <button onClick={() => toggleFolder(company)}
                     className={`w-full flex items-center justify-between transition-all duration-200 group ${isOpen ? 'bg-gradient-to-r from-slate-50 via-white to-slate-50' : 'hover:bg-slate-50/50'}`}>
                     <div className="flex items-center gap-3 md:gap-4 p-3 md:px-5 md:py-4 min-w-0">
-                      <div className={`flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-200 shadow-sm ${
-                        isUnassigned
-                          ? isOpen ? 'bg-slate-500 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
-                          : isOpen ? `bg-gradient-to-br ${accentColor} text-white` : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100'
-                      }`}>
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-200 shadow-sm ${isUnassigned ? isOpen ? 'bg-slate-500 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200' : isOpen ? `bg-gradient-to-br ${accentColor} text-white` : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100'}`}>
                         {isOpen ? <ChevronDownIcon className="h-5 w-5" /> : <ChevronRightIcon className="h-5 w-5" />}
                       </div>
                       <div className="flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center text-lg font-bold shadow-sm bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700">
@@ -710,35 +993,27 @@ export const Shipments: React.FC = () => {
                           {isUnassigned ? '🚫 Unassigned' : company}
                         </h3>
                         <p className="text-[11px] md:text-xs text-slate-400 mt-0.5">
-                          {items.length} shipment{items.length !== 1 ? 's' : ''} · {totalBoxes} piece{totalBoxes !== 1 ? 's' : ''}
-                          {totalCbm > 0 && ` · ${totalCbm.toFixed(1)} m³`}
+                          {items.length} shipment{items.length !== 1 ? 's' : ''} · {totalBoxes} piece{totalBoxes !== 1 ? 's' : ''}{totalCbm > 0 && ` · ${totalCbm.toFixed(1)} m³`}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 md:gap-2 pr-3 md:pr-5">
                       {activeItems.length > 0 && !isUnassigned && (
                         <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[10px] md:text-xs font-bold rounded-full border border-emerald-200">
-                          <CheckCircleIcon className="h-3 w-3" />
-                          {activeItems.length}
+                          <CheckCircleIcon className="h-3 w-3" />{activeItems.length}
                         </span>
                       )}
                       {pendingItems.length > 0 && (
                         <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-[10px] md:text-xs font-bold rounded-full border border-amber-200">
-                          <ClockIcon className="h-3 w-3" />
-                          {pendingItems.length}
+                          <ClockIcon className="h-3 w-3" />{pendingItems.length}
                         </span>
                       )}
-                      <span className={`flex items-center justify-center w-7 h-7 rounded-xl text-xs font-bold ${isUnassigned ? 'bg-slate-100 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>
-                        {items.length}
-                      </span>
+                      <span className={`flex items-center justify-center w-7 h-7 rounded-xl text-xs font-bold ${isUnassigned ? 'bg-slate-100 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>{items.length}</span>
                     </div>
                   </button>
-
                   {isOpen && (
                     <div className="border-t border-slate-100 bg-gradient-to-b from-slate-50/50 to-white p-2 md:p-4 space-y-2 md:space-y-3 animate-slideDown">
-                      {items.map((shipment: any) => (
-                        <ShipmentCard key={shipment.id} shipment={shipment} />
-                      ))}
+                      {items.map((shipment: any) => <ShipmentCard key={shipment.id} shipment={shipment} />)}
                     </div>
                   )}
                 </div>
@@ -755,15 +1030,24 @@ export const Shipments: React.FC = () => {
                 indeterminate={selectedIds.size > 0 && selectedIds.size < shipments.length}
                 onChange={() => selectedIds.size === shipments.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(shipments.map(s => s.id)))} />
               <span className="text-xs font-medium text-slate-500">Select All</span>
-              {selectedIds.size > 0 && (
-                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">{selectedIds.size} selected</span>
-              )}
+              {selectedIds.size > 0 && <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">{selectedIds.size} selected</span>}
             </div>
+            {/* Paginated cards */}
             <div className="space-y-2 md:space-y-3">
-              {shipments.map((shipment: any) => (
-                <ShipmentCard key={shipment.id} shipment={shipment} />
-              ))}
+              {paginatedShipments.map(shipment => <ShipmentCard key={shipment.id} shipment={shipment} />)}
             </div>
+            {/* Load more / pagination */}
+            {hasMore && (
+              <div className="text-center py-4">
+                <button onClick={() => setPage(p => p + 1)}
+                  className="px-6 py-2.5 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 hover:border-blue-200 transition-all shadow-sm hover:shadow-md">
+                  Show More ({shipments.length - paginatedShipments.length} remaining)
+                </button>
+              </div>
+            )}
+            {!hasMore && shipments.length > PAGE_SIZE && (
+              <div className="text-center py-3 text-xs text-slate-400">Showing all {shipments.length} shipments</div>
+            )}
           </div>
         )}
       </div>
@@ -781,24 +1065,19 @@ export const Shipments: React.FC = () => {
       <WithdrawalModal isOpen={withdrawalModalOpen} onClose={() => setWithdrawalModalOpen(false)} shipment={selectedShipment} onSuccess={loadShipments} />
       <BoxQRModal isOpen={qrModalOpen} onClose={() => setQrModalOpen(false)} shipmentId={selectedShipment?.id || ''} shipmentRef={selectedShipment?.referenceId || ''} />
 
-      {/* Bulk Action Bar */}
+      {/* Bulk Action Bar — Real batch operations */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 z-40 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between animate-slideUp">
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 z-40 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between animate-slideUp shadow-2xl">
           <div className="flex items-center gap-3">
             <div className="p-1.5 rounded-xl bg-blue-50"><CheckCircleIcon className="h-4 w-4 text-blue-600" /></div>
-            <span className="text-sm font-bold text-slate-700">
-              <span className="text-blue-600">{selectedIds.size}</span> selected
-            </span>
+            <span className="text-sm font-bold text-slate-700"><span className="text-blue-600">{selectedIds.size}</span> selected</span>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <button onClick={() => setSelectedIds(new Set())}
-              className="px-3 md:px-4 py-2 text-xs md:text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors">
-              Clear
-            </button>
-            <button onClick={() => alert(`Release ${selectedIds.size} shipment(s) - bulk release coming soon`)}
+              className="px-3 md:px-4 py-2 text-xs md:text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors">Clear</button>
+            <button onClick={handleBatchRelease}
               className="flex items-center gap-1.5 px-4 md:px-5 py-2 text-xs md:text-sm font-bold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 rounded-xl shadow-lg shadow-emerald-200/30 transition-all active:scale-95">
-              <ArrowRightOnRectangleIcon className="h-4 w-4" />
-              Release Selected
+              <ArrowRightOnRectangleIcon className="h-4 w-4" />Release Selected
             </button>
           </div>
         </div>
@@ -810,14 +1089,10 @@ export const Shipments: React.FC = () => {
           <div className="bg-white/90 backdrop-blur-xl rounded-2xl border border-slate-200 shadow-2xl p-5 md:p-6 max-w-sm w-full mx-auto animate-scaleIn" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-2xl shadow-lg bg-gradient-to-br ${accentColor} ring-1 ring-white/20`}>
-                  <MapPinIcon className="h-5 w-5 text-white" />
-                </div>
+                <div className={`p-2.5 rounded-2xl shadow-lg bg-gradient-to-br ${accentColor} ring-1 ring-white/20`}><MapPinIcon className="h-5 w-5 text-white" /></div>
                 <h3 className="font-bold text-lg text-slate-800">Rack Location</h3>
               </div>
-              <button onClick={() => setRackPopup(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                <XMarkIcon className="h-5 w-5" />
-              </button>
+              <button onClick={() => setRackPopup(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"><XMarkIcon className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
               <div className="rounded-2xl p-4 border bg-gradient-to-r from-blue-50 to-blue-50/50 border-blue-100">
@@ -825,20 +1100,13 @@ export const Shipments: React.FC = () => {
                 <p className="text-lg font-bold text-blue-800">{rackPopup.rackLocations || 'N/A'}</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl p-3.5 border bg-slate-50 border-slate-100">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Zone</p>
-                  <p className="text-base font-semibold text-slate-700 mt-0.5">{rackPopup.zone || '—'}</p>
-                </div>
-                <div className="rounded-2xl p-3.5 border bg-slate-50 border-slate-100">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Boxes</p>
-                  <p className="text-base font-semibold text-slate-700 mt-0.5">{rackPopup.currentBoxCount || 0} / {rackPopup.originalBoxCount || 0}</p>
-                </div>
+                <div className="rounded-2xl p-3.5 border bg-slate-50 border-slate-100"><p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Zone</p><p className="text-base font-semibold text-slate-700 mt-0.5">{rackPopup.zone || '—'}</p></div>
+                <div className="rounded-2xl p-3.5 border bg-slate-50 border-slate-100"><p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Boxes</p><p className="text-base font-semibold text-slate-700 mt-0.5">{rackPopup.currentBoxCount || 0} / {rackPopup.originalBoxCount || 0}</p></div>
               </div>
               {rackPopup.rackLocations && (
                 <a href={`/racks?highlight=${rackPopup.boxes?.find((b: any) => b.rackId)?.rackId || ''}`}
                   className={`flex items-center justify-center gap-2 w-full mt-1 px-4 py-3 font-semibold rounded-2xl transition-all border bg-gradient-to-r ${accentColor} text-white shadow-md hover:shadow-lg`}>
-                  <SquaresPlusIcon className="h-4 w-4" />
-                  View in Racks →
+                  <SquaresPlusIcon className="h-4 w-4" />View in Racks →
                 </a>
               )}
             </div>
@@ -848,12 +1116,8 @@ export const Shipments: React.FC = () => {
 
       {/* Photo Lightbox */}
       {lightboxOpen && lightboxPhotos.length > 0 && (
-        <PhotoLightbox
-          photos={lightboxPhotos.map(p => p.startsWith('http') ? p : `${getBackendUrl()}${p}`)}
-          currentIndex={lightboxIndex}
-          onClose={() => setLightboxOpen(false)}
-          onIndexChange={(idx) => setLightboxIndex(idx)}
-        />
+        <PhotoLightbox photos={lightboxPhotos.map(p => getBackendPhoto(p))} currentIndex={lightboxIndex}
+          onClose={() => setLightboxOpen(false)} onIndexChange={(idx) => setLightboxIndex(idx)} />
       )}
     </div>
   );
