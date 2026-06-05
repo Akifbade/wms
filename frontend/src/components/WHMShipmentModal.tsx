@@ -106,7 +106,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     taxRate: 0,
   });
 
-  // ???? INTAKE MODE STATE (Pallet vs Box mode)
+  // 📦 INTAKE MODE STATE (Pallet vs Box mode)
   const [intakeMode, setIntakeMode] = useState<'pallet' | 'box'>('pallet');
   const [palletPhotoMap, setPalletPhotoMap] = useState<Record<number, string[]>>({});
   const [palletUploadState, setPalletUploadState] = useState<Record<number, boolean>>({});
@@ -255,7 +255,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     }
   }, [intakeMode, formData.palletCount, formData.pieces, extraBoxes]);
 
-  // ???? SHIPMENT SETTINGS STATE
+  // ⚙️ SHIPMENT SETTINGS STATE
   const [shipmentSettings, setShipmentSettings] = useState<any>({
     requireClientEmail: false,
     requireClientPhone: true,
@@ -267,7 +267,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     formSectionOrder: null, // Will be loaded from settings
   });
 
-  // ???? FORM SECTION ORDERING STATE
+  // 📋 FORM SECTION ORDERING STATE
   const [sectionOrder, setSectionOrder] = useState<string[]>([
     'basic',
     'client',
@@ -307,7 +307,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         loadRacks(),
         loadCompanyProfiles(),
         loadPricingSettings(),
-        loadShipmentSettings(), // ???? LOAD SETTINGS
+        loadShipmentSettings(), // ⚙️ LOAD SETTINGS
       ]);
     } catch (err: any) {
       setError('Failed to load data: ' + err.message);
@@ -396,7 +396,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     }
   };
 
-  // ???? LOAD SHIPMENT SETTINGS
+  // ⚙️ LOAD SHIPMENT SETTINGS
   const loadShipmentSettings = async () => {
     try {
       const response = await fetch('/api/shipment-settings', {
@@ -407,7 +407,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         const settings = data.settings || data;
         setShipmentSettings(settings);
 
-        // ???? LOAD SECTION ORDER FROM SETTINGS
+        // 📋 LOAD SECTION ORDER FROM SETTINGS
         if (settings.formSectionOrder) {
           try {
             const order = JSON.parse(settings.formSectionOrder);
@@ -715,7 +715,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             id={field.id}
             value={value}
             onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-white/80"
             placeholder={`Enter ${field.fieldName.toLowerCase()}`}
             required={field.isRequired}
           />
@@ -728,7 +728,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             id={field.id}
             value={value}
             onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-white/80"
             placeholder={`Enter ${field.fieldName.toLowerCase()}`}
             required={field.isRequired}
           />
@@ -741,7 +741,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             id={field.id}
             value={value}
             onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-white/80"
             required={field.isRequired}
           />
         );
@@ -752,7 +752,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
             id={field.id}
             value={value}
             onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-white/80"
             required={field.isRequired}
           >
             <option value="">Select {field.fieldName.toLowerCase()}</option>
@@ -770,7 +770,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
               id={field.id}
               checked={value === 'true'}
               onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.checked.toString() }))}
-              className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+              className="w-5 h-5 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
             />
             <label htmlFor={field.id} className="text-sm font-medium text-gray-700">
               {field.fieldName}
@@ -801,7 +801,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         throw new Error(`Cannot receive shipment: ${contractValidity?.message || 'Contract has expired or is suspended. Please renew the contract.'}`);
       }
 
-      // ???? VALIDATE AGAINST SHIPMENT SETTINGS
+      // ✅ VALIDATE AGAINST SHIPMENT SETTINGS
       if (!formData.clientName) {
         throw new Error('Client name is required');
       }
@@ -818,7 +818,7 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
         throw new Error('Rack assignment is required by company settings');
       }
 
-      // ???? ADDITIONAL CONDITIONAL VALIDATIONS
+      // ✅ ADDITIONAL CONDITIONAL VALIDATIONS
       if (shipmentSettings.requireClientAddress && !formData.clientAddress) {
         throw new Error('Client address is required by company settings');
       }
@@ -965,22 +965,282 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
     }
   };
 
+  // 🎯 STEP WIZARD STATE (must be before early return for hooks ordering)
+  const [currentStep, setCurrentStep] = useState(0);
+  const totalSteps = 5;
+
+  const stepLabels = [
+    { label: 'Client Info', icon: '👤', desc: 'Client & company details' },
+    { label: 'Shipment Details', icon: '📋', desc: 'Intake mode, pallets, boxes' },
+    { label: 'Dimensions', icon: '📐', desc: 'Size, weight & volume' },
+    { label: 'Photos & Notes', icon: '📷', desc: 'Pallet photos & instructions' },
+    { label: 'Review', icon: '✅', desc: 'Review & submit' },
+  ];
+
   if (!isOpen) return null;
 
   const estimatedCost = calculateEstimatedCost();
 
-  // ???? SECTION RENDER FUNCTIONS
-  const renderBasicSection = () => (
-    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 space-y-4">
-      <div>
-        <h3 className="text-lg font-semibold mb-4 text-blue-800 flex items-center">
-          Basic Shipment Info
-        </h3>
+  // 🎨 RENDER FUNCTIONS
 
-        {/* INTAKE MODE TOGGLE */}
-        <div className="bg-white p-3 rounded-lg border-2 border-blue-300 mb-4">
-          <p className="text-sm font-medium text-gray-700 mb-3">Intake Mode:</p>
-          <div className="flex gap-3">
+  const renderStepIndicator = () => (
+    <div className="relative px-4 py-6">
+      {/* Background track */}
+      <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-gray-200 -translate-y-1/2" />
+      <div
+        className="absolute top-1/2 left-10 h-0.5 bg-gradient-to-r from-blue-500 to-indigo-600 -translate-y-1/2 transition-all duration-500 ease-out"
+        style={{ width: `${(currentStep / (totalSteps - 1)) * 100}%`, maxWidth: 'calc(100% - 5rem)' }}
+      />
+      <div className="relative flex justify-between">
+        {stepLabels.map((step, idx) => {
+          const isCompleted = idx < currentStep;
+          const isCurrent = idx === currentStep;
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => {
+                // Allow going back but not forward past completed steps or current
+                if (idx <= currentStep) setCurrentStep(idx);
+              }}
+              className={`flex flex-col items-center gap-1 group transition-all duration-300 ${
+                isCurrent ? 'scale-110' : ''
+              }`}
+            >
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 ${
+                  isCompleted
+                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-blue-500 text-white shadow-lg shadow-blue-200'
+                    : isCurrent
+                    ? 'bg-white border-blue-500 text-blue-600 shadow-lg shadow-blue-100'
+                    : 'bg-white border-gray-300 text-gray-400'
+                }`}
+              >
+                {isCompleted ? (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <span className={isCurrent ? 'text-blue-600' : ''}>{idx + 1}</span>
+                )}
+              </div>
+              <div className="hidden sm:flex flex-col items-center">
+                <span
+                  className={`text-xs font-semibold transition-colors duration-200 ${
+                    isCurrent ? 'text-blue-600' : isCompleted ? 'text-blue-500' : 'text-gray-400'
+                  }`}
+                >
+                  {step.label}
+                </span>
+                <span className="text-[10px] text-gray-400 hidden lg:block">{step.desc}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderClientInfoStep = () => (
+    <div className="animate-fadeIn space-y-5">
+      {/* Company Profile Card */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🏢</span>
+            <h3 className="text-white font-semibold text-sm">Company Profile</h3>
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Select Company <span className="text-gray-400">(optional)</span>
+              </label>
+              <div className="relative">
+                <select
+                  name="companyProfileId"
+                  value={formData.companyProfileId}
+                  onChange={handleChange}
+                  className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 appearance-none bg-white ${
+                    contractValidity?.hasContract && !contractValidity?.canOperate
+                      ? 'border-red-400 bg-red-50/50'
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <option value="">Select company (optional)</option>
+                  {companyProfiles.map(profile => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </span>
+              </div>
+
+              {/* Contract Status Indicators */}
+              {checkingContract && (
+                <div className="mt-3 flex items-center gap-2 text-sm text-gray-500 bg-gray-50 rounded-xl px-4 py-3">
+                  <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                  Checking contract status...
+                </div>
+              )}
+
+              {contractValidity?.hasContract && !contractValidity?.canOperate && (
+                <div className="mt-3 p-4 bg-red-50 border border-red-200 rounded-xl animate-shake">
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl flex-shrink-0">⛔</span>
+                    <div>
+                      <p className="text-sm font-bold text-red-700">
+                        CONTRACT {contractValidity.isExpired ? 'EXPIRED' : contractValidity.isSuspended ? 'SUSPENDED' : 'BLOCKED'}
+                      </p>
+                      <p className="text-xs text-red-600 mt-0.5">
+                        {contractValidity.message || 'This customer\'s contract has expired or is suspended. Please renew the contract to receive shipments.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {contractValidity?.hasContract && contractValidity?.canOperate && (
+                <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-700">Contract Active</p>
+                      <p className="text-xs text-emerald-600">{contractValidity.monthlyRate} {pricing.currency}/month</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Client Information Card */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">👤</span>
+            <h3 className="text-white font-semibold text-sm">Client Information</h3>
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Client Name <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  name="clientName"
+                  value={formData.clientName}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 hover:border-indigo-300"
+                  placeholder="John Doe"
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Phone Number {shipmentSettings.requireClientPhone && <span className="text-red-500">*</span>}
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                </span>
+                <input
+                  type="tel"
+                  name="clientPhone"
+                  value={formData.clientPhone}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 hover:border-indigo-300"
+                  placeholder="+965 1234 5678"
+                  required={shipmentSettings.requireClientPhone}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Email Address {shipmentSettings.requireClientEmail && <span className="text-red-500">*</span>}
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </span>
+                <input
+                  type="email"
+                  name="clientEmail"
+                  value={formData.clientEmail}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 hover:border-indigo-300"
+                  placeholder="john@example.com"
+                />
+              </div>
+            </div>
+
+            {shipmentSettings.showClientAddress !== false && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Address {shipmentSettings.requireClientAddress && <span className="text-red-500">*</span>}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </span>
+                  <input
+                    type="text"
+                    name="clientAddress"
+                    value={formData.clientAddress}
+                    onChange={handleChange}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 hover:border-indigo-300"
+                    placeholder="Street address, city"
+                    required={shipmentSettings.requireClientAddress}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderShipmentDetailsStep = () => (
+    <div className="animate-fadeIn space-y-5">
+      {/* Intake Mode Toggle */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-amber-100 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📦</span>
+            <h3 className="text-white font-semibold text-sm">Intake Mode</h3>
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="flex gap-4">
             <button
               type="button"
               onClick={() => {
@@ -997,12 +1257,28 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 setBoxesDistribution([1]);
                 setExtraBoxes(0);
               }}
-              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${intakeMode === 'pallet'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+              className={`flex-1 relative overflow-hidden rounded-xl px-5 py-4 font-semibold text-sm transition-all duration-300 ${
+                intakeMode === 'pallet'
+                  ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-200'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+              }`}
             >
-              Pallet Mode
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-2xl">📦</span>
+                <div className="text-left">
+                  <div className="font-bold">Pallet Mode</div>
+                  <div className={`text-xs ${intakeMode === 'pallet' ? 'text-amber-100' : 'text-gray-400'}`}>
+                    Organized by pallets
+                  </div>
+                </div>
+              </div>
+              {intakeMode === 'pallet' && (
+                <div className="absolute top-2 right-2">
+                  <svg className="w-5 h-5 text-white/80" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              )}
             </button>
             <button
               type="button"
@@ -1020,164 +1296,219 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                 setBoxesDistribution([]);
                 setExtraBoxes(0);
               }}
-              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${intakeMode === 'box'
-                ? 'bg-green-600 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+              className={`flex-1 relative overflow-hidden rounded-xl px-5 py-4 font-semibold text-sm transition-all duration-300 ${
+                intakeMode === 'box'
+                  ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-200'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+              }`}
             >
-              Box Mode
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-2xl">📋</span>
+                <div className="text-left">
+                  <div className="font-bold">Box Mode</div>
+                  <div className={`text-xs ${intakeMode === 'box' ? 'text-emerald-100' : 'text-gray-400'}`}>
+                    Individual boxes
+                  </div>
+                </div>
+              </div>
+              {intakeMode === 'box' && (
+                <div className="absolute top-2 right-2">
+                  <svg className="w-5 h-5 text-white/80" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              )}
             </button>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-3">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Company Profile
-          </label>
-          <select
-            name="companyProfileId"
-            value={formData.companyProfileId}
-            onChange={handleChange}
-            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${contractValidity?.hasContract && !contractValidity?.canOperate
-              ? 'border-red-500 bg-red-50'
-              : 'border-gray-300'
-              }`}
-          >
-            <option value="">Select company (optional)</option>
-            {companyProfiles.map(profile => (
-              <option key={profile.id} value={profile.id}>
-                {profile.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Checking Contract Status */}
-          {checkingContract && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-              Checking contract status...
+      {/* Basic Info Card */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-sky-100 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-sky-500 to-cyan-600 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🔖</span>
+            <h3 className="text-white font-semibold text-sm">Basic Shipment Info</h3>
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Barcode ID
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  name="barcode"
+                  value={formData.barcode}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 font-mono text-sm text-gray-800"
+                  readOnly
+                />
+              </div>
             </div>
-          )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Arrival Date <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </span>
+                <input
+                  type="date"
+                  name="arrivalDate"
+                  value={formData.arrivalDate}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all duration-200 hover:border-sky-300"
+                  required
+                />
+              </div>
+            </div>
 
-          {/* Contract Expired/Suspended Warning */}
-          {contractValidity?.hasContract && !contractValidity?.canOperate && (
-            <div className="mt-2 p-3 bg-red-100 border border-red-300 rounded-lg">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">⛔</span>
+            {/* PALLET MODE FIELDS */}
+            {intakeMode === 'pallet' && (
+              <>
                 <div>
-                  <p className="text-sm font-semibold text-red-700">
-                    CONTRACT {contractValidity.isExpired ? 'EXPIRED' : contractValidity.isSuspended ? 'SUSPENDED' : 'BLOCKED'} - SHIPMENT BLOCKED
-                  </p>
-                  <p className="text-xs text-red-600">
-                    {contractValidity.message || 'This customer\'s contract has expired or is suspended. Please renew the contract to receive shipments.'}
-                  </p>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Pallet Count <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500">
+                      📦
+                    </span>
+                    <input
+                      type="number"
+                      name="palletCount"
+                      value={formData.palletCount || ''}
+                      onChange={(e) => {
+                        const value = Math.max(1, parseInt(e.target.value) || 1);
+                        setFormData(prev => ({
+                          ...prev,
+                          palletCount: value,
+                          pieces: value * (prev.boxesPerPallet || 1)
+                        }));
+                      }}
+                      onBlur={(e) => {
+                        // Ensure minimum 1 on blur (when user leaves field)
+                        if (!e.target.value || parseInt(e.target.value) < 1) {
+                          setFormData(prev => ({ ...prev, palletCount: 1, pieces: 1 * (prev.boxesPerPallet || 1) }));
+                        }
+                      }}
+                      className="w-full pl-10 pr-4 py-3 border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 bg-amber-50/50 hover:border-amber-300"
+                      min="1"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Boxes per Pallet <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500">
+                      📋
+                    </span>
+                    <input
+                      type="number"
+                      name="boxesPerPallet"
+                      value={formData.boxesPerPallet || ''}
+                      onChange={(e) => {
+                        const value = Math.max(1, parseInt(e.target.value) || 1);
+                        setFormData(prev => ({
+                          ...prev,
+                          boxesPerPallet: value,
+                          pieces: (prev.palletCount || 1) * value
+                        }));
+                      }}
+                      onBlur={(e) => {
+                        // Ensure minimum 1 on blur
+                        if (!e.target.value || parseInt(e.target.value) < 1) {
+                          setFormData(prev => ({ ...prev, boxesPerPallet: 1, pieces: (prev.palletCount || 1) * 1 }));
+                        }
+                      }}
+                      className="w-full pl-10 pr-4 py-3 border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 bg-amber-50/50 hover:border-amber-300"
+                      min="1"
+                      required
+                      disabled={variablePerPallet}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* BOX MODE FIELDS */}
+            {intakeMode === 'box' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Total Boxes <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500">
+                    📋
+                  </span>
+                  <input
+                    type="number"
+                    name="pieces"
+                    value={formData.pieces || ''}
+                    onChange={(e) => {
+                      const value = Math.max(1, parseInt(e.target.value) || 1);
+                      setFormData(prev => ({
+                        ...prev,
+                        pieces: value
+                      }));
+                    }}
+                    onBlur={(e) => {
+                      // Ensure minimum 1 on blur
+                      if (!e.target.value || parseInt(e.target.value) < 1) {
+                        setFormData(prev => ({ ...prev, pieces: 1 }));
+                      }
+                    }}
+                    className="w-full pl-10 pr-4 py-3 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 bg-emerald-50/50 hover:border-emerald-300"
+                    min="1"
+                    required
+                  />
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Contract Valid Badge */}
-          {contractValidity?.hasContract && contractValidity?.canOperate && (
-            <div className="mt-2 p-2 bg-blue-100 border border-blue-300 rounded-lg">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">📄</span>
-                <span className="text-sm font-medium text-blue-700">
-                  Contract Customer - {contractValidity.monthlyRate} KWD/month ✓
-                </span>
+            {/* AUTO-CALCULATED TOTAL BOXES (for pallet mode) */}
+            {intakeMode === 'pallet' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Total Boxes (auto)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  </span>
+                  <input
+                    type="number"
+                    name="pieces"
+                    value={formData.pieces}
+                    readOnly
+                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-700 font-medium"
+                  />
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Barcode ID
-          </label>
-          <input
-            type="text"
-            name="barcode"
-            value={formData.barcode}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 font-mono text-lg"
-            readOnly
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Arrival Date <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            name="arrivalDate"
-            value={formData.arrivalDate}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            required
-          />
-        </div>
+            )}
+          </div>
 
-        {/* PALLET MODE FIELDS */}
-        {intakeMode === 'pallet' && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Pallet Count <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                name="palletCount"
-                value={formData.palletCount || ''}
-                onChange={(e) => {
-                  const value = Math.max(1, parseInt(e.target.value) || 1);
-                  setFormData(prev => ({
-                    ...prev,
-                    palletCount: value,
-                    pieces: value * (prev.boxesPerPallet || 1)
-                  }));
-                }}
-                onBlur={(e) => {
-                  // Ensure minimum 1 on blur (when user leaves field)
-                  if (!e.target.value || parseInt(e.target.value) < 1) {
-                    setFormData(prev => ({ ...prev, palletCount: 1, pieces: 1 * (prev.boxesPerPallet || 1) }));
-                  }
-                }}
-                className="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50"
-                min="1"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Boxes per Pallet <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                name="boxesPerPallet"
-                value={formData.boxesPerPallet || ''}
-                onChange={(e) => {
-                  const value = Math.max(1, parseInt(e.target.value) || 1);
-                  setFormData(prev => ({
-                    ...prev,
-                    boxesPerPallet: value,
-                    pieces: (prev.palletCount || 1) * value
-                  }));
-                }}
-                onBlur={(e) => {
-                  // Ensure minimum 1 on blur
-                  if (!e.target.value || parseInt(e.target.value) < 1) {
-                    setFormData(prev => ({ ...prev, boxesPerPallet: 1, pieces: (prev.palletCount || 1) * 1 }));
-                  }
-                }}
-                className="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50"
-                min="1"
-                required
-                disabled={variablePerPallet}
-              />
-            </div>
-            <div className="md:col-span-3">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-3">
-                <div className="flex items-center gap-3">
+          {/* Variable Per Pallet Section */}
+          {intakeMode === 'pallet' && (
+            <div className="mt-5 pt-5 border-t border-amber-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="relative inline-flex items-center cursor-pointer">
                   <input
                     id="variablePerPallet"
                     type="checkbox"
@@ -1198,922 +1529,911 @@ export default function WHMShipmentModal({ isOpen, onClose, onSuccess }: WHMShip
                         setFormData(prev => ({ ...prev, pieces: palletCount * bpp }));
                       }
                     }}
-                    className="w-5 h-5"
+                    className="sr-only peer"
                   />
-                  <label htmlFor="variablePerPallet" className="text-sm font-medium text-blue-900">Variable boxes per pallet + extra loose boxes</label>
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
                 </div>
-                {variablePerPallet && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {Array.from({ length: Math.max(getSafeNumber(formData.palletCount, 0), 0) }, (_, idx) => idx).map((idx) => (
-                        <div key={`bpp-${idx}`} className="bg-white border border-blue-200 rounded-md p-2">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Pallet #{idx + 1} boxes</label>
-                          <input
-                            type="number"
-                            min={0}
-                            value={boxesDistribution[idx] ?? 0}
-                            onChange={(ev) => {
-                              const val = parseInt(ev.target.value) || 0;
-                              setBoxesDistribution(prev => {
-                                const next = prev.slice();
-                                next[idx] = Math.max(0, val);
-                                return next;
-                              });
-                            }}
-                            className="w-full px-2 py-2 border border-gray-300 rounded"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="max-w-xs">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Extra loose boxes (not on pallets)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={extraBoxes}
-                        onChange={(ev) => setExtraBoxes(Math.max(0, parseInt(ev.target.value) || 0))}
-                        className="w-full px-2 py-2 border border-gray-300 rounded"
-                      />
-                    </div>
-                  </div>
-                )}
+                <label htmlFor="variablePerPallet" className="text-sm font-medium text-amber-900">
+                  Variable boxes per pallet + extra loose boxes
+                </label>
               </div>
-            </div>
-          </>
-        )}
-
-        {/* BOX MODE FIELDS */}
-        {intakeMode === 'box' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Total Boxes <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              name="pieces"
-              value={formData.pieces || ''}
-              onChange={(e) => {
-                const value = Math.max(1, parseInt(e.target.value) || 1);
-                setFormData(prev => ({
-                  ...prev,
-                  pieces: value
-                }));
-              }}
-              onBlur={(e) => {
-                // Ensure minimum 1 on blur
-                if (!e.target.value || parseInt(e.target.value) < 1) {
-                  setFormData(prev => ({ ...prev, pieces: 1 }));
-                }
-              }}
-              className="w-full px-4 py-3 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-green-50"
-              min="1"
-              required
-            />
-          </div>
-        )}
-
-        {/* AUTO-CALCULATED TOTAL BOXES (for pallet mode) */}
-        {intakeMode === 'pallet' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Total Boxes (auto)
-            </label>
-            <input
-              type="number"
-              name="pieces"
-              value={formData.pieces}
-              readOnly
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-        )}
-
-        {intakeMode === 'pallet' && (() => {
-          const palletCountValue = Math.max(getSafeNumber(formData.palletCount, 0), 0);
-          if (palletCountValue === 0) return null;
-          const palletNumbers = Array.from({ length: palletCountValue }, (_, idx) => idx + 1);
-
-          return (
-            <div className="md:col-span-3">
-              <div className="bg-white border-2 border-blue-200 rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-blue-800 flex items-center gap-2">
-                    Pallet Photos (optional)
-                  </h4>
-                  <span className="text-xs text-gray-500">
-                    {palletNumbers.length} pallet{palletNumbers.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {palletNumbers.map((palletNumber) => {
-                    const photos = palletPhotoMap[palletNumber] || [];
-                    const isUploading = palletUploadState[palletNumber];
-                    return (
-                      <div
-                        key={`pallet-${palletNumber}`}
-                        className="border border-blue-100 rounded-lg p-3 bg-blue-50/60"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <p className="text-xs font-semibold text-blue-700 uppercase">Pallet #{palletNumber}</p>
-                            <p className="text-[11px] text-gray-500">Add up to 5 photos for reference</p>
-                          </div>
-                          {photos.length > 0 && (
-                            <span className="text-xs font-medium text-blue-600">{photos.length} photo{photos.length !== 1 ? 's' : ''}</span>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-blue-300 rounded-md py-6 hover:border-blue-500 hover:bg-blue-100/40 transition-colors cursor-pointer text-center text-xs text-blue-700 font-medium">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              className="hidden"
-                              onChange={(event) => {
-                                handlePalletPhotoUpload(palletNumber, event.target.files);
-                                event.target.value = '';
-                              }}
-                              disabled={isUploading || photos.length >= 5}
-                            />
-                            {isUploading
-                              ? 'Uploading...'
-                              : photos.length >= 5
-                                ? 'Limit reached'
-                                : 'Upload Photos'}
-                          </label>
-                          {photos.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {photos.map((photoUrl, index) => (
-                                <div key={`${palletNumber}-photo-${index}`} className="relative">
-                                  <img
-                                    src={resolveMediaUrl(photoUrl)}
-                                    alt={`Pallet ${palletNumber} photo ${index + 1}`}
-                                    className="h-16 w-16 object-cover rounded-md border border-blue-200"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemovePalletPhoto(palletNumber, index)}
-                                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white text-xs flex items-center justify-center shadow"
-                                    title="Remove photo"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+              {variablePerPallet && (
+                <div className="bg-amber-50/70 rounded-xl p-4 border border-amber-200 space-y-4 animate-fadeIn">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {Array.from({ length: Math.max(getSafeNumber(formData.palletCount, 0), 0) }, (_, idx) => idx).map((idx) => (
+                      <div key={`bpp-${idx}`} className="bg-white border border-amber-200 rounded-xl p-3">
+                        <label className="block text-xs font-semibold text-amber-800 mb-1.5">
+                          🎯 Pallet #{idx + 1} boxes
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={boxesDistribution[idx] ?? 0}
+                          onChange={(ev) => {
+                            const val = parseInt(ev.target.value) || 0;
+                            setBoxesDistribution(prev => {
+                              const next = prev.slice();
+                              next[idx] = Math.max(0, val);
+                              return next;
+                            });
+                          }}
+                          className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        />
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* DIMENSIONS & CBM SECTION - MULTI DIMENSION */}
-        <div className="md:col-span-3">
-          <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-semibold text-slate-800">
-                📦 Shipment Dimensions & Volume
-              </h4>
-              <div className="flex items-center gap-3">
-                {/* Toggle for Direct CBM vs Dimensions */}
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs ${!useDirectCBM ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>
-                    Multi-Dim
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setUseDirectCBM(!useDirectCBM)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useDirectCBM ? 'bg-blue-600' : 'bg-slate-300'}`}
-                  >
-                    <span
-                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${useDirectCBM ? 'translate-x-5' : 'translate-x-1'}`}
+                    ))}
+                  </div>
+                  <div className="max-w-xs">
+                    <label className="block text-xs font-semibold text-amber-800 mb-1.5">
+                      📤 Extra loose boxes (not on pallets)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={extraBoxes}
+                      onChange={(ev) => setExtraBoxes(Math.max(0, parseInt(ev.target.value) || 0))}
+                      className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
-                  </button>
-                  <span className={`text-xs ${useDirectCBM ? 'text-blue-700 font-medium' : 'text-slate-400'}`}>
-                    Direct CBM
-                  </span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
-            {useDirectCBM ? (
-              /* Direct CBM Input */
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    CBM (m³) - Direct Input
-                  </label>
+  const renderDimensionsStep = () => (
+    <div className="animate-fadeIn space-y-5">
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-violet-100 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-5 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📐</span>
+              <h3 className="text-white font-semibold text-sm">Shipment Dimensions & Volume</h3>
+            </div>
+            {/* Toggle for Direct CBM vs Dimensions */}
+            <div className="flex items-center gap-2 bg-white/20 rounded-lg px-3 py-1.5">
+              <span className={`text-xs font-medium ${!useDirectCBM ? 'text-white' : 'text-white/60'}`}>
+                Multi-Dim
+              </span>
+              <button
+                type="button"
+                onClick={() => setUseDirectCBM(!useDirectCBM)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useDirectCBM ? 'bg-white/80' : 'bg-white/40'}`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${useDirectCBM ? 'translate-x-[18px]' : 'translate-x-1'}`}
+                />
+              </button>
+              <span className={`text-xs font-medium ${useDirectCBM ? 'text-white' : 'text-white/60'}`}>
+                Direct CBM
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="p-5">
+          {useDirectCBM ? (
+            /* Direct CBM Input */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  CBM (m³) - Direct Input
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-violet-500 font-bold text-sm">m³</span>
                   <input
                     type="number"
                     name="directCBM"
                     value={formData.directCBM || ''}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="w-full pl-11 pr-4 py-3 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all duration-200 hover:border-violet-300"
                     placeholder="0.680"
                     min="0"
                     step="0.001"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Weight (kg)
-                  </label>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Weight (kg)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                    </svg>
+                  </span>
                   <input
                     type="number"
                     name="weight"
                     value={formData.weight || ''}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="w-full pl-10 pr-4 py-3 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all duration-200 hover:border-violet-300"
                     placeholder="0"
                     min="0"
                     step="0.1"
                   />
                 </div>
               </div>
-            ) : (
-              /* Multi-Dimension Inputs */
-              <div className="space-y-3">
-                {/* Header Row */}
-                <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-600 px-1">
-                  <div className="col-span-1">Item</div>
-                  <div className="col-span-2">Length (cm)</div>
-                  <div className="col-span-2">Width (cm)</div>
-                  <div className="col-span-2">Height (cm)</div>
-                  <div className="col-span-1">Weight</div>
-                  <div className="col-span-1">Qty</div>
-                  <div className="col-span-2">CBM</div>
-                  <div className="col-span-1"></div>
+            </div>
+          ) : (
+            /* Multi-Dimension Inputs */
+            <div className="space-y-4">
+              {/* Table Header */}
+              <div className="hidden md:grid grid-cols-12 gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
+                <div className="col-span-1">Item</div>
+                <div className="col-span-2">Length (cm)</div>
+                <div className="col-span-2">Width (cm)</div>
+                <div className="col-span-2">Height (cm)</div>
+                <div className="col-span-1">Weight</div>
+                <div className="col-span-1">Qty</div>
+                <div className="col-span-2">CBM</div>
+                <div className="col-span-1"></div>
+              </div>
+
+              {/* Dimension Rows */}
+              {dimensions.map((dim, index) => {
+                // Generate label based on ID
+                let label = `#${index + 1}`;
+                if (dim.id.startsWith('pallet-')) {
+                  label = `📦 P${dim.id.replace('pallet-', '')}`;
+                } else if (dim.id === 'loose-boxes') {
+                  label = `📤 Loose`;
+                } else if (dim.id === 'all-boxes') {
+                  label = `📦 Boxes`;
+                }
+
+                return (
+                  <div key={dim.id} className="grid grid-cols-2 md:grid-cols-12 gap-2 items-center bg-gray-50/70 rounded-xl p-3 md:p-2 border border-gray-100 hover:border-violet-200 transition-all">
+                    <div className="col-span-2 md:col-span-1">
+                      <span className="inline-block text-xs font-bold text-violet-600 bg-violet-50 px-2.5 py-1.5 rounded-lg border border-violet-200">
+                        {label}
+                      </span>
+                    </div>
+                    <div className="col-span-2 md:col-span-2">
+                      <input
+                        type="number"
+                        value={dim.length || ''}
+                        onChange={(e) => updateDimension(dim.id, 'length', parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-violet-500 focus:border-violet-500 bg-white"
+                        placeholder="L"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                    <div className="col-span-2 md:col-span-2">
+                      <input
+                        type="number"
+                        value={dim.width || ''}
+                        onChange={(e) => updateDimension(dim.id, 'width', parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-violet-500 focus:border-violet-500 bg-white"
+                        placeholder="W"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                    <div className="col-span-2 md:col-span-2">
+                      <input
+                        type="number"
+                        value={dim.height || ''}
+                        onChange={(e) => updateDimension(dim.id, 'height', parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-violet-500 focus:border-violet-500 bg-white"
+                        placeholder="H"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                    <div className="col-span-1 md:col-span-1">
+                      <input
+                        type="number"
+                        value={dim.weight || ''}
+                        onChange={(e) => updateDimension(dim.id, 'weight', parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-violet-500 focus:border-violet-500 bg-white"
+                        placeholder="kg"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                    <div className="col-span-1 md:col-span-1">
+                      <input
+                        type="number"
+                        value={dim.qty || 1}
+                        onChange={(e) => updateDimension(dim.id, 'qty', parseInt(e.target.value) || 1)}
+                        className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-violet-500 focus:border-violet-500 bg-white"
+                        min="1"
+                      />
+                    </div>
+                    <div className="col-span-2 md:col-span-2">
+                      <div className="px-3 py-2 bg-violet-50 rounded-lg text-sm font-semibold text-violet-700 text-center border border-violet-200">
+                        {dim.cbm.toFixed(4)}
+                      </div>
+                    </div>
+                    <div className="col-span-1 md:col-span-1 flex justify-center">
+                      {dimensions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeDimension(dim.id)}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Remove row"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Add Row Button */}
+              <button
+                type="button"
+                onClick={addDimension}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-violet-600 hover:text-violet-700 hover:bg-violet-50 rounded-xl border-2 border-dashed border-violet-200 hover:border-violet-400 transition-all w-full justify-center"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Dimension Row
+              </button>
+
+              {/* Totals */}
+              <div className="mt-5 pt-4 border-t border-gray-200">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-violet-50 to-purple-50 p-4 rounded-xl border border-violet-200 text-center">
+                    <div className="text-xs font-medium text-violet-600 mb-1">Total CBM</div>
+                    <div className="text-xl font-bold text-violet-800">{dimensionsTotal.cbm.toFixed(4)} m³</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200 text-center">
+                    <div className="text-xs font-medium text-blue-600 mb-1">Total Weight</div>
+                    <div className="text-xl font-bold text-blue-800">{dimensionsTotal.weight.toFixed(2)} kg</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-4 rounded-xl border border-emerald-200 text-center">
+                    <div className="text-xs font-medium text-emerald-600 mb-1">Total Pieces</div>
+                    <div className="text-xl font-bold text-emerald-800">{dimensionsTotal.pieces}</div>
+                  </div>
                 </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
-                {/* Dimension Rows */}
-                {dimensions.map((dim, index) => {
-                  // Generate label based on ID
-                  let label = `#${index + 1}`;
-                  if (dim.id.startsWith('pallet-')) {
-                    label = `📦 P${dim.id.replace('pallet-', '')}`;
-                  } else if (dim.id === 'loose-boxes') {
-                    label = `📤 Loose`;
-                  } else if (dim.id === 'all-boxes') {
-                    label = `📦 Boxes`;
-                  }
+  const renderPhotosAndNotesStep = () => (
+    <div className="animate-fadeIn space-y-5">
+      {/* Warehouse Shipment Toggle */}
+      {shipmentSettings.showWarehouseMode !== false && (
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-orange-100 shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-orange-500 to-red-500 px-5 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🏭</span>
+              <h3 className="text-white font-semibold text-sm">Warehouse Mode</h3>
+            </div>
+          </div>
+          <div className="p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="isWarehouseShipment"
+                  name="isWarehouseShipment"
+                  checked={formData.isWarehouseShipment}
+                  onChange={handleChange}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+              </div>
+              <label htmlFor="isWarehouseShipment" className="text-sm font-medium text-orange-900">
+                This is a warehouse shipment (import/export with shipper/consignee details)
+              </label>
+            </div>
 
-                  return (
-                    <div key={dim.id} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-1">
-                        <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                          {label}
+            {formData.isWarehouseShipment && (
+              <div className="bg-orange-50/70 rounded-xl p-5 border border-orange-200 space-y-4 animate-slideDown">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Shipper Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="shipper"
+                      value={formData.shipper}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 bg-white hover:border-orange-300"
+                      placeholder="ABC Trading Company"
+                      required={formData.isWarehouseShipment}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Consignee Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="consignee"
+                      value={formData.consignee}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 bg-white hover:border-orange-300"
+                      placeholder="XYZ Imports LLC"
+                      required={formData.isWarehouseShipment}
+                    />
+                  </div>
+                  {shipmentSettings.showWeight !== false && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Weight (kg) {shipmentSettings.requireWeight && <span className="text-red-500">*</span>}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                          </svg>
                         </span>
-                      </div>
-                      <div className="col-span-2">
                         <input
                           type="number"
-                          value={dim.length || ''}
-                          onChange={(e) => updateDimension(dim.id, 'length', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="0"
-                          min="0"
-                          step="0.1"
+                          name="weight"
+                          value={formData.weight}
+                          onChange={handleChange}
+                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 bg-white hover:border-orange-300"
+                          placeholder="0.00"
+                          step="0.01"
+                          required={shipmentSettings.requireWeight}
                         />
                       </div>
-                      <div className="col-span-2">
-                        <input
-                          type="number"
-                          value={dim.width || ''}
-                          onChange={(e) => updateDimension(dim.id, 'width', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="0"
-                          min="0"
-                          step="0.1"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <input
-                          type="number"
-                          value={dim.height || ''}
-                          onChange={(e) => updateDimension(dim.id, 'height', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="0"
-                          min="0"
-                          step="0.1"
-                        />
-                      </div>
-                      <div className="col-span-1">
-                        <input
-                          type="number"
-                          value={dim.weight || ''}
-                          onChange={(e) => updateDimension(dim.id, 'weight', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="0"
-                          min="0"
-                          step="0.1"
-                        />
-                      </div>
-                      <div className="col-span-1">
-                        <input
-                          type="number"
-                          value={dim.qty || 1}
-                          onChange={(e) => updateDimension(dim.id, 'qty', parseInt(e.target.value) || 1)}
-                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                          min="1"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <div className="px-2 py-1.5 bg-slate-100 rounded text-sm font-medium text-slate-700 text-center">
-                          {dim.cbm.toFixed(4)}
+                    </div>
+                  )}
+                  {shipmentSettings.showDimensions !== false && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Dimensions (L×W×H) {shipmentSettings.requireDimensions && <span className="text-red-500">*</span>}
+                      </label>
+                      <input
+                        type="text"
+                        name="dimensions"
+                        value={formData.dimensions}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 bg-white hover:border-orange-300"
+                        placeholder="100×50×30 cm"
+                        required={shipmentSettings.requireDimensions}
+                      />
+                    </div>
+                  )}
+                  {shipmentSettings.showDescription !== false && (
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Description {shipmentSettings.requireDescription && <span className="text-red-500">*</span>}
+                      </label>
+                      <textarea
+                        name="description"
+                        value={formData.description}
+                        onChange={handleChange}
+                        rows={3}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 bg-white hover:border-orange-300 resize-none"
+                        placeholder="Describe the shipment contents..."
+                        required={shipmentSettings.requireDescription}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Pallet Photos */}
+      {intakeMode === 'pallet' && (() => {
+        const palletCountValue = Math.max(getSafeNumber(formData.palletCount, 0), 0);
+        if (palletCountValue === 0) return null;
+        const palletNumbers = Array.from({ length: palletCountValue }, (_, idx) => idx + 1);
+
+        return (
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-sky-100 shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-sky-500 to-blue-600 px-5 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">📸</span>
+                  <h3 className="text-white font-semibold text-sm">Pallet Photos</h3>
+                </div>
+                <span className="text-xs text-white/80 bg-white/20 px-2.5 py-1 rounded-lg">
+                  {palletNumbers.length} pallet{palletNumbers.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+            <div className="p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {palletNumbers.map((palletNumber) => {
+                  const photos = palletPhotoMap[palletNumber] || [];
+                  const isUploading = palletUploadState[palletNumber];
+                  return (
+                    <div
+                      key={`pallet-${palletNumber}`}
+                      className="border border-sky-200 rounded-xl p-4 bg-gradient-to-br from-sky-50 to-blue-50/50 hover:shadow-md transition-all duration-200"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="text-sm font-bold text-sky-800">📦 Pallet #{palletNumber}</p>
+                          <p className="text-[11px] text-sky-500">Add up to 5 photos</p>
                         </div>
+                        {photos.length > 0 && (
+                          <span className="text-xs font-semibold text-sky-600 bg-sky-100 px-2 py-1 rounded-lg">
+                            {photos.length}
+                          </span>
+                        )}
                       </div>
-                      <div className="col-span-1 flex justify-center">
-                        {dimensions.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeDimension(dim.id)}
-                            className="p-1 text-red-500 hover:bg-red-50 rounded"
-                            title="Remove row"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                      <div className="space-y-3">
+                        <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl py-8 transition-all duration-200 cursor-pointer ${
+                          photos.length >= 5
+                            ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                            : 'border-sky-300 hover:border-sky-500 bg-white/60 hover:bg-sky-50'
+                        }`}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={(event) => {
+                              handlePalletPhotoUpload(palletNumber, event.target.files);
+                              event.target.value = '';
+                            }}
+                            disabled={isUploading || photos.length >= 5}
+                          />
+                          {isUploading ? (
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-8 h-8 border-3 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+                              <span className="text-xs font-medium text-sky-600">Uploading...</span>
+                            </div>
+                          ) : photos.length >= 5 ? (
+                            <>
+                              <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                              <span className="text-xs font-medium text-gray-400">Limit reached</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-10 h-10 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span className="text-xs font-semibold text-sky-600">Upload Photos</span>
+                              <span className="text-[10px] text-gray-400">Click or drag images</span>
+                            </>
+                          )}
+                        </label>
+                        {photos.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {photos.map((photoUrl, index) => (
+                              <div key={`${palletNumber}-photo-${index}`} className="relative group">
+                                <img
+                                  src={resolveMediaUrl(photoUrl)}
+                                  alt={`Pallet ${palletNumber} photo ${index + 1}`}
+                                  className="h-16 w-16 object-cover rounded-xl border-2 border-sky-200 shadow-sm"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePalletPhoto(palletNumber, index)}
+                                  className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                  title="Remove photo"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
-                {/* Add Row Button */}
-                <button
-                  type="button"
-                  onClick={addDimension}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+      {/* Notes & Special Instructions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {shipmentSettings.showNotes !== false && (
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-gray-600 to-gray-700 px-5 py-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📝</span>
+                <h3 className="text-white font-semibold text-sm">
+                  Additional Notes {shipmentSettings.requireNotes && <span className="text-red-300">*</span>}
+                </h3>
+              </div>
+            </div>
+            <div className="p-4">
+              <textarea
+                name="notes"
+                value={formData.notes}
+                onChange={handleChange}
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-200 bg-white resize-none"
+                placeholder="Any additional notes or comments..."
+                required={shipmentSettings.requireNotes}
+              />
+            </div>
+          </div>
+        )}
+
+        {shipmentSettings.showSpecialInstructions !== false && (
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-gray-600 to-gray-700 px-5 py-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⚡</span>
+                <h3 className="text-white font-semibold text-sm">Special Instructions</h3>
+              </div>
+            </div>
+            <div className="p-4">
+              <textarea
+                name="specialInstructions"
+                value={formData.specialInstructions}
+                onChange={handleChange}
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-200 bg-white resize-none"
+                placeholder="Any special handling or storage requirements..."
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderReviewStep = () => (
+    <div className="animate-fadeIn space-y-5">
+      {/* Storage Assignment */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🏗️</span>
+            <h3 className="text-white font-semibold text-sm">Storage Assignment</h3>
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Assign to Rack {shipmentSettings.requireRackAssignment && <span className="text-red-500">*</span>}
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
-                  Add Dimension Row
-                </button>
+                </span>
+                <select
+                  name="rackId"
+                  value={formData.rackId}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 bg-white appearance-none hover:border-emerald-300"
+                  required={shipmentSettings.requireRackAssignment}
+                >
+                  <option value="">{shipmentSettings.requireRackAssignment ? 'Select a rack (required)' : 'Select a rack (optional)'}</option>
+                  {racks.map(rack => (
+                    <option key={rack.id} value={rack.id}>
+                      {rack.code} - {rack.location} ({rack.capacityUsed}/{rack.capacityTotal})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-                {/* Totals */}
-                <div className="mt-4 pt-3 border-t border-slate-200">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="bg-blue-50 p-3 rounded-lg text-center">
-                      <div className="text-xs text-slate-600 mb-1">Total CBM</div>
-                      <div className="text-lg font-bold text-blue-700">{dimensionsTotal.cbm.toFixed(4)} m³</div>
-                    </div>
-                    <div className="bg-slate-100 p-3 rounded-lg text-center">
-                      <div className="text-xs text-slate-600 mb-1">Total Weight</div>
-                      <div className="text-lg font-bold text-slate-700">{dimensionsTotal.weight.toFixed(2)} kg</div>
-                    </div>
-                    <div className="bg-slate-100 p-3 rounded-lg text-center">
-                      <div className="text-xs text-slate-600 mb-1">Total Pieces</div>
-                      <div className="text-lg font-bold text-slate-700">{dimensionsTotal.pieces}</div>
-                    </div>
-                  </div>
+            {shipmentSettings.showEstimatedDays !== false && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Estimated Storage Days {shipmentSettings.requireEstimatedDays && <span className="text-red-500">*</span>}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </span>
+                  <input
+                    type="number"
+                    name="estimatedDays"
+                    value={formData.estimatedDays}
+                    onChange={handleChange}
+                    className="w-full pl-10 pr-4 py-3 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 bg-white hover:border-emerald-300"
+                    min="1"
+                    required={shipmentSettings.requireEstimatedDays}
+                  />
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
-    </div>
-  );
 
-  const renderClientSection = () => (
-    <div className="bg-gray-50 p-4 rounded-lg">
-      <h3 className="text-lg font-semibold mb-4 text-gray-800 flex items-center">
-        Client Information
-      </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Client Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            name="clientName"
-            value={formData.clientName}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="John Doe"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Phone Number {shipmentSettings.requireClientPhone && <span className="text-red-500">*</span>}
-          </label>
-          <input
-            type="tel"
-            name="clientPhone"
-            value={formData.clientPhone}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="+965 1234 5678"
-            required={shipmentSettings.requireClientPhone}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email Address {shipmentSettings.requireClientEmail && <span className="text-red-500">*</span>}
-          </label>
-          <input
-            type="email"
-            name="clientEmail"
-            value={formData.clientEmail}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="john@example.com"
-          />
-        </div>
-
-        {shipmentSettings.showClientAddress !== false && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Address {shipmentSettings.requireClientAddress && <span className="text-red-500">*</span>}
-            </label>
-            <input
-              type="text"
-              name="clientAddress"
-              value={formData.clientAddress}
-              onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Street address, city"
-              required={shipmentSettings.requireClientAddress}
-            />
+      {/* Custom Fields */}
+      {customFields.length > 0 && (
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-purple-100 shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-5 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🔧</span>
+              <h3 className="text-white font-semibold text-sm">Custom Fields</h3>
+            </div>
           </div>
-        )}
-      </div>
-    </div>
-  );
-
-  const renderWarehouseSection = () => {
-    if (shipmentSettings.showWarehouseMode === false) return null;
-
-    return (
-      <>
-        <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-          <div className="flex items-center space-x-3">
-            <input
-              type="checkbox"
-              id="isWarehouseShipment"
-              name="isWarehouseShipment"
-              checked={formData.isWarehouseShipment}
-              onChange={handleChange}
-              className="w-5 h-5 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500"
-            />
-            <label htmlFor="isWarehouseShipment" className="text-sm font-semibold text-orange-800">
-              This is a warehouse shipment (import/export with shipper/consignee details)
-            </label>
-          </div>
-        </div>
-
-        {formData.isWarehouseShipment && (
-          <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-            <h3 className="text-lg font-semibold mb-4 text-orange-800 flex items-center">
-              Warehouse Details
-            </h3>
+          <div className="p-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Shipper Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="shipper"
-                  value={formData.shipper}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="ABC Trading Company"
-                  required={formData.isWarehouseShipment}
-                />
+              {customFields.map(field => (
+                <div key={field.id} className={field.fieldType === 'TEXTAREA' ? 'md:col-span-2' : ''}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    {field.fieldName} {field.isRequired && <span className="text-red-500">*</span>}
+                  </label>
+                  {renderCustomField(field)}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cost Preview Card */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-amber-100 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-400 to-yellow-500 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">💰</span>
+            <h3 className="text-white font-semibold text-sm">Estimated Storage Cost</h3>
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-amber-50/70 rounded-xl border border-amber-200">
+              <div className="text-xs font-medium text-amber-700 mb-1">Base Cost</div>
+              <div className="text-2xl font-bold text-amber-900">
+                {estimatedCost.baseCost.toFixed(3)}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Consignee Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="consignee"
-                  value={formData.consignee}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="XYZ Imports LLC"
-                  required={formData.isWarehouseShipment}
-                />
+              <div className="text-[10px] text-amber-600 mt-1">
+                {pricing.currency}
               </div>
-              {shipmentSettings.showWeight !== false && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Weight (kg) {shipmentSettings.requireWeight && <span className="text-red-500">*</span>}
-                  </label>
-                  <input
-                    type="number"
-                    name="weight"
-                    value={formData.weight}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0.00"
-                    step="0.01"
-                    required={shipmentSettings.requireWeight}
-                  />
-                </div>
-              )}
-              {shipmentSettings.showDimensions !== false && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Dimensions (L??W??H) {shipmentSettings.requireDimensions && <span className="text-red-500">*</span>}
-                  </label>
-                  <input
-                    type="text"
-                    name="dimensions"
-                    value={formData.dimensions}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="100??50??30 cm"
-                    required={shipmentSettings.requireDimensions}
-                  />
-                </div>
-              )}
-              {shipmentSettings.showDescription !== false && (
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description {shipmentSettings.requireDescription && <span className="text-red-500">*</span>}
-                  </label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    rows={3}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Describe the shipment contents..."
-                    required={shipmentSettings.requireDescription}
-                  />
-                </div>
-              )}
+              <div className="text-[10px] text-gray-500 mt-1">
+                {formData.pieces} pcs × {formData.estimatedDays}d × {pricing.storageRate} rate
+              </div>
             </div>
-          </div>
-        )}
-      </>
-    );
-  };
-
-  const renderStorageSection = () => (
-    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-      <h3 className="text-lg font-semibold mb-4 text-green-800 flex items-center">
-        Storage Assignment
-      </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Assign to Rack {shipmentSettings.requireRackAssignment && <span className="text-red-500">*</span>}
-          </label>
-          <select
-            name="rackId"
-            value={formData.rackId}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            required={shipmentSettings.requireRackAssignment}
-          >
-            <option value="">{shipmentSettings.requireRackAssignment ? 'Select a rack (required)' : 'Select a rack (optional)'}</option>
-            {racks.map(rack => (
-              <option key={rack.id} value={rack.id}>
-                {rack.code} - {rack.location} ({rack.capacityUsed}/{rack.capacityTotal})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {shipmentSettings.showEstimatedDays !== false && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estimated Storage Days {shipmentSettings.requireEstimatedDays && <span className="text-red-500">*</span>}
-            </label>
-            <input
-              type="number"
-              name="estimatedDays"
-              value={formData.estimatedDays}
-              onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              min="1"
-              required={shipmentSettings.requireEstimatedDays}
-            />
-          </div>
-        )}
-
-        {shipmentSettings.showSpecialInstructions !== false && (
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Special Instructions
-            </label>
-            <textarea
-              name="specialInstructions"
-              value={formData.specialInstructions}
-              onChange={handleChange}
-              rows={2}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              placeholder="Any special handling or storage requirements..."
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  const renderCustomFieldsSection = () => {
-    if (customFields.length === 0) return null;
-
-    return (
-      <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-        <h3 className="text-lg font-semibold mb-4 text-purple-800 flex items-center">
-          Custom Fields
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {customFields.map(field => (
-            <div key={field.id} className={field.fieldType === 'TEXTAREA' ? 'md:col-span-2' : ''}>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {field.fieldName} {field.isRequired && <span className="text-red-500">*</span>}
-              </label>
-              {renderCustomField(field)}
+            <div className="text-center p-4 bg-amber-50/70 rounded-xl border border-amber-200">
+              <div className="text-xs font-medium text-amber-700 mb-1">Tax ({pricing.taxRate}%)</div>
+              <div className="text-2xl font-bold text-amber-900">
+                {estimatedCost.tax.toFixed(3)}
+              </div>
+              <div className="text-[10px] text-amber-600 mt-1">
+                {pricing.currency}
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderPricingSection = () => (
-    <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-      <h3 className="text-lg font-semibold mb-4 text-yellow-800 flex items-center">
-        Estimated Cost
-      </h3>
-      <div className="space-y-3">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Storage Rate per Day:</span>
-          <span className="font-medium">{pricing.storageRate.toFixed(3)} {pricing.currency}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Estimated Days:</span>
-          <span className="font-medium">{formData.estimatedDays} days</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Number of Pieces:</span>
-          <span className="font-medium">{formData.pieces} pieces</span>
-        </div>
-        <div className="border-t border-yellow-300 pt-3 flex justify-between">
-          <span className="font-semibold text-yellow-900">Estimated Total:</span>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-yellow-900">
-              {estimatedCost.total.toFixed(3)} {pricing.currency}
+            <div className="text-center p-4 bg-gradient-to-br from-amber-100 to-yellow-100 rounded-xl border-2 border-amber-300 shadow-sm">
+              <div className="text-xs font-bold text-amber-800 mb-1">Total Estimate</div>
+              <div className="text-3xl font-black text-amber-900">
+                {estimatedCost.total.toFixed(3)}
+              </div>
+              <div className="text-xs font-semibold text-amber-700 mt-1">
+                {pricing.currency}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
 
-  // ???? SECTION MAPPING
-  const formSections: Record<string, () => JSX.Element | null> = {
-    basic: renderBasicSection,
-    client: renderClientSection,
-    warehouse: renderWarehouseSection,
-    storage: renderStorageSection,
-    custom: renderCustomFieldsSection,
-    pricing: renderPricingSection,
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-slate-200 transform transition-all duration-300 scale-100">
-        {/* Header - Clean Professional */}
-        <div className="bg-slate-900 px-6 py-4 text-white">
-          <div className="flex justify-between items-center">
+      {/* Settings Requirements Banner */}
+      {(shipmentSettings.requireClientEmail || shipmentSettings.requireEstimatedValue || shipmentSettings.requireRackAssignment) && (
+        <div className="bg-blue-50/80 backdrop-blur-sm rounded-2xl border border-blue-200 p-5">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <span className="text-sm">ℹ️</span>
+            </div>
             <div>
-              <h2 className="text-xl font-semibold">New Shipment Intake</h2>
-              <p className="text-slate-400 text-sm">Warehouse Management System</p>
+              <p className="text-sm font-semibold text-blue-800 mb-1.5">Company Settings Applied</p>
+              <ul className="text-xs space-y-1 text-blue-700">
+                {shipmentSettings.requireClientEmail && <li>• Client email is required</li>}
+                {shipmentSettings.requireEstimatedValue && <li>• Estimated value is required</li>}
+                {shipmentSettings.requireRackAssignment && <li>• Rack assignment is required</li>}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Summary */}
+      <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl border border-indigo-200 p-5">
+        <h4 className="text-sm font-bold text-indigo-800 mb-3 flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          Shipment Summary
+        </h4>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div className="bg-white/70 rounded-xl p-3 border border-indigo-100">
+            <span className="text-xs text-indigo-500 block">Mode</span>
+            <span className="font-semibold text-indigo-900 capitalize">{intakeMode}</span>
+          </div>
+          <div className="bg-white/70 rounded-xl p-3 border border-indigo-100">
+            <span className="text-xs text-indigo-500 block">Client</span>
+            <span className="font-semibold text-indigo-900 truncate block">{formData.clientName || '—'}</span>
+          </div>
+          <div className="bg-white/70 rounded-xl p-3 border border-indigo-100">
+            <span className="text-xs text-indigo-500 block">Total Pcs</span>
+            <span className="font-semibold text-indigo-900">{formData.pieces}</span>
+          </div>
+          <div className="bg-white/70 rounded-xl p-3 border border-indigo-100">
+            <span className="text-xs text-indigo-500 block">Barcode</span>
+            <span className="font-semibold text-indigo-900 font-mono text-xs">{formData.barcode}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // 🎯 MAIN RENDER
+  return (
+    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
+      <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-white/20 transform transition-all duration-300 scale-100 animate-scaleIn">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg">
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white tracking-tight">New Shipment Intake</h2>
+                <p className="text-slate-400 text-xs">Warehouse Management System • {stepLabels[currentStep].label}</p>
+              </div>
             </div>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white rounded-lg p-2 hover:bg-white/10 transition-all duration-200"
+              className="text-slate-400 hover:text-white rounded-xl p-2 hover:bg-white/10 transition-all duration-200"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
+          {/* Step Indicator */}
+          {renderStepIndicator()}
         </div>
 
-        {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(90vh-100px)]">
-          <form onSubmit={handleSubmit} className="p-6 space-y-6 w-full">
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto max-h-[calc(90vh-220px)]">
+          <form onSubmit={handleSubmit} className="p-6 space-y-5">
 
             {/* Messages */}
             {error && (
-              <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-r-lg">
-                <div className="flex items-center">
-                  <span className="mr-2">!</span>
-                  {error}
+              <div className="bg-red-50/90 backdrop-blur-sm border-2 border-red-200 text-red-700 p-4 rounded-2xl animate-shake">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-lg">⚠️</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm">Error</p>
+                    <p className="text-sm text-red-600 mt-0.5">{error}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setError('')}
+                    className="text-red-400 hover:text-red-600"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             )}
             {success && (
-              <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-4 rounded-r-lg">
-                <div className="flex items-center">
-                  <span className="mr-2">✓</span>
-                  {success}
+              <div className="bg-emerald-50/90 backdrop-blur-sm border-2 border-emerald-200 text-emerald-700 p-4 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span>{success}</span>
                 </div>
               </div>
             )}
 
-            {/* Settings Info Banner */}
-            {(shipmentSettings.requireClientEmail || shipmentSettings.requireEstimatedValue || shipmentSettings.requireRackAssignment) && (
-              <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-800 p-4 rounded-r-lg">
-                <div className="flex items-start">
-                  <span className="mr-2 text-lg">i</span>
-                  <div>
-                    <p className="font-semibold mb-1">Company Settings Applied</p>
-                    <ul className="text-sm space-y-1 list-disc list-inside">
-                      {shipmentSettings.requireClientEmail && <li>Client email is required</li>}
-                      {shipmentSettings.requireEstimatedValue && <li>Estimated value is required</li>}
-                      {shipmentSettings.requireRackAssignment && <li>Rack assignment is required</li>}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ???? SECTION ORDERING CONTROLS */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700">Form Sections Order:</span>
-                  <span className="text-xs text-gray-500">Click arrows to reorder</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {sectionOrder.map((section, index) => {
-                    const sectionLabels: Record<string, string> = {
-                      basic: 'Basic',
-                      client: 'Client',
-                      warehouse: 'Warehouse',
-                      storage: 'Storage',
-                      custom: 'Custom',
-                      pricing: 'Pricing'
-                    };
-
-                    return (
-                      <div key={section} className="flex items-center gap-1 bg-white px-2 py-1 rounded border border-gray-300">
-                        <span className="text-xs font-medium">{sectionLabels[section]}</span>
-                        <div className="flex flex-col">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (index > 0) {
-                                const newOrder = [...sectionOrder];
-                                [newOrder[index], newOrder[index - 1]] = [newOrder[index - 1], newOrder[index]];
-                                setSectionOrder(newOrder);
-                              }
-                            }}
-                            disabled={index === 0}
-                            className="text-xs text-gray-500 hover:text-blue-600 disabled:opacity-30 leading-none"
-                          >
-                            Up
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (index < sectionOrder.length - 1) {
-                                const newOrder = [...sectionOrder];
-                                [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-                                setSectionOrder(newOrder);
-                              }
-                            }}
-                            disabled={index === sectionOrder.length - 1}
-                            className="text-xs text-gray-500 hover:text-blue-600 disabled:opacity-30 leading-none"
-                          >
-                            Down
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* ???? DYNAMIC SECTIONS - RENDER IN ORDER */}
-            {sectionOrder.map((sectionId) => {
-              const SectionComponent = formSections[sectionId];
-              return SectionComponent ? (
-                <div key={sectionId}>
-                  {SectionComponent()}
-                </div>
-              ) : null;
-            })}
-
-            {/* ???? CONDITIONAL: Notes */}
-            {shipmentSettings.showNotes !== false && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Additional Notes {shipmentSettings.requireNotes && <span className="text-red-500">*</span>}
-                </label>
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Any additional notes or comments..."
-                  required={shipmentSettings.requireNotes}
-                />
-              </div>
-            )}
-
-            {/* ✅ Storage Assignment - Now using renderStorageSection() component above to avoid duplication */}
-            {renderStorageSection()}
-
-            {/* Custom Fields */}
-            {customFields.length > 0 && (
-              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                <h3 className="text-lg font-semibold mb-4 text-purple-800 flex items-center">
-                  ??? Custom Fields
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {customFields.map(field => (
-                    <div key={field.id}>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {field.fieldName}
-                        {field.isRequired && <span className="text-red-500 ml-1">*</span>}
-                      </label>
-                      {renderCustomField(field)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Cost Estimation */}
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <h3 className="text-lg font-semibold mb-4 text-blue-800 flex items-center">
-                Estimated Storage Cost
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div className="text-center">
-                  <div className="text-gray-600">Base Cost</div>
-                  <div className="text-xl font-bold text-blue-800">
-                    {estimatedCost.baseCost.toFixed(3)} {pricing.currency}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {formData.pieces} pieces x {formData.estimatedDays} days x {pricing.storageRate} rate
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-gray-600">Tax ({pricing.taxRate}%)</div>
-                  <div className="text-xl font-bold text-blue-800">
-                    {estimatedCost.tax.toFixed(3)} {pricing.currency}
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-gray-600">Total Estimate</div>
-                  <div className="text-2xl font-bold text-blue-900">
-                    {estimatedCost.total.toFixed(3)} {pricing.currency}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full sm:w-auto px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
-                disabled={loading}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="w-full sm:w-auto px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
-                disabled={loading}
-              >
-                Reset
-              </button>
-              <button
-                type="submit"
-                className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={loading}
-              >
-                {loading ? 'Creating...' : 'Create Shipment'}
-              </button>
+            {/* Current Step Content */}
+            <div className="min-h-[300px]">
+              {currentStep === 0 && renderClientInfoStep()}
+              {currentStep === 1 && renderShipmentDetailsStep()}
+              {currentStep === 2 && renderDimensionsStep()}
+              {currentStep === 3 && renderPhotosAndNotesStep()}
+              {currentStep === 4 && renderReviewStep()}
             </div>
           </form>
+        </div>
+
+        {/* Navigation Footer */}
+        <div className="bg-gray-50/80 backdrop-blur-sm border-t border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Left: Step info */}
+            <div className="hidden sm:block">
+              <span className="text-xs text-gray-500">
+                Step {currentStep + 1} of {totalSteps}
+              </span>
+              <span className="text-xs text-gray-400 ml-2">—</span>
+              <span className="text-xs font-medium text-gray-600 ml-2">{stepLabels[currentStep].label}</span>
+            </div>
+
+            {/* Right: Buttons */}
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+              {currentStep > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(prev => prev - 1)}
+                  className="px-5 py-2.5 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200 flex items-center gap-2"
+                  disabled={loading}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-5 py-2.5 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+              )}
+
+              {currentStep < totalSteps - 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(prev => prev + 1)}
+                  className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-blue-200 flex items-center gap-2"
+                >
+                  Next
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200"
+                    disabled={loading}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-8 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-sm font-bold hover:from-emerald-600 hover:to-green-700 transition-all duration-200 shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Create Shipment
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
