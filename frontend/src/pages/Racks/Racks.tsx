@@ -203,6 +203,42 @@ export const Racks: React.FC = () => {
     }
   };
 
+  // Calculate utilization based on capacity mode
+  const calcUtilization = (rack: any): number => {
+    const mode = rack.capacityMode || 'FIXED';
+
+    // For FLEXIBLE or BOTH mode, use max of pallet% and box% (most accurate for storage racks)
+    if (mode === 'FLEXIBLE' || mode === 'both') {
+      const palletPct = rack.palletCapacity > 0 ? ((rack.currentPallets || 0) / rack.palletCapacity) * 100 : 0;
+      const boxPct = rack.boxCapacity > 0 ? ((rack.currentBoxes || 0) / rack.boxCapacity) * 100 : 0;
+      const maxPct = Math.max(palletPct, boxPct);
+      if (maxPct > 0) return Math.min(Math.round(maxPct), 100);
+    }
+
+    // Try CBM when available and used > 0
+    if (rack.cbmCapacity && rack.cbmCapacity > 0 && rack.cbmUsed > 0) {
+      return Math.min(Math.round((rack.cbmUsed / rack.cbmCapacity) * 100), 200);
+    }
+
+    // For FLEXIBLE without pallet/box ratio, check capacityUsed
+    if (mode === 'FLEXIBLE') {
+      if (rack.capacityUsed > 0) return 50;
+      return 0;
+    }
+
+    // UNLIMITED: can't calc % — treat occupied as 50%
+    if (mode === 'UNLIMITED') {
+      if (rack.cbmUsed > 0 && rack.cbmCapacity > 0) {
+        return Math.min(Math.round((rack.cbmUsed / rack.cbmCapacity) * 100), 200);
+      }
+      return rack.capacityUsed > 0 ? 50 : 0;
+    }
+
+    // FIXED (default)
+    const total = rack.capacityTotal || 1;
+    return Math.min(Math.round((rack.capacityUsed / total) * 100), 100);
+  };
+
   const filteredRacks = racks.filter((r: any) => {
     const sectionMatch = selectedSection === 'all' || r.code.startsWith(selectedSection);
     const selected = selectedCategory?.toLowerCase();
@@ -281,42 +317,6 @@ export const Racks: React.FC = () => {
     acc[zone].push(rack);
     return acc;
   }, {});
-
-  // Calculate utilization based on capacity mode
-  const calcUtilization = (rack: any): number => {
-    const mode = rack.capacityMode || 'FIXED';
-
-    // For FLEXIBLE or BOTH mode, use max of pallet% and box% (most accurate for storage racks)
-    if (mode === 'FLEXIBLE' || mode === 'both') {
-      const palletPct = rack.palletCapacity > 0 ? ((rack.currentPallets || 0) / rack.palletCapacity) * 100 : 0;
-      const boxPct = rack.boxCapacity > 0 ? ((rack.currentBoxes || 0) / rack.boxCapacity) * 100 : 0;
-      const maxPct = Math.max(palletPct, boxPct);
-      if (maxPct > 0) return Math.min(Math.round(maxPct), 100);
-    }
-
-    // Try CBM when available and used > 0
-    if (rack.cbmCapacity && rack.cbmCapacity > 0 && rack.cbmUsed > 0) {
-      return Math.min(Math.round((rack.cbmUsed / rack.cbmCapacity) * 100), 200);
-    }
-
-    // For FLEXIBLE without pallet/box ratio, check capacityUsed
-    if (mode === 'FLEXIBLE') {
-      if (rack.capacityUsed > 0) return 50;
-      return 0;
-    }
-
-    // UNLIMITED: can't calc % — treat occupied as 50%
-    if (mode === 'UNLIMITED') {
-      if (rack.cbmUsed > 0 && rack.cbmCapacity > 0) {
-        return Math.min(Math.round((rack.cbmUsed / rack.cbmCapacity) * 100), 200);
-      }
-      return rack.capacityUsed > 0 ? 50 : 0;
-    }
-
-    // FIXED (default)
-    const total = rack.capacityTotal || 1;
-    return Math.min(Math.round((rack.capacityUsed / total) * 100), 100);
-  };
 
   // NEW: Render capacity based on mode (INFORMATIVE VERSION)
   const renderCapacity = (rack: any) => {
