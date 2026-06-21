@@ -24,6 +24,7 @@ import UserProfile from './pages/Profile/UserProfile';
 import JobReportsDashboard from './components/moving-jobs/JobReportsDashboard';
 import ApprovalManager from './components/moving-jobs/ApprovalManager';
 import MaterialReports from './pages/Materials/MaterialReports';
+import MaterialStockStatementPro from './pages/Materials/MaterialStockStatementPro';
 import MaterialsHub from './pages/Materials/MaterialsHub';
 import { DamageReport } from './components/reports/DamageReport';
 import { DebugLogin } from './pages/DebugLogin';
@@ -127,6 +128,11 @@ function App() {
               <Route path="material-reports" element={
                 <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                   <MaterialReports />
+                </ProtectedRoute>
+              } />
+              <Route path="material-report-2" element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                  <MaterialStockStatementPro />
                 </ProtectedRoute>
               } />
               <Route path="damage-report" element={

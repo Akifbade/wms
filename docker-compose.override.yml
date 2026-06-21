@@ -1,21 +1,30 @@
+# Staging overrides — merges with docker-compose.yml automatically
 services:
   frontend:
     ports:
-      - "3080:80"
-    volumes:
-      - ./frontend/nginx.local.conf:/etc/nginx/conf.d/default.conf
+      - "4080:80"
+    networks:
+      - wms-staging-network
 
   backend:
     environment:
-      DATABASE_URL: 'mysql://wms_user:wmspassword123@wms-database:3306/warehouse_wms'
-      JWT_SECRET: 'change...tion'
-      FRONTEND_URL: https://qgocargo.cloud
-      APP_PUBLIC_URL: https://qgocargo.cloud
-      BACKUP_DIR: /backups
-      FULL_BACKUP_DIR: /full-backups
+      DATABASE_URL: mysql://wms_user_staging:***@wms-database-staging:3306/warehouse_wms_staging
+      JWT_SECRET: 'staging...secret...change'
+      FRONTEND_URL: https://staging.qgocargo.cloud
+      APP_PUBLIC_URL: https://staging.qgocargo.cloud
       NODE_ENV: production
       PORT: "5000"
+    networks:
+      - wms-staging-network
 
-networks:
-  wms-network:
-    external: true
+  database:
+    ports:
+      - "3407:3306"
+    networks:
+      - wms-staging-network
+
+  phpmyadmin:
+    ports:
+      - "8083:80"
+    networks:
+      - wms-staging-network
