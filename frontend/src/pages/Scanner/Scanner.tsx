@@ -1478,8 +1478,8 @@ Firefox: Click 🔒 → Clear permissions → Reload (will ask again)
       setLoading(true);
       console.log('Loading pending shipments...');
       const token = localStorage.getItem('authToken');
-      // Fetch both PENDING and PARTIAL status shipments
-      const response = await fetch('/api/shipments', {
+      // Fetch both PENDING and PARTIAL status shipments with high limit
+      const response = await fetch('/api/shipments?status=PENDING&status=PARTIAL&limit=500', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

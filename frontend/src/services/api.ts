@@ -378,11 +378,22 @@ export const jobsAPI = {
 
     const query = queryParams.toString();
     const jobs = await apiCall<any[]>(`/moving-jobs${query ? `?${query}` : ''}`);
-    return { jobs }; // Wrap in object for compatibility
+    // Map API fields (jobAddress→origin, dropoffAddress→destination) for frontend compatibility
+    const mappedJobs = (jobs || []).map((j: any) => ({
+      ...j,
+      origin: j.jobAddress || j.origin || '',
+      destination: j.dropoffAddress || j.destination || '',
+    }));
+    return { jobs: mappedJobs }; // Wrap in object for compatibility
   },
 
   getById: async (id: string) => {
-    return apiCall<{ job: any }>(`/moving-jobs/${id}`);
+    const result = await apiCall<{ job: any }>(`/moving-jobs/${id}`);
+    if (result.job) {
+      result.job.origin = result.job.jobAddress || result.job.origin || '';
+      result.job.destination = result.job.dropoffAddress || result.job.destination || '';
+    }
+    return result;
   },
 
   create: async (data: any) => {

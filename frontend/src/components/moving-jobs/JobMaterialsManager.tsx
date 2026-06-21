@@ -56,15 +56,35 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
   const [stockPurchases, setStockPurchases] = useState<any[]>([]);
   const [issuedMaterials, setIssuedMaterials] = useState<IssuedMaterial[]>([]);
 
-  // Issue Material State
+  // Issue Material State — multi-row (one-shot batch)
   const [showIssueForm, setShowIssueForm] = useState(false);
-  const [issueForm, setIssueForm] = useState({
-    materialId: '',
-    quantity: 0,
-    rackId: '',
-    stockPurchaseId: '',
-    notes: ''
-  });
+  const [issueRows, setIssueRows] = useState<Array<{
+    id: string;
+    materialId: string;
+    quantity: number;
+    rackId: string;
+    stockPurchaseId: string;
+    notes: string;
+  }>>([]);
+
+  const addIssueRow = () => {
+    setIssueRows(prev => [...prev, {
+      id: 'row_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      materialId: '',
+      quantity: 0,
+      rackId: '',
+      stockPurchaseId: '',
+      notes: ''
+    }]);
+  };
+
+  const removeIssueRow = (id: string) => {
+    setIssueRows(prev => prev.filter(r => r.id !== id));
+  };
+
+  const updateIssueRow = (id: string, field: string, value: any) => {
+    setIssueRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+  };
 
   // Edit Material State
   const [showEditForm, setShowEditForm] = useState(false);
@@ -147,13 +167,22 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
     }
   };
 
-  const handleIssueMaterial = async (e: React.FormEvent) => {
+  const handleBatchIssueMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     const token = localStorage.getItem('authToken');
+
+    // Filter out incomplete rows
+    const validRows = issueRows.filter(r => r.materialId && r.quantity > 0);
+    if (validRows.length === 0) {
+      alert('Koi material add nahi kiya. Pehle at least ek material select karo.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await fetch('/api/materials/issues', {
+      const response = await fetch('/api/materials/issues/batch', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -161,26 +190,28 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
         },
         body: JSON.stringify({
           jobId,
-          materialId: issueForm.materialId,
-          quantity: issueForm.quantity,
-          rackId: issueForm.rackId || null,
-          notes: issueForm.notes
+          issues: validRows.map(r => ({
+            materialId: r.materialId,
+            quantity: r.quantity,
+            rackId: r.rackId || null,
+            notes: r.notes || null
+          }))
         })
       });
 
+      const data = await response.json();
       if (response.ok) {
-        alert('Material issued successfully! Stock updated.');
+        alert(`${data.count} material(s) successfully issued! Stock updated.`);
         setShowIssueForm(false);
-        setIssueForm({ materialId: '', quantity: 0, rackId: '', stockPurchaseId: '', notes: '' });
+        setIssueRows([]);
         loadData();
         onUpdate?.();
       } else {
-        const error = await response.json();
-        alert(`Failed to issue material: ${error.error}`);
+        alert(`Failed: ${data.error}`);
       }
     } catch (error) {
-      console.error('Failed to issue material:', error);
-      alert('Failed to issue material');
+      console.error('Failed to batch issue materials:', error);
+      alert('Failed to issue materials. Check console.');
     } finally {
       setLoading(false);
     }
@@ -224,7 +255,6 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
 
       if (response.ok) {
         const data = await response.json();
-        console.log('[MaterialReturn] Response data:', data);
         
         alert('Material return recorded successfully!');
         setShowReturnForm(false);
@@ -526,102 +556,109 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
             </button>
           )}
 
-          {/* Issue Material Form */}
+          {/* Issue Material Form — Multi-Row (One-Shot) */}
           {showIssueForm && (
             <div className="bg-gray-50 p-6 rounded-lg mb-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold">Issue Material to Job</h3>
-                <button onClick={() => setShowIssueForm(false)}>
+                <h3 className="text-lg font-bold">🚀 Issue Materials — Ek Saath</h3>
+                <button onClick={() => { setShowIssueForm(false); setIssueRows([]); }}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleIssueMaterial} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Material *</label>
-                  <select
-                    required
-                    value={issueForm.materialId}
-                    onChange={(e) => setIssueForm({ ...issueForm, materialId: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
+              <form onSubmit={handleBatchIssueMaterial}>
+                {/* Rows */}
+                {issueRows.length === 0 && (
+                  <p className="text-gray-500 text-sm mb-4">Abhi tak koi material add nahi kiya. Neeche "+ Add Material Row" button dabao.</p>
+                )}
+
+                {issueRows.map((row, idx) => (
+                  <div key={row.id} className="border border-gray-200 bg-white rounded-lg p-4 mb-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-semibold text-gray-600">Material #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeIssueRow(row.id)}
+                        className="text-red-500 hover:text-red-700 p-1"
+                        title="Remove this row"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Material *</label>
+                        <select
+                          required
+                          value={row.materialId}
+                          onChange={(e) => updateIssueRow(row.id, 'materialId', e.target.value)}
+                          className="w-full border rounded px-2 py-1.5 text-sm"
+                        >
+                          <option value="">-- Select --</option>
+                          {materials.map(mat => (
+                            <option key={mat.id} value={mat.id}>
+                              {mat.sku} - {mat.name} (Stock: {mat.totalQuantity} {mat.unit})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Qty *</label>
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          value={row.quantity || ''}
+                          onChange={(e) => updateIssueRow(row.id, 'quantity', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
+                          className="w-full border rounded px-2 py-1.5 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Rack (Optional)</label>
+                        <select
+                          value={row.rackId}
+                          onChange={(e) => updateIssueRow(row.id, 'rackId', e.target.value)}
+                          className="w-full border rounded px-2 py-1.5 text-sm"
+                        >
+                          <option value="">-- No Rack --</option>
+                          {racks.map(rack => (
+                            <option key={rack.id} value={rack.id}>
+                              {rack.code} - {rack.location}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Notes</label>
+                        <input
+                          type="text"
+                          value={row.notes}
+                          onChange={(e) => updateIssueRow(row.id, 'notes', e.target.value)}
+                          className="w-full border rounded px-2 py-1.5 text-sm"
+                          placeholder="Optional..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add / Submit Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={addIssueRow}
+                    className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm"
                   >
-                    <option value="">-- Select Material --</option>
-                    {materials.map(mat => (
-                      <option key={mat.id} value={mat.id}>
-                        {mat.sku} - {mat.name} (Stock: {mat.totalQuantity} {mat.unit})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Quantity *</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={issueForm.quantity}
-                    onChange={(e) => setIssueForm({
-                      ...issueForm,
-                      quantity: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
-                    })}
-                    className="w-full border rounded px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Storage Rack (Optional)</label>
-                  <select
-                    value={issueForm.rackId}
-                    onChange={(e) => setIssueForm({ ...issueForm, rackId: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                  >
-                    <option value="">-- No Specific Rack --</option>
-                    {racks.map(rack => (
-                      <option key={rack.id} value={rack.id}>
-                        {rack.code} - {rack.location}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Stock Purchase (Optional)</label>
-                  <select
-                    value={issueForm.stockPurchaseId}
-                    onChange={(e) => setIssueForm({ ...issueForm, stockPurchaseId: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                  >
-                    <option value="">-- Any Available Purchase --</option>
-                    {stockPurchases
-                      .filter((p: any) => p.materialId === issueForm.materialId && p.quantityRemaining > 0)
-                      .map((purchase: any) => (
-                        <option key={purchase.id} value={purchase.id}>
-                          PO: {purchase.orderNumber || 'N/A'} | {purchase.quantityRemaining} {materials.find(m => m.id === purchase.materialId)?.unit || ''} @ {purchase.unitCost} KWD
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Notes</label>
-                  <input
-                    type="text"
-                    value={issueForm.notes}
-                    onChange={(e) => setIssueForm({ ...issueForm, notes: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="Any special notes..."
-                  />
-                </div>
-
-                <div className="col-span-2">
+                    <Plus className="w-4 h-4" />
+                    Add Material Row
+                  </button>
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="w-full sm:w-auto bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
+                    disabled={loading || issueRows.length === 0}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm"
                   >
                     <Save className="w-4 h-4" />
-                    {loading ? 'Issuing...' : 'Issue Material'}
+                    {loading ? 'Issuing...' : `Issue All (${issueRows.filter(r => r.materialId && r.quantity > 0).length})`}
                   </button>
                 </div>
               </form>

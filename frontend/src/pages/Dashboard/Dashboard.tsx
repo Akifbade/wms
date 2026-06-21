@@ -111,7 +111,7 @@ export const Dashboard: React.FC = () => {
     },
     {
       name: 'Rack Utilization',
-      value: `${stats?.racks?.utilization || 0}%`,
+      value: `${stats?.racks?.cbm?.utilization ?? stats?.racks?.utilization ?? 0}%`,
       total: `${stats?.racks?.active || 0} active`,
       icon: UserGroupIcon,
       color: 'text-emerald-600'
@@ -401,7 +401,7 @@ export const Dashboard: React.FC = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-slate-900">{(client.revenue || 0).toFixed(2)} KWD</div>
+                    <div className="font-semibold text-slate-900">{((client.invoiceRevenue ?? client.revenue) || 0).toFixed(2)} KWD</div>
                   </div>
                 </div>
               ))

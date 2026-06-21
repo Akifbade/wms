@@ -809,6 +809,122 @@ async function handleCreateIssue(req: AuthRequest, res: any) {
   }
 }
 
+/**
+ * POST /api/materials/issues/batch
+ * Batch issue materials — issue multiple materials in one request
+ * Body: { issues: [{ materialId, quantity, rackId?, notes?, stockBatchId? }] }
+ */
+async function handleBatchCreateIssues(req: AuthRequest, res: any) {
+  try {
+    const { companyId } = req.user!;
+    const { issues } = req.body;
+
+    if (!Array.isArray(issues) || issues.length === 0) {
+      return res.status(400).json({ error: "issues array is required and must not be empty" });
+    }
+
+    // Validate fields & check stock before creating any
+    for (const [idx, item] of issues.entries()) {
+      if (!item.materialId || !item.quantity || item.quantity <= 0) {
+        return res.status(400).json({ error: `Issue #${idx + 1}: materialId and quantity > 0 are required` });
+      }
+      const material = await prisma.packingMaterial.findUnique({ where: { id: item.materialId } });
+      if (!material) {
+        return res.status(404).json({ error: `Issue #${idx + 1}: Material not found (${item.materialId})` });
+      }
+      const availableStock = material.totalQuantity || 0;
+      if (item.quantity > availableStock) {
+        return res.status(400).json({
+          error: `Issue #${idx + 1}: Insufficient stock for "${material.name}". Available: ${availableStock} ${material.unit || 'pcs'}, Requested: ${item.quantity}`,
+          materialIndex: idx,
+          availableStock,
+          requestedQuantity: item.quantity,
+        });
+      }
+      if (item.rackId) {
+        const rack = await prisma.rack.findUnique({ where: { id: item.rackId } });
+        if (!rack) {
+          return res.status(404).json({ error: `Issue #${idx + 1}: Rack not found (${item.rackId})` });
+        }
+      }
+    }
+
+    const jobId = req.body.jobId || null;
+    const createdIssues = [];
+
+    for (const item of issues) {
+      const batch = item.stockBatchId ? await prisma.stockBatch.findUnique({ where: { id: item.stockBatchId } }) : null;
+      const material = await prisma.packingMaterial.findUnique({ where: { id: item.materialId } });
+      const unitCost = batch?.unitCost || material?.unitCost || 0;
+      const totalCost = item.quantity * unitCost;
+
+      const issue = await prisma.materialIssue.create({
+        data: {
+          jobId,
+          materialId: item.materialId,
+          stockBatchId: item.stockBatchId || null,
+          quantity: item.quantity,
+          unitCost,
+          totalCost,
+          rackId: item.rackId || null,
+          issuedById: req.user!.id,
+          notes: item.notes || null,
+          companyId,
+        },
+        include: {
+          material: true,
+          rack: { select: { id: true, code: true, location: true } },
+        },
+      });
+
+      // Deduct from batch if specified
+      if (batch) {
+        await prisma.stockBatch.update({
+          where: { id: item.stockBatchId },
+          data: { quantityRemaining: Math.max(0, batch.quantityRemaining - item.quantity) },
+        });
+      }
+
+      // Update material total quantity
+      await prisma.packingMaterial.update({
+        where: { id: item.materialId },
+        data: { totalQuantity: Math.max(0, (material!.totalQuantity || 0) - item.quantity) },
+      });
+
+      createdIssues.push(issue);
+    }
+
+    // Send a single consolidated email notification
+    try {
+      const job = jobId ? await prisma.movingJob.findUnique({ where: { id: jobId } }) : null;
+      const company = await prisma.company.findUnique({ where: { id: companyId } });
+      const issuedBy = await prisma.user.findUnique({ where: { id: req.user!.id } });
+
+      const materialsSummary = createdIssues.map(i => ({
+        name: (i as any).material?.name || 'Unknown',
+        quantity: i.quantity,
+        unit: (i as any).material?.unit || 'pcs',
+      }));
+
+      await sendNotification(companyId, 'MATERIAL_ISSUED', {
+        jobCode: job?.jobCode || 'Batch Issue',
+        materials: materialsSummary,
+        issuedBy: issuedBy?.name || 'System',
+        issuedAt: new Date().toLocaleString(),
+        companyName: company?.name || 'WMS',
+      });
+    } catch (emailErr) {
+      console.error('Batch email notification error:', emailErr);
+    }
+
+    res.status(201).json({ issues: createdIssues, count: createdIssues.length });
+  } catch (error) {
+    console.error("Error batch issuing materials:", error);
+    res.status(500).json({ error: "Failed to batch issue materials" });
+  }
+}
+
+router.post("/issues/batch", authenticateToken as any, handleBatchCreateIssues);
 router.post("/issues", authenticateToken as any, handleCreateIssue);
 
 /**
