@@ -3730,7 +3730,7 @@ async function getStatementData(companyId: string, startDate?: string, endDate?:
     let totalReceived = 0, totalConsumed = 0;
     for (const po of allPOHistory) {
       if (dateFilter && new Date(po.purchaseOrder.orderDate) < dateFilter.gte) {
-        totalReceived += po.quantityReceived || 0;
+        totalReceived += po.receivedQuantity || po.quantity || 0;
       }
     }
     // Count issues before start date
@@ -3740,12 +3740,12 @@ async function getStatementData(companyId: string, startDate?: string, endDate?:
     for (const iss of allIssuesHistory) totalConsumed += iss.quantity || 0;
     // Count damages before start date
     const allDmgHistory = dateFilter ? await prisma.materialDamage.findMany({
-      where: { materialId: material.id, companyId, reportedAt: { lt: dateFilter.gte } }
+      where: { materialId: material.id, companyId, recordedAt: { lt: dateFilter.gte } }
     }) : [];
     for (const d of allDmgHistory) totalConsumed += d.quantity || 0;
     // Returns before start date
     const allRetHistory = dateFilter ? await prisma.materialReturn.findMany({
-      where: { materialId: material.id, companyId, returnedAt: { lt: dateFilter.gte }, status: { not: 'PENDING' } }
+      where: { materialId: material.id, companyId, recordedAt: { lt: dateFilter.gte } }
     }) : [];
     for (const r of allRetHistory) totalReceived += (r.quantityGood || 0) + (r.quantityDamaged || 0);
 
