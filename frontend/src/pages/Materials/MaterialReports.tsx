@@ -33,7 +33,7 @@ interface Material {
 interface Transaction {
   id: string;
   date: string;
-  type: 'PURCHASE' | 'ISSUE' | 'RETURN' | 'DAMAGE';
+  type: 'PURCHASE' | 'ISSUE' | 'RETURN' | 'DAMAGE' | 'RETURN_PENDING_APPROVAL';
   description: string;
   reference: string;
   referenceType: string;
@@ -57,6 +57,7 @@ interface MaterialStatement {
     totalIssued: number;
     totalReturned: number;
     totalDamaged: number;
+    totalPendingApproval: number;
     closingBalance: number;
     currentStock: number;
     totalValue: number;
@@ -70,6 +71,7 @@ interface Summary {
   totalIssued: number;
   totalReturned: number;
   totalDamaged: number;
+  totalPendingApproval: number;
   totalClosingStock: number;
   totalValue: number;
 }
@@ -216,39 +218,43 @@ const MaterialReports: React.FC = () => {
       alert('No data to export. Please load the statement first.');
       return;
     }
-    const rows: string[] = ['Material,SKU,Unit,Opening Stock,Purchased,Consumed,Returned,Damaged,Closing Stock,Unit Price,Total Value'];
-    statements.forEach(stmt => {
-      rows.push([
-        `"${stmt.material.name}"`,
-        stmt.material.sku,
-        stmt.material.unit,
-        stmt.totals.openingStock,
-        stmt.totals.totalPurchased,
-        stmt.totals.totalIssued,
-        stmt.totals.totalReturned,
-        stmt.totals.totalDamaged,
-        stmt.totals.closingBalance,
-        stmt.material.unitCost.toFixed(2),
-        stmt.totals.totalValue.toFixed(2)
-      ].join(','));
-    });
+    const rows: string[] = ['Material,SKU,Unit,Opening Stock,Current Stock,Waiting Approval,Purchased,Consumed,Returned,Damaged,Closing Stock,Unit Price,Total Value'];
+        statements.forEach(stmt => {
+          rows.push([
+            `"${stmt.material.name}"`,
+            stmt.material.sku,
+            stmt.material.unit,
+            stmt.totals.openingStock,
+            stmt.material.currentStock,
+            stmt.totals.totalPendingApproval || 0,
+            stmt.totals.totalPurchased,
+            stmt.totals.totalIssued,
+            stmt.totals.totalReturned,
+            stmt.totals.totalDamaged,
+            stmt.totals.closingBalance,
+            stmt.material.unitCost.toFixed(2),
+            stmt.totals.totalValue.toFixed(2)
+          ].join(','));
+        });
 
-    // Add totals row
-    if (summary) {
-      rows.push([
-        'TOTAL',
-        '',
-        '',
-        summary.totalOpeningStock,
-        summary.totalPurchased,
-        summary.totalIssued,
-        summary.totalReturned,
-        summary.totalDamaged,
-        summary.totalClosingStock,
-        '',
-        summary.totalValue.toFixed(2)
-      ].join(','));
-    }
+        // Add totals row
+        if (summary) {
+          rows.push([
+            'TOTAL',
+            '',
+            '',
+            summary.totalOpeningStock,
+            statements.reduce((sum, s) => sum + s.material.currentStock, 0),
+            summary.totalPendingApproval || 0,
+            summary.totalPurchased,
+            summary.totalIssued,
+            summary.totalReturned,
+            summary.totalDamaged,
+            summary.totalClosingStock,
+            '',
+            summary.totalValue.toFixed(2)
+          ].join(','));
+        }
 
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -287,7 +293,9 @@ const MaterialReports: React.FC = () => {
       stmt.material.name,
       stmt.material.sku,
       stmt.material.unit,
+      stmt.totals.openingStock.toString(),
       stmt.material.currentStock.toString(),
+      `${stmt.totals.totalPendingApproval || 0}`,
       `+${stmt.totals.totalPurchased}`,
       `-${stmt.totals.totalIssued}`,
       `+${stmt.totals.totalReturned}`,
@@ -303,7 +311,9 @@ const MaterialReports: React.FC = () => {
         'TOTAL',
         '',
         '',
+        summary.totalOpeningStock.toString(),
         totalCurrentStock.toString(),
+        `${summary.totalPendingApproval || 0}`,
         `+${summary.totalPurchased}`,
         `-${summary.totalIssued}`,
         `+${summary.totalReturned}`,
@@ -315,7 +325,7 @@ const MaterialReports: React.FC = () => {
 
     doc.autoTable({
       startY: yPos,
-      head: [['Material', 'SKU', 'Unit', 'Current Stock', 'Purchase', 'Consumed', 'Returned', 'Damaged', 'Unit Price', 'Total Value']],
+      head: [['Material', 'SKU', 'Unit', 'Opening', 'Current Stock', 'Waiting Approval', 'Purchase', 'Consumed', 'Returned', 'Damaged', 'Unit Price', 'Total Value']],
       body: tableData,
       theme: 'grid',
       headStyles: {
@@ -327,16 +337,18 @@ const MaterialReports: React.FC = () => {
       },
       bodyStyles: { fontSize: 8 },
       columnStyles: {
-        0: { cellWidth: 48 },
-        1: { cellWidth: 28 },
-        2: { cellWidth: 18, halign: 'center' },
-        3: { cellWidth: 25, halign: 'right', fontStyle: 'bold' },
-        4: { cellWidth: 22, halign: 'right', textColor: [34, 197, 94] },
-        5: { cellWidth: 24, halign: 'right', textColor: [59, 130, 246] },
-        6: { cellWidth: 22, halign: 'right', textColor: [168, 85, 247] },
-        7: { cellWidth: 22, halign: 'right', textColor: [239, 68, 68] },
-        8: { cellWidth: 25, halign: 'right' },
-        9: { cellWidth: 30, halign: 'right', fontStyle: 'bold' }
+        0: { cellWidth: 38 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 14, halign: 'center' },
+        3: { cellWidth: 20, halign: 'right' },
+        4: { cellWidth: 24, halign: 'right', fontStyle: 'bold' },
+        5: { cellWidth: 24, halign: 'right', textColor: [180, 83, 9] },
+        6: { cellWidth: 20, halign: 'right', textColor: [34, 197, 94] },
+        7: { cellWidth: 22, halign: 'right', textColor: [59, 130, 246] },
+        8: { cellWidth: 20, halign: 'right', textColor: [168, 85, 247] },
+        9: { cellWidth: 20, halign: 'right', textColor: [239, 68, 68] },
+        10: { cellWidth: 22, halign: 'right' },
+        11: { cellWidth: 26, halign: 'right', fontStyle: 'bold' }
       },
       margin: { left: 10, right: 10 },
       didParseCell: (data: any) => {
@@ -785,12 +797,14 @@ const MaterialReports: React.FC = () => {
                       <thead className="bg-gray-100">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Material</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SKU</th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-100">
-                            <span className="print:hidden">📦 </span>Current Stock
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50">+ Purchased</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SKU</th>
+                                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Opening</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-100">
+                                                      <span className="print:hidden">📦 </span>Current Stock
+                                                    </th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-amber-700 uppercase tracking-wider bg-amber-50">⏳ Waiting Approval</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50">+ Purchased</th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50">- Consumed</th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50">+ Returned</th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-red-700 uppercase tracking-wider bg-red-50">- Damaged</th>
@@ -810,8 +824,10 @@ const MaterialReports: React.FC = () => {
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-600">{stmt.material.sku}</td>
                             <td className="px-4 py-3 text-center text-sm text-gray-600">{stmt.material.unit}</td>
-                            <td className="px-4 py-3 text-right font-bold text-blue-700 bg-blue-50">{stmt.material.currentStock}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-green-600 bg-green-50">
+                                                        <td className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{stmt.totals.openingStock}</td>
+                                                        <td className="px-4 py-3 text-right font-bold text-blue-700 bg-blue-50">{stmt.material.currentStock}</td>
+                                                        <td className="px-4 py-3 text-right font-semibold text-amber-700 bg-amber-50">{stmt.totals.totalPendingApproval || '-'}</td>
+                                                        <td className="px-4 py-3 text-right font-semibold text-green-600 bg-green-50">
                               {stmt.totals.totalPurchased > 0 ? `+${stmt.totals.totalPurchased}` : '-'}
                             </td>
                             <td className="px-4 py-3 text-right font-semibold text-blue-600 bg-blue-50">
@@ -845,8 +861,10 @@ const MaterialReports: React.FC = () => {
                         <tfoot className="bg-gray-800 text-white">
                           <tr>
                             <td colSpan={3} className="px-4 py-3 font-bold text-right">TOTAL ({summary.totalMaterials} Materials)</td>
-                            <td className="px-4 py-3 text-right font-bold text-blue-400">{statements.reduce((sum, s) => sum + s.material.currentStock, 0)}</td>
-                            <td className="px-4 py-3 text-right font-bold text-green-400">+{summary.totalPurchased}</td>
+                                                        <td className="px-4 py-3 text-right font-bold text-gray-300">{summary.totalOpeningStock}</td>
+                                                        <td className="px-4 py-3 text-right font-bold text-blue-400">{statements.reduce((sum, s) => sum + s.material.currentStock, 0)}</td>
+                                                        <td className="px-4 py-3 text-right font-bold text-amber-400">{summary.totalPendingApproval || 0}</td>
+                                                        <td className="px-4 py-3 text-right font-bold text-green-400">+{summary.totalPurchased}</td>
                             <td className="px-4 py-3 text-right font-bold text-blue-400">-{summary.totalIssued}</td>
                             <td className="px-4 py-3 text-right font-bold text-purple-400">+{summary.totalReturned}</td>
                             <td className="px-4 py-3 text-right font-bold text-red-400">-{summary.totalDamaged}</td>

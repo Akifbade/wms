@@ -2821,16 +2821,17 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
       transactions.reverse();
 
       // Calculate totals
-      const totals = {
-        openingStock: openingStock,
-        totalPurchased: transactions.filter(t => t.type === 'PURCHASE').reduce((sum, t) => sum + t.stockIn, 0),
-        totalIssued: transactions.filter(t => t.type === 'ISSUE').reduce((sum, t) => sum + t.stockOut, 0),
-        totalReturned: transactions.filter(t => t.type === 'RETURN').reduce((sum, t) => sum + t.stockIn, 0),
-        totalDamaged: transactions.filter(t => t.type === 'DAMAGE').reduce((sum, t) => sum + t.stockOut, 0),
-        closingBalance: runningBalance,
-        currentStock: material.totalQuantity,
-        totalValue: material.totalQuantity * (material.unitCost || 0)
-      };
+          const totals = {
+            openingStock: openingStock,
+            totalPurchased: transactions.filter(t => t.type === 'PURCHASE').reduce((sum, t) => sum + t.stockIn, 0),
+            totalIssued: transactions.filter(t => t.type === 'ISSUE').reduce((sum, t) => sum + t.stockOut, 0),
+            totalReturned: transactions.filter(t => t.type === 'RETURN').reduce((sum, t) => sum + t.stockIn, 0),
+            totalDamaged: transactions.filter(t => t.type === 'DAMAGE').reduce((sum, t) => sum + t.stockOut, 0),
+            totalPendingApproval: transactions.filter(t => t.type === 'RETURN_PENDING_APPROVAL' || t.pendingApproval).reduce((sum, t) => sum + (t.pendingApproval || 0), 0),
+            closingBalance: runningBalance,
+            currentStock: material.totalQuantity,
+            totalValue: material.totalQuantity * (material.unitCost || 0)
+          };
 
       statements.push({
         material: {
@@ -2863,16 +2864,17 @@ router.get("/reports/material-statement", authenticateToken as any, async (req: 
     });
 
     // Overall summary
-    const overallSummary = {
-      totalMaterials: statements.length,
-      totalOpeningStock: statements.reduce((sum, s) => sum + s.totals.openingStock, 0),
-      totalPurchased: statements.reduce((sum, s) => sum + s.totals.totalPurchased, 0),
-      totalIssued: statements.reduce((sum, s) => sum + s.totals.totalIssued, 0),
-      totalReturned: statements.reduce((sum, s) => sum + s.totals.totalReturned, 0),
-      totalDamaged: statements.reduce((sum, s) => sum + s.totals.totalDamaged, 0),
-      totalClosingStock: statements.reduce((sum, s) => sum + s.totals.closingBalance, 0),
-      totalValue: statements.reduce((sum, s) => sum + s.totals.totalValue, 0)
-    };
+        const overallSummary = {
+          totalMaterials: statements.length,
+          totalOpeningStock: statements.reduce((sum, s) => sum + s.totals.openingStock, 0),
+          totalPurchased: statements.reduce((sum, s) => sum + s.totals.totalPurchased, 0),
+          totalIssued: statements.reduce((sum, s) => sum + s.totals.totalIssued, 0),
+          totalReturned: statements.reduce((sum, s) => sum + s.totals.totalReturned, 0),
+          totalDamaged: statements.reduce((sum, s) => sum + s.totals.totalDamaged, 0),
+          totalPendingApproval: statements.reduce((sum, s) => sum + (s.totals.totalPendingApproval || 0), 0),
+          totalClosingStock: statements.reduce((sum, s) => sum + s.totals.closingBalance, 0),
+          totalValue: statements.reduce((sum, s) => sum + s.totals.totalValue, 0)
+        };
 
     console.log(`[MATERIAL-STATEMENT] OVERALL SUMMARY - totalPurchased: ${overallSummary.totalPurchased}, totalMaterials: ${overallSummary.totalMaterials}`);
 
