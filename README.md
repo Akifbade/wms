@@ -262,3 +262,5 @@ For setup issues or questions, refer to the master plan document in `/docs/maste
 7. Use the CSV / Print buttons in the UI to export or print reports for audits.
 
 If you find issues, check the backend logs and ensure the endpoints `/api/materials/issues` and `/api/materials/returns` are being called successfully.
+
+<!-- Security scan triggered at 2026-09-04 13:01:43 -->
