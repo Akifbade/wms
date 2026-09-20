@@ -22,19 +22,21 @@ async function buildJobMaterialsSummary(companyId: string, jobId: string) {
   });
 
   const materials = issues.map(issue => {
-    const returnedGood = (issue.returns || []).reduce((sum, r) => sum + (r.quantityGood || 0), 0);
-    const damaged = (issue.returns || []).reduce((sum, r) => sum + (r.quantityDamaged || 0), 0);
-    const used = Math.max(0, (issue.quantity || 0) - returnedGood - damaged);
-    return {
-      name: issue.material?.name || 'Unknown',
-      unit: issue.material?.unit || 'pcs',
-      issued: issue.quantity || 0,
-      used,
-      returnedGood,
-      damaged,
-      totalCost: issue.totalCost || 0,
-    };
-  });
+      const returnedGood = (issue.returns || []).reduce((sum, r) => sum + (r.quantityGood || 0), 0);
+      const damaged = (issue.returns || []).reduce((sum, r) => sum + (r.quantityDamaged || 0), 0);
+      const used = Math.max(0, (issue.quantity || 0) - returnedGood - damaged);
+      // Cost based on USED qty (not full issued) — returned stock is not a job cost
+      const unitCost = issue.unitCost || 0;
+      return {
+        name: issue.material?.name || 'Unknown',
+        unit: issue.material?.unit || 'pcs',
+        issued: issue.quantity || 0,
+        used,
+        returnedGood,
+        damaged,
+        totalCost: used * unitCost,
+      };
+    });
 
   const totals = materials.reduce(
     (acc, m) => {

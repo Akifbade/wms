@@ -82,11 +82,29 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
     }
   };
 
+  // Cost must be based on USED qty after return (not full issued qty).
+  // used = quantityUsed if saved, else issued - returnedGood - damaged.
+  // If not yet returned, keep issued totalCost as provisional estimate.
+  const getUsedQty = (m: MaterialIssue): number | null => {
+    const returned = m.returns?.[0];
+    if (!returned) return null;
+    if (returned.quantityUsed != null && !Number.isNaN(Number(returned.quantityUsed))) {
+      return Number(returned.quantityUsed);
+    }
+    return Math.max(0, (m.quantity || 0) - (returned.quantityGood || 0) - (returned.quantityDamaged || 0));
+  };
+
+  const getLineCost = (m: MaterialIssue): number => {
+    const usedQty = getUsedQty(m);
+    if (usedQty === null) return m.totalCost || 0;
+    return usedQty * (m.unitCost || 0);
+  };
+
   const calculateTotals = () => {
     const totalIssued = materials.reduce((sum, m) => sum + m.quantity, 0);
     const totalUsed = materials.reduce((sum, m) => {
-      const returned = m.returns?.[0];
-      return sum + (returned?.quantityUsed ?? 0);
+      const used = getUsedQty(m);
+      return sum + (used ?? 0);
     }, 0);
     const totalReturned = materials.reduce((sum, m) => {
       const returned = m.returns?.[0];
@@ -96,7 +114,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
       const returned = m.returns?.[0];
       return sum + (returned?.quantityDamaged ?? 0);
     }, 0);
-    const totalCost = materials.reduce((sum, m) => sum + m.totalCost, 0);
+    const totalCost = materials.reduce((sum, m) => sum + getLineCost(m), 0);
 
     return { totalIssued, totalUsed, totalReturned, totalDamaged, totalCost };
   };
@@ -117,7 +135,9 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
       materials.forEach(material => {
         const returned = material.returns?.[0];
         const status = returned ? 'Returned' : 'Pending';
-        csv += `${material.material.sku},${material.material.name},${material.quantity},${returned?.quantityUsed ?? 0},${returned?.quantityGood ?? 0},${returned?.quantityDamaged ?? 0},${material.unitCost},${material.totalCost},${status}\n`;
+        const usedQty = getUsedQty(material) ?? 0;
+        const lineCost = getLineCost(material);
+        csv += `${material.material.sku},${material.material.name},${material.quantity},${usedQty},${returned?.quantityGood ?? 0},${returned?.quantityDamaged ?? 0},${material.unitCost},${lineCost},${status}\n`;
       });
 
       csv += `\nTotals:,,,${totals.totalIssued},${totals.totalUsed},${totals.totalReturned},${totals.totalDamaged},,${totals.totalCost}\n`;
@@ -256,6 +276,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                   <tbody>
                     {materials.map(material => {
                       const returned = material.returns?.[0];
+                      const lineCost = getLineCost(material);
                       return (
                         <tr key={material.id}>
                           <td className="border px-4 py-2">{material.material.sku}</td>
@@ -265,7 +286,7 @@ export default function JobMaterialReport({ isOpen, onClose, jobId }: JobMateria
                           <td className="border px-4 py-2 text-center text-green-600">{returned?.quantityGood || '-'}</td>
                           <td className="border px-4 py-2 text-center text-red-600">{returned?.quantityDamaged || '-'}</td>
                           <td className="border px-4 py-2 text-right">{material.unitCost.toFixed(2)} KWD</td>
-                          <td className="border px-4 py-2 text-right font-bold">{material.totalCost.toFixed(2)} KWD</td>
+                          <td className="border px-4 py-2 text-right font-bold">{lineCost.toFixed(2)} KWD</td>
                           <td className="border px-4 py-2 text-center">
                             <span className={`px-2 py-1 rounded text-xs ${returned ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
                               }`}>
