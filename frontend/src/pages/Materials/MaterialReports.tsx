@@ -206,63 +206,72 @@ const MaterialReports: React.FC = () => {
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
+      return new Date(dateStr).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    };
 
-  const exportToCSV = () => {
-    if (statements.length === 0) {
-      alert('No data to export. Please load the statement first.');
-      return;
-    }
-    const rows: string[] = ['Material,SKU,Unit,Opening Stock,Current Stock,Waiting Approval,Purchased,Consumed,Returned,Damaged,Closing Stock,Unit Price,Total Value'];
-        statements.forEach(stmt => {
-          rows.push([
-            `"${stmt.material.name}"`,
-            stmt.material.sku,
-            stmt.material.unit,
-            stmt.totals.openingStock,
-            stmt.material.currentStock,
-            stmt.totals.totalPendingApproval || 0,
-            stmt.totals.totalPurchased,
-            stmt.totals.totalIssued,
-            stmt.totals.totalReturned,
-            stmt.totals.totalDamaged,
-            stmt.totals.closingBalance,
-            stmt.material.unitCost.toFixed(2),
-            stmt.totals.totalValue.toFixed(2)
-          ].join(','));
-        });
+    // Stock now (no pending) vs after approval — approval flow unchanged
+    const getPendingQty = (stmt: MaterialStatement) => stmt.totals.totalPendingApproval || 0;
+    const getStockNow = (stmt: MaterialStatement) => stmt.material.currentStock;
+    const getAfterApproval = (stmt: MaterialStatement) => getStockNow(stmt) + getPendingQty(stmt);
+    const totalStockNow = () => statements.reduce((sum, s) => sum + getStockNow(s), 0);
+    const totalAfterApproval = () => statements.reduce((sum, s) => sum + getAfterApproval(s), 0);
 
-        // Add totals row
-        if (summary) {
-          rows.push([
-            'TOTAL',
-            '',
-            '',
-            summary.totalOpeningStock,
-            statements.reduce((sum, s) => sum + s.material.currentStock, 0),
-            summary.totalPendingApproval || 0,
-            summary.totalPurchased,
-            summary.totalIssued,
-            summary.totalReturned,
-            summary.totalDamaged,
-            summary.totalClosingStock,
-            '',
-            summary.totalValue.toFixed(2)
-          ].join(','));
-        }
+    const exportToCSV = () => {
+      if (statements.length === 0) {
+        alert('No data to export. Please load the statement first.');
+        return;
+      }
+      const rows: string[] = ['Material,SKU,Unit,Opening Stock,Stock Now (No Approval),Waiting Approval,After Approval,Purchased,Consumed,Returned,Damaged,Closing Stock,Unit Price,Total Value'];
+      statements.forEach(stmt => {
+        const pending = getPendingQty(stmt);
+        rows.push([
+          `"${stmt.material.name}"`,
+          stmt.material.sku,
+          stmt.material.unit,
+          stmt.totals.openingStock,
+          getStockNow(stmt),
+          pending,
+          getAfterApproval(stmt),
+          stmt.totals.totalPurchased,
+          stmt.totals.totalIssued,
+          stmt.totals.totalReturned,
+          stmt.totals.totalDamaged,
+          stmt.totals.closingBalance,
+          stmt.material.unitCost.toFixed(2),
+          stmt.totals.totalValue.toFixed(2)
+        ].join(','));
+      });
 
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `material-stock-statement-${dateRange.start}-to-${dateRange.end}.csv`;
-    a.click();
-  };
+      if (summary) {
+        rows.push([
+          'TOTAL',
+          '',
+          '',
+          summary.totalOpeningStock,
+          totalStockNow(),
+          summary.totalPendingApproval || 0,
+          totalAfterApproval(),
+          summary.totalPurchased,
+          summary.totalIssued,
+          summary.totalReturned,
+          summary.totalDamaged,
+          summary.totalClosingStock,
+          '',
+          summary.totalValue.toFixed(2)
+        ].join(','));
+      }
+
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `material-stock-statement-${dateRange.start}-to-${dateRange.end}.csv`;
+      a.click();
+    };
 
   // Professional PDF Export
   const exportToPDF = () => {
@@ -288,68 +297,69 @@ const MaterialReports: React.FC = () => {
     doc.setTextColor(0, 0, 0);
     yPos = 40;
 
-    // Stock Statement Table
-    const tableData = statements.map(stmt => [
-      stmt.material.name,
-      stmt.material.sku,
-      stmt.material.unit,
-      stmt.totals.openingStock.toString(),
-      stmt.material.currentStock.toString(),
-      `${stmt.totals.totalPendingApproval || 0}`,
-      `+${stmt.totals.totalPurchased}`,
-      `-${stmt.totals.totalIssued}`,
-      `+${stmt.totals.totalReturned}`,
-      `-${stmt.totals.totalDamaged}`,
-      `${stmt.material.unitCost.toFixed(2)}`,
-      `${stmt.totals.totalValue.toFixed(2)}`
-    ]);
+    // Stock Statement Table — Stock Now / Waiting / After Approval (approval flow unchanged)
+        const tableData = statements.map(stmt => [
+          stmt.material.name,
+          stmt.material.sku,
+          stmt.material.unit,
+          stmt.totals.openingStock.toString(),
+          getStockNow(stmt).toString(),
+          `${getPendingQty(stmt)}`,
+          getAfterApproval(stmt).toString(),
+          `+${stmt.totals.totalPurchased}`,
+          `-${stmt.totals.totalIssued}`,
+          `+${stmt.totals.totalReturned}`,
+          `-${stmt.totals.totalDamaged}`,
+          `${stmt.material.unitCost.toFixed(2)}`,
+          `${stmt.totals.totalValue.toFixed(2)}`
+        ]);
 
-    // Add totals row
-    const totalCurrentStock = statements.reduce((sum, s) => sum + s.material.currentStock, 0);
-    if (summary) {
-      tableData.push([
-        'TOTAL',
-        '',
-        '',
-        summary.totalOpeningStock.toString(),
-        totalCurrentStock.toString(),
-        `${summary.totalPendingApproval || 0}`,
-        `+${summary.totalPurchased}`,
-        `-${summary.totalIssued}`,
-        `+${summary.totalReturned}`,
-        `-${summary.totalDamaged}`,
-        '',
-        `${summary.totalValue.toFixed(2)} KWD`
-      ]);
-    }
+        if (summary) {
+          tableData.push([
+            'TOTAL',
+            '',
+            '',
+            summary.totalOpeningStock.toString(),
+            totalStockNow().toString(),
+            `${summary.totalPendingApproval || 0}`,
+            totalAfterApproval().toString(),
+            `+${summary.totalPurchased}`,
+            `-${summary.totalIssued}`,
+            `+${summary.totalReturned}`,
+            `-${summary.totalDamaged}`,
+            '',
+            `${summary.totalValue.toFixed(2)} KWD`
+          ]);
+        }
 
-    doc.autoTable({
-      startY: yPos,
-      head: [['Material', 'SKU', 'Unit', 'Opening', 'Current Stock', 'Waiting Approval', 'Purchase', 'Consumed', 'Returned', 'Damaged', 'Unit Price', 'Total Value']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: {
-        fillColor: [37, 99, 235],
-        textColor: 255,
-        fontSize: 9,
-        fontStyle: 'bold',
-        halign: 'center'
-      },
-      bodyStyles: { fontSize: 8 },
-      columnStyles: {
-        0: { cellWidth: 38 },
-        1: { cellWidth: 22 },
-        2: { cellWidth: 14, halign: 'center' },
-        3: { cellWidth: 20, halign: 'right' },
-        4: { cellWidth: 24, halign: 'right', fontStyle: 'bold' },
-        5: { cellWidth: 24, halign: 'right', textColor: [180, 83, 9] },
-        6: { cellWidth: 20, halign: 'right', textColor: [34, 197, 94] },
-        7: { cellWidth: 22, halign: 'right', textColor: [59, 130, 246] },
-        8: { cellWidth: 20, halign: 'right', textColor: [168, 85, 247] },
-        9: { cellWidth: 20, halign: 'right', textColor: [239, 68, 68] },
-        10: { cellWidth: 22, halign: 'right' },
-        11: { cellWidth: 26, halign: 'right', fontStyle: 'bold' }
-      },
+        doc.autoTable({
+          startY: yPos,
+          head: [['Material', 'SKU', 'Unit', 'Opening', 'Stock Now', 'Waiting Approval', 'After Approval', 'Purchase', 'Consumed', 'Returned', 'Damaged', 'Unit Price', 'Total Value']],
+          body: tableData,
+          theme: 'grid',
+          headStyles: {
+            fillColor: [37, 99, 235],
+            textColor: 255,
+            fontSize: 8,
+            fontStyle: 'bold',
+            halign: 'center'
+          },
+          bodyStyles: { fontSize: 7 },
+          columnStyles: {
+            0: { cellWidth: 32 },
+            1: { cellWidth: 18 },
+            2: { cellWidth: 12, halign: 'center' },
+            3: { cellWidth: 16, halign: 'right' },
+            4: { cellWidth: 18, halign: 'right', fontStyle: 'bold' },
+            5: { cellWidth: 20, halign: 'right', textColor: [180, 83, 9] },
+            6: { cellWidth: 20, halign: 'right', textColor: [21, 128, 61] },
+            7: { cellWidth: 16, halign: 'right', textColor: [34, 197, 94] },
+            8: { cellWidth: 18, halign: 'right', textColor: [59, 130, 246] },
+            9: { cellWidth: 16, halign: 'right', textColor: [168, 85, 247] },
+            10: { cellWidth: 16, halign: 'right', textColor: [239, 68, 68] },
+            11: { cellWidth: 18, halign: 'right' },
+            12: { cellWidth: 22, halign: 'right', fontStyle: 'bold' }
+          },
       margin: { left: 10, right: 10 },
       didParseCell: (data: any) => {
         if (data.row.index === tableData.length - 1) {
@@ -797,20 +807,28 @@ const MaterialReports: React.FC = () => {
                       <thead className="bg-gray-100">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Material</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SKU</th>
-                                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Opening</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-100">
-                                                      <span className="print:hidden">📦 </span>Current Stock
-                                                    </th>
-                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-amber-700 uppercase tracking-wider bg-amber-50">⏳ Waiting Approval</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50">+ Purchased</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50">- Consumed</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50">+ Returned</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-red-700 uppercase tracking-wider bg-red-50">- Damaged</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit Price</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total Value</th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider print:hidden">Actions</th>
+                                                                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SKU</th>
+                                                                              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
+                                                                              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Opening</th>
+                                                                              <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-100">
+                                                                                Stock Now
+                                                                                <span className="block text-[10px] font-normal normal-case text-blue-600 print:hidden">(no approval)</span>
+                                                                              </th>
+                                                                              <th className="px-4 py-3 text-right text-xs font-semibold text-amber-700 uppercase tracking-wider bg-amber-50">
+                                                                                Waiting Approval
+                                                                                <span className="block text-[10px] font-normal normal-case text-amber-600 print:hidden">(pending)</span>
+                                                                              </th>
+                                                                              <th className="px-4 py-3 text-right text-xs font-semibold text-emerald-800 uppercase tracking-wider bg-emerald-50">
+                                                                                After Approval
+                                                                                <span className="block text-[10px] font-normal normal-case text-emerald-700 print:hidden">(now + pending)</span>
+                                                                              </th>
+                                                                              <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50">+ Purchased</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50">- Consumed</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50">+ Returned</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-red-700 uppercase tracking-wider bg-red-50">- Damaged</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit Price</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total Value</th>
+                                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider print:hidden">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -825,11 +843,12 @@ const MaterialReports: React.FC = () => {
                             <td className="px-4 py-3 text-sm text-gray-600">{stmt.material.sku}</td>
                             <td className="px-4 py-3 text-center text-sm text-gray-600">{stmt.material.unit}</td>
                                                         <td className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{stmt.totals.openingStock}</td>
-                                                        <td className="px-4 py-3 text-right font-bold text-blue-700 bg-blue-50">{stmt.material.currentStock}</td>
-                                                        <td className="px-4 py-3 text-right font-semibold text-amber-700 bg-amber-50">{stmt.totals.totalPendingApproval || '-'}</td>
-                                                        <td className="px-4 py-3 text-right font-semibold text-green-600 bg-green-50">
-                              {stmt.totals.totalPurchased > 0 ? `+${stmt.totals.totalPurchased}` : '-'}
-                            </td>
+                                                                                                                <td className="px-4 py-3 text-right font-bold text-blue-700 bg-blue-50">{getStockNow(stmt)}</td>
+                                                                                                                <td className="px-4 py-3 text-right font-semibold text-amber-700 bg-amber-50">{getPendingQty(stmt) > 0 ? getPendingQty(stmt) : '-'}</td>
+                                                                                                                <td className="px-4 py-3 text-right font-bold text-emerald-800 bg-emerald-50">{getAfterApproval(stmt)}</td>
+                                                                                                                <td className="px-4 py-3 text-right font-semibold text-green-600 bg-green-50">
+                                                                                      {stmt.totals.totalPurchased > 0 ? `+${stmt.totals.totalPurchased}` : '-'}
+                                                                                    </td>
                             <td className="px-4 py-3 text-right font-semibold text-blue-600 bg-blue-50">
                               {stmt.totals.totalIssued > 0 ? `-${stmt.totals.totalIssued}` : '-'}
                             </td>
@@ -861,10 +880,11 @@ const MaterialReports: React.FC = () => {
                         <tfoot className="bg-gray-800 text-white">
                           <tr>
                             <td colSpan={3} className="px-4 py-3 font-bold text-right">TOTAL ({summary.totalMaterials} Materials)</td>
-                                                        <td className="px-4 py-3 text-right font-bold text-gray-300">{summary.totalOpeningStock}</td>
-                                                        <td className="px-4 py-3 text-right font-bold text-blue-400">{statements.reduce((sum, s) => sum + s.material.currentStock, 0)}</td>
-                                                        <td className="px-4 py-3 text-right font-bold text-amber-400">{summary.totalPendingApproval || 0}</td>
-                                                        <td className="px-4 py-3 text-right font-bold text-green-400">+{summary.totalPurchased}</td>
+                                                                                    <td className="px-4 py-3 text-right font-bold text-gray-300">{summary.totalOpeningStock}</td>
+                                                                                    <td className="px-4 py-3 text-right font-bold text-blue-400">{totalStockNow()}</td>
+                                                                                    <td className="px-4 py-3 text-right font-bold text-amber-400">{summary.totalPendingApproval || 0}</td>
+                                                                                    <td className="px-4 py-3 text-right font-bold text-emerald-300">{totalAfterApproval()}</td>
+                                                                                    <td className="px-4 py-3 text-right font-bold text-green-400">+{summary.totalPurchased}</td>
                             <td className="px-4 py-3 text-right font-bold text-blue-400">-{summary.totalIssued}</td>
                             <td className="px-4 py-3 text-right font-bold text-purple-400">+{summary.totalReturned}</td>
                             <td className="px-4 py-3 text-right font-bold text-red-400">-{summary.totalDamaged}</td>
@@ -885,24 +905,36 @@ const MaterialReports: React.FC = () => {
                 {/* End print-only-report wrapper */}
 
                 {/* Legend */}
-                <div className="px-6 py-4 bg-gray-50 border-t flex gap-6 text-sm print:hidden">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                    <span className="text-gray-600">Purchase = Stock In (from vendors)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                    <span className="text-gray-600">Consumed = Stock Out (to jobs)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-purple-500"></span>
-                    <span className="text-gray-600">Returned = Stock In (from jobs)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-red-500"></span>
-                    <span className="text-gray-600">Damaged = Stock Loss</span>
-                  </div>
-                </div>
+                                <div className="px-6 py-4 bg-gray-50 border-t flex flex-wrap gap-x-6 gap-y-2 text-sm print:hidden">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                                    <span className="text-gray-600"><strong>Stock Now</strong> = warehouse stock without pending approval</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                                    <span className="text-gray-600"><strong>Waiting Approval</strong> = return still pending (not in stock yet)</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-emerald-600"></span>
+                                    <span className="text-gray-600"><strong>After Approval</strong> = Stock Now + Waiting (if all approved)</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                                    <span className="text-gray-600">Purchase = Stock In (from vendors)</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                                    <span className="text-gray-600">Consumed = Stock Out (to jobs)</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+                                    <span className="text-gray-600">Returned = Stock In after approved</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-red-500"></span>
+                                    <span className="text-gray-600">Damaged = Stock Loss</span>
+                                  </div>
+                                </div>
               </div>
             )}
 
@@ -956,36 +988,48 @@ const MaterialReports: React.FC = () => {
                       </div>
 
                       {/* Quick Stats */}
-                      <div className="flex items-center gap-6">
-                        <div className="text-center px-3 py-1 bg-gray-100 rounded">
-                          <p className="text-xs text-gray-500">Opening</p>
-                          <p className="font-bold">{stmt.totals.openingStock}</p>
-                        </div>
-                        <div className="text-center px-3 py-1 bg-green-100 rounded">
-                          <p className="text-xs text-green-600">Purchased</p>
-                          <p className="font-bold text-green-700">+{stmt.totals.totalPurchased}</p>
-                        </div>
-                        <div className="text-center px-3 py-1 bg-blue-100 rounded">
-                          <p className="text-xs text-blue-600">Consumed</p>
-                          <p className="font-bold text-blue-700">-{stmt.totals.totalIssued}</p>
-                        </div>
-                        <div className="text-center px-3 py-1 bg-purple-100 rounded">
-                          <p className="text-xs text-purple-600">Returned</p>
-                          <p className="font-bold text-purple-700">+{stmt.totals.totalReturned}</p>
-                        </div>
-                        {stmt.totals.totalDamaged > 0 && (
-                          <div className="text-center px-3 py-1 bg-red-100 rounded">
-                            <p className="text-xs text-red-600">Damaged</p>
-                            <p className="font-bold text-red-700">-{stmt.totals.totalDamaged}</p>
-                          </div>
-                        )}
-                        <div className={`text-center px-3 py-1 rounded ${stmt.totals.closingBalance < stmt.material.minStockLevel ? 'bg-red-100' : 'bg-gray-200'}`}>
-                          <p className="text-xs text-gray-600">Closing</p>
-                          <p className={`font-bold ${stmt.totals.closingBalance < stmt.material.minStockLevel ? 'text-red-600' : ''}`}>
-                            {stmt.totals.closingBalance}
-                          </p>
-                        </div>
-                      </div>
+                                            <div className="flex items-center gap-3 flex-wrap justify-end">
+                                              <div className="text-center px-3 py-1 bg-gray-100 rounded">
+                                                <p className="text-xs text-gray-500">Opening</p>
+                                                <p className="font-bold">{stmt.totals.openingStock}</p>
+                                              </div>
+                                              <div className="text-center px-3 py-1 bg-blue-100 rounded">
+                                                <p className="text-xs text-blue-600">Stock Now</p>
+                                                <p className="font-bold text-blue-700">{getStockNow(stmt)}</p>
+                                              </div>
+                                              <div className="text-center px-3 py-1 bg-amber-100 rounded">
+                                                <p className="text-xs text-amber-700">Waiting</p>
+                                                <p className="font-bold text-amber-800">{getPendingQty(stmt)}</p>
+                                              </div>
+                                              <div className="text-center px-3 py-1 bg-emerald-100 rounded">
+                                                <p className="text-xs text-emerald-700">After Approval</p>
+                                                <p className="font-bold text-emerald-800">{getAfterApproval(stmt)}</p>
+                                              </div>
+                                              <div className="text-center px-3 py-1 bg-green-100 rounded">
+                                                <p className="text-xs text-green-600">Purchased</p>
+                                                <p className="font-bold text-green-700">+{stmt.totals.totalPurchased}</p>
+                                              </div>
+                                              <div className="text-center px-3 py-1 bg-blue-50 rounded">
+                                                <p className="text-xs text-blue-600">Consumed</p>
+                                                <p className="font-bold text-blue-700">-{stmt.totals.totalIssued}</p>
+                                              </div>
+                                              <div className="text-center px-3 py-1 bg-purple-100 rounded">
+                                                <p className="text-xs text-purple-600">Returned</p>
+                                                <p className="font-bold text-purple-700">+{stmt.totals.totalReturned}</p>
+                                              </div>
+                                              {stmt.totals.totalDamaged > 0 && (
+                                                <div className="text-center px-3 py-1 bg-red-100 rounded">
+                                                  <p className="text-xs text-red-600">Damaged</p>
+                                                  <p className="font-bold text-red-700">-{stmt.totals.totalDamaged}</p>
+                                                </div>
+                                              )}
+                                              <div className={`text-center px-3 py-1 rounded ${stmt.totals.closingBalance < stmt.material.minStockLevel ? 'bg-red-100' : 'bg-gray-200'}`}>
+                                                <p className="text-xs text-gray-600">Closing</p>
+                                                <p className={`font-bold ${stmt.totals.closingBalance < stmt.material.minStockLevel ? 'text-red-600' : ''}`}>
+                                                  {stmt.totals.closingBalance}
+                                                </p>
+                                              </div>
+                                            </div>
                     </div>
 
                     {/* Transactions Table - Expanded View */}
