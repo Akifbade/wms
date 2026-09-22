@@ -449,3 +449,36 @@ code {
   .hide-desktop { display: none !important; }
   .mobile-only { display: none !important; }
 }
+/* ===== Materials V3 form controls (clean minimal) ===== */
+.input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: #0f172a;
+  background-color: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+.input::placeholder { color: #94a3b8; }
+select.input { appearance: auto; }
+
+/* ===== Packing list print (A4 clean) ===== */
+@media print {
+  .no-print { display: none !important; }
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  @page { size: A4 portrait; margin: 12mm; }
+  body { background: #fff !important; }
+  .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+}

@@ -1914,3 +1914,159 @@ model EmailLog {
   @@map("email_logs")
 }
 
+
+// ==================== MATERIAL SYSTEM V3 (simple ledger) ====================
+// Purchase cost vs job charge rate kept separate.
+// No approval workflow. Multi-day job entries + packing list.
+
+model MatV3Purchase {
+  id              String   @id @default(cuid())
+  companyId       String
+  purchaseNumber  String
+  vendorName      String
+  invoiceNumber   String?
+  purchaseDate    DateTime @default(now())
+  notes           String?  @db.Text
+  totalAmount     Float    @default(0)
+  status          String   @default("ACTIVE") // ACTIVE, VOID
+  voidReason      String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items MatV3PurchaseItem[]
+
+  @@unique([companyId, purchaseNumber])
+  @@index([companyId, purchaseDate])
+  @@map("mat_v3_purchases")
+}
+
+model MatV3PurchaseItem {
+  id          String @id @default(cuid())
+  purchaseId  String
+  materialId  String
+  quantity    Int
+  unitCost    Float // actual supplier cost
+  totalCost   Float
+  companyId   String
+
+  purchase MatV3Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@index([purchaseId])
+  @@map("mat_v3_purchase_items")
+}
+
+model MatV3Ledger {
+  id            String   @id @default(cuid())
+  companyId     String
+  materialId    String
+  entryType     String // PURCHASE, ISSUE, RETURN, DAMAGE, ADJUST, VOID_PURCHASE
+  direction     String // IN, OUT
+  quantity      Int // always > 0
+  unitCost      Float    @default(0) // stock valuation uses purchase/avg; informational
+  jobId         String?
+  dayNumber     Int?
+  packingListId String?
+  purchaseId    String?
+  jobLineId     String?
+  notes         String?  @db.Text
+  reason        String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  @@index([companyId, materialId, createdAt])
+  @@index([jobId])
+  @@index([packingListId])
+  @@map("mat_v3_ledger")
+}
+
+model MatV3PackingList {
+  id              String    @id @default(cuid())
+  companyId       String
+  jobId           String
+  listNumber      String
+  status          String    @default("OPEN") // OPEN, CLOSED
+  notes           String?   @db.Text
+  attachmentUrl   String? // scanned filled packing list
+  attachmentName  String?
+  closedAt        DateTime?
+  closedById      String?
+  createdById     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  lines MatV3JobLine[]
+
+  @@unique([companyId, listNumber])
+  @@unique([jobId]) // one packing list per job
+  @@index([companyId])
+  @@map("mat_v3_packing_lists")
+}
+
+model MatV3JobLine {
+  id              String   @id @default(cuid())
+  companyId       String
+  jobId           String
+  packingListId   String
+  dayNumber       Int      @default(1)
+  workDate        DateTime @default(now())
+  materialId      String
+  qtyIssued       Int      @default(0)
+  qtyReturned     Int      @default(0) // good stock back
+  qtyDamaged      Int      @default(0)
+  chargeUnitPrice Float    @default(0) // job billing rate (NOT purchase cost)
+  notes           String?
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  packingList MatV3PackingList @relation(fields: [packingListId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, dayNumber])
+  @@index([materialId])
+  @@index([packingListId])
+  @@map("mat_v3_job_lines")
+}
+
+model MatV3JobFinance {
+  id                     String   @id @default(cuid())
+  companyId              String
+  jobId                  String   @unique
+  materialsChargeMode    String   @default("AUTO") // AUTO = sum used*rate, MANUAL = manualMaterialsTotal
+  manualMaterialsTotal   Float?
+  laborCost              Float    @default(0)
+  transportCost          Float    @default(0)
+  otherCost              Float    @default(0)
+  discount               Float    @default(0)
+  notes                  String?  @db.Text
+  materialsLocked        Boolean  @default(false)
+  lockedAt               DateTime?
+  lockedById             String?
+  lastEmailAt            DateTime?
+  updatedById            String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("mat_v3_job_finance")
+}
+
+model MatV3Audit {
+  id          String   @id @default(cuid())
+  companyId   String
+  entityType  String // PURCHASE, JOB_LINE, PACKING_LIST, MATERIAL, FINANCE, STOCK
+  entityId    String?
+  action      String // CREATE, UPDATE, DELETE, VOID, CLOSE, EMAIL
+  beforeJson  String?  @db.LongText
+  afterJson   String?  @db.LongText
+  reason      String?
+  userId      String?
+  userName    String?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([entityType, entityId])
+  @@map("mat_v3_audit")
+}

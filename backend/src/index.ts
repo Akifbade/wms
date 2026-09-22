@@ -31,6 +31,7 @@ import uploadRoutes from './routes/upload';
 import permissionsRoutes from './routes/permissions';
 import movingJobsRoutes from './routes/moving-jobs';
 import materialsRoutes from './routes/materials';
+import materialsV3Routes from './routes/materials-v3';
 import reportsRoutes from './routes/reports';
 import pluginsRoutes from './routes/plugins';
 import jobFilesRoutes from './routes/job-files'; // NEW: Job file uploads
@@ -181,6 +182,7 @@ app.use('/api/permissions', permissionsRoutes);
 app.use('/api/moving-jobs', movingJobsRoutes);
 // app.use('/api/jobs', jobsRoutes); // REMOVED: Duplicate of moving-jobs
 app.use('/api/materials', materialsRoutes);
+app.use('/api/materials-v3', materialsV3Routes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/plugins', pluginsRoutes);
 app.use('/api/job-files', jobFilesRoutes); // NEW: Job file management

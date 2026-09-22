@@ -26,6 +26,7 @@ import ApprovalManager from './components/moving-jobs/ApprovalManager';
 import MaterialReports from './pages/Materials/MaterialReports';
 import MaterialStockStatementPro from './pages/Materials/MaterialStockStatementPro';
 import MaterialsHub from './pages/Materials/MaterialsHub';
+import MaterialsV3 from './pages/MaterialsV3/MaterialsV3';
 import { DamageReport } from './components/reports/DamageReport';
 import { DebugLogin } from './pages/DebugLogin';
 import BackupManagement from './pages/BackupManagement/BackupManagement';
@@ -118,6 +119,11 @@ function App() {
               <Route path="racks" element={
                 <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                   <Racks />
+                </ProtectedRoute>
+              } />
+              <Route path="materials-v3" element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                  <MaterialsV3 />
                 </ProtectedRoute>
               } />
               <Route path="materials" element={

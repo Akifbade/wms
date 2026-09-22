@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: staging
-      DATABASE_URL: mysql://wms_user_staging:st...g@wms-database-staging:3306/warehouse_wms_staging
+      DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 5000
       FRONTEND_URL: http://localhost:4080

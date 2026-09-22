@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import JobMaterialsManager from './JobMaterialsManager';
+import JobMaterialsV3 from './JobMaterialsV3';
 import StaffAssignmentDialog from '../StaffAssignmentDialog';
 
 interface JobDetailsModalProps {
@@ -153,7 +153,7 @@ const JobDetailsModal: React.FC<JobDetailsModalProps> = ({ isOpen, onClose, job,
           )}
 
           {activeTab === 'materials' && (
-            <JobMaterialsManager 
+            <JobMaterialsV3 
               jobId={job.id} 
               jobStatus={job.status}
               onUpdate={onUpdate}
