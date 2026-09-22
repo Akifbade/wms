@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Printer, Paperclip, Lock, Unlock, Trash2, Pencil, X, Save, AlertTriangle, FileText, BarChart3,
 } from 'lucide-react';
@@ -35,7 +35,7 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [role, setRole] = useState('');
-  const [activeDay, setActiveDay] = useState<number>(1);
+  const [activeDay, setActiveDay] = useState<number | 'all'>('all');
   const [showLine, setShowLine] = useState(false);
   const [editing, setEditing] = useState<Line | null>(null);
   const [showFinance, setShowFinance] = useState(false);
@@ -73,8 +73,9 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
       setReport(rep);
       setJob(rep?.job || null);
       setErr('');
+      // stay on the full "All Days" view so the whole history is always visible
       const days: number[] = (jm?.days || []).map((d: any) => d.dayNumber);
-      if (days.length) setActiveDay((prev) => (days.includes(prev) ? prev : Math.max(...days)));
+      if (days.length) setActiveDay((prev) => (typeof prev === 'number' && days.includes(prev) ? prev : 'all'));
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -97,12 +98,28 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
   const materialSummary: any[] = data?.materialSummary || [];
   const unreported: any[] = data?.unreported || [];
   const dayNumbers = useMemo(() => {
-    const s = new Set<number>(days.map((d) => d.dayNumber));
-    s.add(activeDay);
+    const s = new Set<number>();
+    allLines.forEach((l) => s.add(l.dayNumber));
+    days.forEach((d) => s.add(d.dayNumber));
+    // only keep an empty day tab alive while the user is actually adding to it
+    if (showLine && typeof activeDay === 'number') s.add(activeDay);
     return Array.from(s).sort((a, b) => a - b);
-  }, [days, activeDay]);
+  }, [days, allLines, activeDay, showLine]);
 
-  const activeLines = allLines.filter((l) => l.dayNumber === activeDay);
+  /** Day number to add/edit into when the view is on All Days. */
+  const currentDay: number =
+    typeof activeDay === 'number'
+      ? activeDay
+      : dayNumbers.length > 0
+        ? dayNumbers[dayNumbers.length - 1]
+        : 1;
+
+  const activeLines =
+    activeDay === 'all'
+      ? [...allLines].sort(
+          (a, b) => a.dayNumber - b.dayNumber || (a.materialName || '').localeCompare(b.materialName || '')
+        )
+      : allLines.filter((l) => l.dayNumber === activeDay);
   const totals = data?.totals || { issued: 0, returned: 0, damaged: 0, used: 0, outside: 0, chargeAmount: 0, purchaseCost: 0 };
   const finance = data?.finance || {};
 
@@ -114,7 +131,7 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
 
   const openAdd = () => {
     setEditing(null);
-    setForm(blankLine(activeDay));
+    setForm(blankLine(currentDay));
     setShowLine(true);
   };
   const openEdit = (l: Line) => {
@@ -348,9 +365,25 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
       <div className="bg-white border border-slate-200 rounded-xl no-print">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 pt-3">
           <nav className="flex gap-4 overflow-x-auto">
+            {allLines.length > 0 && (
+              <button
+                onClick={() => setActiveDay('all')}
+                className={`whitespace-nowrap pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                  activeDay === 'all'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                All Days
+                <span className="ml-2 text-xs text-slate-400">
+                  {allLines.length} entr{allLines.length === 1 ? 'y' : 'ies'} · {totals.used} used
+                </span>
+              </button>
+            )}
             {dayNumbers.map((d) => {
               const active = d === activeDay;
               const daySum = days.find((x) => x.dayNumber === d)?.summary;
+              const dayRows = allLines.filter((l) => l.dayNumber === d);
               return (
                 <button
                   key={d}
@@ -360,26 +393,27 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
                   }`}
                 >
                   Day {d}
-                  {daySum && (
-                    <span className="ml-2 text-xs text-slate-400">
-                      {daySum.issued} out / {daySum.used} used
-                    </span>
-                  )}
+                  <span className="ml-2 text-xs text-slate-400">
+                    {dayRows.length} entr{dayRows.length === 1 ? 'y' : 'ies'}
+                    {daySum ? ` · ${daySum.used} used` : ''}
+                  </span>
                 </button>
               );
             })}
-            <button
-              onClick={() => {
-                const next = Math.max(...dayNumbers) + 1;
-                setActiveDay(next);
-                setEditing(null);
-                setForm(blankLine(next));
-                setShowLine(true);
-              }}
-              className="whitespace-nowrap pb-3 px-1 text-sm font-medium text-slate-400 hover:text-blue-600 border-b-2 border-transparent inline-flex items-center gap-1"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add Day
-            </button>
+            {canEdit && !locked && (
+              <button
+                onClick={() => {
+                  const next = dayNumbers.length > 0 ? Math.max(...dayNumbers) + 1 : 1;
+                  setActiveDay(next);
+                  setEditing(null);
+                  setForm(blankLine(next));
+                  setShowLine(true);
+                }}
+                className="whitespace-nowrap pb-3 px-1 text-sm font-medium text-slate-400 hover:text-blue-600 border-b-2 border-transparent inline-flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Day
+              </button>
+            )}
           </nav>
 
           {canEdit && !locked && (
@@ -392,11 +426,12 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
           )}
         </div>
 
-        {/* Lines for the day */}
+        {/* Lines */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                {activeDay === 'all' && <th className="px-4 py-3">Day</th>}
                 <th className="px-4 py-3">Material</th>
                 <th className="px-4 py-3 text-right">Issued</th>
                 <th className="px-4 py-3 text-right">Returned</th>
@@ -410,44 +445,104 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
             <tbody className="divide-y divide-slate-100">
               {activeLines.length === 0 && (
                 <tr>
-                  <td colSpan={canEdit ? 8 : 7} className="px-4 py-10 text-center text-slate-400">
-                    {dayNumbers.length > 1 ? `Nothing recorded for Day ${activeDay} yet.` : 'No materials added yet.'}
+                  <td colSpan={(canEdit ? 8 : 7) + (activeDay === 'all' ? 1 : 0)} className="px-4 py-10 text-center text-slate-400">
+                    {activeDay === 'all'
+                      ? 'No materials recorded for this job yet.'
+                      : `Nothing recorded for Day ${activeDay} yet.`}
                   </td>
                 </tr>
               )}
-              {activeLines.map((l) => (
-                <tr key={l.id} className="hover:bg-slate-50/70">
-                  <td className="px-4 py-3">
-                    <span className="font-medium text-slate-800">{l.materialName}</span>
-                    <span className="ml-2 font-mono text-xs text-slate-400">{l.materialSku}</span>
-                    <span className="ml-2 text-xs text-slate-400">{l.unit}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-blue-700">{l.qtyIssued || '—'}</td>
-                  <td className="px-4 py-3 text-right font-medium text-teal-700">{l.qtyReturned || '—'}</td>
-                  <td className="px-4 py-3 text-right font-medium text-red-600">{l.qtyDamaged || '—'}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-900">{l.usedQty}</td>
-                  <td className="px-4 py-3 text-right text-slate-600">{l.chargeRate.toFixed(3)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-900">{l.usedAmount.toFixed(3)}</td>
-                  {canEdit && (
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => openEdit(l)}
-                        title="Edit"
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => removeLine(l)}
-                        title="Remove"
-                        className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded ml-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+
+              {(() => {
+                const rowFor = (l: Line) => (
+                  <tr key={l.id} className="hover:bg-slate-50/70">
+                    {activeDay === 'all' && (
+                      <td className="px-4 py-3">
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                          Day {l.dayNumber}
+                        </span>
+                      </td>
+                    )}
+                    <td className="px-4 py-3">
+                      <span className="font-medium text-slate-800">{l.materialName}</span>
+                      <span className="ml-2 font-mono text-xs text-slate-400">{l.materialSku}</span>
+                      <span className="ml-2 text-xs text-slate-400">{l.unit}</span>
+                      {l.workDate && (
+                        <span className="ml-2 text-xs text-slate-400">
+                          {String(l.workDate).slice(0, 10)}
+                        </span>
+                      )}
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td className="px-4 py-3 text-right font-medium text-blue-700">{l.qtyIssued || '—'}</td>
+                    <td className="px-4 py-3 text-right font-medium text-teal-700">{l.qtyReturned || '—'}</td>
+                    <td className="px-4 py-3 text-right font-medium text-red-600">{l.qtyDamaged || '—'}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-900">{l.usedQty}</td>
+                    <td className="px-4 py-3 text-right text-slate-600">{l.chargeRate.toFixed(3)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-900">{l.usedAmount.toFixed(3)}</td>
+                    {canEdit && (
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        {locked ? (
+                          <span className="text-xs text-slate-400">locked</span>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => openEdit(l)}
+                              title="Edit"
+                              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => removeLine(l)}
+                              title="Remove"
+                              className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded ml-1"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+
+                if (activeDay !== 'all') return activeLines.map(rowFor);
+
+                // All Days: group by day, with a subtotal line per day
+                return dayNumbers
+                  .filter((d) => activeLines.some((l) => l.dayNumber === d))
+                  .map((d) => {
+                    const rows = activeLines.filter((l) => l.dayNumber === d);
+                    const sub = rows.reduce(
+                      (a, l) => ({
+                        issued: a.issued + (l.qtyIssued || 0),
+                        returned: a.returned + (l.qtyReturned || 0),
+                        damaged: a.damaged + (l.qtyDamaged || 0),
+                        amount: a.amount + (l.usedAmount || 0),
+                      }),
+                      { issued: 0, returned: 0, damaged: 0, amount: 0 }
+                    );
+                    return (
+                      <Fragment key={`day-${d}`}>
+                        <tr className="bg-slate-50/80">
+                          <td colSpan={(canEdit ? 8 : 7) + 1} className="px-4 py-2">
+                            <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                              Day {d}
+                            </span>
+                            <span className="ml-3 text-xs text-slate-500">
+                              {sub.issued} out · {sub.returned} back · {sub.damaged} damaged ·{' '}
+                              {sub.issued - sub.returned - sub.damaged} used
+                            </span>
+                            <span className="ml-3 text-xs font-semibold text-slate-700">
+                              {sub.amount.toFixed(3)} KWD
+                            </span>
+                          </td>
+                        </tr>
+                        {rows.map(rowFor)}
+                      </Fragment>
+                    );
+                  });
+              })()}
             </tbody>
           </table>
         </div>
