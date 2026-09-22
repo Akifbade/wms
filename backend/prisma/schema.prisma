@@ -101,24 +101,25 @@ model Company {
   rackLevels        RackStockLevel[]
   materialIssues    MaterialIssue[]
   materialIssueHistory MaterialIssueHistory[]
-  materialReturns   MaterialReturn[]
-  materialDamages   MaterialDamage[]
-  materialApprovals MaterialApproval[]
-  jobCostSnapshots  JobCostSnapshot[]
-  systemPlugins     SystemPlugin[]
-  JobAssignment     JobAssignment[]
-  SystemPluginLog   SystemPluginLog[]
-  shipmentItems     ShipmentItem[] // NEW: Detailed item tracking
+    materialPurchaseHistory MaterialPurchaseHistory[]
+    materialReturns   MaterialReturn[]
+    materialDamages   MaterialDamage[]
+    materialApprovals MaterialApproval[]
+    jobCostSnapshots  JobCostSnapshot[]
+    systemPlugins     SystemPlugin[]
+    JobAssignment     JobAssignment[]
+    SystemPluginLog   SystemPluginLog[]
+    shipmentItems     ShipmentItem[] // NEW: Detailed item tracking
   
-  // NEW: Enhanced Material System Relations
-  materialUsages       MaterialUsage[]
-  materialTransfers    MaterialTransfer[]
-  stockAlerts          StockAlert[]
-  purchaseOrders       PurchaseOrder[]
-  purchaseOrderItems   PurchaseOrderItem[]
-  materialPriceHistory MaterialPriceHistory[]
-  rackAuditLogs        RackAuditLog[]
-  prepaidBalances      CustomerPrepaidBalance[]
+    // NEW: Enhanced Material System Relations
+    materialUsages       MaterialUsage[]
+    materialTransfers    MaterialTransfer[]
+    stockAlerts          StockAlert[]
+    purchaseOrders       PurchaseOrder[]
+    purchaseOrderItems   PurchaseOrderItem[]
+    materialPriceHistory MaterialPriceHistory[]
+    rackAuditLogs        RackAuditLog[]
+    prepaidBalances      CustomerPrepaidBalance[]
   
   // Email & Notification System
   emailSettings        EmailSettings?
@@ -160,7 +161,8 @@ model User {
   stockBatchesReceived    StockBatch[]       @relation("StockBatchReceivedBy")
   materialIssuesCreated   MaterialIssue[]    @relation("MaterialIssuedBy")
   materialIssueHistory    MaterialIssueHistory[] @relation("MaterialIssueHistoryBy")
-  materialReturnsRecorded MaterialReturn[]   @relation("MaterialReturnRecordedBy")
+    materialPurchaseHistory MaterialPurchaseHistory[] @relation("MaterialPurchaseHistoryBy")
+    materialReturnsRecorded MaterialReturn[]   @relation("MaterialReturnRecordedBy")
   damagesRecorded         MaterialDamage[]   @relation("DamageRecordedBy")
   damagesApproved         MaterialDamage[]   @relation("DamageApprovedBy")
   approvalsRequested      MaterialApproval[] @relation("ApprovalRequestedBy")
@@ -1353,13 +1355,14 @@ model PackingMaterial {
   rackLevels       RackStockLevel[]
   materialIssues   MaterialIssue[]
   materialIssueHistory MaterialIssueHistory[]
+  materialPurchaseHistory MaterialPurchaseHistory[]
   materialReturns  MaterialReturn[]
   materialDamages  MaterialDamage[]
-  materialUsages   MaterialUsage[]      // NEW: Track material consumption
-  materialTransfers MaterialTransfer[]  // NEW: Track transfers
-  stockAlerts      StockAlert[]         // NEW: Low stock alerts
-  purchaseOrderItems PurchaseOrderItem[] // NEW: Purchase history
-  priceHistory     MaterialPriceHistory[] // NEW: Price tracking
+  materialUsages   MaterialUsage[]
+  materialTransfers MaterialTransfer[]
+  stockAlerts      StockAlert[]
+  purchaseOrderItems PurchaseOrderItem[]
+  priceHistory     MaterialPriceHistory[]
 
   @@unique([sku, companyId])
   @@index([categoryId])
@@ -1492,6 +1495,39 @@ model MaterialIssueHistory {
   @@map("material_issue_history")
 }
 
+// Track admin edits/deletes on stock purchases (batches + purchase orders)
+model MaterialPurchaseHistory {
+  id               String   @id @default(cuid())
+  action           String   // CREATED, EDITED, DELETED
+  source           String   // stock_batch | purchase_order
+  referenceId      String?  // batch id or PO item id
+  purchaseOrderId  String?
+  materialId       String
+  materialName     String
+  materialSku      String
+  orderNumber      String?
+  vendorName       String?
+  quantity         Int
+  previousQty      Int?
+  unitCost         Float
+  previousUnitCost Float?
+  totalCost        Float
+  orderDate        DateTime?
+  notes            String?
+  reason           String?
+  performedById    String
+  performedAt      DateTime @default(now())
+  companyId        String
+
+  material    PackingMaterial @relation(fields: [materialId], references: [id])
+  performedBy User            @relation("MaterialPurchaseHistoryBy", fields: [performedById], references: [id])
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, performedAt])
+  @@index([materialId])
+  @@map("material_purchase_history")
+}
+
 model MaterialReturn {
   id                 String    @id @default(cuid())
   jobId              String
@@ -1512,7 +1548,7 @@ model MaterialReturn {
   uploadToken        String?   @unique // Token for mobile upload authentication
   uploadTokenExpiry  DateTime? // Token expiry for security
 
-  job        MovingJob         @relation(fields: [jobId], references: [id], onDelete: Restrict) // ← CHANGED: Restrict instead of Cascade - preserves history
+  job        MovingJob         @relation(fields: [jobId], references: [id], onDelete: Restrict) // preserves history
   material   PackingMaterial   @relation(fields: [materialId], references: [id])
   issue      MaterialIssue?    @relation(fields: [issueId], references: [id])
   rack       Rack?             @relation(fields: [rackId], references: [id])

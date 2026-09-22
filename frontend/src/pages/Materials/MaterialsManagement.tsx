@@ -39,6 +39,8 @@ interface StockPurchase {
   orderDate: string;
   receivedDate: string;
   source?: 'stock_batch' | 'purchase_order'; // Track where data came from
+  status?: string;
+  notes?: string;
   materialName?: string;
   materialSku?: string;
 }
@@ -94,6 +96,19 @@ const MaterialsManagement = () => {
     status: 'PENDING',
     notes: '',
   });
+
+  // Admin edit purchase
+  const [editingPurchase, setEditingPurchase] = useState<StockPurchase | null>(null);
+  const [editPurchaseForm, setEditPurchaseForm] = useState({
+    orderNumber: '',
+    vendorName: '',
+    quantity: 0,
+    unitCost: 0,
+    orderDate: '',
+    notes: '',
+    reason: '',
+  });
+  const [purchaseSaving, setPurchaseSaving] = useState(false);
 
   useEffect(() => {
     // Check if token exists before making API calls
@@ -217,7 +232,9 @@ const MaterialsManagement = () => {
           sellingPrice: item.sellingPrice,
           orderDate: item.orderDate,
           receivedDate: item.receivedDate,
-          source: item.source
+          source: item.source,
+          status: item.status,
+          notes: item.notes || ''
         }));
         setStockPurchases(mapped);
       }
@@ -434,6 +451,108 @@ const MaterialsManagement = () => {
       }
     } catch (error) {
       alert('Failed to add stock');
+    }
+  };
+
+
+  const openEditPurchase = (purchase: StockPurchase) => {
+    if (userRole !== 'ADMIN') {
+      alert('Only admin can edit purchases');
+      return;
+    }
+    setEditingPurchase(purchase);
+    setEditPurchaseForm({
+      orderNumber: purchase.orderNumber || '',
+      vendorName: purchase.vendorName || '',
+      quantity: purchase.quantityReceived || 0,
+      unitCost: purchase.unitCost || 0,
+      orderDate: purchase.orderDate ? new Date(purchase.orderDate).toISOString().split('T')[0] : '',
+      notes: purchase.notes || '',
+      reason: '',
+    });
+  };
+
+  const handleSavePurchaseEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPurchase) return;
+    if (userRole !== 'ADMIN') {
+      alert('Only admin can edit purchases');
+      return;
+    }
+    if (!editPurchaseForm.reason.trim()) {
+      alert('Reason is required for audit log');
+      return;
+    }
+    if (!editingPurchase.source) {
+      alert('Unknown purchase source — cannot edit safely');
+      return;
+    }
+    setPurchaseSaving(true);
+    try {
+      const response = await apiFetch(`/materials/purchases/${editingPurchase.id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          source: editingPurchase.source,
+          quantity: editPurchaseForm.quantity,
+          unitCost: editPurchaseForm.unitCost,
+          vendorName: editPurchaseForm.vendorName,
+          orderNumber: editPurchaseForm.orderNumber,
+          orderDate: editPurchaseForm.orderDate || undefined,
+          notes: editPurchaseForm.notes,
+          reason: editPurchaseForm.reason.trim(),
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        alert(data.message || 'Purchase updated');
+        setEditingPurchase(null);
+        fetchMaterials();
+        fetchStockPurchases();
+      } else {
+        alert(data.error || 'Failed to update purchase');
+      }
+    } catch (err) {
+      alert('Failed to update purchase');
+    } finally {
+      setPurchaseSaving(false);
+    }
+  };
+
+  const handleDeletePurchase = async (purchase: StockPurchase) => {
+    if (userRole !== 'ADMIN') {
+      alert('Only admin can delete purchases');
+      return;
+    }
+    if (!purchase.source) {
+      alert('Unknown purchase source — cannot delete safely');
+      return;
+    }
+    const reason = window.prompt(
+      'Delete purchase "' + purchase.orderNumber + '" / ' + (purchase.materialName || 'material') + '?\n\nType reason for audit log (required):'
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      alert('Reason is required for audit log');
+      return;
+    }
+    if (!window.confirm('Confirm delete? Stock will be adjusted. This is logged.')) return;
+    try {
+      const response = await apiFetch(`/materials/purchases/${purchase.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ source: purchase.source, reason: reason.trim() })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        alert(data.message || 'Purchase deleted');
+        fetchMaterials();
+        fetchStockPurchases();
+      } else {
+        alert(data.error || 'Failed to delete purchase');
+      }
+    } catch (err) {
+      alert('Failed to delete purchase');
     }
   };
 
@@ -1042,12 +1161,15 @@ const MaterialsManagement = () => {
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Cost</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  {userRole === 'ADMIN' && (
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {stockPurchases.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={userRole === 'ADMIN' ? 10 : 9} className="px-6 py-4 text-center text-gray-500">
                       No stock purchases found. Add stock using the form above.
                     </td>
                   </tr>
@@ -1080,11 +1202,147 @@ const MaterialsManagement = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         {purchase.orderDate ? new Date(purchase.orderDate).toLocaleDateString() : '-'}
                       </td>
+                      {userRole === 'ADMIN' && (
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openEditPurchase(purchase)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                              title="Edit purchase (admin)"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePurchase(purchase)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                              title="Delete purchase (admin)"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Edit Purchase Modal */}
+      {editingPurchase && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full border border-slate-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Edit Purchase (Admin)</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {editingPurchase.materialName || 'Material'} · {editingPurchase.source === 'stock_batch' ? 'Batch' : 'PO'}
+                </p>
+              </div>
+              <button type="button" onClick={() => setEditingPurchase(null)} className="p-1 text-slate-500 hover:text-slate-800">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSavePurchaseEdit} className="p-5 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Order / Invoice #</label>
+                  <input
+                    type="text"
+                    value={editPurchaseForm.orderNumber}
+                    onChange={(e) => setEditPurchaseForm({ ...editPurchaseForm, orderNumber: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Vendor</label>
+                  <input
+                    type="text"
+                    value={editPurchaseForm.vendorName}
+                    onChange={(e) => setEditPurchaseForm({ ...editPurchaseForm, vendorName: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Quantity *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    required
+                    value={editPurchaseForm.quantity}
+                    onChange={(e) => setEditPurchaseForm({ ...editPurchaseForm, quantity: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Unit Cost (KWD) *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.001"
+                    required
+                    value={editPurchaseForm.unitCost}
+                    onChange={(e) => setEditPurchaseForm({ ...editPurchaseForm, unitCost: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Order Date</label>
+                <input
+                  type="date"
+                  value={editPurchaseForm.orderDate}
+                  onChange={(e) => setEditPurchaseForm({ ...editPurchaseForm, orderDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+                <textarea
+                  rows={2}
+                  value={editPurchaseForm.notes}
+                  onChange={(e) => setEditPurchaseForm({ ...editPurchaseForm, notes: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Reason (audit) *</label>
+                <input
+                  type="text"
+                  required
+                  value={editPurchaseForm.reason}
+                  onChange={(e) => setEditPurchaseForm({ ...editPurchaseForm, reason: e.target.value })}
+                  placeholder="e.g. Wrong qty entered by supervisor"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                />
+              </div>
+              <p className="text-xs text-slate-500">
+                Stock + material statement auto-update. If qty already issued from this batch, edit below issued amount is blocked.
+              </p>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingPurchase(null)}
+                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={purchaseSaving}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:bg-slate-400"
+                >
+                  {purchaseSaving ? 'Saving…' : 'Save changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

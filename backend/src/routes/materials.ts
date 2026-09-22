@@ -536,6 +536,7 @@ router.get("/stock/unified", authenticateToken as any, async (req: AuthRequest, 
       po.items.map(item => ({
         id: item.id,
         source: 'purchase_order' as const,
+        purchaseOrderId: po.id,
         orderNumber: po.orderNumber,
         invoiceNumber: po.orderNumber,
         vendorName: po.vendorName || po.vendor?.name || 'Unknown',
@@ -636,6 +637,32 @@ router.post("/stock", authenticateToken as any, async (req: AuthRequest, res) =>
     });
 
     console.log(`[STOCK] Added ${quantityReceived} to ${batch.material?.name}. New total: ${updatedMaterial.totalQuantity}`);
+
+    // Audit: purchase created
+    try {
+      await prisma.materialPurchaseHistory.create({
+        data: {
+          action: 'CREATED',
+          source: 'stock_batch',
+          referenceId: batch.id,
+          materialId: batch.materialId,
+          materialName: batch.material?.name || 'Unknown',
+          materialSku: batch.material?.sku || '',
+          orderNumber: batch.batchNumber || batch.purchaseOrder || null,
+          vendorName: batch.vendorName,
+          quantity: batch.quantityPurchased,
+          unitCost: batch.unitCost,
+          totalCost: batch.quantityPurchased * batch.unitCost,
+          orderDate: batch.purchaseDate,
+          notes: batch.notes,
+          reason: 'Stock batch created',
+          performedById: userId,
+          companyId
+        }
+      });
+    } catch (histErr) {
+      console.error('Failed to write purchase CREATED history:', histErr);
+    }
 
     res.status(201).json({
       ...batch,
@@ -2201,6 +2228,429 @@ router.get("/reports/complete-tracking", authenticateToken as any, async (req: A
  * GET /api/materials/:materialId/history
  * Get complete transaction history for a material
  */
+// ==================== ADMIN PURCHASE EDIT / DELETE + AUDIT ====================
+/**
+ * GET /api/materials/purchases/history
+ * Audit log for purchase create/edit/delete
+ */
+router.get("/purchases/history", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    const { startDate, endDate, materialId } = req.query;
+    const where: any = { companyId };
+    if (materialId) where.materialId = materialId as string;
+    if (startDate || endDate) {
+      where.performedAt = {};
+      if (startDate) {
+        const s = String(startDate).replace(/['\"]/g, '');
+        where.performedAt.gte = new Date(s.includes('T') ? s : `${s}T00:00:00.000Z`);
+      }
+      if (endDate) {
+        const e = String(endDate).replace(/['\"]/g, '');
+        where.performedAt.lte = new Date(e.includes('T') ? e : `${e}T23:59:59.999Z`);
+      }
+    }
+    const history = await prisma.materialPurchaseHistory.findMany({
+      where,
+      include: {
+        performedBy: { select: { id: true, name: true, email: true } },
+        material: { select: { id: true, name: true, sku: true, unit: true } }
+      },
+      orderBy: { performedAt: 'desc' },
+      take: 500
+    });
+    res.json(history);
+  } catch (error) {
+    console.error("Error fetching purchase history:", error);
+    res.status(500).json({ error: "Failed to fetch purchase history" });
+  }
+});
+
+/**
+ * PUT /api/materials/purchases/:id
+ * ADMIN only — edit stock batch or purchase-order item; keep stock + statement correct
+ * Body: { source: 'stock_batch'|'purchase_order', quantity?, unitCost?, vendorName?, orderDate?, notes?, reason, orderNumber? }
+ */
+router.put("/purchases/:id", authenticateToken as any, authorizeRoles('ADMIN'), async (req: AuthRequest, res) => {
+  try {
+    const { companyId, id: userId } = req.user!;
+    const { id } = req.params;
+    const {
+      source,
+      quantity,
+      unitCost,
+      vendorName,
+      orderDate,
+      notes,
+      reason,
+      orderNumber
+    } = req.body || {};
+
+    if (!source || !['stock_batch', 'purchase_order'].includes(source)) {
+      return res.status(400).json({ error: "source must be stock_batch or purchase_order" });
+    }
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ error: "Reason is required for admin purchase edit" });
+    }
+
+    if (source === 'stock_batch') {
+      const batch = await prisma.stockBatch.findFirst({
+        where: { id, companyId },
+        include: { material: true, issues: true }
+      });
+      if (!batch) return res.status(404).json({ error: "Stock batch not found" });
+
+      const previousQty = batch.quantityPurchased;
+      const previousUnitCost = batch.unitCost;
+      const issuedQty = Math.max(0, batch.quantityPurchased - batch.quantityRemaining);
+      const newQty = quantity !== undefined && quantity !== null ? Number(quantity) : previousQty;
+      const newUnitCost = unitCost !== undefined && unitCost !== null ? Number(unitCost) : previousUnitCost;
+
+      if (!Number.isFinite(newQty) || newQty < 0) {
+        return res.status(400).json({ error: "Invalid quantity" });
+      }
+      if (!Number.isFinite(newUnitCost) || newUnitCost < 0) {
+        return res.status(400).json({ error: "Invalid unit cost" });
+      }
+      if (newQty < issuedQty) {
+        return res.status(400).json({
+          error: `Cannot set qty below already issued amount (${issuedQty}). Return/adjust issues first.`
+        });
+      }
+
+      const qtyDelta = newQty - previousQty;
+      const material = await prisma.packingMaterial.findFirst({ where: { id: batch.materialId, companyId } });
+      if (!material) return res.status(404).json({ error: "Material not found" });
+      const newStock = (material.totalQuantity || 0) + qtyDelta;
+      if (newStock < 0) {
+        return res.status(400).json({ error: `Stock would go negative. Current stock: ${material.totalQuantity}` });
+      }
+
+      const updated = await prisma.$transaction(async (tx) => {
+        await tx.packingMaterial.update({
+          where: { id: batch.materialId },
+          data: {
+            totalQuantity: newStock,
+            ...(unitCost !== undefined && unitCost !== null ? { unitCost: newUnitCost } : {})
+          }
+        });
+
+        const b = await tx.stockBatch.update({
+          where: { id: batch.id },
+          data: {
+            quantityPurchased: newQty,
+            quantityRemaining: newQty - issuedQty,
+            unitCost: newUnitCost,
+            vendorName: vendorName !== undefined ? vendorName : batch.vendorName,
+            notes: notes !== undefined ? notes : batch.notes,
+            purchaseDate: orderDate ? new Date(orderDate) : batch.purchaseDate,
+            batchNumber: orderNumber !== undefined ? orderNumber : batch.batchNumber,
+            purchaseOrder: orderNumber !== undefined ? orderNumber : batch.purchaseOrder
+          },
+          include: { material: { select: { id: true, name: true, sku: true, unit: true, totalQuantity: true } } }
+        });
+
+        await tx.materialPurchaseHistory.create({
+          data: {
+            action: 'EDITED',
+            source: 'stock_batch',
+            referenceId: batch.id,
+            materialId: batch.materialId,
+            materialName: batch.material.name,
+            materialSku: batch.material.sku,
+            orderNumber: b.batchNumber || b.purchaseOrder || null,
+            vendorName: b.vendorName,
+            quantity: newQty,
+            previousQty,
+            unitCost: newUnitCost,
+            previousUnitCost,
+            totalCost: newQty * newUnitCost,
+            orderDate: b.purchaseDate,
+            notes: b.notes,
+            reason: String(reason).trim(),
+            performedById: userId,
+            companyId
+          }
+        });
+
+        return b;
+      });
+
+      return res.json({
+        success: true,
+        source: 'stock_batch',
+        purchase: updated,
+        message: 'Purchase (batch) updated. Stock and statement will reflect the change.'
+      });
+    }
+
+    // purchase_order item
+    const item = await prisma.purchaseOrderItem.findFirst({
+      where: { id, companyId },
+      include: {
+        material: true,
+        purchaseOrder: true
+      }
+    });
+    if (!item) return res.status(404).json({ error: "Purchase order item not found" });
+
+    const po = item.purchaseOrder;
+    const previousQty = item.quantity;
+    const previousUnitCost = item.unitCost;
+    const newQty = quantity !== undefined && quantity !== null ? Number(quantity) : previousQty;
+    const newUnitCost = unitCost !== undefined && unitCost !== null ? Number(unitCost) : previousUnitCost;
+    if (!Number.isFinite(newQty) || newQty < 0) {
+      return res.status(400).json({ error: "Invalid quantity" });
+    }
+    if (!Number.isFinite(newUnitCost) || newUnitCost < 0) {
+      return res.status(400).json({ error: "Invalid unit cost" });
+    }
+
+    const qtyDelta = newQty - previousQty;
+    const affectsStock = po.status === 'RECEIVED';
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (affectsStock && qtyDelta !== 0) {
+        const material = await tx.packingMaterial.findFirst({ where: { id: item.materialId, companyId } });
+        if (!material) throw new Error('MATERIAL_NOT_FOUND');
+        const newStock = (material.totalQuantity || 0) + qtyDelta;
+        if (newStock < 0) {
+          const err: any = new Error('STOCK_NEGATIVE');
+          err.stock = material.totalQuantity;
+          throw err;
+        }
+        await tx.packingMaterial.update({
+          where: { id: item.materialId },
+          data: {
+            totalQuantity: newStock,
+            ...(unitCost !== undefined && unitCost !== null ? { unitCost: newUnitCost } : {})
+          }
+        });
+      } else if (unitCost !== undefined && unitCost !== null) {
+        await tx.packingMaterial.update({
+          where: { id: item.materialId },
+          data: { unitCost: newUnitCost }
+        }).catch(() => null);
+      }
+
+      const newTotal = newQty * newUnitCost;
+      const updatedItem = await tx.purchaseOrderItem.update({
+        where: { id: item.id },
+        data: {
+          quantity: newQty,
+          unitCost: newUnitCost,
+          totalCost: newTotal,
+          receivedQuantity: affectsStock ? newQty : item.receivedQuantity
+        },
+        include: { material: true, purchaseOrder: true }
+      });
+
+      const siblingItems = await tx.purchaseOrderItem.findMany({ where: { purchaseOrderId: po.id } });
+      const totalAmount = siblingItems.reduce((s, it) => s + it.totalCost, 0);
+      await tx.purchaseOrder.update({
+        where: { id: po.id },
+        data: {
+          totalAmount,
+          vendorName: vendorName !== undefined ? vendorName : po.vendorName,
+          notes: notes !== undefined ? notes : po.notes,
+          orderDate: orderDate ? new Date(orderDate) : po.orderDate,
+          orderNumber: orderNumber !== undefined && orderNumber ? orderNumber : po.orderNumber
+        }
+      });
+
+      await tx.materialPurchaseHistory.create({
+        data: {
+          action: 'EDITED',
+          source: 'purchase_order',
+          referenceId: item.id,
+          purchaseOrderId: po.id,
+          materialId: item.materialId,
+          materialName: item.material.name,
+          materialSku: item.material.sku,
+          orderNumber: orderNumber !== undefined && orderNumber ? orderNumber : po.orderNumber,
+          vendorName: vendorName !== undefined ? vendorName : po.vendorName,
+          quantity: newQty,
+          previousQty,
+          unitCost: newUnitCost,
+          previousUnitCost,
+          totalCost: newTotal,
+          orderDate: orderDate ? new Date(orderDate) : po.orderDate,
+          notes: notes !== undefined ? notes : po.notes,
+          reason: String(reason).trim(),
+          performedById: userId,
+          companyId
+        }
+      });
+
+      return updatedItem;
+    });
+
+    res.json({
+      success: true,
+      source: 'purchase_order',
+      purchase: updated,
+      message: 'Purchase (PO) updated. Stock and statement will reflect the change.'
+    });
+  } catch (error: any) {
+    console.error("Error updating purchase:", error);
+    if (error?.message === 'MATERIAL_NOT_FOUND') return res.status(404).json({ error: "Material not found" });
+    if (error?.message === 'STOCK_NEGATIVE') {
+      return res.status(400).json({ error: `Stock would go negative. Current stock: ${error.stock}` });
+    }
+    res.status(500).json({ error: "Failed to update purchase" });
+  }
+});
+
+/**
+ * DELETE /api/materials/purchases/:id
+ * ADMIN only — delete purchase; reverse stock if received. Block if batch already issued.
+ * Body: { source: 'stock_batch'|'purchase_order', reason }
+ */
+router.delete("/purchases/:id", authenticateToken as any, authorizeRoles('ADMIN'), async (req: AuthRequest, res) => {
+  try {
+    const { companyId, id: userId } = req.user!;
+    const { id } = req.params;
+    const { source, reason } = req.body || {};
+
+    if (!source || !['stock_batch', 'purchase_order'].includes(source)) {
+      return res.status(400).json({ error: "source must be stock_batch or purchase_order" });
+    }
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ error: "Reason is required for admin purchase delete" });
+    }
+
+    if (source === 'stock_batch') {
+      const batch = await prisma.stockBatch.findFirst({
+        where: { id, companyId },
+        include: { material: true, issues: true, rackAllocations: true }
+      });
+      if (!batch) return res.status(404).json({ error: "Stock batch not found" });
+
+      const issuedQty = Math.max(0, batch.quantityPurchased - batch.quantityRemaining);
+      if (issuedQty > 0 || (batch.issues && batch.issues.length > 0)) {
+        return res.status(400).json({
+          error: `Cannot delete — ${issuedQty || batch.issues.length} already issued from this batch. Adjust/return issues first.`
+        });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.materialPurchaseHistory.create({
+          data: {
+            action: 'DELETED',
+            source: 'stock_batch',
+            referenceId: batch.id,
+            materialId: batch.materialId,
+            materialName: batch.material.name,
+            materialSku: batch.material.sku,
+            orderNumber: batch.batchNumber || batch.purchaseOrder || null,
+            vendorName: batch.vendorName,
+            quantity: batch.quantityPurchased,
+            previousQty: batch.quantityPurchased,
+            unitCost: batch.unitCost,
+            previousUnitCost: batch.unitCost,
+            totalCost: batch.quantityPurchased * batch.unitCost,
+            orderDate: batch.purchaseDate,
+            notes: batch.notes,
+            reason: String(reason).trim(),
+            performedById: userId,
+            companyId
+          }
+        });
+
+        if (batch.rackAllocations?.length) {
+          await tx.rackStockLevel.deleteMany({ where: { stockBatchId: batch.id, companyId } });
+        }
+
+        const material = await tx.packingMaterial.findFirst({ where: { id: batch.materialId, companyId } });
+        if (material) {
+          const newStock = Math.max(0, (material.totalQuantity || 0) - batch.quantityPurchased);
+          await tx.packingMaterial.update({
+            where: { id: batch.materialId },
+            data: { totalQuantity: newStock }
+          });
+        }
+
+        await tx.stockBatch.delete({ where: { id: batch.id } });
+      });
+
+      return res.json({ success: true, message: "Purchase batch deleted. Stock reduced and logged." });
+    }
+
+    // purchase_order item
+    const item = await prisma.purchaseOrderItem.findFirst({
+      where: { id, companyId },
+      include: { material: true, purchaseOrder: true }
+    });
+    if (!item) return res.status(404).json({ error: "Purchase order item not found" });
+    const po = item.purchaseOrder;
+    const affectsStock = po.status === 'RECEIVED';
+
+    await prisma.$transaction(async (tx) => {
+      if (affectsStock) {
+        const material = await tx.packingMaterial.findFirst({ where: { id: item.materialId, companyId } });
+        if (material) {
+          const newStock = (material.totalQuantity || 0) - item.quantity;
+          if (newStock < 0) {
+            const err: any = new Error('STOCK_NEGATIVE');
+            err.stock = material.totalQuantity;
+            throw err;
+          }
+          await tx.packingMaterial.update({
+            where: { id: item.materialId },
+            data: { totalQuantity: newStock }
+          });
+        }
+      }
+
+      await tx.materialPurchaseHistory.create({
+        data: {
+          action: 'DELETED',
+          source: 'purchase_order',
+          referenceId: item.id,
+          purchaseOrderId: po.id,
+          materialId: item.materialId,
+          materialName: item.material.name,
+          materialSku: item.material.sku,
+          orderNumber: po.orderNumber,
+          vendorName: po.vendorName,
+          quantity: item.quantity,
+          previousQty: item.quantity,
+          unitCost: item.unitCost,
+          previousUnitCost: item.unitCost,
+          totalCost: item.totalCost,
+          orderDate: po.orderDate,
+          notes: po.notes,
+          reason: String(reason).trim(),
+          performedById: userId,
+          companyId
+        }
+      });
+
+      await tx.purchaseOrderItem.delete({ where: { id: item.id } });
+      const remaining = await tx.purchaseOrderItem.count({ where: { purchaseOrderId: po.id } });
+      if (remaining === 0) {
+        await tx.purchaseOrder.delete({ where: { id: po.id } });
+      } else {
+        const siblings = await tx.purchaseOrderItem.findMany({ where: { purchaseOrderId: po.id } });
+        await tx.purchaseOrder.update({
+          where: { id: po.id },
+          data: { totalAmount: siblings.reduce((s, it) => s + it.totalCost, 0) }
+        });
+      }
+    });
+
+    res.json({ success: true, message: "Purchase order item deleted. Stock adjusted and logged." });
+  } catch (error: any) {
+    console.error("Error deleting purchase:", error);
+    if (error?.message === 'STOCK_NEGATIVE') {
+      return res.status(400).json({
+        error: `Cannot delete — stock would go negative (current ${error.stock}). Some qty may already be used.`
+      });
+    }
+    res.status(500).json({ error: "Failed to delete purchase" });
+  }
+});
+
 router.get("/:materialId/history", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
@@ -2503,6 +2953,28 @@ router.post("/purchase-orders", authenticateToken as any, async (req: AuthReques
         });
       }
 
+      await prisma.materialPurchaseHistory.create({
+        data: {
+          action: 'CREATED',
+          source: 'purchase_order',
+          referenceId: item.id,
+          purchaseOrderId: purchaseOrder.id,
+          materialId,
+          materialName: item.material?.name || 'Unknown',
+          materialSku: item.material?.sku || '',
+          orderNumber: purchaseOrder.orderNumber,
+          vendorName,
+          quantity,
+          unitCost,
+          totalCost,
+          orderDate: purchaseOrder.orderDate,
+          notes: notes || null,
+          reason: 'Purchase order created',
+          performedById: userId,
+          companyId
+        }
+      });
+
       return {
         id: item.id,
         orderNumber: purchaseOrder.orderNumber,
@@ -2526,6 +2998,7 @@ router.post("/purchase-orders", authenticateToken as any, async (req: AuthReques
     res.status(500).json({ error: "Failed to create purchase order" });
   }
 });
+
 
 // ==================== MATERIAL STATEMENT (COMPREHENSIVE REPORT) ====================
 

@@ -78,9 +78,14 @@ interface Summary {
 
 interface IssueHistoryItem {
   id: string;
-  issueId: string | null;
-  action: 'CREATED' | 'EDITED' | 'DELETED' | 'RETURN_EDITED' | 'RETURN_DELETED';
-  jobId: string | null;
+  issueId?: string | null;
+  action: string;
+  kind?: 'issue' | 'purchase';
+  source?: string | null;
+  orderNumber?: string | null;
+  vendorName?: string | null;
+  previousUnitCost?: number | null;
+  jobId?: string | null;
   materialId: string;
   materialName: string;
   materialSku: string;
@@ -88,9 +93,9 @@ interface IssueHistoryItem {
   previousQty: number | null;
   unitCost: number;
   totalCost: number;
-  rackId: string | null;
-  rackCode: string | null;
-  notes: string | null;
+  rackId?: string | null;
+  rackCode?: string | null;
+  notes?: string | null;
   reason: string | null;
   performedById: string;
   performedAt: string;
@@ -127,21 +132,52 @@ const MaterialReports: React.FC = () => {
     setHistoryLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      console.log('Loading history with dates:', dateRange.start, dateRange.end);
       const startISO = `${dateRange.start}T00:00:00.000Z`;
       const endISO = `${dateRange.end}T23:59:59.999Z`;
-      const response = await apiFetch(`/materials/issues/history?startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
-      console.log('History API response:', data);
-      console.log('History array length:', Array.isArray(data) ? data.length : 'not an array');
-      setIssueHistory(Array.isArray(data) ? data : []);
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      const q = `startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}`;
+      const [issueRes, purchaseRes] = await Promise.all([
+        apiFetch(`/materials/issues/history?${q}`, { headers }),
+        apiFetch(`/materials/purchases/history?${q}`, { headers })
+      ]);
+      const issueData = await issueRes.json().catch(() => []);
+      const purchaseData = await purchaseRes.json().catch(() => []);
+      const issues: IssueHistoryItem[] = (Array.isArray(issueData) ? issueData : []).map((item: any) => ({
+        ...item,
+        kind: 'issue' as const
+      }));
+      const purchases: IssueHistoryItem[] = (Array.isArray(purchaseData) ? purchaseData : []).map((item: any) => ({
+        id: item.id,
+        kind: 'purchase' as const,
+        action: item.action,
+        source: item.source,
+        orderNumber: item.orderNumber,
+        vendorName: item.vendorName,
+        materialId: item.materialId,
+        materialName: item.materialName,
+        materialSku: item.materialSku,
+        quantity: item.quantity,
+        previousQty: item.previousQty ?? null,
+        unitCost: item.unitCost,
+        previousUnitCost: item.previousUnitCost ?? null,
+        totalCost: item.totalCost,
+        reason: item.reason,
+        notes: item.notes,
+        performedById: item.performedById,
+        performedAt: item.performedAt,
+        material: item.material,
+        performedBy: item.performedBy,
+        jobId: null
+      }));
+      const merged = [...issues, ...purchases].sort(
+        (a, b) => new Date(b.performedAt).getTime() - new Date(a.performedAt).getTime()
+      );
+      setIssueHistory(merged);
     } catch (error) {
-      console.error('Failed to load issue history:', error);
+      console.error('Failed to load audit history:', error);
     } finally {
       setHistoryLoading(false);
     }
@@ -623,7 +659,7 @@ const MaterialReports: React.FC = () => {
               className={`px-6 py-3 font-medium flex items-center gap-2 ${activeTab === 'history' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <History className="w-4 h-4" />
-              Edit/Delete History
+              Audit Book
             </button>
           </div>
         </div>
@@ -635,9 +671,9 @@ const MaterialReports: React.FC = () => {
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <History className="w-5 h-5" />
-                  Material Issue History
+                  Full Audit Book
                 </h2>
-                <p className="text-purple-100 text-sm">All edits and deletions for material issues</p>
+                <p className="text-purple-100 text-sm">Issues + purchases — who changed what, with reason</p>
               </div>
               <button
                 onClick={loadIssueHistory}
@@ -660,7 +696,7 @@ const MaterialReports: React.FC = () => {
               <div className="p-12 text-center">
                 <History className="w-16 h-16 mx-auto text-gray-300" />
                 <h3 className="mt-4 text-lg font-medium text-gray-900">No History Found</h3>
-                <p className="mt-2 text-gray-500">No material issue edits or deletions recorded yet.</p>
+                <p className="mt-2 text-gray-500">No edit/delete records yet for this date range.</p>
               </div>
             )}
 
@@ -700,12 +736,22 @@ const MaterialReports: React.FC = () => {
                             {(item.action === 'DELETED' || item.action === 'RETURN_DELETED') && <Trash2 className="w-3 h-3" />}
                             {(item.action === 'EDITED' || item.action === 'RETURN_EDITED') && <Edit2 className="w-3 h-3" />}
                             {item.action === 'CREATED' && <ArrowUpCircle className="w-3 h-3" />}
-                            {item.action.replace('_', ' ')}
+                            {item.kind === 'purchase' ? `PURCHASE ${item.action}` : item.action.replace('_', ' ')}
                           </span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-medium text-gray-900">{item.materialName}</div>
                           <div className="text-xs text-gray-500">{item.materialSku}</div>
+                          {item.kind === 'purchase' && (
+                            <div className="text-xs text-blue-600 mt-0.5">
+                              Purchase · {item.source === 'stock_batch' ? 'Batch' : 'PO'}
+                              {item.orderNumber ? ` · ${item.orderNumber}` : ''}
+                              {item.vendorName ? ` · ${item.vendorName}` : ''}
+                            </div>
+                          )}
+                          {item.kind !== 'purchase' && item.jobId && (
+                            <div className="text-xs text-purple-600 mt-0.5">Issue / Job</div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {(item.action === 'EDITED' || item.action === 'RETURN_EDITED') && item.previousQty !== null ? (
