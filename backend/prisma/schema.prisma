@@ -1945,9 +1945,14 @@ model MatV3PurchaseItem {
   id          String @id @default(cuid())
   purchaseId  String
   materialId  String
-  quantity    Int
-  unitCost    Float // actual supplier cost
+  quantity    Int // in the material's BASE unit (pieces) - what stock moves by
+  unitCost    Float // per BASE unit, auto-derived when buying by pack
   totalCost   Float
+  // How it was bought (presentation only). e.g. 5 BOX x 24 PCS @ 9.000 KWD per box
+  packUnit      String?
+  packQty       Int?
+  unitsPerPack  Int?
+  packCost      Float? // price per pack/box
   companyId   String
 
   purchase MatV3Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)

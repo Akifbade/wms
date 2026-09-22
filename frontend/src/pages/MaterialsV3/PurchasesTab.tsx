@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, X, Save, Ban, Pencil } from 'lucide-react';
+import { Plus, Trash2, X, Save, Ban, Pencil, Boxes, Package } from 'lucide-react';
 import { matV3 } from '../../services/materialsV3';
 
 interface Item {
   materialId: string;
-  quantity: number;
-  unitCost: number;
+  mode: 'unit' | 'pack';
+  quantity: number; // unit mode: base units
+  unitCost: number; // unit mode: per base unit
+  packUnit: string; // 'BOX'
+  packQty: number; // how many boxes
+  unitsPerPack: number; // pieces inside one box
+  packCost: number; // price per box
 }
 interface Purchase {
   id: string;
@@ -17,7 +22,32 @@ interface Purchase {
   totalAmount: number;
   status: string;
   voidReason?: string;
-  items: (Item & { id: string; materialName: string; materialSku: string; unit: string; totalCost: number })[];
+  items: any[];
+}
+
+const PACK_UNITS = ['BOX', 'CARTON', 'PACK', 'CASE', 'ROLL', 'SET', 'BUNDLE', 'PALLET'];
+
+const blankLine = (): Item => ({
+  materialId: '',
+  mode: 'unit',
+  quantity: 1,
+  unitCost: 0,
+  packUnit: 'BOX',
+  packQty: 1,
+  unitsPerPack: 0,
+  packCost: 0,
+});
+
+/** What this line actually adds to stock, and at what per-unit cost. */
+function lineTotals(l: Item) {
+  if (l.mode === 'pack' && l.packQty > 0 && l.unitsPerPack > 0) {
+    const units = l.packQty * l.unitsPerPack;
+    const total = l.packCost > 0 ? l.packQty * l.packCost : 0;
+    return { units, total, perUnit: units > 0 ? total / units : 0 };
+  }
+  const units = l.quantity || 0;
+  const total = (l.quantity || 0) * (l.unitCost || 0);
+  return { units, total, perUnit: l.unitCost || 0 };
 }
 
 export default function PurchasesTab() {
@@ -32,14 +62,14 @@ export default function PurchasesTab() {
   const isAdmin = role === 'ADMIN';
   const canEdit = role === 'ADMIN' || role === 'MANAGER';
 
-  const blank = () => ({
+  const blankForm = () => ({
     vendorName: '',
     invoiceNumber: '',
     purchaseDate: new Date().toISOString().slice(0, 10),
     notes: '',
-    items: [{ materialId: '', quantity: 1, unitCost: 0 }] as Item[],
+    items: [blankLine()] as Item[],
   });
-  const [form, setForm] = useState<any>(blank());
+  const [form, setForm] = useState<any>(blankForm());
 
   const load = async () => {
     setLoading(true);
@@ -64,25 +94,33 @@ export default function PurchasesTab() {
     load();
   }, []);
 
-  // rate auto-fill from material's purchase rate when a line picks a material
   const setLine = (idx: number, patch: Partial<Item>) => {
     const items = [...form.items];
     items[idx] = { ...items[idx], ...patch };
+
+    // Auto-fill from the material: unit cost, and how it was bought last time
     if (patch.materialId) {
       const mat = materials.find((m) => m.id === patch.materialId);
-      if (mat && (!items[idx].unitCost || items[idx].unitCost === 0)) {
-        items[idx].unitCost = mat.purchaseUnitCost || 0;
+      if (mat) {
+        if (!items[idx].unitCost) items[idx].unitCost = mat.purchaseUnitCost || 0;
+        if (mat.lastPack) {
+          items[idx].mode = 'pack';
+          items[idx].packUnit = items[idx].packUnit || mat.lastPack.packUnit || 'BOX';
+          items[idx].unitsPerPack = items[idx].unitsPerPack || mat.lastPack.unitsPerPack || 0;
+          items[idx].packCost = items[idx].packCost || mat.lastPack.packCost || 0;
+        }
       }
     }
     setForm({ ...form, items });
   };
 
-  const addLine = () => setForm({ ...form, items: [...form.items, { materialId: '', quantity: 1, unitCost: 0 }] });
+  const addLine = () => setForm({ ...form, items: [...form.items, blankLine()] });
+  const dupLine = (i: number) => setForm({ ...form, items: [...form.items, { ...form.items[i] }] });
   const delLine = (i: number) => setForm({ ...form, items: form.items.filter((_: any, x: number) => x !== i) });
 
   const openCreate = () => {
     setEditing(null);
-    setForm(blank());
+    setForm(blankForm());
     setShowForm(true);
   };
 
@@ -93,10 +131,38 @@ export default function PurchasesTab() {
       invoiceNumber: p.invoiceNumber || '',
       purchaseDate: (p.purchaseDate || '').slice(0, 10),
       notes: p.notes || '',
-      items: p.items.map((i) => ({ materialId: i.materialId, quantity: i.quantity, unitCost: i.unitCost })),
+      items: p.items.map((i: any) => ({
+        materialId: i.materialId,
+        mode: i.packUnit && i.unitsPerPack ? 'pack' : 'unit',
+        quantity: i.quantity,
+        unitCost: i.unitCost,
+        packUnit: i.packUnit || 'BOX',
+        packQty: i.packQty || 1,
+        unitsPerPack: i.unitsPerPack || 0,
+        packCost: i.packCost || 0,
+      })),
     });
     setShowForm(true);
   };
+
+  const payloadItems = () =>
+    form.items
+      .map((l: Item) => {
+        if (l.mode === 'pack') {
+          const t = lineTotals(l);
+          return {
+            materialId: l.materialId,
+            packUnit: l.packUnit,
+            packQty: l.packQty,
+            unitsPerPack: l.unitsPerPack,
+            packCost: l.packCost,
+            quantity: t.units,
+            unitCost: t.perUnit,
+          };
+        }
+        return { materialId: l.materialId, quantity: l.quantity, unitCost: l.unitCost };
+      })
+      .filter((i: any) => i.materialId && (i.quantity > 0 || (i.packQty > 0 && i.unitsPerPack > 0)));
 
   const save = async () => {
     try {
@@ -104,9 +170,9 @@ export default function PurchasesTab() {
         alert('Vendor name is required');
         return;
       }
-      const items = form.items.filter((i: Item) => i.materialId && i.quantity > 0);
+      const items = payloadItems();
       if (items.length === 0) {
-        alert('Add at least one material line with quantity');
+        alert('Add at least one material with a quantity');
         return;
       }
       if (editing) {
@@ -136,9 +202,17 @@ export default function PurchasesTab() {
     }
   };
 
-  const formTotal = form.items.reduce((s: number, i: Item) => s + (i.quantity || 0) * (i.unitCost || 0), 0);
+  const formTotal = form.items.reduce((s: number, l: Item) => s + lineTotals(l).total, 0);
+  const formUnits = form.items.reduce((s: number, l: Item) => s + lineTotals(l).units, 0);
   const active = list.filter((p) => p.status !== 'VOID');
   const totalSpend = active.reduce((s, p) => s + (p.totalAmount || 0), 0);
+
+  const describeItem = (i: any) => {
+    if (i.packUnit && i.unitsPerPack) {
+      return `${i.packQty} ${i.packUnit} × ${i.unitsPerPack} = ${i.quantity}`;
+    }
+    return `${i.quantity}`;
+  };
 
   return (
     <div className="space-y-5">
@@ -146,12 +220,18 @@ export default function PurchasesTab() {
         <Stat label="Purchases" value={String(active.length)} />
         <Stat label="Total Spend" value={`${totalSpend.toFixed(3)} KWD`} />
         <Stat label="Vendors" value={String(new Set(active.map((p) => p.vendorName)).size)} />
-        <Stat label="This Month" value={String(active.filter((p) => (p.purchaseDate || '').slice(0, 7) === new Date().toISOString().slice(0, 7)).length)} />
+        <Stat
+          label="This Month"
+          value={String(
+            active.filter((p) => (p.purchaseDate || '').slice(0, 7) === new Date().toISOString().slice(0, 7)).length
+          )}
+        />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-500">
-          One purchase, many materials. Stock goes up the moment you save.
+          One purchase, <strong className="text-slate-700">many materials</strong>. Buy by piece, or by box/pack with
+          the per-unit cost worked out automatically.
         </p>
         {canEdit && (
           <button
@@ -201,22 +281,18 @@ export default function PurchasesTab() {
                   <td className="px-4 py-3 font-medium text-slate-800">{p.vendorName}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {p.items.slice(0, 3).map((i) => (
+                      {p.items.slice(0, 3).map((i: any) => (
                         <span
-                          key={i.id}
-                          className="inline-flex px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-600 border border-slate-200"
+                          key={i.id || i.materialId}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-600 border border-slate-200"
                         >
-                          {i.materialName} × {i.quantity}
+                          {i.materialName} — {describeItem(i)}
                         </span>
                       ))}
-                      {p.items.length > 3 && (
-                        <span className="text-xs text-slate-400">+{p.items.length - 3} more</span>
-                      )}
+                      {p.items.length > 3 && <span className="text-xs text-slate-400">+{p.items.length - 3} more</span>}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                    {(p.totalAmount || 0).toFixed(3)}
-                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-900">{(p.totalAmount || 0).toFixed(3)}</td>
                   <td className="px-4 py-3 text-center">
                     {p.status === 'VOID' ? (
                       <span
@@ -262,7 +338,7 @@ export default function PurchasesTab() {
 
       {showForm && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <h3 className="font-semibold text-slate-900">
                 {editing ? `Edit Purchase ${editing.purchaseNumber}` : 'New Purchase'}
@@ -301,61 +377,175 @@ export default function PurchasesTab() {
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Materials</span>
-                  <button onClick={addLine} className="text-xs font-medium text-blue-600 hover:text-blue-700">
-                    + Add line
-                  </button>
+                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                    Materials ({form.items.length})
+                  </span>
                 </div>
-                <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
-                  {form.items.map((line: Item, idx: number) => (
-                    <div key={idx} className="flex flex-wrap items-end gap-2 p-3">
-                      <div className="flex-1 min-w-[180px]">
-                        <select
-                          value={line.materialId}
-                          onChange={(e) => setLine(idx, { materialId: e.target.value })}
-                          className="input"
-                        >
-                          <option value="">Select material…</option>
-                          {materials.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.name} ({m.sku})
-                            </option>
-                          ))}
-                        </select>
+
+                <div className="space-y-3">
+                  {form.items.map((line: Item, idx: number) => {
+                    const t = lineTotals(line);
+                    const mat = materials.find((m) => m.id === line.materialId);
+                    return (
+                      <div key={idx} className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                        <div className="flex flex-wrap items-end gap-2">
+                          <div className="flex-1 min-w-[200px]">
+                            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                              Material {idx + 1}
+                            </label>
+                            <select
+                              value={line.materialId}
+                              onChange={(e) => setLine(idx, { materialId: e.target.value })}
+                              className="input bg-white"
+                            >
+                              <option value="">Select material…</option>
+                              {materials.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.name} ({m.sku}) — stock {m.onHand}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="flex rounded-lg border border-slate-200 overflow-hidden bg-white">
+                            <button
+                              onClick={() => setLine(idx, { mode: 'unit' })}
+                              className={`px-3 py-2 text-xs font-medium inline-flex items-center gap-1 ${
+                                line.mode === 'unit' ? 'bg-blue-600 text-white' : 'text-slate-600'
+                              }`}
+                            >
+                              <Package className="w-3.5 h-3.5" /> By {mat?.unit || 'unit'}
+                            </button>
+                            <button
+                              onClick={() => setLine(idx, { mode: 'pack' })}
+                              className={`px-3 py-2 text-xs font-medium inline-flex items-center gap-1 border-l border-slate-200 ${
+                                line.mode === 'pack' ? 'bg-blue-600 text-white' : 'text-slate-600'
+                              }`}
+                            >
+                              <Boxes className="w-3.5 h-3.5" /> By box/pack
+                            </button>
+                          </div>
+
+                          <button
+                            onClick={() => delLine(idx)}
+                            className="p-2 text-slate-400 hover:text-red-600"
+                            disabled={form.items.length === 1}
+                            title="Remove"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {line.mode === 'unit' ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                            <Field label={`Qty (${mat?.unit || 'unit'})`}>
+                              <input
+                                type="number"
+                                min="1"
+                                value={line.quantity}
+                                onChange={(e) => setLine(idx, { quantity: Number(e.target.value) })}
+                                className="input bg-white"
+                              />
+                            </Field>
+                            <Field label="Rate per unit (KWD)">
+                              <input
+                                type="number"
+                                step="0.001"
+                                value={line.unitCost}
+                                onChange={(e) => setLine(idx, { unitCost: Number(e.target.value) })}
+                                className="input bg-white"
+                              />
+                            </Field>
+                            <div className="col-span-2 flex items-end">
+                              <div className="text-xs text-slate-500 pb-2">
+                                Stock + <strong className="text-slate-800">{t.units}</strong> · Total{' '}
+                                <strong className="text-slate-800">{t.total.toFixed(3)} KWD</strong>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                              <Field label="Pack type">
+                                <select
+                                  value={line.packUnit}
+                                  onChange={(e) => setLine(idx, { packUnit: e.target.value })}
+                                  className="input bg-white"
+                                >
+                                  {PACK_UNITS.map((u) => (
+                                    <option key={u} value={u}>
+                                      {u}
+                                    </option>
+                                  ))}
+                                </select>
+                              </Field>
+                              <Field label="How many packs">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={line.packQty}
+                                  onChange={(e) => setLine(idx, { packQty: Number(e.target.value) })}
+                                  className="input bg-white"
+                                />
+                              </Field>
+                              <Field label={`Pieces in 1 ${line.packUnit}`}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={line.unitsPerPack}
+                                  onChange={(e) => setLine(idx, { unitsPerPack: Number(e.target.value) })}
+                                  className="input bg-white"
+                                  placeholder="e.g. 24"
+                                />
+                              </Field>
+                              <Field label={`Price per ${line.packUnit} (KWD)`}>
+                                <input
+                                  type="number"
+                                  step="0.001"
+                                  value={line.packCost}
+                                  onChange={(e) => setLine(idx, { packCost: Number(e.target.value) })}
+                                  className="input bg-white"
+                                />
+                              </Field>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs bg-white border border-slate-200 rounded-lg px-3 py-2">
+                              <span className="text-slate-500">
+                                Stock +{' '}
+                                <strong className="text-slate-800">
+                                  {t.units} {mat?.unit || ''}
+                                </strong>{' '}
+                                ({line.packQty} {line.packUnit} × {line.unitsPerPack})
+                              </span>
+                              <span className="text-slate-500">
+                                Total <strong className="text-slate-800">{t.total.toFixed(3)} KWD</strong>
+                              </span>
+                              <span className="text-emerald-700 font-medium">
+                                Auto cost per {mat?.unit || 'unit'}: {t.perUnit.toFixed(4)} KWD
+                              </span>
+                            </div>
+                          </>
+                        )}
+
+                        {form.items.length > 1 && (
+                          <button
+                            onClick={() => dupLine(idx)}
+                            className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700"
+                          >
+                            + Duplicate this line
+                          </button>
+                        )}
                       </div>
-                      <div className="w-24">
-                        <input
-                          type="number"
-                          min="1"
-                          value={line.quantity}
-                          onChange={(e) => setLine(idx, { quantity: Number(e.target.value) })}
-                          className="input"
-                          placeholder="Qty"
-                        />
-                      </div>
-                      <div className="w-28">
-                        <input
-                          type="number"
-                          step="0.001"
-                          value={line.unitCost}
-                          onChange={(e) => setLine(idx, { unitCost: Number(e.target.value) })}
-                          className="input"
-                          placeholder="Rate"
-                        />
-                      </div>
-                      <div className="w-24 text-right text-sm font-medium text-slate-700 pb-2">
-                        {((line.quantity || 0) * (line.unitCost || 0)).toFixed(3)}
-                      </div>
-                      <button
-                        onClick={() => delLine(idx)}
-                        className="p-2 text-slate-400 hover:text-red-600"
-                        disabled={form.items.length === 1}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+
+                <button
+                  onClick={addLine}
+                  className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-blue-300 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-50"
+                >
+                  <Plus className="w-4 h-4" /> Add Another Material to This Purchase
+                </button>
               </div>
 
               <Field label="Notes">
@@ -367,17 +557,16 @@ export default function PurchasesTab() {
                 />
               </Field>
 
-              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-slate-600">Purchase Total</span>
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+                <span className="text-sm text-slate-600">
+                  {form.items.length} material(s) · stock + <strong className="text-slate-800">{formUnits}</strong>
+                </span>
                 <span className="text-lg font-semibold text-slate-900">{formTotal.toFixed(3)} KWD</span>
               </div>
             </div>
 
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
-              <button
-                onClick={() => setShowForm(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-              >
+              <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm font-medium text-slate-600">
                 Cancel
               </button>
               <button

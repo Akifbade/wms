@@ -120,6 +120,57 @@ async function avgCostMap(companyId: string) {
   return out;
 }
 
+/**
+ * Normalise one purchase line.
+ * Two ways to buy:
+ *   plain  -> quantity (base units) x unitCost
+ *   pack   -> packQty (boxes) x unitsPerPack (pieces in a box) @ packCost per box
+ * In pack mode the per-base-unit cost is derived automatically.
+ */
+function normalizePurchaseLine(i: any) {
+  const packQty = okNum(i.packQty);
+  const unitsPerPack = okNum(i.unitsPerPack);
+  const packCost = okNum(i.packCost);
+  const packUnit = i.packUnit ? String(i.packUnit).trim() : null;
+
+  if (packQty > 0 && unitsPerPack > 0) {
+    const quantity = Math.round(packQty * unitsPerPack);
+    const totalCost = packCost > 0 ? packQty * packCost : okNum(i.totalCost);
+    const unitCost = quantity > 0 ? totalCost / quantity : 0;
+    return {
+      materialId: String(i.materialId || ""),
+      quantity,
+      unitCost,
+      totalCost,
+      packUnit,
+      packQty,
+      unitsPerPack,
+      packCost: packCost > 0 ? packCost : totalCost / packQty,
+    };
+  }
+
+  const quantity = okNum(i.quantity);
+  const unitCost = okNum(i.unitCost);
+  return {
+    materialId: String(i.materialId || ""),
+    quantity,
+    unitCost,
+    totalCost: quantity * unitCost,
+    packUnit: null,
+    packQty: null,
+    unitsPerPack: null,
+    packCost: null,
+  };
+}
+
+/** "5 BOX x 24 PCS @ 9.000" style description for the ledger note. */
+function describePurchaseLine(l: any, materialName: string) {
+  if (l.packUnit && l.packQty && l.unitsPerPack) {
+    return `${materialName}: ${l.packQty} ${l.packUnit} x ${l.unitsPerPack} = ${l.quantity} units @ ${(l.packCost || 0).toFixed(3)}/${l.packUnit}`;
+  }
+  return `${materialName}: ${l.quantity} units @ ${(l.unitCost || 0).toFixed(3)}`;
+}
+
 async function nextPackingListNumber(companyId: string) {
   const year = new Date().getFullYear();
   const count = await prisma.matV3PackingList.count({ where: { companyId } });
@@ -293,6 +344,25 @@ router.get("/materials", authenticateToken as any, async (req: AuthRequest, res:
     });
     const stock = await stockMap(companyId);
     const costs = await avgCostMap(companyId);
+
+    // Remember how each material was last bought (pack unit / units per pack) for auto-fill
+    const recentItems = await prisma.matV3PurchaseItem.findMany({
+      where: { companyId },
+      orderBy: { id: "desc" },
+      take: 500,
+      select: { materialId: true, packUnit: true, unitsPerPack: true, packCost: true, unitCost: true },
+    });
+    const lastPack: Record<string, any> = {};
+    for (const it of recentItems) {
+      if (!lastPack[it.materialId] && it.packUnit && it.unitsPerPack) {
+        lastPack[it.materialId] = {
+          packUnit: it.packUnit,
+          unitsPerPack: it.unitsPerPack,
+          packCost: it.packCost,
+        };
+      }
+    }
+
     res.json(
       materials.map((m) => {
         const onHand = stock[m.id] || 0;
@@ -310,6 +380,7 @@ router.get("/materials", authenticateToken as any, async (req: AuthRequest, res:
           stockValue: onHand * unitCost,
           lowStock: m.minStockLevel > 0 && onHand <= m.minStockLevel,
           isActive: m.isActive,
+          lastPack: lastPack[m.id] || null,
         };
       })
     );
@@ -452,20 +523,23 @@ router.post("/purchases", authenticateToken as any, authorizeRoles("ADMIN", "MAN
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: "At least one material line is required" });
 
     const clean = items
-      .map((i: any) => ({
-        materialId: String(i.materialId || ""),
-        quantity: okNum(i.quantity),
-        unitCost: okNum(i.unitCost),
-      }))
+      .map((i: any) => normalizePurchaseLine(i))
       .filter((i: any) => i.materialId && i.quantity > 0);
 
-    if (clean.length === 0) return res.status(400).json({ error: "Each line needs a material and quantity greater than 0" });
+    if (clean.length === 0) {
+      return res.status(400).json({ error: "Each line needs a material and quantity greater than 0" });
+    }
 
     const purchaseNumber = (req.body.purchaseNumber && String(req.body.purchaseNumber).trim()) || (await nextPurchaseNumber(companyId));
     const dup = await prisma.matV3Purchase.findFirst({ where: { companyId, purchaseNumber } });
     if (dup) return res.status(400).json({ error: `Purchase number ${purchaseNumber} already exists` });
 
-    const total = clean.reduce((s: number, i: any) => s + i.quantity * i.unitCost, 0);
+    const total = clean.reduce((s: number, i: any) => s + i.totalCost, 0);
+    const matNames = await prisma.packingMaterial.findMany({
+      where: { companyId, id: { in: clean.map((c: any) => c.materialId) } },
+      select: { id: true, name: true },
+    });
+    const nameById = Object.fromEntries(matNames.map((m) => [m.id, m.name]));
 
     const created = await prisma.$transaction(async (tx) => {
       const purchase = await tx.matV3Purchase.create({
@@ -487,7 +561,11 @@ router.post("/purchases", authenticateToken as any, authorizeRoles("ADMIN", "MAN
             materialId: line.materialId,
             quantity: line.quantity,
             unitCost: line.unitCost,
-            totalCost: line.quantity * line.unitCost,
+            totalCost: line.totalCost,
+            packUnit: line.packUnit,
+            packQty: line.packQty,
+            unitsPerPack: line.unitsPerPack,
+            packCost: line.packCost,
             companyId,
           },
         });
@@ -500,7 +578,7 @@ router.post("/purchases", authenticateToken as any, authorizeRoles("ADMIN", "MAN
             quantity: line.quantity,
             unitCost: line.unitCost,
             purchaseId: purchase.id,
-            notes: `Purchase ${purchaseNumber} from ${vendorName}`,
+            notes: describePurchaseLine(line, nameById[line.materialId] || "Material"),
             createdById: req.user!.id,
           },
         });
@@ -531,13 +609,7 @@ router.put("/purchases/:id", authenticateToken as any, authorizeRoles("ADMIN") a
 
     const { vendorName, invoiceNumber, purchaseDate, notes, items } = req.body;
     const clean = Array.isArray(items)
-      ? items
-          .map((i: any) => ({
-            materialId: String(i.materialId || ""),
-            quantity: okNum(i.quantity),
-            unitCost: okNum(i.unitCost),
-          }))
-          .filter((i: any) => i.materialId && i.quantity > 0)
+      ? items.map((i: any) => normalizePurchaseLine(i)).filter((i: any) => i.materialId && i.quantity > 0)
       : null;
 
     // Simulate the new ledger to guarantee nothing goes negative
@@ -555,7 +627,13 @@ router.put("/purchases/:id", authenticateToken as any, authorizeRoles("ADMIN") a
 
     const updated = await prisma.$transaction(async (tx) => {
       await tx.matV3Ledger.deleteMany({ where: { companyId, purchaseId: before.id } });
-      const total = clean ? clean.reduce((s: number, i: any) => s + i.quantity * i.unitCost, 0) : before.totalAmount;
+      const total = clean ? clean.reduce((s: number, i: any) => s + i.totalCost, 0) : before.totalAmount;
+
+      const matNames = await tx.packingMaterial.findMany({
+        where: { companyId, id: { in: (clean || before.items).map((c: any) => c.materialId) } },
+        select: { id: true, name: true },
+      });
+      const nameById = Object.fromEntries(matNames.map((m) => [m.id, m.name]));
 
       await tx.matV3Purchase.update({
         where: { id: before.id },
@@ -577,7 +655,11 @@ router.put("/purchases/:id", authenticateToken as any, authorizeRoles("ADMIN") a
               materialId: line.materialId,
               quantity: line.quantity,
               unitCost: line.unitCost,
-              totalCost: line.quantity * line.unitCost,
+              totalCost: line.totalCost,
+              packUnit: line.packUnit,
+              packQty: line.packQty,
+              unitsPerPack: line.unitsPerPack,
+              packCost: line.packCost,
               companyId,
             },
           });
@@ -590,7 +672,7 @@ router.put("/purchases/:id", authenticateToken as any, authorizeRoles("ADMIN") a
               quantity: line.quantity,
               unitCost: line.unitCost,
               purchaseId: before.id,
-              notes: `Purchase ${before.purchaseNumber} (edited)`,
+              notes: `${describePurchaseLine(line, nameById[line.materialId] || "Material")} (edited)`,
               reason,
               createdById: req.user!.id,
             },
@@ -609,7 +691,7 @@ router.put("/purchases/:id", authenticateToken as any, authorizeRoles("ADMIN") a
               quantity: it.quantity,
               unitCost: it.unitCost,
               purchaseId: before.id,
-              notes: `Purchase ${before.purchaseNumber} (edited)`,
+              notes: `${describePurchaseLine(it, nameById[it.materialId] || "Material")} (edited)`,
               reason,
               createdById: req.user!.id,
             },
