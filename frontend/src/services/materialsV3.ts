@@ -47,6 +47,9 @@ export const matV3 = {
   // jobs
   jobMaterials: (jobId: string) => req(`/jobs/${jobId}/materials`),
   packingList: (jobId: string) => req(`/jobs/${jobId}/packing-list`),
+  /** Record a print of the sheet. Copy 2+ needs a reason (stamped DUPLICATE). */
+  printPackingList: (jobId: string, reason?: string) =>
+    req(`/jobs/${jobId}/packing-list/print`, { method: 'POST', body: JSON.stringify({ reason: reason || '' }) }),
   addJobLine: (jobId: string, body: any) => req(`/jobs/${jobId}/lines`, { method: 'POST', body: JSON.stringify(body) }),
   updateJobLine: (jobId: string, lineId: string, body: any) =>
     req(`/jobs/${jobId}/lines/${lineId}`, { method: 'PUT', body: JSON.stringify(body) }),

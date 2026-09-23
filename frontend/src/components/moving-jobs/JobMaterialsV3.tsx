@@ -47,6 +47,8 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
   const canEdit = role === 'ADMIN' || role === 'MANAGER';
   const isAdmin = role === 'ADMIN';
   const locked = !!data?.materialsLocked;
+  /** the sheet has been printed -> out quantities are frozen (admin can override with a reason) */
+  const issuedLockedNow = !!data?.issuedLocked;
 
   const blankLine = (day: number) => ({
     materialId: '',
@@ -169,6 +171,14 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
           const reason = window.prompt('Job materials are CLOSED. Admin reason for this change (required):');
           if (!reason || !reason.trim()) return;
           body.reason = reason.trim();
+        } else if (issuedLockedNow && form.qtyIssued !== editing.qtyIssued) {
+          const reason = window.prompt(
+            `The packing list sheet has already been printed.\n\n` +
+              `Changing the OUT quantity for ${editing.materialName} (${editing.qtyIssued} → ${form.qtyIssued}) ` +
+              `will be recorded against your name.\n\nAdmin reason (required):`
+          );
+          if (!reason || !reason.trim()) return;
+          body.reason = reason.trim();
         }
         await matV3.updateJobLine(jobId, editing.id, body);
       } else {
@@ -248,7 +258,34 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const printPackingList = () => window.print();
+  /**
+   * Print the packing list sheet.
+   * The print is recorded first, so the sheet carries PRINT #N and a reprint is
+   * stamped DUPLICATE — a hand-made replacement sheet has no entry in the log.
+   */
+  const printPackingList = async () => {
+    const already = data?.printCount || 0;
+    let reason = '';
+    if (already > 0) {
+      const r = window.prompt(
+        `This sheet was already printed ${already} time(s).\n\n` +
+          `Copy #${already + 1} will be stamped "DUPLICATE" and recorded against your name.\n\n` +
+          `Reason for reprint (required):`
+      );
+      if (!r || !r.trim()) return;
+      reason = r.trim();
+    }
+    try {
+      const rec = await matV3.printPackingList(jobId, reason);
+      await load(true);
+      setTimeout(() => window.print(), 150);
+      if (rec?.isDuplicate) {
+        setTimeout(() => alert(`Printed as DUPLICATE copy #${rec.printNumber}. This is recorded in the job.`), 300);
+      }
+    } catch (e: any) {
+      alert(e.message);
+    }
+  };
 
   if (loading && !data) {
     return <div className="py-16 text-center text-slate-400 text-sm">Loading job materials…</div>;
@@ -275,10 +312,40 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
                     <Unlock className="w-3 h-3" /> Open
                   </span>
                 )}
+                {(data?.printCount || 0) > 0 && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
+                      data.printCount > 1
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    <Printer className="w-3 h-3" />
+                    Printed {data.printCount}×
+                    {data.printCount > 1 ? ' — duplicates exist' : ''}
+                  </span>
+                )}
+                {data?.issuedLocked && !locked && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                    <Lock className="w-3 h-3" /> Out locked
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
                 {job?.jobCode} • {job?.clientName}
               </p>
+              {(data?.prints || []).length > 0 && (
+                <p className="text-xs text-slate-400 mt-1">
+                  {(data.prints as any[])
+                    .map(
+                      (p) =>
+                        `#${p.printNumber} ${new Date(p.createdAt).toLocaleDateString()} ${
+                          p.printedByName || ''
+                        }${p.reason ? ` (${p.reason})` : ''}`
+                    )
+                    .join('  ·  ')}
+                </p>
+              )}
             </div>
           </div>
 
@@ -674,13 +741,19 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
               </div>
 
               <div className="grid grid-cols-3 gap-3">
-                <Field label="Issued">
+                <Field label={issuedLockedNow ? 'Issued (frozen)' : 'Issued'}>
                   <input
                     type="number"
                     min="0"
                     value={form.qtyIssued}
                     onChange={(e) => setForm({ ...form, qtyIssued: Number(e.target.value) })}
-                    className="input"
+                    className={`input ${issuedLockedNow && !isAdmin ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
+                    disabled={issuedLockedNow && !isAdmin}
+                    title={
+                      issuedLockedNow && !isAdmin
+                        ? 'The sheet has been printed — the out quantity is frozen. Ask admin.'
+                        : ''
+                    }
                   />
                 </Field>
                 <Field label="Returned (good)">
@@ -712,6 +785,14 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
                       : outstandingFor(form.materialId)}
                   </strong>
                   . You can return up to that much (plus what you issue now).
+                </div>
+              )}
+
+              {issuedLockedNow && (
+                <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  This sheet has already been printed{data?.printCount > 1 ? ` (${data.printCount} copies exist)` : ''}.
+                  The <strong>Issued (out)</strong> quantity is frozen — only the return can be filled in. An admin can
+                  still change it, with a reason.
                 </div>
               )}
 
@@ -1009,13 +1090,37 @@ function PackingListPrint({ data, job, lines }: any) {
   });
   const dayKeys = Object.keys(byDay).map(Number).sort((a, b) => a - b);
 
+  const printCount = data?.printCount || 0;
+  const lastPrint = (data?.prints || []).slice(-1)[0];
+  const isDuplicate = printCount > 1;
+
   return (
     <div className="text-slate-900">
+      {isDuplicate && (
+        <div className="border-2 border-slate-900 text-center py-2 mb-3">
+          <p className="text-lg font-bold tracking-widest">DUPLICATE — COPY #{printCount}</p>
+          <p className="text-xs">
+            NOT THE ORIGINAL SHEET. Original issued {data?.packingList?.firstPrintedAt
+              ? new Date(data.packingList.firstPrintedAt).toLocaleString()
+              : '—'}
+            {lastPrint?.reason ? ` · Reason: ${lastPrint.reason}` : ''}
+          </p>
+        </div>
+      )}
       <div className="text-center mb-4">
         <h1 className="text-xl font-bold">QGO CARGO — PACKING LIST</h1>
         <p className="text-sm">
           List No: <strong>{data?.packingList?.listNumber}</strong>
+          {printCount > 0 && (
+            <>
+              {'  ·  '}
+              <strong>PRINT #{printCount}</strong>
+              {lastPrint?.createdAt && <> ({new Date(lastPrint.createdAt).toLocaleString()})</>}
+              {lastPrint?.printedByName && <> — {lastPrint.printedByName}</>}
+            </>
+          )}
         </p>
+        {printCount === 0 && <p className="text-xs text-slate-500">Not yet printed from the system</p>}
       </div>
       <table className="w-full text-xs mb-4">
         <tbody>
@@ -1081,15 +1186,56 @@ function PackingListPrint({ data, job, lines }: any) {
         </div>
       ))}
 
-      <div className="mt-8 flex justify-between text-xs">
+      {/* Return sheet — the crew writes what actually came back on this same paper */}
+      <div className="mt-6 print-avoid-break">
+        <h3 className="font-semibold text-sm mb-1">Return to Warehouse (filled by crew on site)</h3>
+        <table className="w-full text-xs border border-slate-300">
+          <thead className="bg-slate-100">
+            <tr>
+              <th className="border border-slate-300 px-2 py-1 text-left">Material</th>
+              <th className="border border-slate-300 px-2 py-1 text-right w-20">Out</th>
+              <th className="border border-slate-300 px-2 py-1 text-right w-20">Returned</th>
+              <th className="border border-slate-300 px-2 py-1 text-right w-20">Damaged</th>
+              <th className="border border-slate-300 px-2 py-1 text-left w-32">Remark</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[1, 2, 3, 4].map((i) => (
+              <tr key={`ret-${i}`}>
+                <td className="border border-slate-300 px-2 py-3"></td>
+                <td className="border border-slate-300 px-2 py-3"></td>
+                <td className="border border-slate-300 px-2 py-3"></td>
+                <td className="border border-slate-300 px-2 py-3"></td>
+                <td className="border border-slate-300 px-2 py-3"></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-8 grid grid-cols-3 gap-4 text-xs">
         <div>
-          <p className="mb-8">Packer / Crew Signature: ______________________</p>
+          <p className="mb-8">Packer / Crew: ______________________</p>
           <p>Name: ______________________</p>
         </div>
         <div>
-          <p className="mb-8">Supervisor Signature: ______________________</p>
+          <p className="mb-8">Supervisor: ______________________</p>
+          <p>Name: ______________________</p>
+        </div>
+        <div>
+          <p className="mb-8">Warehouse In-charge: ______________________</p>
           <p>Date: ______________________</p>
         </div>
+      </div>
+
+      <div className="mt-6 pt-2 border-t border-slate-300 flex justify-between text-[10px] text-slate-500">
+        <span>
+          {data?.packingList?.listNumber} · {job?.jobCode}
+        </span>
+        <span>
+          PRINT #{printCount}
+          {isDuplicate ? ` (DUPLICATE — copy ${printCount})` : ' (ORIGINAL)'}
+        </span>
       </div>
     </div>
   );

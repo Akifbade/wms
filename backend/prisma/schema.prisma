@@ -1995,6 +1995,10 @@ model MatV3PackingList {
   notes           String?   @db.Text
   attachmentUrl   String? // scanned filled packing list
   attachmentName  String?
+  printCount      Int       @default(0) // how many times the sheet was printed
+  firstPrintedAt  DateTime?
+  firstPrintedById String?
+  lockedAt        DateTime? // issued quantities frozen from here
   closedAt        DateTime?
   closedById      String?
   createdById     String?
@@ -2007,6 +2011,27 @@ model MatV3PackingList {
   @@unique([jobId]) // one packing list per job
   @@index([companyId])
   @@map("mat_v3_packing_lists")
+}
+
+/// Every time a packing list sheet is printed — who, when, which copy.
+/// The sheet carries PRINT #N; copy 2 and above are stamped DUPLICATE so a
+/// hand-made replacement sheet can never pass as the original.
+model MatV3ListPrint {
+  id            String   @id @default(cuid())
+  companyId     String
+  packingListId String
+  jobId         String
+  listNumber    String
+  printNumber   Int
+  isDuplicate   Boolean  @default(false)
+  printedById   String?
+  printedByName String?
+  reason        String? // why it was reprinted
+  createdAt     DateTime @default(now())
+
+  @@index([companyId, packingListId])
+  @@index([companyId, jobId])
+  @@map("mat_v3_list_prints")
 }
 
 model MatV3JobLine {

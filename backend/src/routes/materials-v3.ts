@@ -303,8 +303,21 @@ async function jobMaterialView(companyId: string, jobId: string) {
 
   const finance = await prisma.matV3JobFinance.findFirst({ where: { companyId, jobId } });
 
+  // Tamper-evidence: every print of the sheet, in order. Copy 1 is the original
+  // handover sheet; 2+ are stamped DUPLICATE so a hand-made sheet can't pass.
+  const prints = list
+    ? await prisma.matV3ListPrint.findMany({
+        where: { companyId, packingListId: list.id },
+        orderBy: { printNumber: "asc" },
+      })
+    : [];
+
   return {
     packingList: list,
+    prints,
+    printCount: list?.printCount || 0,
+    /** issued quantities are frozen once the sheet has been printed */
+    issuedLocked: !!list?.lockedAt,
     days,
     lines: enriched,
     materialSummary,
@@ -913,6 +926,94 @@ router.get("/jobs/:jobId/packing-list", authenticateToken as any, async (req: Au
   }
 });
 
+/**
+ * Record a print of the packing list sheet.
+ * Copy 1 = the original handover sheet (this also freezes the issued quantities).
+ * Copy 2+ = stamped DUPLICATE, reason required, and shown in the job.
+ * A sheet made by hand has no entry here — that is what makes it detectable.
+ */
+router.post(
+  "/jobs/:jobId/packing-list/print",
+  authenticateToken as any,
+  authorizeRoles("ADMIN", "MANAGER", "SUPERVISOR") as any,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const companyId = req.user!.companyId;
+      const list = await ensurePackingList(companyId, req.params.jobId, req.user!.id);
+      const reason = (req.body?.reason || "").trim();
+      const printNumber = (list.printCount || 0) + 1;
+      const isDuplicate = printNumber > 1;
+
+      if (isDuplicate && !reason) {
+        return res.status(400).json({
+          error: `This sheet was already printed (copy #${printNumber - 1}). A reprint needs a reason.`,
+          needsReason: true,
+          printNumber,
+        });
+      }
+
+      const me = await prisma.user.findFirst({ where: { id: req.user!.id }, select: { name: true } });
+
+      const record = await prisma.matV3ListPrint.create({
+        data: {
+          companyId,
+          packingListId: list.id,
+          jobId: req.params.jobId,
+          listNumber: list.listNumber,
+          printNumber,
+          isDuplicate,
+          printedById: req.user!.id,
+          printedByName: me?.name || "",
+          reason: reason || null,
+        },
+      });
+
+      const updated = await prisma.matV3PackingList.update({
+        where: { id: list.id },
+        data: {
+          printCount: printNumber,
+          firstPrintedAt: list.firstPrintedAt || new Date(),
+          firstPrintedById: list.firstPrintedById || req.user!.id,
+          // freeze the outbound quantities from the very first print
+          lockedAt: list.lockedAt || new Date(),
+        },
+      });
+
+      await prisma.matV3Audit.create({
+        data: {
+          companyId,
+          entityType: "PACKING_LIST",
+          entityId: list.id,
+          action: isDuplicate ? "PACKING_LIST_REPRINT" : "PACKING_LIST_PRINT",
+          afterJson: JSON.stringify({
+            jobId: req.params.jobId,
+            listNumber: list.listNumber,
+            printNumber,
+            isDuplicate,
+            reason: reason || null,
+          }),
+          reason: reason || null,
+          userId: req.user!.id,
+          userName: me?.name || "",
+        },
+      });
+
+      res.json({
+        printNumber,
+        isDuplicate,
+        listNumber: list.listNumber,
+        printedAt: record.createdAt,
+        printedByName: me?.name || "",
+        reason: reason || null,
+        lockedAt: updated.lockedAt,
+      });
+    } catch (e: any) {
+      console.error("[mat-v3] packing list print:", e);
+      res.status(500).json({ error: e.message || "Failed to record print" });
+    }
+  }
+);
+
 router.post("/jobs/:jobId/packing-list/attachment", authenticateToken as any, packingUpload.single("file") as any, async (req: AuthRequest, res: Response) => {
   try {
     const companyId = req.user!.companyId;
@@ -1056,6 +1157,26 @@ router.put("/jobs/:jobId/lines/:lineId", authenticateToken as any, authorizeRole
       if (!reason) return res.status(400).json({ error: "Reason is required to edit closed job materials" });
     }
 
+    // Once the sheet is printed the crew is carrying those numbers on paper.
+    // Changing what went out afterwards is exactly how material disappears,
+    // so it is frozen — admin only, with a reason, and it is audited.
+    if (list?.lockedAt && req.body.qtyIssued !== undefined) {
+      const newIssued = okNum(req.body.qtyIssued);
+      if (newIssued !== line.qtyIssued) {
+        const role = req.user!.role;
+        const reason = String(req.body?.reason || "").trim();
+        if (role !== "ADMIN") {
+          return res.status(400).json({
+            error: "Packing list sheet has been printed — the out quantity is frozen. Only admin can change it.",
+            issuedLocked: true,
+          });
+        }
+        if (!reason) {
+          return res.status(400).json({ error: "Reason is required to change an out quantity after printing" });
+        }
+      }
+    }
+
     const issued = req.body.qtyIssued !== undefined ? okNum(req.body.qtyIssued) : line.qtyIssued;
     const returned = req.body.qtyReturned !== undefined ? okNum(req.body.qtyReturned) : line.qtyReturned;
     const damaged = req.body.qtyDamaged !== undefined ? okNum(req.body.qtyDamaged) : line.qtyDamaged;
@@ -1174,6 +1295,17 @@ router.delete("/jobs/:jobId/lines/:lineId", authenticateToken as any, authorizeR
     if (list?.status === "CLOSED" && req.user!.role !== "ADMIN") {
       return res.status(400).json({ error: "Job materials are closed. Only admin can change." });
     }
+    // A printed line is on the paper the crew signed — deleting it would hide an issue
+    if (list?.lockedAt) {
+      const reason = String(req.body?.reason || "").trim();
+      if (req.user!.role !== "ADMIN") {
+        return res.status(400).json({
+          error: "Packing list sheet has been printed — this line cannot be deleted. Only admin can, with a reason.",
+          issuedLocked: true,
+        });
+      }
+      if (!reason) return res.status(400).json({ error: "Reason is required to delete a line after printing" });
+    }
     await prisma.$transaction(async (tx) => {
       await tx.matV3Ledger.deleteMany({ where: { companyId, jobLineId: line.id } });
       await tx.matV3JobLine.delete({ where: { id: line.id } });
@@ -1267,6 +1399,16 @@ router.post("/jobs/:jobId/close", authenticateToken as any, authorizeRoles("ADMI
       });
     }
     const f = view.finance as any;
+    // The signed sheet is the proof behind these numbers. Without it there is
+    // nothing to check against later, so closing needs the photo/scan
+    // (an admin can still force it through).
+    if (!list.attachmentUrl && !req.body?.force) {
+      return res.status(400).json({
+        error:
+          "Attach the signed packing list (photo or scan) before closing — that is the proof for these numbers.",
+        needsAttachment: true,
+      });
+    }
     const financeRow = await prisma.matV3JobFinance.findFirst({ where: { companyId, jobId: req.params.jobId } });
     if (financeRow) {
       await prisma.matV3JobFinance.update({
