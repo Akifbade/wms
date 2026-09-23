@@ -41,6 +41,7 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
   const [showFinance, setShowFinance] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [report, setReport] = useState<any>(null);
+  const [printMode, setPrintMode] = useState<'blank' | 'filled'>('blank');
   const fileRef = useRef<HTMLInputElement>(null);
   const printedRef = useRef<HTMLDivElement>(null);
 
@@ -260,10 +261,20 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
 
   /**
    * Print the packing list sheet.
-   * The print is recorded first, so the sheet carries PRINT #N and a reprint is
-   * stamped DUPLICATE — a hand-made replacement sheet has no entry in the log.
+   *
+   * 'blank'  = the sheet that goes out with the crew (everything written by hand).
+   *            This is the one that is recorded: copy 1 = ORIGINAL, copy 2+ =
+   *            DUPLICATE, so a hand-made replacement sheet has no log entry.
+   * 'filled' = a record of what was entered, for the file. Not logged.
    */
-  const printPackingList = async () => {
+  const printPackingList = async (mode: 'blank' | 'filled') => {
+    setPrintMode(mode);
+
+    if (mode === 'filled') {
+      setTimeout(() => window.print(), 150);
+      return;
+    }
+
     const already = data?.printCount || 0;
     let reason = '';
     if (already > 0) {
@@ -285,6 +296,15 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
     } catch (e: any) {
       alert(e.message);
     }
+  };
+
+  /** The paper comes back before anything is entered — so the photo comes first. */
+  const sheetAttached = !!data?.packingList?.attachmentUrl;
+  const blockForSheet = () => {
+    alert(
+      'Attach the photo of the signed packing list sheet first.\n\n' +
+        'That paper is the proof for these numbers — nothing can be entered until it is attached.'
+    );
   };
 
   if (loading && !data) {
@@ -365,11 +385,21 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
               {data?.packingList?.attachmentUrl ? 'Replace List' : 'Attach Signed List'}
             </button>
             <button
-              onClick={printPackingList}
+              onClick={() => printPackingList('blank')}
               className="inline-flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50"
+              title="The sheet the crew takes to the warehouse and writes on by hand"
             >
-              <Printer className="w-4 h-4" /> Print List
+              <Printer className="w-4 h-4" /> Print Blank Sheet
             </button>
+            {(data?.lines || []).length > 0 && (
+              <button
+                onClick={() => printPackingList('filled')}
+                className="inline-flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-500 text-sm font-medium rounded-lg hover:bg-slate-50"
+                title="A copy of what has been entered, for the file"
+              >
+                <Printer className="w-4 h-4" /> Print Record
+              </button>
+            )}
             <button
               onClick={() => setShowFinance(true)}
               className="inline-flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50"
@@ -426,6 +456,26 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
         <Mini label="Job Charge" value={`${(finance.materialsTotal ?? totals.chargeAmount).toFixed(3)} KWD`} tone="slate" bold />
       </div>
 
+      {!sheetAttached && canEdit && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 no-print flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-amber-900">
+              Signed packing list sheet not attached yet
+            </p>
+            <p className="text-xs text-amber-800 mt-0.5">
+              The crew's hand-written sheet is the proof behind every number. Attach its photo first — then the material
+              details can be entered.
+            </p>
+          </div>
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700"
+          >
+            <Paperclip className="w-4 h-4" /> Attach Signed Sheet
+          </button>
+        </div>
+      )}
+
       {err && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 no-print">{err}</div>}
 
       {/* Day tabs */}
@@ -470,6 +520,7 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
             {canEdit && !locked && (
               <button
                 onClick={() => {
+                  if (!sheetAttached) return blockForSheet();
                   const next = dayNumbers.length > 0 ? Math.max(...dayNumbers) + 1 : 1;
                   setActiveDay(next);
                   setEditing(null);
@@ -485,7 +536,7 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
 
           {canEdit && !locked && (
             <button
-              onClick={openAdd}
+              onClick={() => (sheetAttached ? openAdd() : blockForSheet())}
               className="mb-2 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
             >
               <Plus className="w-4 h-4" /> Add Material
@@ -553,14 +604,14 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
                         ) : (
                           <>
                             <button
-                              onClick={() => openEdit(l)}
+                              onClick={() => (sheetAttached ? openEdit(l) : blockForSheet())}
                               title="Edit"
                               className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded"
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => removeLine(l)}
+                              onClick={() => (sheetAttached ? removeLine(l) : blockForSheet())}
                               title="Remove"
                               className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded ml-1"
                             >
@@ -859,7 +910,7 @@ export default function JobMaterialsV3({ jobId, onUpdate }: JobMaterialsV3Props)
 
       {/* Print-only packing list sheet */}
       <div className="hidden print:block print-sheet" ref={printedRef}>
-        <PackingListPrint data={data} job={job} lines={allLines} />
+        <PackingListPrint data={data} job={job} lines={allLines} blank={printMode === 'blank'} />
       </div>
     </div>
   );
@@ -1083,7 +1134,7 @@ function ReportModal({ report, onClose }: { report: any; onClose: () => void }) 
   );
 }
 
-function PackingListPrint({ data, job, lines }: any) {
+function PackingListPrint({ data, job, lines, blank = false }: any) {
   const byDay: Record<number, any[]> = {};
   lines.forEach((l: Line) => {
     (byDay[l.dayNumber] ||= []).push(l);
@@ -1143,52 +1194,76 @@ function PackingListPrint({ data, job, lines }: any) {
         </tbody>
       </table>
 
-      {dayKeys.map((d) => (
-        <div key={d} className="mb-4 print-avoid-break">
-          <h3 className="font-semibold text-sm mb-1">Day {d}</h3>
+      {blank ? (
+        /* The sheet that goes out with the crew: everything is written by hand */
+        <div className="mb-4 print-avoid-break">
+          <h3 className="font-semibold text-sm mb-1">
+            1. OUT — material taken from warehouse (write by hand, one line per material per day)
+          </h3>
           <table className="w-full text-xs border border-slate-300">
             <thead className="bg-slate-100">
               <tr>
+                <th className="border border-slate-300 px-2 py-1 text-left w-12">Day</th>
                 <th className="border border-slate-300 px-2 py-1 text-left">Material</th>
-                <th className="border border-slate-300 px-2 py-1 text-right w-20">Issued</th>
-                <th className="border border-slate-300 px-2 py-1 text-right w-20">Returned</th>
-                <th className="border border-slate-300 px-2 py-1 text-right w-20">Damaged</th>
-                <th className="border border-slate-300 px-2 py-1 text-right w-16">Used</th>
-                <th className="border border-slate-300 px-2 py-1 w-28">Crew Note</th>
+                <th className="border border-slate-300 px-2 py-1 text-right w-16">Qty</th>
+                <th className="border border-slate-300 px-2 py-1 text-left w-20">Unit</th>
+                <th className="border border-slate-300 px-2 py-1 text-left w-32">Remark</th>
               </tr>
             </thead>
             <tbody>
-              {byDay[d].map((l) => (
-                <tr key={l.id}>
-                  <td className="border border-slate-300 px-2 py-1">
-                    {l.materialName} <span className="text-slate-400">({l.unit})</span>
-                  </td>
-                  <td className="border border-slate-300 px-2 py-1 text-right">{l.qtyIssued || ''}</td>
-                  <td className="border border-slate-300 px-2 py-1 text-right">{l.qtyReturned || ''}</td>
-                  <td className="border border-slate-300 px-2 py-1 text-right">{l.qtyDamaged || ''}</td>
-                  <td className="border border-slate-300 px-2 py-1 text-right">{l.usedQty}</td>
-                  <td className="border border-slate-300 px-2 py-1"></td>
-                </tr>
-              ))}
-              {/* blank rows for crew to write during the day */}
-              {[1, 2].map((i) => (
-                <tr key={`blank-${i}`}>
-                  <td className="border border-slate-300 px-2 py-3"></td>
-                  <td className="border border-slate-300 px-2 py-3"></td>
-                  <td className="border border-slate-300 px-2 py-3"></td>
-                  <td className="border border-slate-300 px-2 py-3"></td>
-                  <td className="border border-slate-300 px-2 py-3"></td>
-                  <td className="border border-slate-300 px-2 py-3"></td>
+              {Array.from({ length: 16 }).map((_, i) => (
+                <tr key={`out-${i}`}>
+                  <td className="border border-slate-300 px-2 py-2.5"></td>
+                  <td className="border border-slate-300 px-2 py-2.5"></td>
+                  <td className="border border-slate-300 px-2 py-2.5"></td>
+                  <td className="border border-slate-300 px-2 py-2.5"></td>
+                  <td className="border border-slate-300 px-2 py-2.5"></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      ))}
+      ) : (
+        dayKeys.map((d) => (
+          <div key={d} className="mb-4 print-avoid-break">
+            <h3 className="font-semibold text-sm mb-1">Day {d}</h3>
+            <table className="w-full text-xs border border-slate-300">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="border border-slate-300 px-2 py-1 text-left">Material</th>
+                  <th className="border border-slate-300 px-2 py-1 text-right w-20">Issued</th>
+                  <th className="border border-slate-300 px-2 py-1 text-right w-20">Returned</th>
+                  <th className="border border-slate-300 px-2 py-1 text-right w-20">Damaged</th>
+                  <th className="border border-slate-300 px-2 py-1 text-right w-16">Used</th>
+                  <th className="border border-slate-300 px-2 py-1 w-28">Crew Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byDay[d].map((l) => (
+                  <tr key={l.id}>
+                    <td className="border border-slate-300 px-2 py-1">
+                      {l.materialName} <span className="text-slate-400">({l.unit})</span>
+                    </td>
+                    <td className="border border-slate-300 px-2 py-1 text-right">{l.qtyIssued || ''}</td>
+                    <td className="border border-slate-300 px-2 py-1 text-right">{l.qtyReturned || ''}</td>
+                    <td className="border border-slate-300 px-2 py-1 text-right">{l.qtyDamaged || ''}</td>
+                    <td className="border border-slate-300 px-2 py-1 text-right">{l.usedQty}</td>
+                    <td className="border border-slate-300 px-2 py-1"></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))
+      )}
 
       {/* Return sheet — the crew writes what actually came back on this same paper */}
       <div className="mt-6 print-avoid-break">
-        <h3 className="font-semibold text-sm mb-1">Return to Warehouse (filled by crew on site)</h3>
+        <h3 className="font-semibold text-sm mb-1">
+          {blank
+            ? '2. RETURN to warehouse (write by hand when the material comes back — 3 signatures below)'
+            : 'Return to Warehouse (filled by crew on site)'}
+        </h3>
         <table className="w-full text-xs border border-slate-300">
           <thead className="bg-slate-100">
             <tr>

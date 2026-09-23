@@ -875,6 +875,23 @@ router.post("/stock/adjust", authenticateToken as any, authorizeRoles("ADMIN") a
    MOVING JOB — MATERIALS (multi-day)
    ============================================================ */
 
+/**
+ * Guard: the crew's hand-written sheet is the proof behind every number, and the
+ * paper only comes back to the office at the end. So nothing may be entered or
+ * changed until that signed sheet is attached to the job.
+ * An admin can override with { force: true }.
+ */
+async function requireSignedSheet(list: any, req: AuthRequest, res: Response): Promise<boolean> {
+  if (list?.attachmentUrl) return true;
+  if (req.body?.force && req.user!.role === "ADMIN") return true;
+  res.status(400).json({
+    error:
+      "Attach the photo of the signed packing list sheet first — that paper is the proof for these numbers.",
+    needsAttachment: true,
+  });
+  return false;
+}
+
 router.get("/jobs/:jobId/materials", authenticateToken as any, async (req: AuthRequest, res: Response) => {
   try {
     const companyId = req.user!.companyId;
@@ -1042,6 +1059,7 @@ router.post("/jobs/:jobId/lines", authenticateToken as any, authorizeRoles("ADMI
 
     const list = await ensurePackingList(companyId, req.params.jobId, req.user!.id);
     if (list.status === "CLOSED") return res.status(400).json({ error: "Job materials are closed. Reopen first." });
+    if (!(await requireSignedSheet(list, req, res))) return;
 
     const issued = okNum(qtyIssued);
     const returned = okNum(qtyReturned);
@@ -1157,25 +1175,16 @@ router.put("/jobs/:jobId/lines/:lineId", authenticateToken as any, authorizeRole
       if (!reason) return res.status(400).json({ error: "Reason is required to edit closed job materials" });
     }
 
-    // Once the sheet is printed the crew is carrying those numbers on paper.
-    // Changing what went out afterwards is exactly how material disappears,
-    // so it is frozen — admin only, with a reason, and it is audited.
-    if (list?.lockedAt && req.body.qtyIssued !== undefined) {
-      const newIssued = okNum(req.body.qtyIssued);
-      if (newIssued !== line.qtyIssued) {
-        const role = req.user!.role;
-        const reason = String(req.body?.reason || "").trim();
-        if (role !== "ADMIN") {
-          return res.status(400).json({
-            error: "Packing list sheet has been printed — the out quantity is frozen. Only admin can change it.",
-            issuedLocked: true,
-          });
-        }
-        if (!reason) {
-          return res.status(400).json({ error: "Reason is required to change an out quantity after printing" });
-        }
-      }
-    }
+    if (!(await requireSignedSheet(list, req, res))) return;
+
+    // NOTE: no print-lock on the out quantity here.
+    // The real flow is: the BLANK sheet is printed and taken to the warehouse,
+    // the crew writes everything by hand, and only when the material comes back
+    // does the supervisor enter the numbers. So printing happens BEFORE entry and
+    // must never block it. What protects the numbers is:
+    //   - the sheet carries a system-issued list number + a logged print record
+    //   - the signed sheet photo must be attached before anything is entered
+    //   - closing the job locks the entry (admin + reason to change afterwards)
 
     const issued = req.body.qtyIssued !== undefined ? okNum(req.body.qtyIssued) : line.qtyIssued;
     const returned = req.body.qtyReturned !== undefined ? okNum(req.body.qtyReturned) : line.qtyReturned;
@@ -1295,17 +1304,8 @@ router.delete("/jobs/:jobId/lines/:lineId", authenticateToken as any, authorizeR
     if (list?.status === "CLOSED" && req.user!.role !== "ADMIN") {
       return res.status(400).json({ error: "Job materials are closed. Only admin can change." });
     }
-    // A printed line is on the paper the crew signed — deleting it would hide an issue
-    if (list?.lockedAt) {
-      const reason = String(req.body?.reason || "").trim();
-      if (req.user!.role !== "ADMIN") {
-        return res.status(400).json({
-          error: "Packing list sheet has been printed — this line cannot be deleted. Only admin can, with a reason.",
-          issuedLocked: true,
-        });
-      }
-      if (!reason) return res.status(400).json({ error: "Reason is required to delete a line after printing" });
-    }
+    // Printed lines are NOT protected here — the sheet is printed blank before
+    // the material leaves, and entry happens afterwards. Closing is what locks.
     await prisma.$transaction(async (tx) => {
       await tx.matV3Ledger.deleteMany({ where: { companyId, jobLineId: line.id } });
       await tx.matV3JobLine.delete({ where: { id: line.id } });
