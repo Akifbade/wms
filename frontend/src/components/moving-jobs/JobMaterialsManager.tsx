@@ -46,6 +46,7 @@ interface IssuedMaterial {
     quantityGood: number;
     quantityDamaged: number;
     recordedAt: string;
+    physicalReportUrl?: string | null;
   }>;
 }
 
@@ -285,6 +286,48 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
       alert('Failed to record material return');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Attach / REPLACE the physical report on an existing return.
+  // Previously the upload box only existed on the "record return" form, so a
+  // return saved without a report could never get one — and Approvals kept
+  // showing whatever old file was linked.
+  const [reportReturnId, setReportReturnId] = useState<string | null>(null);
+  const reportInputRef = useRef<HTMLInputElement>(null);
+
+  const pickReportFor = (returnId: string) => {
+    setReportReturnId(returnId);
+    setTimeout(() => reportInputRef.current?.click(), 0);
+  };
+
+  const handleReplaceReport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !reportReturnId) return;
+
+    const token = localStorage.getItem('authToken');
+    const fd = new FormData();
+    fd.append('physicalReport', file);
+
+    try {
+      const res = await fetch(`/api/materials/returns/${reportReturnId}/physical-report`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Upload failed');
+      alert(
+        data.replaced
+          ? 'Report replaced. Approvals will now show the new file.'
+          : 'Physical report attached.'
+      );
+      setReportReturnId(null);
+      loadData();
+      onUpdate?.();
+    } catch (err: any) {
+      alert(err.message || 'Failed to upload physical report');
     }
   };
 
@@ -1117,6 +1160,13 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                   <div key={ret.id} className="bg-gray-50 p-3 rounded mt-2 relative group">
                     <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
+                        onClick={() => pickReportFor(ret.id)}
+                        className="p-1 text-green-600 hover:bg-green-100 rounded"
+                        title={ret.physicalReportUrl ? 'Replace Physical Report' : 'Attach Physical Report'}
+                      >
+                        <Upload className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => openEditReturnForm(ret)}
                         className="p-1 text-blue-600 hover:bg-blue-100 rounded"
                         title="Edit Return"
@@ -1151,6 +1201,27 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                         </p>
                       </div>
                     </div>
+                    <div className="mt-2 flex items-center gap-3 text-xs">
+                      <span className="text-gray-500">Physical Report:</span>
+                      {ret.physicalReportUrl ? (
+                        <a
+                          href={ret.physicalReportUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-green-700 underline"
+                        >
+                          📄 View / download
+                        </a>
+                      ) : (
+                        <span className="text-amber-600">not attached</span>
+                      )}
+                      <button
+                        onClick={() => pickReportFor(ret.id)}
+                        className="text-blue-600 underline"
+                      >
+                        {ret.physicalReportUrl ? 'replace' : 'upload'}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1161,6 +1232,15 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
           )}
         </div>
       )}
+
+      {/* Hidden picker for attaching / replacing a return's physical report */}
+      <input
+        ref={reportInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/jpg,application/pdf"
+        className="hidden"
+        onChange={handleReplaceReport}
+      />
 
       {/* Edit Return Modal */}
       {showEditReturnForm && (

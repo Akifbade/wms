@@ -1418,6 +1418,57 @@ const returnUploadFields = damagePhotoUpload.fields([
 
 router.post("/returns", authenticateToken as any, returnUploadFields, handleCreateReturn);
 
+/**
+ * POST /api/materials/returns/:returnId/physical-report
+ * Attach or REPLACE the physical report on an EXISTING material return.
+ *
+ * Why this exists: the upload box only lived on the "record return" form, so
+ * once a return was saved there was no way to add or correct its report. A
+ * re-upload appeared to do nothing and Approvals kept showing the old file.
+ */
+router.post(
+  "/returns/:returnId/physical-report",
+  authenticateToken as any,
+  returnUploadFields,
+  async (req: AuthRequest, res) => {
+    try {
+      const { companyId } = req.user!;
+      const returnId = req.params.returnId;
+
+      const materialReturn = await prisma.materialReturn.findFirst({
+        where: { id: returnId, companyId },
+      });
+      if (!materialReturn) return res.status(404).json({ error: "Material return not found" });
+
+      const files = (req as any).files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+      const file = files?.physicalReport?.[0];
+      if (!file) return res.status(400).json({ error: "No file uploaded" });
+
+      const previousUrl = materialReturn.physicalReportUrl;
+      const fileUrl = `/uploads/physical-reports/${file.filename}`;
+
+      const updated = await prisma.materialReturn.update({
+        where: { id: returnId },
+        data: { physicalReportUrl: fileUrl },
+      });
+
+      console.log(`[Materials] 📄 Physical report replaced on return ${returnId}: ${previousUrl} -> ${fileUrl}`);
+
+      res.json({
+        success: true,
+        returnId,
+        physicalReportUrl: updated.physicalReportUrl,
+        previousUrl,
+        fileName: file.originalname,
+        replaced: Boolean(previousUrl),
+      });
+    } catch (error: any) {
+      console.error("Error uploading physical report for return:", error);
+      res.status(500).json({ error: "Failed to upload physical report" });
+    }
+  }
+);
+
 // ==================== MATERIAL APPROVALS ====================
 
 /**

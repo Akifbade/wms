@@ -62,9 +62,9 @@ export default function MobileUploadPage() {
             console.log('[MobileUpload] Status response:', response.data);
             setUploadStatus(response.data);
 
-            if (response.data.uploaded) {
-                setError('Physical report already uploaded for this material return.');
-            }
+            // Do NOT block re-upload: a wrong/old report must be replaceable.
+            // (Previously this set a hard error and the page locked into
+            // "Upload Complete!", so a new upload looked like it was ignored.)
         } catch (err: any) {
             console.error('[MobileUpload] Status check error:', err);
             console.error('[MobileUpload] Error response:', err.response?.data);
@@ -179,69 +179,76 @@ export default function MobileUploadPage() {
                         </div>
                     )}
 
-                    {uploadStatus?.uploaded ? (
-                        <div className="text-center py-8">
-                            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <span className="text-4xl">✅</span>
-                            </div>
-                            <h2 className="text-xl font-bold text-green-700 mb-2">Upload Complete!</h2>
-                            <p className="text-gray-600 mb-6">Physical report has been uploaded successfully.</p>
-
-                            {previewUrl && (
-                                <div className="mb-4">
-                                    <img src={previewUrl} alt="Uploaded report" className="max-w-full h-auto rounded-lg border" />
-                                </div>
-                            )}
-
-                            <button
-                                onClick={() => window.close()}
-                                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                            >
-                                Close Window
-                            </button>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Hidden file input */}
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/jpeg,image/jpg,image/png,application/pdf"
-                                capture="environment"
-                                onChange={handleFileSelect}
-                                className="hidden"
-                            />
-
-                            {/* Preview */}
-                            {previewUrl && (
-                                <div className="mb-4">
-                                    <img src={previewUrl} alt="Preview" className="max-w-full h-auto rounded-lg border" />
-                                </div>
-                            )}
-
-                            {/* Upload button */}
-                            <button
-                                onClick={handleCameraCapture}
-                                disabled={uploading}
-                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 hover:from-blue-700 hover:to-purple-700 transition disabled:opacity-50"
-                            >
-                                {uploading ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                                        <span>Uploading...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="text-2xl">📸</span>
-                                        <span>Take Photo / Select File</span>
-                                    </>
-                                )}
-                            </button>
-
-                            <p className="text-xs text-gray-500 text-center mt-4">
-                                Accepted formats: JPEG, PNG, PDF (max 10MB)
+                    {uploadStatus?.uploaded && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                            <p className="text-green-800 text-sm font-medium">
+                                ✅ A report is already uploaded for this return.
                             </p>
-                        </>
+                            {uploadStatus.fileUrl && (
+                                <a
+                                    href={uploadStatus.fileUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-xs text-green-700 underline"
+                                >
+                                    View the current file
+                                </a>
+                            )}
+                            <p className="text-xs text-green-800 mt-1">
+                                Uploading a new file below will <strong>replace</strong> the old one.
+                            </p>
+                        </div>
+                    )}
+
+                    <>
+                        {/* Hidden file input */}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,application/pdf"
+                            capture="environment"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                        />
+
+                        {/* Preview */}
+                        {previewUrl && (
+                            <div className="mb-4">
+                                <img src={previewUrl} alt="Preview" className="max-w-full h-auto rounded-lg border" />
+                            </div>
+                        )}
+
+                        {/* Upload button */}
+                        <button
+                            onClick={handleCameraCapture}
+                            disabled={uploading}
+                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 hover:from-blue-700 hover:to-purple-700 transition disabled:opacity-50"
+                        >
+                            {uploading ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                                    <span>Uploading...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-2xl">📸</span>
+                                    <span>{uploadStatus?.uploaded ? 'Upload / Replace File' : 'Take Photo / Select File'}</span>
+                                </>
+                            )}
+                        </button>
+
+                        <p className="text-xs text-gray-500 text-center mt-4">
+                            Accepted formats: JPEG, PNG, PDF (max 10MB)
+                        </p>
+                    </>
+
+                    {uploadStatus?.uploaded && (
+                        <button
+                            onClick={() => window.close()}
+                            className="w-full mt-3 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                        >
+                            Close Window
+                        </button>
                     )}
                 </div>
             </div>
