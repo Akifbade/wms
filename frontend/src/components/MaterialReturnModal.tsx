@@ -186,6 +186,31 @@ export default function MaterialReturnModal({ isOpen, onClose, jobId, onSuccess,
               const err = await updateRes.json();
               throw new Error(err.error || 'Failed to update return');
             }
+
+            // The PUT above is JSON-only and can never carry a file, so a chosen
+            // physical report was silently DROPPED whenever the return already
+            // existed - which is always the case after a rejection + re-upload.
+            // That is why the old report kept showing in Approvals.
+            // Send the file separately to the dedicated upload endpoint.
+            if (physicalReportFile && !physicalReportAttached) {
+              console.log('[MaterialReturnModal] Attaching physical report to EXISTING return:', returnData.existingReturnId);
+              const reportForm = new FormData();
+              reportForm.append('physicalReport', physicalReportFile);
+              const reportRes = await fetch(`/api/materials/returns/${returnData.existingReturnId}/physical-report`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                },
+                body: reportForm
+              });
+              if (!reportRes.ok) {
+                const err = await reportRes.json().catch(() => ({}));
+                throw new Error(err.error || 'Physical report upload failed');
+              }
+              physicalReportAttached = true;
+              console.log('[MaterialReturnModal] ✅ Physical report REPLACED on existing return');
+            }
+
             // Use existing return ID for QR
             if (!createdReturnId) createdReturnId = returnData.existingReturnId;
           } catch (err: any) {
