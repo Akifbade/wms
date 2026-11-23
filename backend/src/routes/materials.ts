@@ -3655,6 +3655,328 @@ router.delete("/returns/:id", authenticateToken as any, authorizeRoles('ADMIN'),
   }
 });
 
+/**
+ * GET /api/materials/reports/tally
+ * Single-material full tally: stock, purchases, job usage (where/who), returns, ledger
+ * Query: materialId (required), startDate, endDate
+ */
+router.get("/reports/tally", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    const { materialId, startDate, endDate } = req.query as {
+      materialId?: string;
+      startDate?: string;
+      endDate?: string;
+    };
+
+    if (!materialId) {
+      return res.status(400).json({ error: "materialId is required" });
+    }
+
+    const material = await prisma.packingMaterial.findFirst({
+      where: { id: materialId, companyId },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        unit: true,
+        category: true,
+        totalQuantity: true,
+        minStockLevel: true,
+        unitCost: true,
+        sellingPrice: true,
+        isActive: true,
+      },
+    });
+
+    if (!material) {
+      return res.status(404).json({ error: "Material not found" });
+    }
+
+    const rangeStart = startDate ? new Date(startDate) : null;
+    if (rangeStart) rangeStart.setHours(0, 0, 0, 0);
+    const rangeEnd = endDate ? new Date(endDate) : null;
+    if (rangeEnd) rangeEnd.setHours(23, 59, 59, 999);
+
+    const inRange = (d: Date | string | null | undefined) => {
+      if (!d) return !rangeStart && !rangeEnd;
+      const t = new Date(d).getTime();
+      if (rangeStart && t < rangeStart.getTime()) return false;
+      if (rangeEnd && t > rangeEnd.getTime()) return false;
+      return true;
+    };
+    const beforeRange = (d: Date | string | null | undefined) => {
+      if (!rangeStart || !d) return false;
+      return new Date(d).getTime() < rangeStart.getTime();
+    };
+
+    // Purchases: PO items (RECEIVED) + stock batches
+    const poItems = await prisma.purchaseOrderItem.findMany({
+      where: { materialId, companyId },
+      include: {
+        purchaseOrder: { include: { vendor: true } },
+      },
+    });
+    const batches = await prisma.stockBatch.findMany({
+      where: { materialId, companyId },
+      include: { vendor: true },
+    });
+
+    const purchases: any[] = [];
+    let purchasedQty = 0;
+    let purchasedCost = 0;
+    let priorPurchased = 0;
+
+    for (const item of poItems) {
+      if (item.purchaseOrder.status !== "RECEIVED") continue;
+      const d = item.purchaseOrder.orderDate || item.purchaseOrder.receivedDate;
+      const row = {
+        id: item.id,
+        source: "purchase_order",
+        date: d,
+        reference: item.purchaseOrder.orderNumber,
+        vendor: item.purchaseOrder.vendorName || item.purchaseOrder.vendor?.name || "Unknown",
+        quantity: item.quantity,
+        unitCost: item.unitCost || 0,
+        totalCost: item.totalCost || item.quantity * (item.unitCost || 0),
+      };
+      if (beforeRange(d)) priorPurchased += row.quantity;
+      if (inRange(d)) {
+        purchases.push(row);
+        purchasedQty += row.quantity;
+        purchasedCost += row.totalCost;
+      }
+    }
+
+    for (const batch of batches) {
+      const d = batch.purchaseDate;
+      const row = {
+        id: batch.id,
+        source: "stock_batch",
+        date: d,
+        reference: batch.batchNumber || batch.purchaseOrder || "BATCH",
+        vendor: batch.vendorName || batch.vendor?.name || "Direct",
+        quantity: batch.quantityPurchased,
+        unitCost: batch.unitCost || 0,
+        totalCost: batch.quantityPurchased * (batch.unitCost || 0),
+      };
+      if (beforeRange(d)) priorPurchased += row.quantity;
+      if (inRange(d)) {
+        purchases.push(row);
+        purchasedQty += row.quantity;
+        purchasedCost += row.totalCost;
+      }
+    }
+    purchases.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Issues with job + issuer + returns
+    const issues = await prisma.materialIssue.findMany({
+      where: { materialId, companyId },
+      include: {
+        job: {
+          select: {
+            id: true,
+            jobCode: true,
+            jobTitle: true,
+            clientName: true,
+            clientPhone: true,
+            jobDate: true,
+            jobAddress: true,
+            dropoffAddress: true,
+            status: true,
+            deletedAt: true,
+          },
+        },
+        issuedBy: { select: { id: true, name: true } },
+        returns: {
+          select: {
+            id: true,
+            quantityUsed: true,
+            quantityGood: true,
+            quantityDamaged: true,
+            restocked: true,
+            recordedAt: true,
+            recordedBy: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { issuedAt: "desc" },
+    });
+
+    let issuedQty = 0;
+    let usedQty = 0;
+    let returnedQty = 0;
+    let damagedQty = 0;
+    let usageCost = 0;
+    let priorIssued = 0;
+    let priorReturned = 0;
+    let priorDamaged = 0;
+
+    const jobUsage: any[] = [];
+    const ledger: any[] = [];
+
+    for (const issue of issues) {
+      if (issue.job?.deletedAt) continue;
+
+      const retUsed = issue.returns.reduce((s, r) => s + (r.quantityUsed || 0), 0);
+      const retGood = issue.returns.reduce((s, r) => s + (r.quantityGood || 0), 0);
+      const retDamaged = issue.returns.reduce((s, r) => s + (r.quantityDamaged || 0), 0);
+      const hasReturn = issue.returns.length > 0;
+      const used = hasReturn ? retUsed : Math.max(0, issue.quantity - retGood);
+      const lineCost = used * (issue.unitCost || 0);
+
+      if (beforeRange(issue.issuedAt)) {
+        priorIssued += issue.quantity;
+      }
+      for (const r of issue.returns) {
+        if (beforeRange(r.recordedAt)) {
+          priorReturned += r.quantityGood || 0;
+          priorDamaged += r.quantityDamaged || 0;
+        }
+      }
+
+      if (inRange(issue.issuedAt)) {
+        issuedQty += issue.quantity;
+        usedQty += used;
+        returnedQty += retGood;
+        damagedQty += retDamaged;
+        usageCost += lineCost;
+
+        jobUsage.push({
+          issueId: issue.id,
+          jobId: issue.job?.id || issue.jobId,
+          jobCode: issue.job?.jobCode || "N/A",
+          jobTitle: issue.job?.jobTitle || "",
+          clientName: issue.job?.clientName || "",
+          clientPhone: issue.job?.clientPhone || "",
+          jobDate: issue.job?.jobDate || null,
+          status: issue.job?.status || "",
+          fromAddress: issue.job?.jobAddress || "",
+          toAddress: issue.job?.dropoffAddress || "",
+          issued: issue.quantity,
+          used,
+          returnedGood: retGood,
+          damaged: retDamaged,
+          unitCost: issue.unitCost || 0,
+          cost: lineCost,
+          hasReturn,
+          issuedAt: issue.issuedAt,
+          issuedBy: issue.issuedBy?.name || "Unknown",
+          returnedBy: issue.returns.map((r) => r.recordedBy?.name).filter(Boolean).join(", ") || null,
+        });
+
+        ledger.push({
+          date: issue.issuedAt,
+          type: "ISSUE",
+          description: `Issued to ${issue.job?.jobCode || "job"} — ${issue.job?.clientName || ""}`,
+          jobCode: issue.job?.jobCode || null,
+          jobId: issue.job?.id || issue.jobId,
+          stockIn: 0,
+          stockOut: issue.quantity,
+          unitCost: issue.unitCost || 0,
+          person: issue.issuedBy?.name || "Unknown",
+        });
+      }
+
+      for (const r of issue.returns) {
+        if (!inRange(r.recordedAt)) continue;
+        if ((r.quantityGood || 0) > 0) {
+          ledger.push({
+            date: r.recordedAt,
+            type: r.restocked ? "RETURN" : "RETURN_PENDING",
+            description: `Return good from ${issue.job?.jobCode || "job"}${r.restocked ? "" : " (pending approval)"}`,
+            jobCode: issue.job?.jobCode || null,
+            jobId: issue.job?.id || issue.jobId,
+            stockIn: r.restocked ? r.quantityGood || 0 : 0,
+            stockOut: 0,
+            pending: r.restocked ? 0 : r.quantityGood || 0,
+            unitCost: issue.unitCost || 0,
+            person: r.recordedBy?.name || "Unknown",
+          });
+        }
+        if ((r.quantityDamaged || 0) > 0) {
+          ledger.push({
+            date: r.recordedAt,
+            type: "DAMAGE",
+            description: `Damaged on ${issue.job?.jobCode || "job"}`,
+            jobCode: issue.job?.jobCode || null,
+            jobId: issue.job?.id || issue.jobId,
+            stockIn: 0,
+            stockOut: r.quantityDamaged || 0,
+            unitCost: issue.unitCost || 0,
+            person: r.recordedBy?.name || "Unknown",
+          });
+        }
+      }
+    }
+
+    for (const p of purchases) {
+      ledger.push({
+        date: p.date,
+        type: "PURCHASE",
+        description: `Purchase ${p.reference} — ${p.vendor}`,
+        jobCode: null,
+        jobId: null,
+        stockIn: p.quantity,
+        stockOut: 0,
+        unitCost: p.unitCost,
+        person: p.vendor,
+        reference: p.reference,
+      });
+    }
+
+    ledger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Opening ≈ prior purchases - prior issues + prior restocked returns
+    // (damaged stays out of stock)
+    const openingStock = Math.max(0, priorPurchased - priorIssued + priorReturned);
+    const closingCalc = openingStock + purchasedQty - issuedQty + returnedQty;
+    // Note: damaged is part of issued that didn't return; already reflected in issued - returned
+
+    const tally = {
+      openingStock,
+      purchased: purchasedQty,
+      purchasedCost,
+      issued: issuedQty,
+      used: usedQty,
+      returnedGood: returnedQty,
+      damaged: damagedQty,
+      usageCost,
+      closingCalc,
+      currentStock: material.totalQuantity,
+      jobCount: jobUsage.length,
+      purchaseCount: purchases.length,
+      equation: `Opening ${openingStock} + Purchased ${purchasedQty} − Issued ${issuedQty} + Returned ${returnedQty} ≈ ${closingCalc} (system stock now: ${material.totalQuantity})`,
+    };
+
+    res.json({
+      material: {
+        id: material.id,
+        sku: material.sku,
+        name: material.name,
+        unit: material.unit,
+        category: material.category,
+        currentStock: material.totalQuantity,
+        minStockLevel: material.minStockLevel,
+        unitCost: material.unitCost || 0,
+        sellingPrice: material.sellingPrice || 0,
+        isActive: material.isActive,
+      },
+      period: {
+        startDate: startDate || null,
+        endDate: endDate || null,
+      },
+      tally,
+      purchases,
+      jobUsage,
+      ledger,
+    });
+  } catch (error) {
+    console.error("Error generating material tally:", error);
+    res.status(500).json({ error: "Failed to generate material tally" });
+  }
+});
+
 export default router;
 
 
