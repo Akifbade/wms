@@ -52,8 +52,42 @@ const resolveUploadPath = (fileUrl: string | null | undefined) => {
 router.get("/", authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { companyId } = req.user!;
+    const { status, search } = req.query as { status?: string; search?: string };
+
+    const where: any = {
+      companyId,
+      deletedAt: null,
+    };
+
+    // Status filter — supports comma-separated values (e.g. SCHEDULED,PLANNED)
+    if (status && String(status).trim() && String(status).toLowerCase() !== 'all') {
+      const statuses = String(status)
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean);
+      if (statuses.length === 1) {
+        where.status = statuses[0];
+      } else if (statuses.length > 1) {
+        where.status = { in: statuses };
+      }
+    }
+
+    // Search — job code, title, client, phone, addresses
+    const q = (search || '').trim();
+    if (q) {
+      where.OR = [
+        { jobCode: { contains: q } },
+        { jobTitle: { contains: q } },
+        { clientName: { contains: q } },
+        { clientPhone: { contains: q } },
+        { jobAddress: { contains: q } },
+        { dropoffAddress: { contains: q } },
+        { notes: { contains: q } },
+      ];
+    }
+
     const jobs = await prisma.movingJob.findMany({
-      where: { companyId },
+      where,
       include: {
         assignments: {
           include: {
@@ -76,7 +110,8 @@ router.get("/", authenticateToken as any, async (req: AuthRequest, res) => {
           select: {
             id: true,
             quantityGood: true,
-            quantityDamaged: true
+            quantityDamaged: true,
+            physicalReportUrl: true,
           }
         },
         approvals: {

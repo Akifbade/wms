@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   PlusIcon,
@@ -13,7 +13,9 @@ import {
   FolderIcon,
   ArrowRightIcon,
   PhoneIcon,
-  PaperClipIcon
+  PaperClipIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { jobsAPI } from '../../services/api';
 import CreateMovingJobModal from '../../components/CreateMovingJobModal';
@@ -27,6 +29,8 @@ export const MovingJobs: React.FC = () => {
   const { jobId } = useParams<{ jobId?: string }>();
   const navigate = useNavigate();
   const [filterStatus, setFilterStatus] = useState('all');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -36,10 +40,19 @@ export const MovingJobs: React.FC = () => {
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [fileManagerOpen, setFileManagerOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<any>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Debounce search typing → actual query (300ms)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   useEffect(() => {
     loadJobs();
-  }, [filterStatus]);
+  }, [filterStatus, searchQuery]);
 
   // Auto-open job report if jobId is in URL
   useEffect(() => {
@@ -65,6 +78,9 @@ export const MovingJobs: React.FC = () => {
         };
         params.status = statusMap[filterStatus] || filterStatus.toUpperCase();
       }
+      if (searchQuery) {
+        params.search = searchQuery;
+      }
 
       const data = await jobsAPI.getAll(params);
       setJobs(data.jobs || []);
@@ -73,6 +89,12 @@ export const MovingJobs: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const clearSearch = () => {
+    setSearchInput('');
+    setSearchQuery('');
+    searchInputRef.current?.focus();
   };
 
   const getStatusBadge = (status: string) => {
@@ -135,26 +157,78 @@ export const MovingJobs: React.FC = () => {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 no-scrollbar">
-        {['all', 'scheduled', 'inprogress', 'completed'].map((status) => (
-          <button
-            key={status}
-            onClick={() => setFilterStatus(status)}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors border min-h-[36px] ${filterStatus === status
-                ? 'bg-gray-900 text-white border-gray-900'
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-              }`}
-          >
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-          </button>
-        ))}
+      {/* Search + Filters */}
+      <div className="mb-4 space-y-3">
+        <div className="relative">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" />
+          <input
+            ref={searchInputRef}
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search job code, client, phone, title, address..."
+            className="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300 min-h-[44px]"
+            autoComplete="off"
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-700 rounded"
+              title="Clear search"
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {['all', 'scheduled', 'inprogress', 'completed'].map((status) => (
+            <button
+              key={status}
+              onClick={() => setFilterStatus(status)}
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors border min-h-[36px] ${filterStatus === status
+                  ? 'bg-slate-800 text-white border-slate-800'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+            >
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {searchQuery && (
+          <p className="text-xs text-slate-500">
+            Showing results for <span className="font-medium text-slate-700">"{searchQuery}"</span>
+            {!loading && <> · {jobs.length} job{jobs.length === 1 ? '' : 's'}</>}
+          </p>
+        )}
       </div>
 
       {/* Jobs Grid */}
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
+        </div>
+      ) : jobs.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-lg p-10 text-center">
+          <p className="text-slate-700 font-medium">
+            {searchQuery ? 'No jobs match your search' : 'No jobs found'}
+          </p>
+          <p className="text-sm text-slate-500 mt-1">
+            {searchQuery
+              ? 'Try another name, job code, phone, or clear the search'
+              : 'Create a new job to get started'}
+          </p>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="mt-4 inline-flex items-center px-4 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700"
+            >
+              Clear search
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
