@@ -1069,15 +1069,22 @@ router.get("/issues", authenticateToken as any, async (req: AuthRequest, res) =>
 
 /**
  * PUT /api/materials/issues/:id
- * Edit a material issue (only if not returned)
+ * Edit a material issue (qty and/or unit price).
+ * - Quantity: ADMIN + MANAGER, only if NOT yet returned (stock adjusts).
+ * - Unit price: ADMIN only, allowed even after return (no stock change — cost only).
+ * Every change writes material_issue_history (audit).
  */
 router.put("/issues/:id", authenticateToken as any, authorizeRoles('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
   try {
-    const { companyId, id: userId } = req.user!;
+    const { companyId, id: userId, role } = req.user!;
     const { id } = req.params;
-    const { quantity, notes, reason } = req.body;
+    const { quantity, unitCost, notes, reason } = req.body;
+    const isAdmin = role === 'ADMIN';
 
-    // Get the existing issue with material info
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ error: "Reason is required for audit log" });
+    }
+
     const existingIssue = await prisma.materialIssue.findFirst({
       where: { id, companyId },
       include: {
@@ -1091,68 +1098,125 @@ router.put("/issues/:id", authenticateToken as any, authorizeRoles('ADMIN', 'MAN
       return res.status(404).json({ error: "Material issue not found" });
     }
 
-    // Check if already returned
-    if (existingIssue.returns && existingIssue.returns.length > 0) {
-      return res.status(400).json({ error: "Cannot edit - material has already been returned" });
-    }
-
+    const hasReturns = !!(existingIssue.returns && existingIssue.returns.length > 0);
     const previousQty = existingIssue.quantity;
-    const newQuantity = quantity || previousQty;
-    const qtyDifference = newQuantity - previousQty;
+    const previousUnitCost = existingIssue.unitCost ?? 0;
 
-    // Calculate new total cost
-    const newTotalCost = newQuantity * existingIssue.unitCost;
-
-    // Update material stock (restore old quantity, deduct new quantity)
-    const material = await prisma.packingMaterial.findUnique({ where: { id: existingIssue.materialId } });
-    if (material) {
-      const newStock = (material.totalQuantity || 0) + previousQty - newQuantity;
-      if (newStock < 0) {
-        return res.status(400).json({ error: `Insufficient stock. Available: ${(material.totalQuantity || 0) + previousQty}` });
+    // ---- resolve new quantity ----
+    let newQuantity = previousQty;
+    const qtyProvided = quantity !== undefined && quantity !== null && quantity !== '';
+    if (qtyProvided) {
+      newQuantity = parseInt(String(quantity), 10);
+      if (!Number.isFinite(newQuantity) || newQuantity < 1) {
+        return res.status(400).json({ error: "Quantity must be a whole number >= 1" });
       }
-      await prisma.packingMaterial.update({
-        where: { id: existingIssue.materialId },
-        data: { totalQuantity: newStock }
-      });
+      if (newQuantity !== previousQty && hasReturns) {
+        return res.status(400).json({
+          error: "Cannot change quantity after return — stock already adjusted. Delete/edit the return first, or only correct the unit price."
+        });
+      }
     }
 
-    // Create history record for the edit
+    // ---- resolve new unit cost (ADMIN only) ----
+    let newUnitCost = previousUnitCost;
+    const priceProvided = unitCost !== undefined && unitCost !== null && unitCost !== '';
+    if (priceProvided) {
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Only ADMIN can edit unit price" });
+      }
+      newUnitCost = parseFloat(String(unitCost));
+      if (!Number.isFinite(newUnitCost) || newUnitCost < 0) {
+        return res.status(400).json({ error: "Unit cost must be a number >= 0" });
+      }
+    }
+
+    const qtyChanged = newQuantity !== previousQty;
+    const priceChanged = Math.abs(newUnitCost - previousUnitCost) > 1e-9;
+
+    if (!qtyChanged && !priceChanged && (notes === undefined || notes === existingIssue.notes)) {
+      return res.status(400).json({ error: "No changes provided" });
+    }
+
+    // ---- stock adjust only when quantity changes (pre-return) ----
+    if (qtyChanged) {
+      const material = await prisma.packingMaterial.findUnique({ where: { id: existingIssue.materialId } });
+      if (material) {
+        const newStock = (material.totalQuantity || 0) + previousQty - newQuantity;
+        if (newStock < 0) {
+          return res.status(400).json({
+            error: `Insufficient stock. Available with this issue released: ${(material.totalQuantity || 0) + previousQty}`
+          });
+        }
+        await prisma.packingMaterial.update({
+          where: { id: existingIssue.materialId },
+          data: { totalQuantity: newStock }
+        });
+      }
+    }
+
+    const newTotalCost = newQuantity * newUnitCost;
+    const action = priceChanged && !qtyChanged ? 'PRICE_EDITED' : 'EDITED';
+
+    const auditNotesParts: string[] = [];
+    if (notes !== undefined && notes !== null && String(notes).trim() !== '') {
+      auditNotesParts.push(String(notes).trim());
+    } else if (existingIssue.notes) {
+      auditNotesParts.push(existingIssue.notes);
+    }
+    if (priceChanged) {
+      auditNotesParts.push(`prevUnitCost=${previousUnitCost}→${newUnitCost}`);
+    }
+    if (qtyChanged) {
+      auditNotesParts.push(`prevQty=${previousQty}→${newQuantity}`);
+    }
+
     await prisma.materialIssueHistory.create({
       data: {
         issueId: id,
-        action: 'EDITED',
+        action,
         jobId: existingIssue.jobId,
         materialId: existingIssue.materialId,
         materialName: existingIssue.material.name,
         materialSku: existingIssue.material.sku,
         quantity: newQuantity,
         previousQty: previousQty,
-        unitCost: existingIssue.unitCost,
+        unitCost: newUnitCost,
         totalCost: newTotalCost,
         rackId: existingIssue.rackId,
         rackCode: existingIssue.rack?.code || null,
-        notes: notes || existingIssue.notes,
-        reason: reason || 'Quantity updated',
+        notes: auditNotesParts.join(' | ') || null,
+        reason: String(reason).trim(),
         performedById: userId,
         companyId
       }
     });
 
-    // Update the issue
     const updatedIssue = await prisma.materialIssue.update({
       where: { id },
       data: {
         quantity: newQuantity,
+        unitCost: newUnitCost,
         totalCost: newTotalCost,
-        notes: notes || existingIssue.notes
+        notes: notes !== undefined ? (notes || null) : existingIssue.notes
       },
       include: {
         material: true,
-        rack: true
+        rack: true,
+        returns: true
       }
     });
 
-    res.json(updatedIssue);
+    res.json({
+      ...updatedIssue,
+      _meta: {
+        qtyChanged,
+        priceChanged,
+        stockAdjusted: qtyChanged,
+        previousQty,
+        previousUnitCost,
+        action
+      }
+    });
   } catch (error) {
     console.error("Error updating material issue:", error);
     res.status(500).json({ error: "Failed to update material issue" });

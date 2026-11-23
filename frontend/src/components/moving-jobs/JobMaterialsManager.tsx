@@ -92,9 +92,12 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
   const [editingIssue, setEditingIssue] = useState<IssuedMaterial | null>(null);
   const [editForm, setEditForm] = useState({
     quantity: 0,
+    unitCost: 0,
     notes: '',
     reason: ''
   });
+  const [userRole, setUserRole] = useState<string>('');
+  const isAdmin = userRole === 'ADMIN';
 
   // Delete Material State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -132,6 +135,15 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const userData = JSON.parse(userStr);
+        setUserRole(userData.role || '');
+      }
+    } catch {
+      setUserRole('');
+    }
     loadData();
   }, [jobId]);
 
@@ -437,31 +449,63 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
   };
 
   const getTotalIssued = () => {
-    return issuedMaterials.reduce((sum, item) => sum + item.totalCost, 0);
+    // After return: cost = used × unitCost; before return: issued totalCost
+    return issuedMaterials.reduce((sum, item) => {
+      const ret = item.returns?.[0];
+      if (ret && ret.quantityUsed != null) {
+        return sum + (Number(ret.quantityUsed) * (item.unitCost || 0));
+      }
+      if (ret) {
+        const used = Math.max(0, (item.quantity || 0) - (ret.quantityGood || 0) - (ret.quantityDamaged || 0));
+        return sum + used * (item.unitCost || 0);
+      }
+      return sum + (item.totalCost || 0);
+    }, 0);
   };
 
   const getPendingReturns = () => {
     return issuedMaterials.filter(item => !item.returns || item.returns.length === 0).length;
   };
 
-  // Open Edit Form
+  // Open Edit Form — admin can open even after return (price fix); qty locked if returned
   const openEditForm = (issue: IssuedMaterial) => {
     setEditingIssue(issue);
     setEditForm({
       quantity: issue.quantity,
+      unitCost: issue.unitCost,
       notes: issue.notes || '',
       reason: ''
     });
     setShowEditForm(true);
   };
 
-  // Handle Edit Material Issue
+  // Handle Edit Material Issue (qty and/or admin unit price)
   const handleEditIssue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingIssue) return;
+    if (!editForm.reason.trim()) {
+      alert('Reason required — audit log me save hoga');
+      return;
+    }
 
     setLoading(true);
     const token = localStorage.getItem('authToken');
+    const hasReturns = !!(editingIssue.returns && editingIssue.returns.length > 0);
+
+    const body: Record<string, unknown> = {
+      notes: editForm.notes,
+      reason: editForm.reason.trim()
+    };
+
+    // Qty only if not returned
+    if (!hasReturns) {
+      body.quantity = editForm.quantity;
+    }
+
+    // Price only admin
+    if (isAdmin) {
+      body.unitCost = editForm.unitCost;
+    }
 
     try {
       const response = await fetch(`/api/materials/issues/${editingIssue.id}`, {
@@ -470,15 +514,15 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          quantity: editForm.quantity,
-          notes: editForm.notes,
-          reason: editForm.reason
-        })
+        body: JSON.stringify(body)
       });
 
       if (response.ok) {
-        alert('Material issue updated successfully!');
+        const data = await response.json();
+        const bits: string[] = [];
+        if (data._meta?.qtyChanged) bits.push('qty updated (stock adjusted)');
+        if (data._meta?.priceChanged) bits.push('price updated');
+        alert(bits.length ? `Saved: ${bits.join(', ')}. Audit logged.` : 'Material issue updated!');
         setShowEditForm(false);
         setEditingIssue(null);
         loadData();
@@ -750,24 +794,25 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        {/* Edit/Delete only if not returned */}
-                        {(!issue.returns || issue.returns.length === 0) && (
-                          <>
-                            <button
-                              onClick={() => openEditForm(issue)}
-                              className="text-blue-600 hover:text-blue-800 p-1"
-                              title="Edit Issue"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => openDeleteConfirm(issue)}
-                              className="text-red-600 hover:text-red-800 p-1"
-                              title="Delete Issue"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
+                        {/* Edit: always for admin (price); qty only if not returned. Manager: only if not returned */}
+                        {((!issue.returns || issue.returns.length === 0) || isAdmin) && (
+                          <button
+                            onClick={() => openEditForm(issue)}
+                            className="text-blue-600 hover:text-blue-800 p-1"
+                            title={isAdmin ? 'Edit qty / unit price (Admin)' : 'Edit Issue'}
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {/* Delete: only if not returned (stock restore) */}
+                        {(!issue.returns || issue.returns.length === 0) && isAdmin && (
+                          <button
+                            onClick={() => openDeleteConfirm(issue)}
+                            className="text-red-600 hover:text-red-800 p-1"
+                            title="Delete Issue"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         )}
                         {/* Record Return - only for completed jobs */}
                         {jobStatus === 'COMPLETED' && (
@@ -792,52 +837,84 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
       {/* Edit Material Issue Modal */}
       {showEditForm && editingIssue && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full border border-slate-200">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold">✏️ Edit Material Issue</h3>
+              <h3 className="text-lg font-bold text-slate-800">Edit Material Issue</h3>
               <button onClick={() => setShowEditForm(false)}>
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="bg-blue-50 p-4 rounded mb-4">
-              <p className="font-medium">{editingIssue.material.name}</p>
-              <p className="text-sm text-gray-600">SKU: {editingIssue.material.sku}</p>
-              <p className="text-sm text-gray-600">Current Qty: {editingIssue.quantity} {editingIssue.material.unit}</p>
+            <div className="bg-slate-50 border border-slate-200 p-4 rounded mb-4">
+              <p className="font-medium text-slate-800">{editingIssue.material.name}</p>
+              <p className="text-sm text-slate-500">SKU: {editingIssue.material.sku}</p>
+              <p className="text-sm text-slate-500">
+                Current: {editingIssue.quantity} {editingIssue.material.unit} @ {editingIssue.unitCost.toFixed(3)} KWD
+              </p>
+              {editingIssue.returns && editingIssue.returns.length > 0 && (
+                <p className="text-xs text-amber-700 mt-2">
+                  Already returned — quantity locked. Admin can still fix unit price.
+                </p>
+              )}
             </div>
 
             <form onSubmit={handleEditIssue} className="space-y-4 w-full">
               <div>
-                <label className="block text-sm font-medium mb-1">New Quantity *</label>
+                <label className="block text-sm font-medium mb-1 text-slate-700">Quantity *</label>
                 <input
                   type="number"
                   required
                   min="1"
+                  disabled={!!(editingIssue.returns && editingIssue.returns.length > 0)}
                   value={editForm.quantity}
                   onChange={(e) => setEditForm({ ...editForm, quantity: parseInt(e.target.value) || 0 })}
-                  className="w-full border rounded px-3 py-2"
+                  className="w-full border border-slate-200 rounded px-3 py-2 disabled:bg-slate-100 disabled:text-slate-500"
                 />
+                {!(editingIssue.returns && editingIssue.returns.length > 0) && (
+                  <p className="text-xs text-slate-500 mt-1">Qty change will adjust warehouse stock automatically.</p>
+                )}
               </div>
 
+              {isAdmin && (
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-slate-700">Unit Cost (KWD) — Admin *</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.001"
+                    value={editForm.unitCost}
+                    onChange={(e) => setEditForm({ ...editForm, unitCost: parseFloat(e.target.value) || 0 })}
+                    className="w-full border border-slate-200 rounded px-3 py-2"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    New total (issued): {(editForm.quantity * editForm.unitCost).toFixed(3)} KWD
+                    {editingIssue.returns?.[0]?.quantityUsed != null && (
+                      <> · used cost: {(Number(editingIssue.returns[0].quantityUsed) * editForm.unitCost).toFixed(3)} KWD</>
+                    )}
+                  </p>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium mb-1">Notes</label>
+                <label className="block text-sm font-medium mb-1 text-slate-700">Notes</label>
                 <input
                   type="text"
                   value={editForm.notes}
                   onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
+                  className="w-full border border-slate-200 rounded px-3 py-2"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Reason for Change *</label>
+                <label className="block text-sm font-medium mb-1 text-slate-700">Reason for Change * (audit)</label>
                 <input
                   type="text"
                   required
                   value={editForm.reason}
                   onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
-                  placeholder="e.g., Correction, quantity adjustment..."
+                  className="w-full border border-slate-200 rounded px-3 py-2"
+                  placeholder="e.g., Wrong unit price (roll vs meter), qty correction..."
                 />
               </div>
 
@@ -845,14 +922,14 @@ const JobMaterialsManager: React.FC<JobMaterialsManagerProps> = ({ jobId, jobSta
                 <button
                   type="button"
                   onClick={() => setShowEditForm(false)}
-                  className="w-full sm:w-auto flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300"
+                  className="w-full sm:w-auto flex-1 bg-slate-100 text-slate-800 border border-slate-200 px-4 py-2 rounded hover:bg-slate-200"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full sm:w-auto flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                  disabled={loading || !editForm.reason.trim()}
+                  className="w-full sm:w-auto flex-1 bg-slate-800 text-white px-4 py-2 rounded hover:bg-slate-900 disabled:bg-slate-400"
                 >
                   {loading ? 'Saving...' : 'Save Changes'}
                 </button>

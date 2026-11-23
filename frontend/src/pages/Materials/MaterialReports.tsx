@@ -719,7 +719,7 @@ const MaterialReports: React.FC = () => {
                       <tr
                         key={item.id}
                         className={`
-                        ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'bg-red-50' : (item.action === 'EDITED' || item.action === 'RETURN_EDITED') ? 'bg-yellow-50' : 'bg-green-50'}
+                        ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'bg-red-50' : (item.action === 'EDITED' || item.action === 'RETURN_EDITED' || item.action === 'PRICE_EDITED') ? 'bg-yellow-50' : 'bg-green-50'}
                         ${item.jobId ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}
                       `}
                         onClick={() => item.jobId && window.open(`/jobs/${item.jobId}`, '_blank')}
@@ -730,11 +730,11 @@ const MaterialReports: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${(item.action === 'DELETED' || item.action === 'RETURN_DELETED') ? 'bg-red-100 text-red-700' :
-                            (item.action === 'EDITED' || item.action === 'RETURN_EDITED') ? 'bg-yellow-100 text-yellow-700' :
+                            (item.action === 'EDITED' || item.action === 'RETURN_EDITED' || item.action === 'PRICE_EDITED') ? 'bg-yellow-100 text-yellow-700' :
                               'bg-green-100 text-green-700'
                             }`}>
                             {(item.action === 'DELETED' || item.action === 'RETURN_DELETED') && <Trash2 className="w-3 h-3" />}
-                            {(item.action === 'EDITED' || item.action === 'RETURN_EDITED') && <Edit2 className="w-3 h-3" />}
+                            {(item.action === 'EDITED' || item.action === 'RETURN_EDITED' || item.action === 'PRICE_EDITED') && <Edit2 className="w-3 h-3" />}
                             {item.action === 'CREATED' && <ArrowUpCircle className="w-3 h-3" />}
                             {item.kind === 'purchase' ? `PURCHASE ${item.action}` : item.action.replace('_', ' ')}
                           </span>
@@ -765,9 +765,17 @@ const MaterialReports: React.FC = () => {
                               {item.quantity}
                             </span>
                           )}
+                          {item.action === 'PRICE_EDITED' && (
+                            <div className="text-xs text-yellow-700 mt-0.5">@ {Number(item.unitCost || 0).toFixed(3)} KWD</div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right text-sm text-gray-600">
                           KWD {item.totalCost?.toFixed(2) || '0.00'}
+                          {item.notes && String(item.notes).includes('prevUnitCost=') && (
+                            <div className="text-xs text-slate-500 truncate max-w-[8rem] ml-auto" title={item.notes}>
+                              {String(item.notes).split('prevUnitCost=')[1]?.split('|')[0]?.trim()}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
                           {item.reason || '-'}
