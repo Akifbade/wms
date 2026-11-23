@@ -277,7 +277,7 @@ const MaterialReports: React.FC = () => {
           stmt.totals.totalReturned,
           stmt.totals.totalDamaged,
           stmt.totals.closingBalance,
-          stmt.material.unitCost.toFixed(2),
+          stmt.material.unitCost.toFixed(3),
           stmt.totals.totalValue.toFixed(2)
         ].join(','));
       });
@@ -346,7 +346,7 @@ const MaterialReports: React.FC = () => {
           `-${stmt.totals.totalIssued}`,
           `+${stmt.totals.totalReturned}`,
           `-${stmt.totals.totalDamaged}`,
-          `${stmt.material.unitCost.toFixed(2)}`,
+          `${stmt.material.unitCost.toFixed(3)}`,
           `${stmt.totals.totalValue.toFixed(2)}`
         ]);
 
@@ -912,7 +912,7 @@ const MaterialReports: React.FC = () => {
                             <td className="px-4 py-3 text-right font-semibold text-red-600 bg-red-50">
                               {stmt.totals.totalDamaged > 0 ? `-${stmt.totals.totalDamaged}` : '-'}
                             </td>
-                            <td className="px-4 py-3 text-right text-sm">{stmt.material.unitCost.toFixed(2)} KWD</td>
+                            <td className="px-4 py-3 text-right text-sm">{stmt.material.unitCost.toFixed(3)} KWD</td>
                             <td className="px-4 py-3 text-right font-semibold">{stmt.totals.totalValue.toFixed(2)} KWD</td>
                             <td className="px-4 py-3 text-center print:hidden">
                               <button
