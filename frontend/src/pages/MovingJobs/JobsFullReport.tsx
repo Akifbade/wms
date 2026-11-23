@@ -813,17 +813,25 @@ const JobsFullReport: React.FC = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
                   {[
                     { label: 'Opening', value: tally.tally.openingStock },
-                    { label: 'Purchased', value: tally.tally.purchased },
+                    {
+                      label: 'Purchased',
+                      value: tally.tally.purchased,
+                      sub:
+                        tally.tally.purchasedDirect || tally.tally.purchasedPO
+                          ? `D ${tally.tally.purchasedDirect || 0} · PO ${tally.tally.purchasedPO || 0}`
+                          : null,
+                    },
                     { label: 'Issued', value: tally.tally.issued },
                     { label: 'Used', value: tally.tally.used },
                     { label: 'Returned', value: tally.tally.returnedGood },
                     { label: 'Damaged', value: tally.tally.damaged },
                     { label: 'Jobs', value: tally.tally.jobCount },
                     { label: 'Usage cost', value: money(tally.tally.usageCost) },
-                  ].map((c) => (
+                  ].map((c: any) => (
                     <div key={c.label} className="bg-white border border-slate-200 rounded-xl px-3 py-3">
                       <div className="text-[10px] uppercase tracking-wide text-slate-400">{c.label}</div>
                       <div className="mt-1 text-base font-semibold text-slate-900 tabular-nums">{c.value}</div>
+                      {c.sub && <div className="text-[10px] text-slate-500 mt-0.5">{c.sub}</div>}
                     </div>
                   ))}
                 </div>
@@ -832,7 +840,14 @@ const JobsFullReport: React.FC = () => {
                   {(
                     [
                       { id: 'jobs', label: `Where used (${tally.jobUsage?.length || 0})` },
-                      { id: 'purchases', label: `Purchases (${tally.purchases?.length || 0})` },
+                      {
+                        id: 'purchases',
+                        label: `Purchases (${tally.purchases?.length || 0}${
+                          tally.tally.purchaseCountAllTime
+                            ? ` / all ${tally.tally.purchaseCountAllTime}`
+                            : ''
+                        })`,
+                      },
                       { id: 'ledger', label: `Full ledger (${tally.ledger?.length || 0})` },
                     ] as const
                   ).map((t) => (
@@ -910,53 +925,112 @@ const JobsFullReport: React.FC = () => {
                 )}
 
                 {tallySub === 'purchases' && (
-                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                    {(tally.purchases || []).length === 0 ? (
-                      <div className="px-4 py-10 text-center text-sm text-slate-500">
-                        No purchases in this range.
+                  <div className="space-y-3">
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-600">
+                      <div className="font-medium text-slate-800 mb-1">Two purchase types (both counted)</div>
+                      <div>
+                        <span className="inline-block px-2 py-0.5 rounded-full border border-slate-200 bg-white mr-1">
+                          Direct Stock Entry
+                        </span>
+                        Materials → Add Stock
+                        <span className="mx-2 text-slate-300">|</span>
+                        <span className="inline-block px-2 py-0.5 rounded-full border border-slate-200 bg-white mr-1">
+                          Purchase Order
+                        </span>
+                        PO received into warehouse
                       </div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm">
-                          <thead className="bg-slate-50 text-slate-500 text-xs">
-                            <tr>
-                              <th className="text-left font-medium px-4 py-3">Date</th>
-                              <th className="text-left font-medium px-3 py-3">Reference</th>
-                              <th className="text-left font-medium px-3 py-3">Vendor</th>
-                              <th className="text-right font-medium px-3 py-3">Qty</th>
-                              <th className="text-right font-medium px-3 py-3">Unit</th>
-                              <th className="text-right font-medium px-4 py-3">Total</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {tally.purchases.map((p: any) => (
-                              <tr key={p.id}>
-                                <td className="px-4 py-2">{fmtDate(p.date)}</td>
-                                <td className="px-3 py-2 font-medium">{p.reference}</td>
-                                <td className="px-3 py-2">{p.vendor}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{p.quantity}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{Number(p.unitCost).toFixed(3)}</td>
-                                <td className="text-right px-4 py-2 tabular-nums font-medium">
-                                  {Number(p.totalCost).toFixed(3)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="bg-slate-50 font-semibold">
-                              <td className="px-4 py-2" colSpan={3}>
-                                Period purchases
-                              </td>
-                              <td className="text-right px-3 py-2 tabular-nums">{tally.tally.purchased}</td>
-                              <td />
-                              <td className="text-right px-4 py-2 tabular-nums">
-                                {money(tally.tally.purchasedCost)}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    )}
+                    </div>
+
+                    {(() => {
+                      const periodRows = tally.purchases || [];
+                      const allRows = tally.purchasesAllTime || [];
+                      const showAllNote = periodRows.length === 0 && allRows.length > 0;
+                      const rows = showAllNote ? allRows : periodRows;
+
+                      const renderTable = (list: any[], footerLabel: string, footerQty: number, footerCost: number) => (
+                        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                              <thead className="bg-slate-50 text-slate-500 text-xs">
+                                <tr>
+                                  <th className="text-left font-medium px-4 py-3">Date</th>
+                                  <th className="text-left font-medium px-3 py-3">Type</th>
+                                  <th className="text-left font-medium px-3 py-3">Reference</th>
+                                  <th className="text-left font-medium px-3 py-3">Vendor</th>
+                                  <th className="text-right font-medium px-3 py-3">Qty</th>
+                                  <th className="text-right font-medium px-3 py-3">Unit</th>
+                                  <th className="text-right font-medium px-4 py-3">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {list.map((p: any) => (
+                                  <tr key={`${p.source}-${p.id}`}>
+                                    <td className="px-4 py-2 whitespace-nowrap">{fmtDate(p.date)}</td>
+                                    <td className="px-3 py-2">
+                                      <span
+                                        className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                                          p.source === 'direct_stock'
+                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                            : 'border-sky-200 bg-sky-50 text-sky-800'
+                                        }`}
+                                      >
+                                        {p.typeLabel || (p.source === 'direct_stock' ? 'Direct Stock Entry' : 'Purchase Order')}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2 font-medium">{p.reference}</td>
+                                    <td className="px-3 py-2">{p.vendor}</td>
+                                    <td className="text-right px-3 py-2 tabular-nums">{p.quantity}</td>
+                                    <td className="text-right px-3 py-2 tabular-nums">{Number(p.unitCost).toFixed(3)}</td>
+                                    <td className="text-right px-4 py-2 tabular-nums font-medium">
+                                      {Number(p.totalCost).toFixed(3)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="bg-slate-50 font-semibold">
+                                  <td className="px-4 py-2" colSpan={4}>
+                                    {footerLabel}
+                                  </td>
+                                  <td className="text-right px-3 py-2 tabular-nums">{footerQty}</td>
+                                  <td />
+                                  <td className="text-right px-4 py-2 tabular-nums">{money(footerCost)}</td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </div>
+                      );
+
+                      if (rows.length === 0) {
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-xl px-4 py-10 text-center text-sm text-slate-500">
+                            No purchase history found for this material (neither Direct Stock Entry nor Purchase Order).
+                          </div>
+                        );
+                      }
+
+                      if (showAllNote) {
+                        const allQty = allRows.reduce((s: number, p: any) => s + (p.quantity || 0), 0);
+                        const allCost = allRows.reduce((s: number, p: any) => s + (p.totalCost || 0), 0);
+                        return (
+                          <>
+                            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                              No purchases in the selected date range. Showing full purchase history instead (
+                              {allRows.length} entries · Direct + PO).
+                            </div>
+                            {renderTable(allRows, 'All-time purchases (Direct + PO)', allQty, allCost)}
+                          </>
+                        );
+                      }
+
+                      return renderTable(
+                        periodRows,
+                        `Period purchases (Direct ${tally.tally.purchasedDirect || 0} + PO ${tally.tally.purchasedPO || 0})`,
+                        tally.tally.purchased,
+                        tally.tally.purchasedCost
+                      );
+                    })()}
                   </div>
                 )}
 

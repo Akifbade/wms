@@ -3710,7 +3710,9 @@ router.get("/reports/tally", authenticateToken as any, async (req: AuthRequest, 
       return new Date(d).getTime() < rangeStart.getTime();
     };
 
-    // Purchases: PO items (RECEIVED) + stock batches
+    // Purchases: TWO real paths in this system
+    // 1) Direct stock entry → stock_batches (Materials → Add Stock)
+    // 2) Purchase orders → purchase_order_items when PO is RECEIVED
     const poItems = await prisma.purchaseOrderItem.findMany({
       where: { materialId, companyId },
       include: {
@@ -3722,27 +3724,45 @@ router.get("/reports/tally", authenticateToken as any, async (req: AuthRequest, 
       include: { vendor: true },
     });
 
-    const purchases: any[] = [];
+    const purchasesPeriod: any[] = [];
+    const purchasesAll: any[] = [];
     let purchasedQty = 0;
     let purchasedCost = 0;
     let priorPurchased = 0;
 
     for (const item of poItems) {
-      if (item.purchaseOrder.status !== "RECEIVED") continue;
-      const d = item.purchaseOrder.orderDate || item.purchaseOrder.receivedDate;
+      // Count stock-in only when goods are received
+      const st = String(item.purchaseOrder.status || "").toUpperCase();
+      if (st !== "RECEIVED") continue;
+
+      // Prefer receivedDate for "when stock actually came in"
+      const d = item.purchaseOrder.receivedDate || item.purchaseOrder.orderDate;
+      // Prefer receivedQuantity when set, else ordered quantity
+      const qty =
+        item.receivedQuantity && item.receivedQuantity > 0
+          ? item.receivedQuantity
+          : item.quantity;
+      if (!qty) continue;
+
       const row = {
         id: item.id,
         source: "purchase_order",
+        typeLabel: "Purchase Order",
         date: d,
+        orderDate: item.purchaseOrder.orderDate,
+        receivedDate: item.purchaseOrder.receivedDate,
         reference: item.purchaseOrder.orderNumber,
         vendor: item.purchaseOrder.vendorName || item.purchaseOrder.vendor?.name || "Unknown",
-        quantity: item.quantity,
+        quantity: qty,
         unitCost: item.unitCost || 0,
-        totalCost: item.totalCost || item.quantity * (item.unitCost || 0),
+        totalCost: item.totalCost || qty * (item.unitCost || 0),
+        status: item.purchaseOrder.status,
+        inPeriod: inRange(d),
       };
+      purchasesAll.push(row);
       if (beforeRange(d)) priorPurchased += row.quantity;
-      if (inRange(d)) {
-        purchases.push(row);
+      if (row.inPeriod) {
+        purchasesPeriod.push(row);
         purchasedQty += row.quantity;
         purchasedCost += row.totalCost;
       }
@@ -3752,22 +3772,33 @@ router.get("/reports/tally", authenticateToken as any, async (req: AuthRequest, 
       const d = batch.purchaseDate;
       const row = {
         id: batch.id,
-        source: "stock_batch",
+        source: "direct_stock",
+        typeLabel: "Direct Stock Entry",
         date: d,
-        reference: batch.batchNumber || batch.purchaseOrder || "BATCH",
-        vendor: batch.vendorName || batch.vendor?.name || "Direct",
+        orderDate: d,
+        receivedDate: d,
+        reference: batch.batchNumber || batch.purchaseOrder || "DIRECT",
+        vendor: batch.vendorName || batch.vendor?.name || "Direct Entry",
         quantity: batch.quantityPurchased,
         unitCost: batch.unitCost || 0,
         totalCost: batch.quantityPurchased * (batch.unitCost || 0),
+        status: "DIRECT",
+        notes: batch.notes || null,
+        inPeriod: inRange(d),
       };
+      purchasesAll.push(row);
       if (beforeRange(d)) priorPurchased += row.quantity;
-      if (inRange(d)) {
-        purchases.push(row);
+      if (row.inPeriod) {
+        purchasesPeriod.push(row);
         purchasedQty += row.quantity;
         purchasedCost += row.totalCost;
       }
     }
-    purchases.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const byDateDesc = (a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime();
+    const byDateAsc = (a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime();
+    purchasesPeriod.sort(byDateAsc);
+    purchasesAll.sort(byDateDesc);
 
     // Issues with job + issuer + returns
     const issues = await prisma.materialIssue.findMany({
@@ -3910,11 +3941,11 @@ router.get("/reports/tally", authenticateToken as any, async (req: AuthRequest, 
       }
     }
 
-    for (const p of purchases) {
+    for (const p of purchasesPeriod) {
       ledger.push({
         date: p.date,
-        type: "PURCHASE",
-        description: `Purchase ${p.reference} — ${p.vendor}`,
+        type: p.source === "direct_stock" ? "DIRECT_PURCHASE" : "PO_PURCHASE",
+        description: `${p.typeLabel}: ${p.reference} — ${p.vendor}`,
         jobCode: null,
         jobId: null,
         stockIn: p.quantity,
@@ -3922,6 +3953,7 @@ router.get("/reports/tally", authenticateToken as any, async (req: AuthRequest, 
         unitCost: p.unitCost,
         person: p.vendor,
         reference: p.reference,
+        source: p.source,
       });
     }
 
@@ -3933,10 +3965,15 @@ router.get("/reports/tally", authenticateToken as any, async (req: AuthRequest, 
     const closingCalc = openingStock + purchasedQty - issuedQty + returnedQty;
     // Note: damaged is part of issued that didn't return; already reflected in issued - returned
 
+    const directPeriod = purchasesPeriod.filter((p) => p.source === "direct_stock");
+    const poPeriod = purchasesPeriod.filter((p) => p.source === "purchase_order");
+
     const tally = {
       openingStock,
       purchased: purchasedQty,
       purchasedCost,
+      purchasedDirect: directPeriod.reduce((s, p) => s + p.quantity, 0),
+      purchasedPO: poPeriod.reduce((s, p) => s + p.quantity, 0),
       issued: issuedQty,
       used: usedQty,
       returnedGood: returnedQty,
@@ -3945,7 +3982,8 @@ router.get("/reports/tally", authenticateToken as any, async (req: AuthRequest, 
       closingCalc,
       currentStock: material.totalQuantity,
       jobCount: jobUsage.length,
-      purchaseCount: purchases.length,
+      purchaseCount: purchasesPeriod.length,
+      purchaseCountAllTime: purchasesAll.length,
       equation: `Opening ${openingStock} + Purchased ${purchasedQty} − Issued ${issuedQty} + Returned ${returnedQty} ≈ ${closingCalc} (system stock now: ${material.totalQuantity})`,
     };
 
@@ -3967,7 +4005,14 @@ router.get("/reports/tally", authenticateToken as any, async (req: AuthRequest, 
         endDate: endDate || null,
       },
       tally,
-      purchases,
+      // Period purchases (what the date filter asked for)
+      purchases: purchasesPeriod,
+      // Full history so UI can still show when period is empty (both Direct + PO)
+      purchasesAllTime: purchasesAll,
+      purchaseSources: {
+        directStock: "Materials → Add Stock (Direct Entry) → stock_batches",
+        purchaseOrder: "Purchase Orders (RECEIVED) → purchase_order_items",
+      },
       jobUsage,
       ledger,
     });
