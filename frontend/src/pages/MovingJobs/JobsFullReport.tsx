@@ -137,11 +137,14 @@ const JobsFullReport: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [tallyMaterialId, setTallyMaterialId] = useState('');
+  const [tallyMaterialId, setTallyMaterialId] = useState(''); // '' = All materials
   const [tally, setTally] = useState<any>(null);
+  const [tallyAll, setTallyAll] = useState<any>(null);
   const [tallyLoading, setTallyLoading] = useState(false);
   const [tallyError, setTallyError] = useState('');
   const [tallySub, setTallySub] = useState<'jobs' | 'purchases' | 'ledger'>('jobs');
+  const [tallySearch, setTallySearch] = useState('');
+  const [tallyOnlyActive, setTallyOnlyActive] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -202,28 +205,42 @@ const JobsFullReport: React.FC = () => {
   }, [startDate, endDate, status, search, materialId]);
 
   const loadTally = async (mid?: string) => {
-    const id = mid || tallyMaterialId;
-    if (!id) {
-      setTally(null);
-      setTallyError('Select a material to see full tally.');
-      return;
-    }
+    const id = mid !== undefined ? mid : tallyMaterialId;
     setTallyLoading(true);
     setTallyError('');
     try {
-      const params = new URLSearchParams({ materialId: id });
-      if (startDate) params.set('startDate', startDate);
-      if (endDate) params.set('endDate', endDate);
-      const res = await apiFetch(`/materials/reports/tally?${params.toString()}`, {
-        headers: authHeaders(),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Failed (${res.status})`);
+      if (!id) {
+        // All materials summary
+        const params = new URLSearchParams();
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+        if (tallySearch.trim()) params.set('search', tallySearch.trim());
+        const res = await apiFetch(`/materials/reports/tally-all?${params.toString()}`, {
+          headers: authHeaders(),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Failed (${res.status})`);
+        }
+        setTallyAll(await res.json());
+        setTally(null);
+      } else {
+        const params = new URLSearchParams({ materialId: id });
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+        const res = await apiFetch(`/materials/reports/tally?${params.toString()}`, {
+          headers: authHeaders(),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Failed (${res.status})`);
+        }
+        setTally(await res.json());
+        setTallyAll(null);
       }
-      setTally(await res.json());
     } catch (e: any) {
       setTally(null);
+      setTallyAll(null);
       setTallyError(e.message || 'Tally load failed');
     } finally {
       setTallyLoading(false);
@@ -231,20 +248,21 @@ const JobsFullReport: React.FC = () => {
   };
 
   useEffect(() => {
-    if (tab === 'tally' && tallyMaterialId) {
+    if (tab === 'tally') {
       loadTally(tallyMaterialId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, tallyMaterialId, startDate, endDate]);
 
-  // Auto-pick first material if opening tally empty
-  useEffect(() => {
-    if (tab === 'tally' && !tallyMaterialId && materials.length) {
-      // Prefer MEDIUM CARTON if present
-      const medium = materials.find((m) => /medium/i.test(m.name));
-      setTallyMaterialId(medium?.id || materials[0].id);
-    }
-  }, [tab, tallyMaterialId, materials]);
+  const openSingleTally = (mid: string) => {
+    setTallyMaterialId(mid);
+    setTallySub('jobs');
+  };
+
+  const backToAllTally = () => {
+    setTallyMaterialId('');
+    setTally(null);
+  };
 
   const setPreset = (preset: 'prev' | 'this' | '30' | 'all') => {
     const now = new Date();
@@ -740,19 +758,19 @@ const JobsFullReport: React.FC = () => {
           </div>
         )}
 
-        {/* MATERIAL TALLY TAB — full single-material flow */}
+        {/* MATERIAL TALLY TAB — all materials + single drill-down */}
         {tab === 'tally' && (
           <div className="space-y-4">
             <div className="bg-white border border-slate-200 rounded-xl p-4">
               <div className="flex flex-col sm:flex-row sm:items-end gap-3">
                 <div className="flex-1">
-                  <label className="block text-xs text-slate-500 mb-1">Material (example: Medium Carton)</label>
+                  <label className="block text-xs text-slate-500 mb-1">Material</label>
                   <select
                     value={tallyMaterialId}
                     onChange={(e) => setTallyMaterialId(e.target.value)}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
                   >
-                    <option value="">Select material…</option>
+                    <option value="">All materials</option>
                     {materials.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.name}
@@ -761,17 +779,33 @@ const JobsFullReport: React.FC = () => {
                     ))}
                   </select>
                 </div>
+                {!tallyMaterialId && (
+                  <div className="flex-1">
+                    <label className="block text-xs text-slate-500 mb-1">Search name / SKU</label>
+                    <input
+                      value={tallySearch}
+                      onChange={(e) => setTallySearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') loadTally('');
+                      }}
+                      placeholder="Filter materials…"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => loadTally()}
-                  disabled={!tallyMaterialId || tallyLoading}
+                  disabled={tallyLoading}
                   className="px-4 py-2 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40"
                 >
-                  {tallyLoading ? 'Loading…' : 'Load full tally'}
+                  {tallyLoading ? 'Loading…' : tallyMaterialId ? 'Load full tally' : 'Load all materials'}
                 </button>
               </div>
               <p className="text-xs text-slate-500 mt-2">
-                Shows purchases, where it was used (job / client / address), who issued it, used vs returned, and stock remaining for the date range above.
+                {tallyMaterialId
+                  ? 'Full detail for one material: purchases (Direct + PO), where used, who, stock remaining.'
+                  : 'All materials overview for the date range. Click a row for full detail.'}
               </p>
             </div>
 
@@ -781,18 +815,173 @@ const JobsFullReport: React.FC = () => {
               </div>
             )}
 
-            {tallyLoading && !tally && (
+            {tallyLoading && !tally && !tallyAll && (
               <div className="py-12 text-center text-sm text-slate-500">Loading material tally…</div>
             )}
 
+            {/* ALL MATERIALS VIEW */}
+            {!tallyMaterialId && tallyAll && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                  {[
+                    { label: 'Materials', value: tallyAll.totals.materialCount },
+                    { label: 'With activity', value: tallyAll.totals.activeMaterials },
+                    {
+                      label: 'Purchased',
+                      value: tallyAll.totals.purchased,
+                      sub: `D ${tallyAll.totals.purchasedDirect || 0} · PO ${tallyAll.totals.purchasedPO || 0}`,
+                    },
+                    { label: 'Issued', value: tallyAll.totals.issued },
+                    { label: 'Used', value: tallyAll.totals.used },
+                    { label: 'Returned', value: tallyAll.totals.returnedGood },
+                    { label: 'Damaged', value: tallyAll.totals.damaged },
+                    { label: 'Usage cost', value: money(tallyAll.totals.usageCost) },
+                  ].map((c: any) => (
+                    <div key={c.label} className="bg-white border border-slate-200 rounded-xl px-3 py-3">
+                      <div className="text-[10px] uppercase tracking-wide text-slate-400">{c.label}</div>
+                      <div className="mt-1 text-base font-semibold text-slate-900 tabular-nums">{c.value}</div>
+                      {c.sub && <div className="text-[10px] text-slate-500 mt-0.5">{c.sub}</div>}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+                  <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={tallyOnlyActive}
+                      onChange={(e) => setTallyOnlyActive(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    Only materials with activity in this period
+                  </label>
+                  <div className="text-xs text-slate-500">
+                    Click any material for full tally (purchases, jobs, ledger)
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  {(() => {
+                    const list = (tallyAll.materials || []).filter((m: any) =>
+                      tallyOnlyActive ? m.hasActivity : true
+                    );
+                    if (!list.length) {
+                      return (
+                        <div className="px-4 py-10 text-center text-sm text-slate-500">
+                          No materials with activity in this date range.
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-slate-50 text-slate-500 text-xs">
+                            <tr>
+                              <th className="text-left font-medium px-4 py-3">Material</th>
+                              <th className="text-right font-medium px-3 py-3">Stock now</th>
+                              <th className="text-right font-medium px-3 py-3">Purchased</th>
+                              <th className="text-right font-medium px-3 py-3">Issued</th>
+                              <th className="text-right font-medium px-3 py-3">Used</th>
+                              <th className="text-right font-medium px-3 py-3">Returned</th>
+                              <th className="text-right font-medium px-3 py-3">Damaged</th>
+                              <th className="text-right font-medium px-3 py-3">Jobs</th>
+                              <th className="text-right font-medium px-4 py-3">Usage cost</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {list.map((m: any) => (
+                              <tr
+                                key={m.materialId}
+                                className="hover:bg-slate-50/80 cursor-pointer"
+                                onClick={() => openSingleTally(m.materialId)}
+                                title="Open full tally"
+                              >
+                                <td className="px-4 py-3">
+                                  <div className="font-medium text-slate-900 underline-offset-2 group-hover:underline">
+                                    {m.name}
+                                  </div>
+                                  <div className="text-xs text-slate-500">
+                                    {m.sku} · {m.unit}
+                                    {m.purchasedDirect || m.purchasedPO
+                                      ? ` · D ${m.purchasedDirect || 0} / PO ${m.purchasedPO || 0}`
+                                      : ''}
+                                  </div>
+                                </td>
+                                <td className="text-right px-3 py-3 tabular-nums">
+                                  <span
+                                    className={
+                                      m.currentStock <= (m.minStockLevel || 0)
+                                        ? 'text-rose-600 font-semibold'
+                                        : ''
+                                    }
+                                  >
+                                    {m.currentStock}
+                                  </span>
+                                </td>
+                                <td className="text-right px-3 py-3 tabular-nums">{m.purchased || '—'}</td>
+                                <td className="text-right px-3 py-3 tabular-nums">{m.issued || '—'}</td>
+                                <td className="text-right px-3 py-3 tabular-nums font-medium">{m.used || '—'}</td>
+                                <td className="text-right px-3 py-3 tabular-nums">{m.returnedGood || '—'}</td>
+                                <td className="text-right px-3 py-3 tabular-nums">{m.damaged || '—'}</td>
+                                <td className="text-right px-3 py-3 tabular-nums">{m.jobCount || '—'}</td>
+                                <td className="text-right px-4 py-3 tabular-nums font-medium">
+                                  {m.usageCost ? money(m.usageCost) : '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-slate-50 font-semibold text-sm">
+                              <td className="px-4 py-2">
+                                Totals ({list.length} materials)
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">—</td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {list.reduce((s: number, m: any) => s + (m.purchased || 0), 0)}
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {list.reduce((s: number, m: any) => s + (m.issued || 0), 0)}
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {list.reduce((s: number, m: any) => s + (m.used || 0), 0)}
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {list.reduce((s: number, m: any) => s + (m.returnedGood || 0), 0)}
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {list.reduce((s: number, m: any) => s + (m.damaged || 0), 0)}
+                              </td>
+                              <td className="text-right px-3 py-2">—</td>
+                              <td className="text-right px-4 py-2 tabular-nums">
+                                {money(list.reduce((s: number, m: any) => s + (m.usageCost || 0), 0))}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* SINGLE MATERIAL VIEW */}
             {tally && (
               <>
                 <div className="bg-white border border-slate-200 rounded-xl p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
+                      <button
+                        type="button"
+                        onClick={backToAllTally}
+                        className="text-xs text-slate-500 hover:text-slate-800 mb-1 print:hidden"
+                      >
+                        ← Back to all materials
+                      </button>
                       <h2 className="text-lg font-semibold text-slate-900">{tally.material.name}</h2>
                       <p className="text-sm text-slate-500">
-                        {tally.material.sku} · {tally.material.unit} · Unit cost {Number(tally.material.unitCost || 0).toFixed(3)} KWD
+                        {tally.material.sku} · {tally.material.unit} · Unit cost{' '}
+                        {Number(tally.material.unitCost || 0).toFixed(3)} KWD
                       </p>
                     </div>
                     <div className="text-right">
@@ -801,7 +990,9 @@ const JobsFullReport: React.FC = () => {
                         {tally.material.currentStock}
                       </div>
                       {tally.material.currentStock <= tally.material.minStockLevel && (
-                        <div className="text-xs text-rose-600 mt-0.5">At / below min ({tally.material.minStockLevel})</div>
+                        <div className="text-xs text-rose-600 mt-0.5">
+                          At / below min ({tally.material.minStockLevel})
+                        </div>
                       )}
                     </div>
                   </div>

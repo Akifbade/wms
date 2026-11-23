@@ -3656,6 +3656,260 @@ router.delete("/returns/:id", authenticateToken as any, authorizeRoles('ADMIN'),
 });
 
 /**
+ * GET /api/materials/reports/tally-all
+ * All-materials period summary (Direct + PO purchases, issues/used/returns, stock now)
+ * Query: startDate, endDate, search (optional name/sku)
+ */
+router.get("/reports/tally-all", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    const { startDate, endDate, search } = req.query as {
+      startDate?: string;
+      endDate?: string;
+      search?: string;
+    };
+
+    const rangeStart = startDate ? new Date(startDate) : null;
+    if (rangeStart) rangeStart.setHours(0, 0, 0, 0);
+    const rangeEnd = endDate ? new Date(endDate) : null;
+    if (rangeEnd) rangeEnd.setHours(23, 59, 59, 999);
+
+    const inRange = (d: Date | string | null | undefined) => {
+      if (!d) return !rangeStart && !rangeEnd;
+      const t = new Date(d).getTime();
+      if (rangeStart && t < rangeStart.getTime()) return false;
+      if (rangeEnd && t > rangeEnd.getTime()) return false;
+      return true;
+    };
+
+    const searchTrim = (search || "").trim();
+    const materials = await prisma.packingMaterial.findMany({
+      where: {
+        companyId,
+        ...(searchTrim
+          ? {
+              OR: [
+                { name: { contains: searchTrim } },
+                { sku: { contains: searchTrim } },
+              ],
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        unit: true,
+        category: true,
+        totalQuantity: true,
+        minStockLevel: true,
+        unitCost: true,
+        isActive: true,
+      },
+      orderBy: { name: "asc" },
+    });
+
+    type Agg = {
+      purchased: number;
+      purchasedDirect: number;
+      purchasedPO: number;
+      purchasedCost: number;
+      purchaseCount: number;
+      issued: number;
+      used: number;
+      returnedGood: number;
+      damaged: number;
+      usageCost: number;
+      jobIds: Set<string>;
+    };
+
+    const map = new Map<string, Agg>();
+    for (const m of materials) {
+      map.set(m.id, {
+        purchased: 0,
+        purchasedDirect: 0,
+        purchasedPO: 0,
+        purchasedCost: 0,
+        purchaseCount: 0,
+        issued: 0,
+        used: 0,
+        returnedGood: 0,
+        damaged: 0,
+        usageCost: 0,
+        jobIds: new Set(),
+      });
+    }
+
+    // Direct stock batches
+    const batches = await prisma.stockBatch.findMany({
+      where: { companyId },
+      select: {
+        materialId: true,
+        purchaseDate: true,
+        quantityPurchased: true,
+        unitCost: true,
+      },
+    });
+    for (const b of batches) {
+      const a = map.get(b.materialId);
+      if (!a) continue;
+      if (!inRange(b.purchaseDate)) continue;
+      a.purchased += b.quantityPurchased || 0;
+      a.purchasedDirect += b.quantityPurchased || 0;
+      a.purchasedCost += (b.quantityPurchased || 0) * (b.unitCost || 0);
+      a.purchaseCount += 1;
+    }
+
+    // Purchase orders (RECEIVED only)
+    const poItems = await prisma.purchaseOrderItem.findMany({
+      where: { companyId },
+      include: {
+        purchaseOrder: {
+          select: { status: true, receivedDate: true, orderDate: true },
+        },
+      },
+    });
+    for (const item of poItems) {
+      const a = map.get(item.materialId);
+      if (!a) continue;
+      if (String(item.purchaseOrder.status || "").toUpperCase() !== "RECEIVED") continue;
+      const d = item.purchaseOrder.receivedDate || item.purchaseOrder.orderDate;
+      if (!inRange(d)) continue;
+      const qty =
+        item.receivedQuantity && item.receivedQuantity > 0
+          ? item.receivedQuantity
+          : item.quantity;
+      if (!qty) continue;
+      a.purchased += qty;
+      a.purchasedPO += qty;
+      a.purchasedCost += item.totalCost || qty * (item.unitCost || 0);
+      a.purchaseCount += 1;
+    }
+
+    // Issues + returns
+    const issues = await prisma.materialIssue.findMany({
+      where: { companyId },
+      include: {
+        job: { select: { id: true, deletedAt: true } },
+        returns: {
+          select: {
+            quantityUsed: true,
+            quantityGood: true,
+            quantityDamaged: true,
+          },
+        },
+      },
+    });
+
+    for (const issue of issues) {
+      const a = map.get(issue.materialId);
+      if (!a) continue;
+      if (issue.job?.deletedAt) continue;
+      if (!inRange(issue.issuedAt)) continue;
+
+      const retUsed = issue.returns.reduce((s, r) => s + (r.quantityUsed || 0), 0);
+      const retGood = issue.returns.reduce((s, r) => s + (r.quantityGood || 0), 0);
+      const retDamaged = issue.returns.reduce((s, r) => s + (r.quantityDamaged || 0), 0);
+      const hasReturn = issue.returns.length > 0;
+      const used = hasReturn ? retUsed : Math.max(0, issue.quantity - retGood);
+      const lineCost = used * (issue.unitCost || 0);
+
+      a.issued += issue.quantity || 0;
+      a.used += used;
+      a.returnedGood += retGood;
+      a.damaged += retDamaged;
+      a.usageCost += lineCost;
+      const jid = issue.job?.id || issue.jobId;
+      if (jid) a.jobIds.add(jid);
+    }
+
+    const rows = materials.map((m) => {
+      const a = map.get(m.id)!;
+      return {
+        materialId: m.id,
+        sku: m.sku,
+        name: m.name,
+        unit: m.unit,
+        category: m.category,
+        isActive: m.isActive,
+        currentStock: m.totalQuantity,
+        minStockLevel: m.minStockLevel,
+        unitCost: m.unitCost || 0,
+        purchased: a.purchased,
+        purchasedDirect: a.purchasedDirect,
+        purchasedPO: a.purchasedPO,
+        purchasedCost: a.purchasedCost,
+        purchaseCount: a.purchaseCount,
+        issued: a.issued,
+        used: a.used,
+        returnedGood: a.returnedGood,
+        damaged: a.damaged,
+        usageCost: a.usageCost,
+        jobCount: a.jobIds.size,
+        hasActivity:
+          a.purchased > 0 ||
+          a.issued > 0 ||
+          a.used > 0 ||
+          a.returnedGood > 0 ||
+          a.damaged > 0,
+      };
+    });
+
+    // Active first, then materials with activity in period, then name
+    rows.sort((x, y) => {
+      if (y.hasActivity !== x.hasActivity) return y.hasActivity ? 1 : -1;
+      if (y.used !== x.used) return y.used - x.used;
+      return x.name.localeCompare(y.name);
+    });
+
+    const totals = rows.reduce(
+      (s, r) => {
+        s.purchased += r.purchased;
+        s.purchasedDirect += r.purchasedDirect;
+        s.purchasedPO += r.purchasedPO;
+        s.purchasedCost += r.purchasedCost;
+        s.issued += r.issued;
+        s.used += r.used;
+        s.returnedGood += r.returnedGood;
+        s.damaged += r.damaged;
+        s.usageCost += r.usageCost;
+        s.currentStock += r.currentStock;
+        if (r.hasActivity) s.activeMaterials += 1;
+        return s;
+      },
+      {
+        purchased: 0,
+        purchasedDirect: 0,
+        purchasedPO: 0,
+        purchasedCost: 0,
+        issued: 0,
+        used: 0,
+        returnedGood: 0,
+        damaged: 0,
+        usageCost: 0,
+        currentStock: 0,
+        activeMaterials: 0,
+      }
+    );
+
+    res.json({
+      period: {
+        startDate: startDate || null,
+        endDate: endDate || null,
+      },
+      totals: {
+        ...totals,
+        materialCount: rows.length,
+      },
+      materials: rows,
+    });
+  } catch (error) {
+    console.error("Error generating all-materials tally:", error);
+    res.status(500).json({ error: "Failed to generate all-materials tally" });
+  }
+});
+
+/**
  * GET /api/materials/reports/tally
  * Single-material full tally: stock, purchases, job usage (where/who), returns, ledger
  * Query: materialId (required), startDate, endDate
