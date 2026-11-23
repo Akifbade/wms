@@ -9,6 +9,7 @@ import { Shipments } from './pages/Shipments/Shipments';
 import ShipmentReport from './pages/ShipmentReport/ShipmentReport';
 import { Racks } from './pages/Racks/Racks';
 import { MovingJobs } from './pages/MovingJobs/MovingJobs';
+import JobsFullReport from './pages/MovingJobs/JobsFullReport';
 import { Settings } from './pages/Settings/Settings';
 import { Scanner } from './pages/Scanner/Scanner';
 import { Login } from './pages/Login/Login';
@@ -135,20 +136,25 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="moving-jobs" element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
-                  <MovingJobs />
-                </ProtectedRoute>
-              } />
-              <Route path="moving-jobs/:jobId" element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
-                  <MovingJobs />
-                </ProtectedRoute>
-              } />
-              <Route path="job-reports" element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
-                  <JobReportsDashboard />
-                </ProtectedRoute>
-              } />
+                              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                                <MovingJobs />
+                              </ProtectedRoute>
+                            } />
+                            <Route path="moving-jobs/:jobId" element={
+                              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                                <MovingJobs />
+                              </ProtectedRoute>
+                            } />
+                            <Route path="jobs-report" element={
+                              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                                <JobsFullReport />
+                              </ProtectedRoute>
+                            } />
+                            <Route path="job-reports" element={
+                              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                                <JobReportsDashboard />
+                              </ProtectedRoute>
+                            } />
               <Route path="approvals" element={
                 <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
                   <ApprovalManager />

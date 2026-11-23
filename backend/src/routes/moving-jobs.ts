@@ -136,6 +136,235 @@ router.get("/", authenticateToken as any, async (req: AuthRequest, res) => {
 });
 
 /**
+ * GET /api/moving-jobs/reports/full
+ * Full jobs + materials usage report with filters
+ * Query: startDate, endDate, status, search, materialId
+ * MUST stay above /:jobId
+ */
+router.get("/reports/full", authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { companyId } = req.user!;
+    const { startDate, endDate, status, search, materialId } = req.query as {
+      startDate?: string;
+      endDate?: string;
+      status?: string;
+      search?: string;
+      materialId?: string;
+    };
+
+    const where: any = {
+      companyId,
+      deletedAt: null,
+    };
+
+    if (startDate || endDate) {
+      where.jobDate = {};
+      if (startDate) {
+        const s = new Date(startDate);
+        s.setHours(0, 0, 0, 0);
+        where.jobDate.gte = s;
+      }
+      if (endDate) {
+        const e = new Date(endDate);
+        e.setHours(23, 59, 59, 999);
+        where.jobDate.lte = e;
+      }
+    }
+
+    if (status && status !== "all") {
+      const s = String(status).toLowerCase();
+      if (s === "scheduled") where.status = { in: ["SCHEDULED", "PLANNED"] };
+      else if (s === "inprogress" || s === "in_progress") where.status = "IN_PROGRESS";
+      else if (s === "completed") where.status = { in: ["COMPLETED", "CLOSED"] };
+      else if (s === "cancelled") where.status = "CANCELLED";
+      else if (s === "dispatched") where.status = "DISPATCHED";
+      else where.status = String(status).toUpperCase();
+    }
+
+    if (search && String(search).trim()) {
+      const q = String(search).trim();
+      where.OR = [
+        { jobCode: { contains: q } },
+        { clientName: { contains: q } },
+        { clientPhone: { contains: q } },
+        { jobTitle: { contains: q } },
+        { jobAddress: { contains: q } },
+        { dropoffAddress: { contains: q } },
+      ];
+    }
+
+    const jobs = await prisma.movingJob.findMany({
+      where,
+      include: {
+        materialIssues: {
+          include: {
+            material: {
+              select: {
+                id: true,
+                sku: true,
+                name: true,
+                unit: true,
+              },
+            },
+            returns: {
+              select: {
+                quantityUsed: true,
+                quantityGood: true,
+                quantityDamaged: true,
+              },
+            },
+          },
+          orderBy: { issuedAt: "asc" },
+        },
+        materialReturns: {
+          select: {
+            id: true,
+            quantityUsed: true,
+            quantityGood: true,
+            quantityDamaged: true,
+            physicalReportUrl: true,
+          },
+        },
+      },
+      orderBy: [{ jobDate: "desc" }, { createdAt: "desc" }],
+    });
+
+    let filteredJobs = jobs;
+    if (materialId) {
+      filteredJobs = jobs.filter((j: any) =>
+        j.materialIssues.some((iss: any) => iss.materialId === materialId)
+      );
+    }
+
+    const matAgg: Record<string, any> = {};
+
+    const jobRows = filteredJobs.map((job: any) => {
+      const lines = job.materialIssues.map((issue: any) => {
+        const retUsed = issue.returns.reduce((s: number, r: any) => s + (r.quantityUsed || 0), 0);
+        const retGood = issue.returns.reduce((s: number, r: any) => s + (r.quantityGood || 0), 0);
+        const retDamaged = issue.returns.reduce((s: number, r: any) => s + (r.quantityDamaged || 0), 0);
+        const hasReturn = issue.returns.length > 0;
+        const usedQty = hasReturn ? retUsed : Math.max(0, issue.quantity - retGood);
+        const lineCost = usedQty * (issue.unitCost || 0);
+
+        const mid = issue.materialId;
+        if (!matAgg[mid]) {
+          matAgg[mid] = {
+            materialId: mid,
+            sku: issue.material?.sku || "",
+            name: issue.material?.name || "Unknown",
+            unit: issue.material?.unit || "",
+            issued: 0,
+            used: 0,
+            returnedGood: 0,
+            damaged: 0,
+            cost: 0,
+            jobIds: new Set(),
+          };
+        }
+        matAgg[mid].issued += issue.quantity || 0;
+        matAgg[mid].used += usedQty;
+        matAgg[mid].returnedGood += retGood;
+        matAgg[mid].damaged += retDamaged;
+        matAgg[mid].cost += lineCost;
+        matAgg[mid].jobIds.add(job.id);
+
+        return {
+          issueId: issue.id,
+          materialId: mid,
+          sku: issue.material?.sku || "",
+          name: issue.material?.name || "Unknown",
+          unit: issue.material?.unit || "",
+          issued: issue.quantity || 0,
+          used: usedQty,
+          returnedGood: retGood,
+          damaged: retDamaged,
+          unitCost: issue.unitCost || 0,
+          lineCost,
+          hasReturn,
+          issuedAt: issue.issuedAt,
+        };
+      });
+
+      const totals = lines.reduce(
+        (acc: any, l: any) => {
+          acc.issued += l.issued;
+          acc.used += l.used;
+          acc.returnedGood += l.returnedGood;
+          acc.damaged += l.damaged;
+          acc.cost += l.lineCost;
+          return acc;
+        },
+        { issued: 0, used: 0, returnedGood: 0, damaged: 0, cost: 0 }
+      );
+
+      return {
+        id: job.id,
+        jobCode: job.jobCode,
+        jobTitle: job.jobTitle,
+        clientName: job.clientName,
+        clientPhone: job.clientPhone,
+        jobDate: job.jobDate,
+        status: job.status,
+        driverName: job.driverName,
+        vehicleNumber: job.vehicleNumber,
+        fromAddress: job.jobAddress,
+        toAddress: job.dropoffAddress,
+        materials: lines,
+        totals,
+        hasPhysicalReport: (job.materialReturns || []).some((r: any) => !!r.physicalReportUrl),
+      };
+    });
+
+    const materialsSummary = Object.values(matAgg)
+      .map((m: any) => ({
+        materialId: m.materialId,
+        sku: m.sku,
+        name: m.name,
+        unit: m.unit,
+        issued: m.issued,
+        used: m.used,
+        returnedGood: m.returnedGood,
+        damaged: m.damaged,
+        cost: m.cost,
+        jobCount: m.jobIds.size,
+      }))
+      .sort((a: any, b: any) => b.cost - a.cost);
+
+    const summary = {
+      jobCount: jobRows.length,
+      completed: jobRows.filter((j: any) => j.status === "COMPLETED" || j.status === "CLOSED").length,
+      inProgress: jobRows.filter((j: any) => j.status === "IN_PROGRESS").length,
+      scheduled: jobRows.filter((j: any) => j.status === "SCHEDULED" || j.status === "PLANNED" || j.status === "DISPATCHED").length,
+      cancelled: jobRows.filter((j: any) => j.status === "CANCELLED").length,
+      withMaterials: jobRows.filter((j: any) => j.materials.length > 0).length,
+      totalIssued: jobRows.reduce((s: number, j: any) => s + j.totals.issued, 0),
+      totalUsed: jobRows.reduce((s: number, j: any) => s + j.totals.used, 0),
+      totalReturned: jobRows.reduce((s: number, j: any) => s + j.totals.returnedGood, 0),
+      totalDamaged: jobRows.reduce((s: number, j: any) => s + j.totals.damaged, 0),
+      totalCost: jobRows.reduce((s: number, j: any) => s + j.totals.cost, 0),
+      materialTypes: materialsSummary.length,
+    };
+
+    res.json({
+      filters: {
+        startDate: startDate || null,
+        endDate: endDate || null,
+        status: status || "all",
+        search: search || null,
+        materialId: materialId || null,
+      },
+      summary,
+      jobs: jobRows,
+      materialsSummary,
+    });
+  } catch (error) {
+    console.error("Error generating full jobs report:", error);
+    res.status(500).json({ error: "Failed to generate full jobs report." });
+  }
+});
+
+/**
  * GET /api/moving-jobs/:jobId
  * Fetch a specific moving job with all related data
  */

@@ -133,13 +133,22 @@ export const MovingJobs: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Moving Jobs</h1>
           <p className="text-sm text-gray-500">Manage your moving operations</p>
         </div>
-        <button
-          onClick={() => setCreateModalOpen(true)}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm min-h-[44px] w-full sm:w-auto justify-center"
-        >
-          <PlusIcon className="h-5 w-5 mr-1.5" />
-          New Job
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => navigate('/jobs-report')}
+            className="inline-flex items-center px-4 py-2 bg-white text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm min-h-[44px] w-full sm:w-auto justify-center"
+          >
+            Full Report
+          </button>
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm min-h-[44px] w-full sm:w-auto justify-center"
+          >
+            <PlusIcon className="h-5 w-5 mr-1.5" />
+            New Job
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
